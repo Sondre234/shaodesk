@@ -377,6 +377,11 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(tiling_open_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME maximized_tile_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/maximized_tile_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>
+            ${EXAMPLE_CONFIG})
+        set_tests_properties(maximized_tile_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME screenshot_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/screenshot_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>

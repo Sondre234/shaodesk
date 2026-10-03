@@ -390,7 +390,11 @@ space back to its neighbour.
   it; one floated with Super + V stays floating. A tile dropped on a monitor that does not
   tile floats there.
 - Dialogs and fixed-size windows float. Super + V (`toggle_floating`) floats
-  or tiles the focused window; snapping or maximizing a tile also floats it.
+  or tiles the focused window; snapping or maximizing a tile also floats it. A window
+  opening into the tiling of a workspace brings the windows maximized there back into the
+  tiling instead of covering them, as it does fullscreen ones, and turning tiling on brings
+  back every window that floated only because it was snapped or maximized
+  (`tests/maximized_tile_smoke.py`).
 - Turning tiling off returns every window of that monitor to its floating position and
   size. A window
   now tiled on another monitor keeps its size and its place relative to that monitor,
