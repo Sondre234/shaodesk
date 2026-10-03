@@ -613,6 +613,9 @@ void server_cursor_motion_absolute(struct wl_listener *listener, void *data);
 void server_cursor_button(struct wl_listener *listener, void *data);
 void server_cursor_axis(struct wl_listener *listener, void *data);
 void server_cursor_frame(struct wl_listener *listener, void *data);
+void seat_request_cursor(struct wl_listener *listener, void *data);
+void set_default_cursor(struct sh_server *server);
+void seat_pointer_focus_change(struct wl_listener *listener, void *data);
 
 /* effects.c */
 void update_dim(struct sh_toplevel *toplevel);
@@ -697,9 +700,6 @@ void configure_pointer(struct sh_server *server, struct wlr_input_device *device
 void server_new_input(struct wl_listener *listener, void *data);
 void server_new_virtual_keyboard(struct wl_listener *listener, void *data);
 void server_new_virtual_pointer(struct wl_listener *listener, void *data);
-void seat_request_cursor(struct wl_listener *listener, void *data);
-void set_default_cursor(struct sh_server *server);
-void seat_pointer_focus_change(struct wl_listener *listener, void *data);
 void seat_request_set_selection(struct wl_listener *listener, void *data);
 void seat_request_set_primary_selection(struct wl_listener *listener, void *data);
 void seat_request_start_drag(struct wl_listener *listener, void *data);

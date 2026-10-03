@@ -231,32 +231,6 @@ void server_new_virtual_pointer(struct wl_listener *listener, void *data) {
         wlr_cursor_map_input_to_output(server->cursor, device, event->suggested_output);
 }
 
-void seat_request_cursor(struct wl_listener *listener, void *data) {
-    struct sh_server *server = wl_container_of(listener, server, request_cursor);
-
-    struct wlr_seat_pointer_request_set_cursor_event *event = data;
-    struct wlr_seat_client *focused_client = server->seat->pointer_state.focused_client;
-
-    if (focused_client == event->seat_client) {
-        server->shape_edges = 0;
-        server->shown_edges = 0;
-        wlr_cursor_set_surface(server->cursor, event->surface, event->hotspot_x, event->hotspot_y);
-    }
-}
-
-void set_default_cursor(struct sh_server *server) {
-    server->shape_edges = 0;
-    server->shown_edges = 0;
-    wlr_cursor_set_xcursor(server->cursor, server->cursor_mgr, "default");
-}
-
-void seat_pointer_focus_change(struct wl_listener *listener, void *data) {
-    struct sh_server *server = wl_container_of(listener, server, pointer_focus_change);
-    struct wlr_seat_pointer_focus_change_event *event = data;
-    if (!event->new_surface)
-        set_default_cursor(server);
-}
-
 void seat_request_set_selection(struct wl_listener *listener, void *data) {
     struct sh_server *server = wl_container_of(listener, server, request_set_selection);
     struct wlr_seat_request_set_selection_event *event = data;
