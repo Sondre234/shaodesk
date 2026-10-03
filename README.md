@@ -541,6 +541,3 @@ version 3 or (at your option) any later version. See [LICENSE](LICENSE).
 The compositor adapter derives from TinyWL. Its upstream MIT license is
 preserved in [vendor/tinywl/LICENSE](vendor/tinywl/LICENSE). The protocol
 files in `protocols/` keep the licenses stated in each file.
-
-
-
