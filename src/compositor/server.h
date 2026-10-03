@@ -587,6 +587,7 @@ void add_listener(struct wl_signal *signal, struct wl_listener *listener,
                   wl_notify_func_t notify);
 const struct sh_settings *server_settings(struct sh_server *server);
 struct wlr_output *first_output(struct sh_server *server);
+int output_slot(struct sh_server *server, const char *name);
 int *output_workspace(struct sh_server *server, const char *name);
 bool toplevel_visible(struct sh_toplevel *toplevel);
 struct wlr_output *focused_output(struct sh_server *server);
@@ -639,23 +640,10 @@ void refresh_frame(struct sh_toplevel *toplevel);
 void forget_decoration(struct sh_toplevel *toplevel);
 bool output_named(const struct sh_output *output, const char *name);
 void output_description(const struct wlr_output *output, char *text, size_t size);
+bool output_key_matches(const char *key, const struct wlr_output *output);
+const struct sh_monitor *monitor_settings(const struct sh_settings *settings,
+                                          const struct wlr_output *output);
 struct wlr_output *find_output(struct sh_server *server, const char *name);
-struct wlr_output *tiled_output(struct sh_toplevel *toplevel);
-enum sh_tile_layout toplevel_layout(struct sh_toplevel *toplevel);
-bool output_default_tiling(struct sh_server *server, struct wlr_output *output);
-bool output_tiles(struct sh_server *server, struct wlr_output *output);
-bool tiles_for(struct sh_toplevel *toplevel, struct wlr_output *output);
-struct wlr_output *home_output(struct sh_toplevel *toplevel);
-bool wants_tiling(struct sh_toplevel *toplevel, struct wlr_output *output);
-bool toplevel_is_dialog(struct sh_toplevel *toplevel);
-void tile_toplevel_at(struct sh_toplevel *toplevel, struct wlr_output *output,
-                      struct sh_toplevel *target, bool has_point, double x, double y);
-void tile_toplevel(struct sh_toplevel *toplevel, struct wlr_output *output,
-                   struct sh_toplevel *target, bool at_cursor);
-void untile_toplevel(struct sh_toplevel *toplevel, bool restore);
-void set_output_tiling(struct sh_server *server, struct wlr_output *output, bool enabled);
-void move_tile(struct sh_toplevel *toplevel, struct sh_toplevel *neighbour,
-               struct wlr_output *output, bool horizontal, int sign);
 
 /* control.c */
 void notify_subscribers(struct sh_server *server);
@@ -708,6 +696,30 @@ int session_name_compare(const struct dirent **a, const struct dirent **b);
 int session_name_filter(const struct dirent *entry);
 bool session_claim(struct sh_server *server, struct sh_toplevel *toplevel,
                    struct sh_window_rule *rule, bool ruled);
+
+/* tiling.c */
+struct wlr_output *tiled_output(struct sh_toplevel *toplevel);
+enum sh_tile_layout toplevel_layout(struct sh_toplevel *toplevel);
+bool output_default_tiling(struct sh_server *server, struct wlr_output *output);
+bool workspace_tiles(struct sh_server *server, struct wlr_output *output, int workspace);
+bool output_tiles(struct sh_server *server, struct wlr_output *output);
+bool tiles_for(struct sh_toplevel *toplevel, struct wlr_output *output);
+struct wlr_output *home_output(struct sh_toplevel *toplevel);
+bool wants_tiling(struct sh_toplevel *toplevel, struct wlr_output *output);
+bool toplevel_is_dialog(struct sh_toplevel *toplevel);
+void tile_toplevel_at(struct sh_toplevel *toplevel, struct wlr_output *output,
+                      struct sh_toplevel *target, bool has_point, double x, double y);
+void tile_toplevel(struct sh_toplevel *toplevel, struct wlr_output *output,
+                   struct sh_toplevel *target, bool at_cursor);
+void untile_toplevel(struct sh_toplevel *toplevel, bool restore);
+void rehome_tiles(struct sh_server *server);
+void set_tiling(struct sh_server *server, struct wlr_output *output, bool enabled);
+void set_output_tiling(struct sh_server *server, struct wlr_output *output, bool enabled);
+void move_tile(struct sh_toplevel *toplevel, struct sh_toplevel *neighbour,
+               struct wlr_output *output, bool horizontal, int sign);
+void configure_layouts(struct sh_server *server);
+void apply_output_layout(struct sh_server *server, const struct wlr_output *output);
+void reconfigure_tiling(struct sh_server *server);
 
 /* toplevel.c */
 struct wlr_surface *toplevel_surface(struct sh_toplevel *toplevel);
