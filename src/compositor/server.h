@@ -586,15 +586,6 @@ uint64_t now_ns(void);
 void add_listener(struct wl_signal *signal, struct wl_listener *listener,
                   wl_notify_func_t notify);
 const struct sh_settings *server_settings(struct sh_server *server);
-int output_slot(struct sh_server *server, const char *name);
-int *output_workspace(struct sh_server *server, const char *name);
-bool toplevel_visible(struct sh_toplevel *toplevel);
-void show_workspaces(struct sh_server *server);
-void set_active_output(struct sh_server *server, const char *name);
-void show_workspace(struct sh_server *server, const char *output, int workspace);
-struct wlr_output *focused_output(struct sh_server *server);
-void set_toplevel_output(struct sh_toplevel *toplevel, struct wlr_output *output);
-void follow_output(struct sh_toplevel *toplevel);
 void deactivate_toplevel(struct sh_server *server);
 void keyboard_enter(struct wlr_seat *seat, struct wlr_surface *surface);
 void focus_toplevel_raise(struct sh_toplevel *toplevel, bool raise);
@@ -610,11 +601,6 @@ void focus_top_on(struct sh_server *server, struct wlr_output *output);
 void focus_desktop(struct sh_server *server, struct wlr_output *output);
 void focus_layer(struct sh_layer *layer);
 struct sh_toplevel *current_toplevel(struct sh_server *server);
-void switch_workspace(struct sh_server *server, struct wlr_output *output, int workspace);
-void set_sticky(struct sh_toplevel *toplevel, bool sticky, bool retile);
-void move_toplevel_to_workspace(struct sh_server *server, struct sh_toplevel *toplevel,
-                                int workspace);
-void move_to_workspace(struct sh_server *server, int workspace);
 struct sh_toplevel *toplevel_toward(struct sh_toplevel *from_toplevel, bool horizontal,
                                     int sign, bool tiles_only);
 void pointer_follow(struct sh_toplevel *toplevel);
@@ -885,6 +871,23 @@ void server_new_xdg_popup(struct wl_listener *listener, void *data);
 void minimize_toplevel(struct sh_toplevel *toplevel);
 struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *output);
 struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel);
+
+/* workspace.c */
+int output_slot(struct sh_server *server, const char *name);
+int *output_workspace(struct sh_server *server, const char *name);
+bool toplevel_visible(struct sh_toplevel *toplevel);
+void show_workspaces(struct sh_server *server);
+void set_active_output(struct sh_server *server, const char *name);
+void show_workspace(struct sh_server *server, const char *output, int workspace);
+struct wlr_output *focused_output(struct sh_server *server);
+void set_toplevel_output(struct sh_toplevel *toplevel, struct wlr_output *output);
+void follow_output(struct sh_toplevel *toplevel);
+void set_toplevel_workspace(struct sh_toplevel *toplevel, int workspace);
+void switch_workspace(struct sh_server *server, struct wlr_output *output, int workspace);
+void set_sticky(struct sh_toplevel *toplevel, bool sticky, bool retile);
+void move_toplevel_to_workspace(struct sh_server *server, struct sh_toplevel *toplevel,
+                                int workspace);
+void move_to_workspace(struct sh_server *server, int workspace);
 
 /* xwayland.c */
 #if WLR_HAS_XWAYLAND
