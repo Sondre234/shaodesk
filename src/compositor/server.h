@@ -590,6 +590,9 @@ struct wlr_output *first_output(struct sh_server *server);
 int output_slot(struct sh_server *server, const char *name);
 int *output_workspace(struct sh_server *server, const char *name);
 bool toplevel_visible(struct sh_toplevel *toplevel);
+void show_workspaces(struct sh_server *server);
+void set_active_output(struct sh_server *server, const char *name);
+void show_workspace(struct sh_server *server, const char *output, int workspace);
 struct wlr_output *focused_output(struct sh_server *server);
 void set_toplevel_output(struct sh_toplevel *toplevel, struct wlr_output *output);
 void follow_output(struct sh_toplevel *toplevel);
@@ -610,6 +613,7 @@ struct sh_toplevel *toplevel_toward(struct sh_toplevel *from_toplevel, bool hori
                                     int sign, bool tiles_only);
 void pointer_follow(struct sh_toplevel *toplevel);
 bool groups_enabled(struct sh_server *server);
+void group_follow(struct sh_toplevel *toplevel);
 void group_show(struct sh_toplevel *toplevel);
 void group_detach(struct sh_toplevel *toplevel);
 bool groupable(struct sh_toplevel *toplevel);
@@ -666,6 +670,14 @@ void unpublish_toplevel(struct sh_toplevel *toplevel);
 /* layer_shell.c */
 void arrange_layers(struct sh_server *server);
 void server_new_layer_surface(struct wl_listener *listener, void *data);
+
+/* output_moves.c */
+void evacuate_output(struct sh_server *server, const char *name, struct wlr_box gone,
+                     bool keep_workspaces);
+void schedule_evacuation(struct sh_server *server, struct sh_output *output);
+void return_home_windows(struct sh_server *server);
+void move_workspace_to_output(struct sh_server *server, const char *target);
+void swap_output_workspaces(struct sh_server *server, const char *target);
 
 /* placement.c */
 struct sh_rect gap_area(const struct sh_settings *settings, struct sh_rect area,
