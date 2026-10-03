@@ -164,6 +164,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/output_moves.c
         src/compositor/overview.c
         src/compositor/placement.c
+        src/compositor/query.c
         src/compositor/scratchpad.c
         src/compositor/session.c
         src/compositor/swallow.c

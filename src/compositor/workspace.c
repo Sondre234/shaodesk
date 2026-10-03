@@ -249,3 +249,30 @@ void move_toplevel_to_workspace(struct sh_server *server, struct sh_toplevel *to
 void move_to_workspace(struct sh_server *server, int workspace) {
     move_toplevel_to_workspace(server, current_toplevel(server), workspace);
 }
+
+/* The workspaces of `output` that hold windows, as "1,3", or "-" for none. */
+void occupied_workspaces(struct sh_server *server, struct wlr_output *output, char *text,
+                         size_t size) {
+    unsigned used = 0;
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (toplevel->scratchpad && toplevel->minimized)
+            continue; // hidden in the scratchpad, on no workspace
+        if (!strcmp(toplevel->output, output->name) && toplevel->workspace < 32)
+            used |= 1u << toplevel->workspace;
+    }
+    size_t length = 0;
+    text[0] = '\0';
+    for (int i = 0; i < 32 && length < size; ++i) {
+        if (used & 1u << i)
+            length += snprintf(text + length, size - length, "%s%d", length ? "," : "", i + 1);
+    }
+    if (!used)
+        snprintf(text, size, "-");
+}
+
+/* The focused output's workspace, numbered from 1, or 1 without outputs. */
+int focused_workspace(struct sh_server *server) {
+    struct wlr_output *output = focused_output(server);
+    return output ? *output_workspace(server, output->name) + 1 : 1;
+}
