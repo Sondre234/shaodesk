@@ -45,8 +45,8 @@ Windows that leave decorations to the window manager (Wayland applications that 
 server-side decorations, such as kitty, and X11 applications such as Spotify) get no title
 bar. Instead, a strip of three flat buttons sits over their top-right corner (minimize,
 fullscreen, and close, from left to right) and appears when the pointer nears that corner, so
-it never covers text. Dragging the window's top edge (its top 6 pixels, as a title bar would)
-moves the window. Other windows, and windows that ask to draw their own frame, decorate
+it never covers text. Dragging the window's top edge (its top 6 pixels, as a title bar would;
+`windows.drag_strip` changes how many) moves the window. Other windows, and windows that ask to draw their own frame, decorate
 themselves.
 
 Dropping a dragged window with the pointer at the top edge of the screen, or on a panel along
