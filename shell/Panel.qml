@@ -1138,6 +1138,7 @@ Item {
 
     Rectangle {
         id: bar
+        objectName: "bar"
         anchors.left: parent.left; anchors.right: parent.right
         anchors.leftMargin: shell.panelMarginLeft; anchors.rightMargin: shell.panelMarginRight
         anchors.bottom: root.onTop ? undefined : parent.bottom
@@ -1159,6 +1160,21 @@ Item {
             anchors.fill: parent
             acceptedButtons: Qt.RightButton
             onPressed: (mouse) => root.openContextMenu(bar, mouse.x, -1)
+        }
+        // Scrolling the bar anywhere its widgets leave the wheel alone pages through this
+        // output's workspaces: a wheel notch (or a touchpad's worth of travel) moves one,
+        // stopping at either end; down or right goes to the next.
+        WheelHandler {
+            property real travel: 0
+            onWheel: (event) => {
+                travel += event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x
+                var steps = travel > 0 ? Math.floor(travel / 120) : Math.ceil(travel / 120)
+                travel -= steps * 120
+                if (steps !== 0) {
+                    var target = workspaceIndicator.workspaceState.current - steps
+                    workspaceIndicator.show(Math.max(1, Math.min(shell.workspaceCount, target)))
+                }
+            }
         }
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
@@ -1369,7 +1385,8 @@ Item {
                 }
             }
             // This output's workspaces: the current one highlighted, a dot under those with
-            // windows. Scrolling pages through them; clicking a number switches to it.
+            // windows. Clicking a number switches to it; scrolling pages through them, as it does
+            // anywhere on the bar.
             Row {
                 id: workspaceIndicator
                 objectName: "workspaceIndicator"
@@ -1430,20 +1447,6 @@ Item {
                                 width: 4; height: 4; radius: 2
                                 color: workspaceButton.current ? shell.accent : shell.textColor
                             }
-                        }
-                    }
-                }
-                // A wheel notch (or a touchpad's worth of travel) moves one workspace, stopping
-                // at either end; down or right goes to the next.
-                WheelHandler {
-                    property real travel: 0
-                    onWheel: (event) => {
-                        travel += event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x
-                        var steps = travel > 0 ? Math.floor(travel / 120) : Math.ceil(travel / 120)
-                        travel -= steps * 120
-                        if (steps !== 0) {
-                            var target = workspaceIndicator.workspaceState.current - steps
-                            workspaceIndicator.show(Math.max(1, Math.min(shell.workspaceCount, target)))
                         }
                     }
                 }
