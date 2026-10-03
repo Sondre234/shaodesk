@@ -17,7 +17,6 @@ _Static_assert((unsigned)SH_EDGE_TOP == (unsigned)WLR_EDGE_TOP &&
 static struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel);
 static void swallow_release(struct sh_toplevel *child);
 static void center_scratchpad(struct sh_toplevel *toplevel, struct wlr_output *output);
-static void reload_config(struct sh_server *server);
 /* END FORWARD */
 
 uint64_t now_ns(void) {
@@ -356,7 +355,7 @@ static struct sh_toplevel *oldest_urgent(struct sh_server *server) {
     return oldest;
 }
 
-static void focus_urgent(struct sh_server *server) {
+void focus_urgent(struct sh_server *server) {
     if (server->locked)
         return;
     struct sh_toplevel *toplevel = oldest_urgent(server);
@@ -400,7 +399,7 @@ void focus_previous(struct sh_server *server) {
 
 /* Focuses the window focused before the current one, wherever it is (its output switches to
  * its workspace). Windows hidden in the scratchpad or minimized are not in the history. */
-static void focus_last(struct sh_server *server) {
+void focus_last(struct sh_server *server) {
     if (server->locked)
         return;
     struct sh_toplevel *toplevel;
@@ -636,7 +635,7 @@ static void move_toplevel_to_workspace(struct sh_server *server, struct sh_tople
     }
 }
 
-static void move_to_workspace(struct sh_server *server, int workspace) {
+void move_to_workspace(struct sh_server *server, int workspace) {
     move_toplevel_to_workspace(server, current_toplevel(server), workspace);
 }
 
@@ -704,7 +703,7 @@ void pointer_follow(struct sh_toplevel *toplevel) {
  * the focused output. With none there, it moves to the next output that way, as sway does, so
  * an empty output can be reached from the keyboard: its topmost window, else its bare desktop
  * with the pointer at its centre, where new windows open. */
-static void focus_direction(struct sh_server *server, enum sh_action action) {
+void focus_direction(struct sh_server *server, enum sh_action action) {
     if (server->locked)
         return;
     struct wlr_output *output = focused_output(server);
@@ -955,7 +954,7 @@ void group_join(struct sh_toplevel *toplevel, unsigned group) {
 
 /* The focused window becomes a group of one, so windows opening next join it, or, in a group,
  * the whole group dissolves: hidden members return to tiles beside the shown one. */
-static void group_toggle(struct sh_server *server, struct sh_toplevel *current) {
+void group_toggle(struct sh_server *server, struct sh_toplevel *current) {
     if (!current)
         return;
     if (!current->group) {
@@ -991,7 +990,7 @@ static void group_toggle(struct sh_server *server, struct sh_toplevel *current) 
     notify_subscribers(server);
 }
 
-static void group_cycle(struct sh_server *server, struct sh_toplevel *current, int step) {
+void group_cycle(struct sh_server *server, struct sh_toplevel *current, int step) {
     if (!current || !current->group)
         return;
     struct sh_toplevel *next = group_step(current, step);
@@ -1001,7 +1000,7 @@ static void group_cycle(struct sh_server *server, struct sh_toplevel *current, i
 }
 
 /* Takes the focused window out of its group into a slot of its own beside it. */
-static void ungroup(struct sh_server *server, struct sh_toplevel *current) {
+void ungroup(struct sh_server *server, struct sh_toplevel *current) {
     if (!current || !current->group)
         return;
     struct sh_toplevel *heir = current->group_hidden ? NULL : group_step(current, 1);
@@ -1025,7 +1024,7 @@ static void ungroup(struct sh_server *server, struct sh_toplevel *current) {
 
 /* Moves the focused window into the group of the window beside it, that way: it becomes the
  * shown tab in that window's slot. */
-static void group_merge(struct sh_server *server, enum sh_action action) {
+void group_merge(struct sh_server *server, enum sh_action action) {
     struct sh_toplevel *current = server->focused_toplevel;
     if (server->locked || !groupable(current))
         return;
@@ -1223,7 +1222,7 @@ void swallow_end(struct sh_toplevel *toplevel) {
 /* swallow_toggle: the focused window gives its terminal a place again, or, when it has none
  * swallowed, takes the place of the terminal it was started from (else of the terminal that
  * was focused last on its workspace). */
-static void swallow_toggle(struct sh_server *server, struct sh_toplevel *current) {
+void swallow_toggle(struct sh_server *server, struct sh_toplevel *current) {
     if (!current || server->locked || !toplevel_mapped(current) || !toplevel_visible(current))
         return;
     if (current->swallow_peer) {
@@ -1306,8 +1305,8 @@ void switcher_close(struct sh_server *server, int index) {
 
 /* Opens the switcher on the focused output, selecting the window focused before the current
  * one (or the least recent one, going `backward`); when open, moves the selection instead. */
-static void switcher_open(struct sh_server *server, bool backward, uint32_t modifiers,
-                          xkb_keysym_t key) {
+void switcher_open(struct sh_server *server, bool backward, uint32_t modifiers,
+                   xkb_keysym_t key) {
     if (server->switcher.open) {
         switcher_select(server, server->switcher.selected + (backward ? -1 : 1));
         return;
@@ -1363,7 +1362,7 @@ void switcher_forget(struct sh_toplevel *toplevel) {
 
 /* Keys while the switcher is open: the opening key (with Shift, backward), Tab, and the arrows
  * move the selection, Return confirms, Escape cancels. It keeps every key from the windows. */
-static void switcher_key(struct sh_server *server, uint32_t modifiers, xkb_keysym_t sym) {
+void switcher_key(struct sh_server *server, uint32_t modifiers, xkb_keysym_t sym) {
     switch (sym) {
     case XKB_KEY_Escape:
         switcher_close(server, -1);
@@ -1871,7 +1870,7 @@ static void overview_lower_fullscreen(struct sh_server *server, bool lower) {
     }
 }
 
-static void overview_open(struct sh_server *server) {
+void overview_open(struct sh_server *server) {
     struct sh_overview *overview = &server->overview;
     const struct sh_settings *settings = server_settings(server);
     if (!settings->overview) {
@@ -1947,7 +1946,7 @@ static void overview_open(struct sh_server *server) {
 
 /* Closes the overview, focusing `chosen` if any; else, with `workspace` not below 0, showing
  * that workspace on the overview's output. The thumbnails glide back to the windows. */
-static void overview_close(struct sh_server *server, struct sh_toplevel *chosen, int workspace) {
+void overview_close(struct sh_server *server, struct sh_toplevel *chosen, int workspace) {
     struct sh_overview *overview = &server->overview;
     if (!overview->open)
         return;
@@ -2005,7 +2004,7 @@ void overview_dismiss(struct sh_server *server) {
         overview_hide(server);
 }
 
-static void overview_confirm(struct sh_server *server, int index) {
+void overview_confirm(struct sh_server *server, int index) {
     struct sh_overview *overview = &server->overview;
     if (!overview->open)
         return;
@@ -2067,7 +2066,7 @@ static int overview_strip_at(struct sh_overview *overview, double x, double y) {
 
 /* Keys while the overview is open. Text goes to the filter; the rest is navigation. Every key
  * is kept from the windows. */
-static void overview_key(struct sh_server *server, uint32_t modifiers, xkb_keysym_t sym) {
+void overview_key(struct sh_server *server, uint32_t modifiers, xkb_keysym_t sym) {
     struct sh_overview *overview = &server->overview;
     bool control = modifiers & WLR_MODIFIER_CTRL;
     int selected = overview->selected;
@@ -2297,7 +2296,7 @@ bool overview_axis(struct sh_server *server, const struct wlr_pointer_axis_event
  * scratchpad_show brings one to the middle of the focused output's current workspace, where it
  * stays in the scratchpad (and hides again on the next scratchpad_show) until it is moved to a
  * workspace or tiled. */
-static bool scratchpad_enabled(struct sh_server *server) {
+bool scratchpad_enabled(struct sh_server *server) {
     if (server_settings(server)->scratchpad)
         return true;
     if (!server->scratchpad_off_logged)
@@ -2346,7 +2345,7 @@ void hide_in_scratchpad(struct sh_toplevel *toplevel) {
 
 /* Hides the focused scratchpad window; else focuses one shown on the focused output; else
  * shows the hidden one put there longest ago, or failing that takes one shown elsewhere. */
-static void scratchpad_show(struct sh_server *server) {
+void scratchpad_show(struct sh_server *server) {
     struct sh_toplevel *focused = server->focused_toplevel;
     if (focused && focused->scratchpad) {
         hide_in_scratchpad(focused);
@@ -2393,472 +2392,6 @@ static void empty_scratchpad(struct sh_server *server) {
     }
 }
 
-/* Hands the output under the pointer or the focused window's box to the configuration side, which
- * runs grim in the background. */
-bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, char *error,
-                     size_t error_size) {
-    const char *output_name = NULL;
-    struct sh_rect box = {0};
-    if (mode == SH_SCREENSHOT_OUTPUT) {
-        struct wlr_output *output = wlr_output_layout_output_at(
-            server->output_layout, server->cursor->x, server->cursor->y);
-        if (!output) {
-            snprintf(error, error_size, "no output under the pointer");
-            return false;
-        }
-        output_name = output->name;
-    } else if (mode == SH_SCREENSHOT_WINDOW) {
-        struct sh_toplevel *current = current_toplevel(server);
-        if (!current) {
-            snprintf(error, error_size, "no focused window");
-            return false;
-        }
-        struct wlr_box geometry = toplevel_box(current);
-        box = (struct sh_rect){geometry.x, geometry.y, geometry.width, geometry.height};
-    }
-    return server->callbacks->screenshot(server->callbacks->userdata, mode, output_name, &box,
-                                         error, error_size);
-}
-
-/* The tiling layout actions, on the focused output's current workspace. */
-static void layout_action(struct sh_server *server, enum sh_action action) {
-    struct wlr_output *output = focused_output(server);
-    if (!output || server->locked)
-        return;
-    const char *name = output->name;
-    int workspace = *output_workspace(server, name);
-    struct sh_toplevel *current = current_toplevel(server);
-    if (current && (!current->tiled || tiled_output(current) != output ||
-                    current->workspace != workspace))
-        current = NULL;
-    bool changed = true;
-    // The master keys resize the focused column in the scrolling layout.
-    if (sh_tiling_layout(server->tiling, name, workspace) == SH_LAYOUT_SCROLL) {
-        if (action == SH_MASTER_GROW)
-            action = SH_COLUMN_WIDEN;
-        else if (action == SH_MASTER_SHRINK)
-            action = SH_COLUMN_NARROW;
-    }
-    switch (action) {
-    case SH_LAYOUT_NEXT:
-    case SH_LAYOUT_PREV:
-        sh_tiling_cycle_layout(server->tiling, name, workspace, action == SH_LAYOUT_NEXT ? 1 : -1);
-        break;
-    case SH_SET_LAYOUT_DWINDLE:
-    case SH_SET_LAYOUT_MASTER:
-    case SH_SET_LAYOUT_SPIRAL:
-    case SH_SET_LAYOUT_MONOCLE:
-    case SH_SET_LAYOUT_SCROLL:
-        sh_tiling_set_layout(server->tiling, name, workspace,
-                             (enum sh_tile_layout)(action - SH_SET_LAYOUT_DWINDLE));
-        break;
-    case SH_PROMOTE: {
-        void *master = sh_tiling_master(server->tiling, name, workspace);
-        if (current && master == current)
-            master = sh_tiling_neighbour(server->tiling, current, 1);
-        changed = current && master && sh_tiling_swap(server->tiling, current, master);
-        break;
-    }
-    case SH_SWAP_NEXT:
-    case SH_SWAP_PREV: {
-        void *other = current ? sh_tiling_neighbour(server->tiling, current,
-                                                     action == SH_SWAP_NEXT ? 1 : -1)
-                              : NULL;
-        changed = other && sh_tiling_swap(server->tiling, current, other);
-        break;
-    }
-    case SH_FOCUS_NEXT:
-    case SH_FOCUS_PREV: {
-        struct sh_toplevel *other = current ? sh_tiling_neighbour(server->tiling, current,
-                                                                  action == SH_FOCUS_NEXT ? 1 : -1)
-                                            : NULL;
-        if (other) {
-            focus_toplevel(other);
-            pointer_follow(other);
-        }
-        return;
-    }
-    case SH_MASTER_GROW:
-    case SH_MASTER_SHRINK:
-        changed = sh_tiling_adjust(server->tiling, name, workspace,
-                                   action == SH_MASTER_GROW ? 0.05 : -0.05, 0);
-        break;
-    case SH_MASTER_MORE:
-    case SH_MASTER_LESS:
-        changed = sh_tiling_adjust(server->tiling, name, workspace, 0,
-                                   action == SH_MASTER_MORE ? 1 : -1);
-        break;
-    case SH_SCROLL_LEFT:
-    case SH_SCROLL_RIGHT: {
-        struct sh_toplevel *other = current ? sh_tiling_scroll_step(server->tiling, current,
-                                                                    action == SH_SCROLL_RIGHT ? 1 : -1, 0)
-                                            : NULL;
-        if (other) {
-            focus_toplevel(other);
-            pointer_follow(other);
-        }
-        return;
-    }
-    case SH_COLUMN_WIDEN:
-    case SH_COLUMN_NARROW:
-    case SH_COLUMN_CYCLE_WIDTH:
-    case SH_CONSUME_LEFT:
-    case SH_CONSUME_RIGHT:
-    case SH_EXPEL:
-    case SH_CENTER_COLUMN:
-        changed = current && sh_tiling_scroll_action(server->tiling, current, action);
-        break;
-    default:
-        return;
-    }
-    if (!changed)
-        return;
-    if (current)
-        sh_tiling_set_focus(server->tiling, current); // a new layout finds the view to move
-    reflow_output(server, output);
-    // Monocle stacks the tiles: keep the focused one on top.
-    if (current)
-        focus_toplevel(current);
-}
-
-/* Shared by key bindings and the control socket. */
-void run_action(struct sh_server *server, enum sh_action action, int argument) {
-    int count = server_settings(server)->workspaces;
-    struct sh_toplevel *current = current_toplevel(server);
-    switch (action) {
-    case SH_NONE:
-    case SH_HANDLED:
-        break;
-    case SH_QUIT:
-        wl_display_terminate(server->wl_display);
-        break;
-    case SH_RELOAD:
-        reload_config(server);
-        break;
-    case SH_CYCLE: {
-        // Raise the least recently focused visible window.
-        struct sh_toplevel *toplevel;
-        wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
-            if (toplevel != current && toplevel_visible(toplevel)) {
-                focus_toplevel(toplevel);
-                break;
-            }
-        }
-        break;
-    }
-    case SH_FOCUS_LAST:
-        focus_last(server);
-        break;
-    case SH_FOCUS_URGENT:
-        focus_urgent(server);
-        break;
-    case SH_GROUP_TOGGLE:
-        if (groups_enabled(server))
-            group_toggle(server, current);
-        break;
-    case SH_GROUP_NEXT:
-    case SH_GROUP_PREV:
-        if (groups_enabled(server))
-            group_cycle(server, current, action == SH_GROUP_NEXT ? 1 : -1);
-        break;
-    case SH_UNGROUP:
-        if (groups_enabled(server))
-            ungroup(server, current);
-        break;
-    case SH_GROUP_MERGE_LEFT:
-    case SH_GROUP_MERGE_RIGHT:
-    case SH_GROUP_MERGE_UP:
-    case SH_GROUP_MERGE_DOWN:
-        if (groups_enabled(server))
-            group_merge(server, action);
-        break;
-    case SH_FULLSCREEN:
-        if (current)
-            set_fullscreen(current, !current->fullscreen);
-        break;
-    case SH_CLOSE:
-        if (current)
-            toplevel_close(current);
-        break;
-    case SH_WORKSPACE: {
-        struct wlr_output *output = focused_output(server);
-        int workspace = argument - 1;
-        // With back-and-forth, naming the workspace already shown returns to the previous one.
-        if (output && server_settings(server)->workspace_back_and_forth &&
-            workspace == *output_workspace(server, output->name))
-            workspace = server->output_workspaces[output_slot(server, output->name)].previous;
-        switch_workspace(server, output, workspace);
-        break;
-    }
-    case SH_WORKSPACE_BACK: {
-        struct wlr_output *output = focused_output(server);
-        if (output)
-            switch_workspace(server, output,
-                             server->output_workspaces[output_slot(server, output->name)].previous);
-        break;
-    }
-    case SH_MOVE_TO_WORKSPACE:
-        move_to_workspace(server, argument - 1);
-        break;
-    case SH_WORKSPACE_NEXT:
-    case SH_WORKSPACE_PREV: {
-        struct wlr_output *output = focused_output(server);
-        if (!output)
-            break;
-        int step = action == SH_WORKSPACE_NEXT ? 1 : count - 1;
-        switch_workspace(server, output, (*output_workspace(server, output->name) + step) % count);
-        break;
-    }
-    case SH_TOGGLE_TILING: {
-        struct wlr_output *output = focused_output(server);
-        set_tiling(server, output, !output_tiles(server, output));
-        break;
-    }
-    case SH_LAYOUT_NEXT:
-    case SH_LAYOUT_PREV:
-    case SH_SET_LAYOUT_DWINDLE:
-    case SH_SET_LAYOUT_MASTER:
-    case SH_SET_LAYOUT_SPIRAL:
-    case SH_SET_LAYOUT_MONOCLE:
-    case SH_SET_LAYOUT_SCROLL:
-    case SH_SCROLL_LEFT:
-    case SH_SCROLL_RIGHT:
-    case SH_COLUMN_WIDEN:
-    case SH_COLUMN_NARROW:
-    case SH_COLUMN_CYCLE_WIDTH:
-    case SH_CONSUME_LEFT:
-    case SH_CONSUME_RIGHT:
-    case SH_EXPEL:
-    case SH_CENTER_COLUMN:
-    case SH_PROMOTE:
-    case SH_FOCUS_NEXT:
-    case SH_FOCUS_PREV:
-    case SH_SWAP_NEXT:
-    case SH_SWAP_PREV:
-    case SH_MASTER_GROW:
-    case SH_MASTER_SHRINK:
-    case SH_MASTER_MORE:
-    case SH_MASTER_LESS:
-        layout_action(server, action);
-        break;
-    case SH_LAUNCHER:
-        request_launcher(server);
-        break;
-    case SH_PALETTE:
-        request_palette(server);
-        break;
-    case SH_FOCUS_LEFT:
-    case SH_FOCUS_RIGHT:
-    case SH_FOCUS_UP:
-    case SH_FOCUS_DOWN:
-        focus_direction(server, action);
-        break;
-    case SH_MOVE_LEFT:
-    case SH_MOVE_RIGHT:
-    case SH_MOVE_UP:
-    case SH_MOVE_DOWN:
-        move_window(server, action);
-        break;
-    case SH_MOVE_TO_SCRATCHPAD:
-        if (current && scratchpad_enabled(server))
-            hide_in_scratchpad(current);
-        break;
-    case SH_SCRATCHPAD_SHOW:
-        if (scratchpad_enabled(server))
-            scratchpad_show(server);
-        break;
-    case SH_RESIZE_LEFT:
-    case SH_RESIZE_RIGHT:
-    case SH_RESIZE_UP:
-    case SH_RESIZE_DOWN:
-        resize_window(server, action, argument);
-        break;
-    case SH_SCREENSHOT: {
-        char error[256] = "";
-        if (!take_screenshot(server, (enum sh_screenshot_mode)argument, error, sizeof(error)))
-            wlr_log(WLR_ERROR, "Screenshot not taken: %s", error);
-        break;
-    }
-    case SH_SWITCHER_NEXT:
-    case SH_SWITCHER_PREV:
-        switcher_open(server, action == SH_SWITCHER_PREV, 0, XKB_KEY_NoSymbol);
-        break;
-    case SH_SWITCHER_CONFIRM:
-        switcher_close(server, argument > 0 ? argument - 1 : server->switcher.selected);
-        break;
-    case SH_SWITCHER_CANCEL:
-        switcher_close(server, -1);
-        break;
-    case SH_OVERVIEW_TOGGLE:
-        if (server->overview.open)
-            overview_close(server, NULL, -1);
-        else
-            overview_open(server);
-        break;
-    case SH_OVERVIEW_CONFIRM:
-        overview_confirm(server, argument > 0 ? argument - 1 : server->overview.selected);
-        break;
-    case SH_OVERVIEW_CANCEL:
-        overview_close(server, NULL, -1);
-        break;
-    case SH_PEEK:
-    case SH_PEEK_TOGGLE:
-        set_peek(server, !server->peeking);
-        break;
-    case SH_NIGHT_LIGHT_TOGGLE:
-        server->night_mode = server->night_kelvin < SH_KELVIN_NEUTRAL ? SH_NIGHT_OFF : SH_NIGHT_ON;
-        night_light_update(server);
-        break;
-    case SH_NIGHT_LIGHT_ON:
-        server->night_mode = SH_NIGHT_ON;
-        night_light_update(server);
-        break;
-    case SH_NIGHT_LIGHT_OFF:
-        server->night_mode = SH_NIGHT_OFF;
-        night_light_update(server);
-        break;
-    case SH_NIGHT_LIGHT_AUTO:
-        server->night_mode = SH_NIGHT_AUTO;
-        night_light_update(server);
-        break;
-    case SH_ZOOM_IN:
-        zoom_by(server, 1);
-        break;
-    case SH_ZOOM_OUT:
-        zoom_by(server, -1);
-        break;
-    case SH_ZOOM_RESET:
-        zoom_by(server, 0);
-        break;
-    case SH_SWALLOW_TOGGLE:
-        swallow_toggle(server, current);
-        break;
-    case SH_MOVE_WORKSPACE_TO_OUTPUT:
-    case SH_SWAP_WORKSPACES: {
-        const char *target = server->callbacks->action_target
-                                 ? server->callbacks->action_target(server->callbacks->userdata)
-                                 : "";
-        if (action == SH_MOVE_WORKSPACE_TO_OUTPUT)
-            move_workspace_to_output(server, target);
-        else
-            swap_output_workspaces(server, target);
-        break;
-    }
-    case SH_DND_TOGGLE:
-        send_shell_line(server, "dnd toggle\n");
-        break;
-    case SH_DND_ON:
-        send_shell_line(server, "dnd on\n");
-        break;
-    case SH_DND_OFF:
-        send_shell_line(server, "dnd off\n");
-        break;
-    case SH_NOTIFICATION_HISTORY:
-        request_shell(server, "notifications");
-        break;
-    case SH_TOGGLE_STICKY:
-        if (current && server_settings(server)->sticky)
-            set_sticky(current, !current->sticky, true);
-        break;
-    case SH_TOGGLE_FLOATING:
-        if (current && current->sticky) {
-            current->sticky_floating = false; // it tiles once it is no longer sticky
-            set_sticky(current, false, true);
-        } else if (current && current->tiled) {
-            current->floating = true;
-            current->placed = false;
-            untile_toplevel(current, true);
-        } else if (current) {
-            current->floating = false;
-            current->scratchpad = false; // tiled, it leaves the scratchpad
-            if (wants_tiling(current, NULL))
-                tile_toplevel(current, NULL, NULL, true);
-        }
-        break;
-    default:
-        arrange_windows(server, action);
-        break;
-    }
-}
-
-#if WLR_HAS_SESSION
-// Returns the VT a key switches to, or 0. Ctrl+AltGr+Fn counts as Ctrl+Alt+Fn: some keyboards'
-// only Alt key is Right Alt, which AltGr layouts turn into Level3 instead of Alt.
-static unsigned vt_for_key(uint32_t modifiers, xkb_keysym_t sym) {
-    if (sym >= XKB_KEY_XF86Switch_VT_1 && sym <= XKB_KEY_XF86Switch_VT_12)
-        return sym - XKB_KEY_XF86Switch_VT_1 + 1;
-    if ((modifiers & WLR_MODIFIER_CTRL) && (modifiers & (WLR_MODIFIER_ALT | WLR_MODIFIER_MOD5)) &&
-        sym >= XKB_KEY_F1 && sym <= XKB_KEY_F12)
-        return sym - XKB_KEY_F1 + 1;
-    return 0;
-}
-#endif
-
-bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, uint32_t modifiers,
-                       xkb_keysym_t sym) {
-    struct sh_server *server = keyboard->server;
-#if WLR_HAS_SESSION
-    unsigned vt = vt_for_key(modifiers, sym);
-    if (server->session && vt) {
-        wlr_session_change_vt(server->session, vt);
-        return true;
-    }
-#endif
-    if (server->locked)
-        return false; // Every other key belongs to the lock screen.
-    if (server->switcher.open) {
-        switcher_key(server, modifiers, sym);
-        return true;
-    }
-    if (server->overview.open) {
-        // The overview's own bindings (toggling it again) work as bound; other keys are its.
-        int bound_argument = 0;
-        enum sh_action bound =
-            modifiers & (WLR_MODIFIER_CTRL | WLR_MODIFIER_ALT | WLR_MODIFIER_LOGO)
-                ? server->callbacks->key(server->callbacks->userdata, modifiers, sym,
-                                         &bound_argument)
-                : SH_NONE;
-        if (bound == SH_OVERVIEW_TOGGLE || bound == SH_OVERVIEW_CONFIRM ||
-            bound == SH_OVERVIEW_CANCEL)
-            run_action(server, bound, bound_argument);
-        else
-            overview_key(server, modifiers, sym);
-        return true;
-    }
-    int argument = 0;
-    enum sh_action action =
-        server->callbacks->key(server->callbacks->userdata, modifiers, sym, &argument);
-    if (action == SH_NONE)
-        return false;
-    if (action == SH_PEEK) {
-        // Held: the desktop shows until the key comes back up.
-        server->peek_keycode = keycode;
-        server->peek_keyboard = keyboard;
-        set_peek(server, true);
-        server->peek_keycode = keycode; // set_peek only forgets it when peeking ends
-        return true;
-    }
-    if (action == SH_SWITCHER_NEXT || action == SH_SWITCHER_PREV) {
-        // Held, the binding's modifiers keep it open. Shift may come and go to step backward.
-        uint32_t held =
-            WLR_MODIFIER_CTRL | WLR_MODIFIER_ALT | WLR_MODIFIER_LOGO | WLR_MODIFIER_MOD5;
-        switcher_open(server, action == SH_SWITCHER_PREV, modifiers & held,
-                      xkb_keysym_to_lower(sym));
-        return true;
-    }
-    run_action(server, action, argument);
-    int rate = keyboard->wlr_keyboard->repeat_info.rate;
-    if (action >= SH_RESIZE_LEFT && action <= SH_RESIZE_DOWN && rate > 0 &&
-        keyboard->repeat_timer) {
-        keyboard->repeat_keycode = keycode;
-        keyboard->repeat_action = action;
-        keyboard->repeat_argument = argument;
-        wl_event_source_timer_update(keyboard->repeat_timer,
-                                     keyboard->wlr_keyboard->repeat_info.delay);
-    }
-    return true;
-}
-
 static void configure_animations(struct sh_server *server) {
     const struct sh_settings *settings = server_settings(server);
     struct sh_animator_config config = {.enabled = settings->animations,
@@ -2868,7 +2401,7 @@ static void configure_animations(struct sh_server *server) {
     sh_animator_configure(server->animator, &config);
 }
 
-static void reload_config(struct sh_server *server) {
+void reload_config(struct sh_server *server) {
     if (!server->callbacks->reload(server->callbacks->userdata))
         return;
     struct sh_output *overridden;

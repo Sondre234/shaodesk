@@ -603,8 +603,10 @@ void focus_toplevel(struct sh_toplevel *toplevel);
 float urgent_pulse(struct sh_toplevel *toplevel, int64_t now);
 void set_urgent(struct sh_toplevel *toplevel, bool urgent);
 void activation_requested(struct sh_toplevel *toplevel);
+void focus_urgent(struct sh_server *server);
 bool hover_focuses(struct sh_server *server, struct sh_toplevel *toplevel);
 void focus_previous(struct sh_server *server);
+void focus_last(struct sh_server *server);
 void focus_desktop(struct sh_server *server, struct wlr_output *output);
 void focus_layer(struct sh_layer *layer);
 void minimize_toplevel(struct sh_toplevel *toplevel);
@@ -613,9 +615,11 @@ struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *o
 struct sh_toplevel *current_toplevel(struct sh_server *server);
 void switch_workspace(struct sh_server *server, struct wlr_output *output, int workspace);
 void set_sticky(struct sh_toplevel *toplevel, bool sticky, bool retile);
+void move_to_workspace(struct sh_server *server, int workspace);
 struct sh_toplevel *toplevel_toward(struct sh_toplevel *from_toplevel, bool horizontal,
                                     int sign, bool tiles_only);
 void pointer_follow(struct sh_toplevel *toplevel);
+void focus_direction(struct sh_server *server, enum sh_action action);
 bool groups_enabled(struct sh_server *server);
 int group_size(struct sh_server *server, unsigned group);
 int group_index(struct sh_toplevel *from);
@@ -624,24 +628,41 @@ void group_show(struct sh_toplevel *toplevel);
 void group_detach(struct sh_toplevel *toplevel);
 bool groupable(struct sh_toplevel *toplevel);
 void group_join(struct sh_toplevel *toplevel, unsigned group);
+void group_toggle(struct sh_server *server, struct sh_toplevel *current);
+void group_cycle(struct sh_server *server, struct sh_toplevel *current, int step);
+void ungroup(struct sh_server *server, struct sh_toplevel *current);
+void group_merge(struct sh_server *server, enum sh_action action);
 struct sh_toplevel *swallow_host(struct sh_toplevel *child, bool terminals_only);
 bool swallow_wanted(struct sh_toplevel *child);
 void swallow_attach(struct sh_toplevel *host, struct sh_toplevel *child);
 void swallow_end(struct sh_toplevel *toplevel);
+void swallow_toggle(struct sh_server *server, struct sh_toplevel *current);
 void switcher_close(struct sh_server *server, int index);
+void switcher_open(struct sh_server *server, bool backward, uint32_t modifiers,
+                   xkb_keysym_t key);
 void switcher_forget(struct sh_toplevel *toplevel);
+void switcher_key(struct sh_server *server, uint32_t modifiers, xkb_keysym_t sym);
 size_t overview_describe(struct sh_server *server, char *text, size_t size);
 void overview_select(struct sh_server *server, int index);
 void overview_touch(struct sh_server *server, bool relayout);
 void overview_forget(struct sh_toplevel *toplevel);
+void overview_open(struct sh_server *server);
+void overview_close(struct sh_server *server, struct sh_toplevel *chosen, int workspace);
 void overview_dismiss(struct sh_server *server);
+void overview_confirm(struct sh_server *server, int index);
 void overview_view(struct sh_server *server, int workspace);
 void overview_set_filter(struct sh_server *server, const char *text);
+void overview_key(struct sh_server *server, uint32_t modifiers, xkb_keysym_t sym);
 bool overview_button(struct sh_server *server, const struct wlr_pointer_button_event *event);
 bool overview_motion(struct sh_server *server);
 void overview_hot_corner(struct sh_server *server);
 bool overview_axis(struct sh_server *server, const struct wlr_pointer_axis_event *event);
+bool scratchpad_enabled(struct sh_server *server);
 void hide_in_scratchpad(struct sh_toplevel *toplevel);
+void scratchpad_show(struct sh_server *server);
+void reload_config(struct sh_server *server);
+
+/* actions.c */
 bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, char *error,
                      size_t error_size);
 void run_action(struct sh_server *server, enum sh_action action, int argument);
