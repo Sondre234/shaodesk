@@ -602,8 +602,12 @@ void focus_layer(struct sh_layer *layer);
 void minimize_toplevel(struct sh_toplevel *toplevel);
 struct sh_rect usable_area(struct sh_server *server, struct wlr_output *output);
 struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *output);
+struct sh_toplevel *current_toplevel(struct sh_server *server);
 void switch_workspace(struct sh_server *server, struct wlr_output *output, int workspace);
 void set_sticky(struct sh_toplevel *toplevel, bool sticky, bool retile);
+struct sh_toplevel *toplevel_toward(struct sh_toplevel *from_toplevel, bool horizontal,
+                                    int sign, bool tiles_only);
+void pointer_follow(struct sh_toplevel *toplevel);
 bool groups_enabled(struct sh_server *server);
 void group_show(struct sh_toplevel *toplevel);
 void group_detach(struct sh_toplevel *toplevel);
@@ -635,28 +639,23 @@ void refresh_frame(struct sh_toplevel *toplevel);
 void forget_decoration(struct sh_toplevel *toplevel);
 bool output_named(const struct sh_output *output, const char *name);
 void output_description(const struct wlr_output *output, char *text, size_t size);
-struct sh_rect gap_area(const struct sh_settings *settings, struct sh_rect area,
-                        enum sh_action action);
-struct sh_rect inside_border(struct sh_server *server, struct sh_rect rect);
-struct wlr_output *toplevel_output(struct sh_toplevel *toplevel);
-struct wlr_box rebase_box(struct sh_server *server, struct wlr_box box,
-                          struct wlr_output *output);
-void restore_toplevel(struct sh_toplevel *toplevel);
-void place_maximized(struct sh_toplevel *toplevel);
-void place_by_hand(struct sh_toplevel *toplevel, enum sh_action action);
-void reflow_output(struct sh_server *server, struct wlr_output *output);
 struct wlr_output *find_output(struct sh_server *server, const char *name);
 struct wlr_output *tiled_output(struct sh_toplevel *toplevel);
+enum sh_tile_layout toplevel_layout(struct sh_toplevel *toplevel);
 bool output_default_tiling(struct sh_server *server, struct wlr_output *output);
 bool output_tiles(struct sh_server *server, struct wlr_output *output);
+bool tiles_for(struct sh_toplevel *toplevel, struct wlr_output *output);
 struct wlr_output *home_output(struct sh_toplevel *toplevel);
 bool wants_tiling(struct sh_toplevel *toplevel, struct wlr_output *output);
 bool toplevel_is_dialog(struct sh_toplevel *toplevel);
+void tile_toplevel_at(struct sh_toplevel *toplevel, struct wlr_output *output,
+                      struct sh_toplevel *target, bool has_point, double x, double y);
 void tile_toplevel(struct sh_toplevel *toplevel, struct wlr_output *output,
                    struct sh_toplevel *target, bool at_cursor);
 void untile_toplevel(struct sh_toplevel *toplevel, bool restore);
 void set_output_tiling(struct sh_server *server, struct wlr_output *output, bool enabled);
-void unarrange_in_place(struct sh_toplevel *toplevel);
+void move_tile(struct sh_toplevel *toplevel, struct sh_toplevel *neighbour,
+               struct wlr_output *output, bool horizontal, int sign);
 
 /* control.c */
 void notify_subscribers(struct sh_server *server);
@@ -679,6 +678,24 @@ void unpublish_toplevel(struct sh_toplevel *toplevel);
 /* layer_shell.c */
 void arrange_layers(struct sh_server *server);
 void server_new_layer_surface(struct wl_listener *listener, void *data);
+
+/* placement.c */
+struct sh_rect gap_area(const struct sh_settings *settings, struct sh_rect area,
+                        enum sh_action action);
+bool frameless(struct sh_toplevel *toplevel, struct wlr_output *output);
+struct sh_rect inside_border(struct sh_server *server, struct sh_rect rect);
+struct wlr_output *toplevel_output(struct sh_toplevel *toplevel);
+struct wlr_box rebase_box(struct sh_server *server, struct wlr_box box,
+                          struct wlr_output *output);
+void restore_toplevel(struct sh_toplevel *toplevel);
+void place_maximized(struct sh_toplevel *toplevel);
+void place_by_hand(struct sh_toplevel *toplevel, enum sh_action action);
+void arrange_windows(struct sh_server *server, enum sh_action action);
+void reflow_output(struct sh_server *server, struct wlr_output *output);
+struct sh_rect floating_area(struct sh_server *server, struct wlr_output *output);
+void unarrange_in_place(struct sh_toplevel *toplevel);
+void move_window(struct sh_server *server, enum sh_action action);
+void resize_window(struct sh_server *server, enum sh_action action, int amount);
 
 /* session.c */
 pid_t toplevel_pid(struct sh_toplevel *toplevel);
