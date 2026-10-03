@@ -5,6 +5,10 @@ tagged release yet; everything below is on `main`.
 
 ## Unreleased (2026-10-03)
 
+- Fullscreen a program asks for itself, like a browser's fullscreen video, stays over the
+  panels when it loses focus, so a video on one monitor no longer shows the taskbar over it
+  while you work on another. Raising another window on the same monitor still lowers it
+  below that window and the panels.
 - The project is now called shaodesk everywhere, and nothing answers to the old `shaode`
   name: the executables are `shaodesk` and `shaodesk-shell` (`shaodesk msg`,
   `shaodesk import`), the configuration lives in `~/.config/shaodesk`, state in

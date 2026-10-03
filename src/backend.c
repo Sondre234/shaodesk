@@ -952,13 +952,28 @@ static void deactivate_toplevel(struct sh_server *server) {
     if (!server->focused_toplevel)
         return;
     struct sh_toplevel *old = server->focused_toplevel;
-    if (old->fullscreen)
+    // Fullscreen the client asked for stays over the panels, so a video keeps covering its
+    // output while another output has focus; raising a window over it lowers it.
+    if (old->fullscreen && !old->fullscreen_cover)
         wlr_scene_node_reparent(&old->scene_tree->node, server->windows);
     toplevel_set_activated(old, false);
     if (old->foreign)
         wlr_foreign_toplevel_handle_v1_set_activated(old->foreign, false);
     server->focused_toplevel = NULL;
     refresh_frame(old);
+}
+
+/* Puts the fullscreen windows covering the panels on `toplevel`'s output down among the
+ * others, so that it can come to the front over them. */
+static void lower_fullscreen_covers(struct sh_toplevel *toplevel) {
+    struct sh_server *server = toplevel->server;
+    struct wlr_output *output = toplevel_output(toplevel);
+    struct sh_toplevel *other;
+    wl_list_for_each(other, &server->toplevels, link) {
+        if (other != toplevel && other->fullscreen && other->fullscreen_cover &&
+            other->scene_tree && toplevel_output(other) == output)
+            wlr_scene_node_reparent(&other->scene_tree->node, server->windows);
+    }
 }
 
 /* Gives the window keyboard focus; `raise` also brings it to the front. */
@@ -1003,6 +1018,8 @@ static void focus_toplevel_raise(struct sh_toplevel *toplevel, bool raise) {
         tile_toplevel(toplevel, NULL, NULL, false);
     wlr_scene_node_set_enabled(&toplevel->scene_tree->node, true);
     // Panels stay reachable once a fullscreen window loses focus.
+    if (raise && !toplevel->fullscreen)
+        lower_fullscreen_covers(toplevel);
     if (raise || toplevel->fullscreen) {
         wlr_scene_node_reparent(&toplevel->scene_tree->node,
                                 toplevel->fullscreen ? fullscreen_tree(toplevel) : server->windows);
