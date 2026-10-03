@@ -3,6 +3,7 @@
 
 /* BEGIN FORWARD */
 static void set_fullscreen_focus(struct sh_toplevel *toplevel, bool fullscreen, bool focus);
+static void toplevel_request_minimize(struct wl_listener *listener, void *data);
 /* END FORWARD */
 
 /* Window operations shared by xdg-shell and XWayland toplevels. */
@@ -840,4 +841,10 @@ struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *o
 struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel) {
     return toplevel->fullscreen_cover ? toplevel->server->fullscreen_cover
                                       : toplevel->server->fullscreen;
+}
+
+static void toplevel_request_minimize(struct wl_listener *listener, void *data) {
+    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, request_minimize);
+    if (toplevel_mapped(toplevel))
+        minimize_toplevel(toplevel);
 }

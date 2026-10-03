@@ -653,7 +653,6 @@ void pointer_follow(struct sh_toplevel *toplevel);
 void focus_direction(struct sh_server *server, enum sh_action action);
 
 /* foreign_toplevel.c */
-void toplevel_request_minimize(struct wl_listener *listener, void *data);
 void toplevel_title_changed(struct wl_listener *listener, void *data);
 void toplevel_app_id_changed(struct wl_listener *listener, void *data);
 void server_new_capture_request(struct wl_listener *listener, void *data);

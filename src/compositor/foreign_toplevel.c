@@ -39,11 +39,6 @@ static void foreign_minimize(struct wl_listener *listener, void *data) {
     else
         focus_toplevel(toplevel);
 }
-void toplevel_request_minimize(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, request_minimize);
-    if (toplevel_mapped(toplevel))
-        minimize_toplevel(toplevel);
-}
 static void update_listed_state(struct sh_toplevel *toplevel) {
     if (!toplevel->listed)
         return;
