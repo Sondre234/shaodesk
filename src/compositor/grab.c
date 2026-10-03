@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* Moving and resizing windows with the pointer: the grab, the magnetic edges that catch a
+ * dragged window, and what dropping it does. */
 #include "server.h"
 
 static void magnet_hide_guides(struct sh_server *server) {

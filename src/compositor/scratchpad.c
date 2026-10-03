@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
-#include "server.h"
-
 /* Sway's scratchpad. A window put there floats and hides, listed in the taskbar as minimized.
  * scratchpad_show brings one to the middle of the focused output's current workspace, where it
  * stays in the scratchpad (and hides again on the next scratchpad_show) until it is moved to a
  * workspace or tiled. */
+#include "server.h"
+
 bool scratchpad_enabled(struct sh_server *server) {
     if (server_settings(server)->scratchpad)
         return true;

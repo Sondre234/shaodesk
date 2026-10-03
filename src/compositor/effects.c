@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* Effects: dimming of inactive windows, peeking at the desktop, night light, the magnifier,
+ * and hot corners. */
 #include "server.h"
 
 /* Asks every output for a frame, so that fades keep advancing while nothing else changes. */

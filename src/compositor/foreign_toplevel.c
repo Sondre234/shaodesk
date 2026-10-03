@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* Windows as other clients see them: wlr-foreign-toplevel handles for taskbars, and
+ * ext-foreign-toplevel handles with image capture sources for capturing a single window. */
 #include "server.h"
 
 static void foreign_activate(struct wl_listener *listener, void *data) {

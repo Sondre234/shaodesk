@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* Actions as key bindings, button bindings and the control socket name them: run_action hands
+ * each to the module that carries it out. Also screenshots. */
 #include "server.h"
 
 /* Hands the output under the pointer or the focused window's box to the configuration side, which

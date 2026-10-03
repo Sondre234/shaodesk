@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* Window groups (features.groups): windows that share one slot, shown one at a time and
+ * switched with a tab strip. */
 #include "server.h"
 
 /* Window groups. The member showing holds the group's slot (its tile, or its floating place);

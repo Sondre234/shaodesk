@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* The window switcher: a list of windows, most recently focused first, that the shell draws
+ * from the events sent here. */
 #include "server.h"
 
-/* The window switcher. Subscribers get "switcher OUTPUT SELECTED COUNT" followed by COUNT
+/* Subscribers get "switcher OUTPUT SELECTED COUNT" followed by COUNT
  * lines "switcher-window APP_ID\tTITLE\tOUTPUT\tWORKSPACE\tMINIMIZED\tURGENT" as it opens or its list
  * changes, "switcher-select N" as the selection moves (both counting from 0), and
  * "switcher-close" when it closes. */

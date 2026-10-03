@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* Windows changing outputs: an output's windows move to another when it goes away and return
+ * when it comes back, and workspaces move or swap between outputs. */
 #include "server.h"
 
 /* `box` moved from where it was on the output covering `from` to the same place relative to

@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
 /* Derived from wlroots TinyWL 0.20.2; see vendor/tinywl/LICENSE. */
+/* Server setup and teardown, configuration reload, signal handlers, and small helpers the
+ * other files share. */
 #include "server.h"
 
 _Static_assert((unsigned)SH_ALT == (unsigned)WLR_MODIFIER_ALT &&

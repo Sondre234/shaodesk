@@ -1,4 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* The glue between windows and the tiling layouts (src/tiling.cpp): which outputs and
+ * workspaces tile, windows joining and leaving the tiling, the layout actions, and the layout
+ * settings. */
 #include "server.h"
 
 struct wlr_output *tiled_output(struct sh_toplevel *toplevel) {

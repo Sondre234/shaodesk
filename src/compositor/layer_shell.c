@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* wlr-layer-shell surfaces (panels, launchers, wallpapers): their stacking and placement, the
+ * area they leave free for windows, and their keyboard focus. */
 #include "server.h"
 
 /* Reserve exclusive panel regions before positioning nonexclusive layers. */

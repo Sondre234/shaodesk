@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* Windows: what xdg-shell and XWayland toplevels share, xdg-shell toplevels and popups,
+ * opening new windows by the window rules, and maximize, fullscreen and minimize. */
 #include "server.h"
 
 /* BEGIN FORWARD */

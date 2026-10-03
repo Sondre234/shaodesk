@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* Workspaces: each output's current workspace and which windows show, switching with the
+ * slide, moving windows between workspaces, and sticky windows. */
 #include "server.h"
 
 /* The slot in output_workspaces of the output named `name`, which need not be connected: a

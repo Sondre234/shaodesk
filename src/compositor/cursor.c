@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* The pointer: what lies under it, focus on hover, the window controls, tab strips and resize
+ * bands it acts on, button bindings, scrolling, and the cursor image. */
 #include "server.h"
 
 /* BEGIN FORWARD */

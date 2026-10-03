@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* XWayland: X11 windows run through the shared toplevel code, and the XWM waker that works
+ * around stranded X events. */
 #include "server.h"
 
 #if WLR_HAS_XWAYLAND

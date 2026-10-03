@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* Keyboard focus: which window or panel has it, how it moves (back, by direction, to the
+ * desktop of an output), and urgent windows that ask for it. */
 #include "server.h"
 
 void deactivate_toplevel(struct sh_server *server) {

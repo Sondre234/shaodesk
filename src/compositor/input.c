@@ -1,4 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* Input devices: keyboards (keymaps, key presses matched against the bindings, and repeat),
+ * pointers and their libinput settings, virtual devices, and the seat's selection,
+ * drag-and-drop and pointer constraints. */
 #include "server.h"
 
 /* BEGIN FORWARD */

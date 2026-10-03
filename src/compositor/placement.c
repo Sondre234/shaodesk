@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* Window placement: the output a window belongs to, snapping, maximizing and the one-shot
+ * grid, reflowing arranged windows and tiles, and moving and resizing by keyboard. */
 #include "server.h"
 
 /* BEGIN FORWARD */

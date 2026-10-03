@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* Outputs: adding, configuring and laying out monitors from outputs.monitors and the
+ * wlr-output-management protocol, and committing each frame with zoom and night light. */
 #include "server.h"
 
 static void output_frame(struct wl_listener *listener, void *data) {

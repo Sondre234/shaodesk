@@ -1,4 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* The control socket (`shaodesk msg`): one request per connection, answered with "ok" and any
+ * output, or with "error: ...". Subscribers stay connected and get the state after each change,
+ * and events for the shell. */
 #include "server.h"
 
 /* Control socket: one newline-terminated request per connection, answered with

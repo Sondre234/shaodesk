@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
+/* ext-session-lock-v1 screen locking, and what keeps the machine awake: idle inhibitors, and a
+ * sleep inhibitor while this VT is in front. */
 #include "server.h"
 
 /* ext-session-lock-v1: an opaque cover hides the desktop from the moment a lock

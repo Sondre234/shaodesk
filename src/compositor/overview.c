@@ -1,6 +1,4 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
-#include "server.h"
-
 /* The overview (Expose). Opening it lays every window of the focused output's workspace out as
  * a live thumbnail in a grid, with a strip of the output's workspaces above. It is drawn by the
  * compositor from scaled copies of the windows' scene nodes (overview_scene.h), so the
@@ -8,6 +6,8 @@
  * draws the text (titles, the filter) over it from the events sent by overview_announce. The
  * overview takes the keyboard and the pointer while open and changes nothing until a window
  * is picked, a workspace chosen, or a thumbnail dropped on the strip. */
+#include "server.h"
+
 static void overview_colour(float out[4], float r, float g, float b, float a) {
     out[0] = r * a; // scene rectangles take premultiplied colours
     out[1] = g * a;

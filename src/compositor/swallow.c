@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
-#include "server.h"
-
 /* Window swallowing (windows.swallow). A window started from a terminal, which the process
  * ancestry shows, takes the terminal's slot and hides it; when the window closes, the terminal
  * takes the slot back. */
+#include "server.h"
+
 static bool swallow_listed(const char (*names)[64], int count, const char *name) {
     for (int i = 0; name && i < count; ++i) {
         if (!strcasecmp(names[i], name))
