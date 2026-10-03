@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
 #include "server.h"
 
-/* The current workspace of the output named `name`, which need not be connected. */
+/* The slot in output_workspaces of the output named `name`, which need not be connected: a
+ * free or forgotten one for a name not seen before. */
 int output_slot(struct sh_server *server, const char *name) {
     int count = sizeof(server->output_workspaces) / sizeof(server->output_workspaces[0]);
     int unused = -1, gone = -1;

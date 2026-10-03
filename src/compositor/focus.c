@@ -29,7 +29,6 @@ static void lower_fullscreen_covers(struct sh_toplevel *toplevel) {
     }
 }
 
-/* Gives the window keyboard focus; `raise` also brings it to the front. */
 /* Gives the surface keyboard focus even while the seat has no keyboard (headless, or before a
  * virtual keyboard connects), so the first keyboard to appear types into it. */
 void keyboard_enter(struct wlr_seat *seat, struct wlr_surface *surface) {
@@ -41,6 +40,7 @@ void keyboard_enter(struct wlr_seat *seat, struct wlr_surface *surface) {
         wlr_seat_keyboard_notify_enter(seat, surface, NULL, 0, NULL);
 }
 
+/* Gives the window keyboard focus; `raise` also brings it to the front. */
 void focus_toplevel_raise(struct sh_toplevel *toplevel, bool raise) {
     if (!toplevel || toplevel->server->locked)
         return;

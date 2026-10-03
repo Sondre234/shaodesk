@@ -664,9 +664,6 @@ static void control_client_close(struct sh_control_client *client) {
     free(client);
 }
 
-/* The state subscribers get: "tiling on|off", "workspace N" and "focused NAME" for the focused output, and
- * "output NAME N USED TILING" for each output, with its current workspace, those holding
- * windows ("1,3", or "-"), and whether it tiles ("on" or "off"). */
 /* Removes a multi-byte character cut short at the end of `text`, as snprintf leaves one. */
 static void drop_partial_utf8(char *text) {
     size_t length = strlen(text), start = length;
@@ -682,6 +679,9 @@ static void drop_partial_utf8(char *text) {
         text[start - 1] = '\0';
 }
 
+/* The state subscribers get: "tiling on|off", "workspace N" and "focused NAME" for the focused
+ * output, and "output NAME N USED TILING" for each output, with its current workspace, those
+ * holding windows ("1,3", or "-"), and whether it tiles ("on" or "off"). */
 static void describe_state(struct sh_server *server, char *state, size_t size) {
     struct wlr_output *focused = focused_output(server);
     size_t length = snprintf(state, size, "tiling %s\nworkspace %d\nfocused %s\n",
