@@ -636,7 +636,6 @@ bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, cha
                      size_t error_size);
 void run_action(struct sh_server *server, enum sh_action action, int argument);
 uint32_t corner_edges(struct sh_toplevel *toplevel, uint32_t edges);
-void reset_cursor_mode(struct sh_server *server);
 enum wlr_xdg_toplevel_decoration_v1_mode
 decoration_mode(struct wlr_xdg_toplevel_decoration_v1 *decoration);
 void refresh_decoration(struct sh_toplevel *toplevel);
@@ -668,6 +667,12 @@ void toplevel_app_id_changed(struct wl_listener *listener, void *data);
 void server_new_capture_request(struct wl_listener *listener, void *data);
 void publish_toplevel(struct sh_toplevel *toplevel);
 void unpublish_toplevel(struct sh_toplevel *toplevel);
+
+/* grab.c */
+void reset_cursor_mode(struct sh_server *server);
+void finish_grab(struct sh_server *server);
+void process_cursor_move(struct sh_server *server);
+void process_cursor_resize(struct sh_server *server);
 
 /* layer_shell.c */
 void arrange_layers(struct sh_server *server);
