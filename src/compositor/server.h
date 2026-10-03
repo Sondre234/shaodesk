@@ -641,11 +641,6 @@ bool swallow_wanted(struct sh_toplevel *child);
 void swallow_attach(struct sh_toplevel *host, struct sh_toplevel *child);
 void swallow_end(struct sh_toplevel *toplevel);
 void swallow_toggle(struct sh_server *server, struct sh_toplevel *current);
-void switcher_close(struct sh_server *server, int index);
-void switcher_open(struct sh_server *server, bool backward, uint32_t modifiers,
-                   xkb_keysym_t key);
-void switcher_forget(struct sh_toplevel *toplevel);
-void switcher_key(struct sh_server *server, uint32_t modifiers, xkb_keysym_t sym);
 void reload_config(struct sh_server *server);
 
 /* actions.c */
@@ -821,6 +816,13 @@ int session_name_compare(const struct dirent **a, const struct dirent **b);
 int session_name_filter(const struct dirent *entry);
 bool session_claim(struct sh_server *server, struct sh_toplevel *toplevel,
                    struct sh_window_rule *rule, bool ruled);
+
+/* switcher.c */
+void switcher_close(struct sh_server *server, int index);
+void switcher_open(struct sh_server *server, bool backward, uint32_t modifiers,
+                   xkb_keysym_t key);
+void switcher_forget(struct sh_toplevel *toplevel);
+void switcher_key(struct sh_server *server, uint32_t modifiers, xkb_keysym_t sym);
 
 /* tiling.c */
 struct wlr_output *tiled_output(struct sh_toplevel *toplevel);
