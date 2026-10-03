@@ -251,6 +251,21 @@ static void leave_fullscreen_for(struct sh_toplevel *toplevel, struct wlr_output
     }
 }
 
+/* Puts the windows on `toplevel`'s workspace of `output` that float only because they were
+ * maximized by hand back into the tiling, so that the new tile does not open over them. */
+static void retile_maximized_for(struct sh_toplevel *toplevel, struct wlr_output *output) {
+    struct sh_toplevel *other;
+    wl_list_for_each(other, &toplevel->server->toplevels, link) {
+        if (other == toplevel || !other->placed || !other->arranged ||
+            other->arrangement != SH_MAXIMIZE || other->minimized ||
+            other->workspace != toplevel->workspace || toplevel_output(other) != output)
+            continue;
+        other->floating = other->placed = false;
+        if (wants_tiling(other, output))
+            tile_toplevel(other, output, NULL, false);
+    }
+}
+
 #define SH_PLACE_OTHERS 32
 
 void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool maximized) {
@@ -389,6 +404,7 @@ void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool maximized)
         toplevel->floating = host->floating;
         group_show(toplevel);
     } else if (wants_tiling(toplevel, tile_output)) {
+        retile_maximized_for(toplevel, tile_output);
         tile_toplevel(toplevel, tile_output, target, visible);
     } else if (toplevel->tile_sized) {
         toplevel->tile_sized = false; // It floats after all: let the client choose its size.

@@ -176,6 +176,8 @@ static void apply_tiling(struct sh_server *server, struct wlr_output *output) {
         if (toplevel->tiled ? tiled_output(toplevel) != output : home_output(toplevel) != output)
             continue;
         bool enabled = tiles_for(toplevel, output);
+        if (enabled && toplevel->placed) // floating only because it was snapped or maximized
+            toplevel->floating = toplevel->placed = false;
         if (enabled && wants_tiling(toplevel, output))
             tile_toplevel(toplevel, output, NULL, false);
         else if (!enabled && toplevel->tiled)
