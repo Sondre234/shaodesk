@@ -3,6 +3,18 @@
 Notable changes, newest first. Dates are when the work landed. The project has not made a
 tagged release yet; everything below is on `main`.
 
+## Unreleased (2026-10-03)
+
+- The project is now called shaodesk everywhere, and nothing answers to the old `shaode`
+  name: the executables are `shaodesk` and `shaodesk-shell` (`shaodesk msg`,
+  `shaodesk import`), the configuration lives in `~/.config/shaodesk`, state in
+  `~/.local/state/shaodesk`, and the environment variables and CMake options start with
+  `SHAODESK_` (`SHAODESK_SOCKET`, `SHAODESK_DEFAULT_CONFIG`, `SHAODESK_BUILD_SHELL`, ...).
+  The session sets `XDG_CURRENT_DESKTOP=shaodesk` and installs `shaodesk-portals.conf` and
+  `shaodesk.desktop`. To carry a setup over, move `~/.config/shaode` and
+  `~/.local/state/shaode` to the new names, update launch scripts and key bindings that run
+  `shaode`, and configure a fresh build directory.
+
 ## Unreleased (2026-09-28)
 
 - The configuration reloads when it is saved, as in Hyprland: the compositor watches the `.lua`
@@ -18,8 +30,8 @@ tagged release yet; everything below is on `main`.
   away first, which made the click restore the window instead.
 - Appearance profiles: `profiles` names sets of `appearance`, `windows` and `shell` settings laid
   over the configuration, and `profile` picks the one to start with. Switch from the panel's
-  right-click menu (Appearance), the command palette, or `shaode msg profile NAME|next|prev`; the
-  choice is saved in `$XDG_STATE_HOME/shaode/profile` and kept across restarts. The example
+  right-click menu (Appearance), the command palette, or `shaodesk msg profile NAME|next|prev`; the
+  choice is saved in `$XDG_STATE_HOME/shaodesk/profile` and kept across restarts. The example
   configuration ships `default` and `light`. A profile button on the panel (`shell.widgets.profiles`)
   lists them to switch with one click.
 - Quality sweep: `tools/check-all.sh` builds, runs the whole suite, then runs it again under
@@ -38,8 +50,8 @@ tagged release yet; everything below is on `main`.
 - Notifications: the shell serves `org.freedesktop.Notifications` and shows cards (actions,
   markup, icons and images, progress, urgency, replacement, timeouts that pause on hover) in a
   corner of the focused monitor; the panel's bell keeps a history with an unread badge, and
-  do-not-disturb (`dnd_toggle`, `dnd_on`, `dnd_off`, `shaode msg dnd`) silences the cards. On-screen
-  display for volume, brightness and `shaode msg osd TEXT [PERCENT]`. See the `notifications` and
+  do-not-disturb (`dnd_toggle`, `dnd_on`, `dnd_off`, `shaodesk msg dnd`) silences the cards. On-screen
+  display for volume, brightness and `shaodesk msg osd TEXT [PERCENT]`. See the `notifications` and
   `osd` settings and `notification_history` (Super + N).
 - `windows.placement`: new floating windows can open `"cascade"`d (the default, as before),
   `"center"`ed, or `"smart"`, in the free space where they cover the other windows least.
@@ -54,7 +66,7 @@ tagged release yet; everything below is on `main`.
   asks for attention through xdg-activation, `_NET_WM_STATE_DEMANDS_ATTENTION` or an X11 urgency
   hint is marked urgent instead of taking focus. Its border pulses in `windows.urgent_color`
   (also without a `border_width`), and `focus_urgent` (Super + U) jumps to the one that asked
-  first. `"focus"` restores the old behaviour, `"ignore"` drops requests. `shaode msg get urgent`
+  first. `"focus"` restores the old behaviour, `"ignore"` drops requests. `shaodesk msg get urgent`
   and the subscription report them. The shell marks urgent windows on the taskbar (also
   stacked buttons and their hover list), the workspace indicator, the overview, the window
   switcher and the command palette.
@@ -74,11 +86,11 @@ tagged release yet; everything below is on `main`.
 - Hotplug: windows of an unplugged monitor (fullscreen ones too) move to the nearest one (tiles
   rejoin its tiling, workspace numbers kept; a monitor turned off in the configuration hands its
   floating windows over the same way, onto the workspace the other one shows) and return when it is plugged back in (`outputs.return_windows`).
-  Headless sessions can plug virtual outputs with `shaode msg headless_output add|remove`.
+  Headless sessions can plug virtual outputs with `shaodesk msg headless_output add|remove`.
 - `layout.outputs`: per-monitor `tile_layout`, `master_ratio` and `master_count` for the
   workspaces not set by hand, applied live on reload and when a monitor returns. A ratio or
   master count changed by an action no longer freezes the workspace's layout against later
-  configuration changes. `shaode msg get layout OUTPUT [WORKSPACE]`.
+  configuration changes. `shaodesk msg get layout OUTPUT [WORKSPACE]`.
 - Window swallowing: with `windows.swallow.enabled` a window started from a terminal (found
   through process ancestry) takes its tile or floating place and hides it; closing it brings
   the terminal back. `swallow_toggle` does it by hand; `windows.swallow.terminals` and
@@ -109,10 +121,10 @@ tagged release yet; everything below is on `main`.
   corner.
 - Night light: `night_light` settings warm the screen on a schedule (fixed times or a location)
   with the actions `night_light_toggle`, `night_light_on`, `night_light_off`, `night_light_auto`.
-- Sessions: `shaode msg session save|restore|list|delete NAME` keeps window placement,
+- Sessions: `shaodesk msg session save|restore|list|delete NAME` keeps window placement,
   layouts and workspaces, and `restore NAME launch` starts applications that are missing.
 - Named workspaces: `layout.workspace_names` labels them in the panel and lets bindings and
-  `shaode msg workspace NAME` reach them by name.
+  `shaodesk msg workspace NAME` reach them by name.
 - Scrolling tile layout (`layout_scroll`, `tile_layout = "scroll"`), after niri and PaperWM:
   columns on an endless strip, a view that follows focus (`layout.scroll.follow`), column
   width presets, stacked windows, and the actions `scroll_left`, `scroll_right`,
@@ -154,7 +166,7 @@ tagged release yet; everything below is on `main`.
 
 ## 2026-09-25
 
-- `shaode import` carries Hyprland, Waybar, wallbash, and pywal looks into `theme.lua`.
+- `shaodesk import` carries Hyprland, Waybar, wallbash, and pywal looks into `theme.lua`.
 - Per-monitor mode, scale, position, rotation, disable, and adaptive sync settings.
 - Per-output workspaces, shown on each panel.
 - Window open/close animations and tile glide.
@@ -170,7 +182,7 @@ tagged release yet; everything below is on `main`.
 - Browser and Electron protocols (linux-dmabuf, primary selection, xdg-activation,
   cursor-shape) and screen capture for screenshots and screen sharing through portals.
 - Qt Quick shell: taskbar, launcher, desktop shortcuts, wallpaper, workspaces, control
-  socket (`shaode msg`), fullscreen, session lock, idle notification and inhibit.
+  socket (`shaodesk msg`), fullscreen, session lock, idle notification and inhibit.
 - Standalone `--session` backend (DRM/libinput) that survives VT switches; first
   physical tests on an AMD laptop and an NVIDIA three-monitor desktop.
 - Gentoo QEMU/KVM test VM scripts; GPL-3.0-or-later license.
