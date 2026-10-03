@@ -1,8 +1,20 @@
-<h1 align="center"><img src="docs/banner.svg" alt="shaoDe — mouse-first Wayland desktop" width="800"></h1>
+<div align="center">
 
-A mouse-first Wayland desktop: a wlroots compositor with floating windows, edge snapping and
-optional Hyprland-style automatic tiling, a Qt Quick shell with a taskbar, launcher and
-notifications, and a Lua configuration that reloads when you save it.
+# shaodesk
+
+A mouse-first Wayland desktop.<br>
+Floating windows, edge snapping and optional Hyprland-style tiling, a Qt Quick shell with a
+taskbar, launcher and notifications, and a Lua configuration that reloads when you save it.
+
+[![license](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
+[![wlroots](https://img.shields.io/badge/wlroots-0.20-teal)](https://gitlab.freedesktop.org/wlroots/wlroots)
+[![Lua](https://img.shields.io/badge/config-Lua%205.4-navy)](docs/config-reference.md)
+[![status](https://img.shields.io/badge/status-early%20development-orange)](docs/verification.md)
+
+[Highlights](#highlights) · [Building](#building) · [Running](#running) ·
+[Configuration](#configuration) · [Features](docs/features.md) · [Contributing](CONTRIBUTING.md)
+
+</div>
 
 shaodesk is a fork of shaoDe. The executables (`shaode`, `shaode-shell`), the configuration
 path (`~/.config/shaode`) and the code keep the shaoDe name, so the documentation does too.
