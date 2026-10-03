@@ -1,10 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
 #include "server.h"
 
-void fade_update(void *data) {
-    refresh_frame(data);
-}
-
 int64_t now_ms(void) {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);

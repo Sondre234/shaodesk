@@ -614,7 +614,6 @@ void server_cursor_axis(struct wl_listener *listener, void *data);
 void server_cursor_frame(struct wl_listener *listener, void *data);
 
 /* effects.c */
-void fade_update(void *data);
 int64_t now_ms(void);
 void update_dim(struct sh_toplevel *toplevel);
 bool tick_effects(struct sh_server *server);
