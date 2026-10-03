@@ -1,7 +1,7 @@
 # Changelog
 
 Notable changes, newest first. Dates are when the work landed. The project has not made a
-tagged release yet; everything below is on `master`.
+tagged release yet; everything below is on `main`.
 
 ## Unreleased (2026-09-28)
 
