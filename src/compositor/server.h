@@ -624,19 +624,6 @@ struct sh_toplevel *toplevel_toward(struct sh_toplevel *from_toplevel, bool hori
                                     int sign, bool tiles_only);
 void pointer_follow(struct sh_toplevel *toplevel);
 void focus_direction(struct sh_server *server, enum sh_action action);
-bool groups_enabled(struct sh_server *server);
-int group_size(struct sh_server *server, unsigned group);
-int group_index(struct sh_toplevel *from);
-void group_follow(struct sh_toplevel *toplevel);
-void hand_over_slot(struct sh_toplevel *from, struct sh_toplevel *to);
-void group_show(struct sh_toplevel *toplevel);
-void group_detach(struct sh_toplevel *toplevel);
-bool groupable(struct sh_toplevel *toplevel);
-void group_join(struct sh_toplevel *toplevel, unsigned group);
-void group_toggle(struct sh_server *server, struct sh_toplevel *current);
-void group_cycle(struct sh_server *server, struct sh_toplevel *current, int step);
-void ungroup(struct sh_server *server, struct sh_toplevel *current);
-void group_merge(struct sh_server *server, enum sh_action action);
 void reload_config(struct sh_server *server);
 
 /* actions.c */
@@ -707,6 +694,22 @@ void reset_cursor_mode(struct sh_server *server);
 void finish_grab(struct sh_server *server);
 void process_cursor_move(struct sh_server *server);
 void process_cursor_resize(struct sh_server *server);
+
+/* group.c */
+bool groups_enabled(struct sh_server *server);
+int group_size(struct sh_server *server, unsigned group);
+int group_index(struct sh_toplevel *from);
+void group_follow(struct sh_toplevel *toplevel);
+void hand_over_slot(struct sh_toplevel *from, struct sh_toplevel *to);
+void group_show(struct sh_toplevel *toplevel);
+void group_detach(struct sh_toplevel *toplevel);
+bool groupable(struct sh_toplevel *toplevel);
+void group_join(struct sh_toplevel *toplevel, unsigned group);
+void group_toggle(struct sh_server *server, struct sh_toplevel *current);
+void group_cycle(struct sh_server *server, struct sh_toplevel *current, int step);
+void ungroup(struct sh_server *server, struct sh_toplevel *current);
+void group_merge(struct sh_server *server, enum sh_action action);
+void dissolve_groups(struct sh_server *server);
 
 /* input.c */
 bool configure_keyboard(struct sh_server *server, struct wlr_keyboard *keyboard);
