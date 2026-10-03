@@ -654,6 +654,7 @@ struct sh_toplevel *toplevel_toward(struct sh_toplevel *from_toplevel, bool hori
                                     int sign, bool tiles_only);
 void pointer_follow(struct sh_toplevel *toplevel);
 void focus_direction(struct sh_server *server, enum sh_action action);
+void request_activate(struct wl_listener *listener, void *data);
 
 /* foreign_toplevel.c */
 void toplevel_title_changed(struct wl_listener *listener, void *data);
@@ -704,7 +705,6 @@ void seat_request_set_selection(struct wl_listener *listener, void *data);
 void seat_request_set_primary_selection(struct wl_listener *listener, void *data);
 void seat_request_start_drag(struct wl_listener *listener, void *data);
 void seat_start_drag(struct wl_listener *listener, void *data);
-void request_activate(struct wl_listener *listener, void *data);
 void server_new_constraint(struct wl_listener *listener, void *data);
 void seat_keyboard_focus_change(struct wl_listener *listener, void *data);
 

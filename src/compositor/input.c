@@ -263,28 +263,6 @@ void seat_start_drag(struct wl_listener *listener, void *data) {
         wlr_scene_drag_icon_create(server->drag_icons, drag->icon);
 }
 
-static struct sh_toplevel *toplevel_for_surface(struct sh_server *server,
-                                                struct wlr_surface *surface) {
-    struct sh_toplevel *toplevel;
-    wl_list_for_each(toplevel, &server->toplevels, link) {
-        if (toplevel_surface(toplevel) == surface)
-            return toplevel;
-    }
-    return NULL;
-}
-
-/* xdg-activation: an application asks to be raised, e.g. a browser opening a link from chat.
- * wlroots expires and validates tokens. Tokens made without an input serial are honoured too:
- * a browser handed a link by another process often has nothing better. What the window then
- * gets depends on windows.activation. */
-void request_activate(struct wl_listener *listener, void *data) {
-    struct sh_server *server = wl_container_of(listener, server, request_activate);
-    struct wlr_xdg_activation_v1_request_activate_event *event = data;
-    struct sh_toplevel *toplevel = toplevel_for_surface(server, event->surface);
-    if (toplevel)
-        activation_requested(toplevel);
-}
-
 /* Pointer constraints (games, remote desktops, pointer lock in browsers) apply to the
  * keyboard-focused surface only, and only while the pointer is over it. */
 static void set_active_constraint(struct sh_server *server,
