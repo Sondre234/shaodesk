@@ -641,16 +641,15 @@ enum wlr_xdg_toplevel_decoration_v1_mode
 decoration_mode(struct wlr_xdg_toplevel_decoration_v1 *decoration);
 void refresh_decoration(struct sh_toplevel *toplevel);
 int64_t now_ms(void);
+bool tick_effects(struct sh_server *server);
 double zoom_level(struct sh_server *server, int64_t now);
+void output_release_zoom(struct sh_output *output);
+bool output_commit_zoomed(struct sh_output *output, struct wlr_scene_output *scene_output,
+                          const struct wlr_scene_output_state_options *options,
+                          double level);
 void refresh_frame(struct sh_toplevel *toplevel);
 void forget_decoration(struct sh_toplevel *toplevel);
 void process_cursor_motion(struct sh_server *server, uint32_t time);
-bool output_named(const struct sh_output *output, const char *name);
-void output_description(const struct wlr_output *output, char *text, size_t size);
-bool output_key_matches(const char *key, const struct wlr_output *output);
-const struct sh_monitor *monitor_settings(const struct sh_settings *settings,
-                                          const struct wlr_output *output);
-struct wlr_output *find_output(struct sh_server *server, const char *name);
 
 /* control.c */
 void notify_subscribers(struct sh_server *server);
@@ -682,6 +681,19 @@ void server_new_lock(struct wl_listener *listener, void *data);
 void session_active(struct wl_listener *listener, void *data);
 #endif
 void server_new_inhibitor(struct wl_listener *listener, void *data);
+
+/* output.c */
+bool output_named(const struct sh_output *output, const char *name);
+void output_description(const struct wlr_output *output, char *text, size_t size);
+bool output_key_matches(const char *key, const struct wlr_output *output);
+const struct sh_monitor *monitor_settings(const struct sh_settings *settings,
+                                          const struct wlr_output *output);
+void arrange_outputs(struct sh_server *server);
+void configure_output(struct sh_server *server, struct sh_output *output);
+void output_config_test(struct wl_listener *listener, void *data);
+void output_config_apply(struct wl_listener *listener, void *data);
+void server_new_output(struct wl_listener *listener, void *data);
+struct wlr_output *find_output(struct sh_server *server, const char *name);
 
 /* output_moves.c */
 void evacuate_output(struct sh_server *server, const char *name, struct wlr_box gone,
