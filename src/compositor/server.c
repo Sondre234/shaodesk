@@ -31,7 +31,6 @@ static void refresh_tabs(struct sh_toplevel *toplevel);
 static void night_light_update(struct sh_server *server);
 static void zoom_by(struct sh_server *server, int steps);
 static void set_peek(struct sh_server *server, bool on);
-static void refresh_frame(struct sh_toplevel *toplevel);
 static void process_cursor_motion(struct sh_server *server, uint32_t time);
 static void process_pointer_target(struct sh_server *server, uint32_t time);
 static void lock_output_presented(struct sh_output *output);
@@ -63,8 +62,6 @@ static void reconfigure_tiling(struct sh_server *server);
 static void publish_toplevel(struct sh_toplevel *toplevel);
 static void unpublish_toplevel(struct sh_toplevel *toplevel);
 static void arrange_layers(struct sh_server *server);
-static void begin_interactive(struct sh_toplevel *toplevel, enum sh_cursor_mode mode,
-                              uint32_t edges);
 static void fit_fullscreen(struct sh_toplevel *toplevel);
 static void refit_fullscreen(struct sh_server *server);
 static void set_fullscreen_focus(struct sh_toplevel *toplevel, bool fullscreen, bool focus);
@@ -79,8 +76,8 @@ static uint64_t now_ns(void) {
 }
 
 
-static void add_listener(struct wl_signal *signal, struct wl_listener *listener,
-                         wl_notify_func_t notify) {
+void add_listener(struct wl_signal *signal, struct wl_listener *listener,
+                  wl_notify_func_t notify) {
     listener->notify = notify;
     wl_signal_add(signal, listener);
 }
@@ -127,7 +124,7 @@ static void toplevel_set_activated(struct sh_toplevel *toplevel, bool activated)
     wlr_xdg_toplevel_set_activated(toplevel->xdg_toplevel, activated);
 }
 /* Positions the window in layout coordinates; X11 clients also learn the position. */
-static void toplevel_configure(struct sh_toplevel *toplevel, int x, int y, int width, int height) {
+void toplevel_configure(struct sh_toplevel *toplevel, int x, int y, int width, int height) {
     ++toplevel->server->stats.configures;
     wlr_scene_node_set_position(&toplevel->scene_tree->node, x, y);
 #if WLR_HAS_XWAYLAND
@@ -200,7 +197,7 @@ static void toplevel_set_fullscreen_state(struct sh_toplevel *toplevel, bool ful
     wlr_xdg_toplevel_set_fullscreen(toplevel->xdg_toplevel, fullscreen);
 }
 /* Answers a denied client request by repeating the current state. */
-static void toplevel_refresh(struct sh_toplevel *toplevel) {
+void toplevel_refresh(struct sh_toplevel *toplevel) {
 #if WLR_HAS_XWAYLAND
     if (toplevel->xsurface) {
         if (toplevel_mapped(toplevel))
@@ -391,7 +388,7 @@ static void lower_fullscreen_covers(struct sh_toplevel *toplevel) {
 /* Gives the window keyboard focus; `raise` also brings it to the front. */
 /* Gives the surface keyboard focus even while the seat has no keyboard (headless, or before a
  * virtual keyboard connects), so the first keyboard to appear types into it. */
-static void keyboard_enter(struct wlr_seat *seat, struct wlr_surface *surface) {
+void keyboard_enter(struct wlr_seat *seat, struct wlr_surface *surface) {
     struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(seat);
     if (keyboard)
         wlr_seat_keyboard_notify_enter(seat, surface, keyboard->keycodes, keyboard->num_keycodes,
@@ -510,7 +507,7 @@ static bool toplevel_can_be_urgent(struct sh_toplevel *toplevel) {
 }
 
 /* Marks or unmarks `toplevel` as urgent. The focused window never is: it has the attention. */
-static void set_urgent(struct sh_toplevel *toplevel, bool urgent) {
+void set_urgent(struct sh_toplevel *toplevel, bool urgent) {
     struct sh_server *server = toplevel->server;
     if (toplevel->urgent == urgent)
         return;
@@ -530,7 +527,7 @@ static void set_urgent(struct sh_toplevel *toplevel, bool urgent) {
 
 /* A client asks to be focused (xdg-activation, _NET_ACTIVE_WINDOW): what it gets follows
  * windows.activation. */
-static void activation_requested(struct sh_toplevel *toplevel) {
+void activation_requested(struct sh_toplevel *toplevel) {
     if (!toplevel_can_be_urgent(toplevel))
         return;
     switch (server_settings(toplevel->server)->activation) {
@@ -3978,7 +3975,7 @@ static void raise_frame_node(struct sh_toplevel *toplevel, struct wlr_scene_node
 }
 
 /* Adds, removes, or updates a window's controls to match what it asks for and its state. */
-static void refresh_decoration(struct sh_toplevel *toplevel) {
+void refresh_decoration(struct sh_toplevel *toplevel) {
     struct sh_server *server = toplevel->server;
     if (!toplevel->scene_tree)
         return;
@@ -4412,7 +4409,7 @@ static float rule_opacity(struct sh_toplevel *toplevel, const char *app_id, cons
 
 /* The border around the window's geometry and its opacity, both following focus. Called on
  * every commit, since the geometry and the set of surfaces can change with any of them. */
-static void refresh_frame(struct sh_toplevel *toplevel) {
+void refresh_frame(struct sh_toplevel *toplevel) {
     if (!toplevel->scene_tree)
         return;
     overview_touch(toplevel->server, false); // a thumbnail of it may need copying again
@@ -7159,7 +7156,7 @@ static void update_listed_state(struct sh_toplevel *toplevel) {
                                                              app_id ? app_id : ""};
     wlr_ext_foreign_toplevel_handle_v1_update_state(toplevel->listed, &state);
 }
-static void toplevel_title_changed(struct wl_listener *listener, void *data) {
+void toplevel_title_changed(struct wl_listener *listener, void *data) {
     struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, title_changed);
     const char *title = toplevel_title(toplevel);
     if (toplevel->foreign)
@@ -7169,7 +7166,7 @@ static void toplevel_title_changed(struct wl_listener *listener, void *data) {
     if (toplevel->urgent)
         notify_subscribers(toplevel->server); // the shell finds the window by its title
 }
-static void toplevel_app_id_changed(struct wl_listener *listener, void *data) {
+void toplevel_app_id_changed(struct wl_listener *listener, void *data) {
     struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, app_id_changed);
     const char *app_id = toplevel_app_id(toplevel);
     if (toplevel->foreign)
@@ -7360,7 +7357,7 @@ static void server_new_layer_surface(struct wl_listener *listener, void *data) {
     add_listener(&surface->events.new_popup, &layer->new_popup, layer_new_popup);
 }
 
-static void maximize_toplevel(struct sh_toplevel *toplevel, bool maximized) {
+void maximize_toplevel(struct sh_toplevel *toplevel, bool maximized) {
     if (toplevel->tiled) {
         toplevel_refresh(toplevel); // Tiles ignore client maximize requests, as in Hyprland.
         return;
@@ -7459,7 +7456,7 @@ static void leave_fullscreen_for(struct sh_toplevel *toplevel, struct wlr_output
 
 #define SH_PLACE_OTHERS 32
 
-static void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool maximized) {
+void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool maximized) {
     struct sh_server *server = toplevel->server;
     int offset = 40 + 32 * (wl_list_length(&toplevel->server->toplevels) % 8);
     int x = offset, y = offset;
@@ -7622,7 +7619,7 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
                  toplevel->xdg_toplevel->requested.maximized);
 }
 
-static void unmap_toplevel(struct sh_toplevel *toplevel) {
+void unmap_toplevel(struct sh_toplevel *toplevel) {
     // The client's buffers go with this commit; the closing animation draws a copy of them.
     struct sh_server *server = toplevel->server;
     if (toplevel->shown && server->running && toplevel_visible(toplevel)) {
@@ -7682,7 +7679,7 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 }
 
 /* Frees a window after removing the listeners xdg-shell and X11 windows have in common. */
-static void free_toplevel(struct sh_toplevel *toplevel) {
+void free_toplevel(struct sh_toplevel *toplevel) {
     sh_anim_finish(&toplevel->anim);
     sh_tween_stop(&toplevel->fade);
     free(toplevel->opacity_rule.app_id);
@@ -7714,8 +7711,8 @@ static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
     free_toplevel(toplevel);
 }
 
-static void begin_interactive(struct sh_toplevel *toplevel, enum sh_cursor_mode mode,
-                              uint32_t edges) {
+void begin_interactive(struct sh_toplevel *toplevel, enum sh_cursor_mode mode,
+                       uint32_t edges) {
     struct sh_server *server = toplevel->server;
     if (toplevel->fullscreen) {
         // Only a move, and it leaves fullscreen once the pointer has travelled a little.
@@ -7879,7 +7876,7 @@ static void set_fullscreen_focus(struct sh_toplevel *toplevel, bool fullscreen, 
 }
 
 /* Fullscreen the client asks for itself, like a video player's: it covers the panels too. */
-static void set_client_fullscreen(struct sh_toplevel *toplevel, bool fullscreen) {
+void set_client_fullscreen(struct sh_toplevel *toplevel, bool fullscreen) {
     if (fullscreen && !toplevel->fullscreen)
         toplevel->fullscreen_cover = true;
     set_fullscreen(toplevel, fullscreen);
@@ -7960,359 +7957,6 @@ static void server_new_decoration(struct wl_listener *listener, void *data) {
     add_listener(&decoration->events.destroy, &toplevel->decoration_destroy, decoration_destroy);
     decoration_set_mode(toplevel);
 }
-
-#if WLR_HAS_XWAYLAND
-/* X11 windows: managed ones behave like xdg toplevels; override-redirect ones
- * (menus, tooltips, drag icons) are drawn where they ask and never take part in focus order. */
-static void xwayland_map(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, map);
-    struct wlr_xwayland_surface *xsurface = toplevel->xsurface;
-    struct sh_server *server = toplevel->server;
-    toplevel->unmanaged = xsurface->override_redirect;
-    toplevel->scene_tree =
-        wlr_scene_tree_create(toplevel->unmanaged ? server->unmanaged : server->windows);
-    toplevel->content = toplevel->scene_tree ? wlr_scene_tree_create(toplevel->scene_tree) : NULL;
-    if (!toplevel->content ||
-        !wlr_scene_subsurface_tree_create(toplevel->content, xsurface->surface)) {
-        wlr_log(WLR_ERROR, "Cannot create scene for X11 window");
-        if (toplevel->scene_tree)
-            wlr_scene_node_destroy(&toplevel->scene_tree->node);
-        toplevel->scene_tree = toplevel->content = NULL;
-        toplevel->dim = NULL;
-        return;
-    }
-    if (toplevel->unmanaged) {
-        wlr_scene_node_set_position(&toplevel->scene_tree->node, xsurface->x, xsurface->y);
-        if (!server->locked && wlr_xwayland_surface_override_redirect_wants_focus(xsurface))
-            keyboard_enter(server->seat, xsurface->surface);
-        return;
-    }
-    toplevel->scene_tree->node.data = &toplevel->node;
-    toplevel->content->node.data = &toplevel->node;
-    toplevel->fullscreen_cover = xsurface->fullscreen;
-    map_toplevel(toplevel, xsurface->fullscreen,
-                 xsurface->maximized_horz && xsurface->maximized_vert);
-    refresh_decoration(toplevel);
-}
-
-static void xwayland_unmap(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, unmap);
-    struct sh_server *server = toplevel->server;
-    if (!toplevel->scene_tree)
-        return;
-    if (toplevel->unmanaged) {
-        // Return the keyboard from a closed X11 menu to the focused window.
-        if (server->seat->keyboard_state.focused_surface == toplevel->xsurface->surface) {
-            if (server->focused_toplevel)
-                focus_toplevel(server->focused_toplevel);
-            else
-                wlr_seat_keyboard_clear_focus(server->seat);
-        }
-    } else {
-        unmap_toplevel(toplevel);
-    }
-    sh_anim_finish(&toplevel->anim);
-    wlr_scene_node_destroy(&toplevel->scene_tree->node);
-    toplevel->scene_tree = toplevel->content = NULL;
-    toplevel->dim = NULL;
-}
-
-static void xwayland_associate(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, x_associate);
-    struct wlr_surface *surface = toplevel->xsurface->surface;
-    toplevel->associated = true;
-    add_listener(&surface->events.map, &toplevel->map, xwayland_map);
-    add_listener(&surface->events.unmap, &toplevel->unmap, xwayland_unmap);
-    // The X11 and Wayland sockets race: Xwayland's first buffer can arrive before the
-    // WL_SURFACE_SERIAL message that pairs it, and wlroots only maps on a later commit. An
-    // unmapped surface gets no frame callbacks, so Xwayland never sends one (Wine dialogs).
-    if (!surface->mapped && wlr_surface_has_buffer(surface))
-        wlr_surface_map(surface);
-}
-
-static void xwayland_dissociate(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, x_dissociate);
-    toplevel->associated = false;
-    wl_list_remove(&toplevel->map.link);
-    wl_list_remove(&toplevel->unmap.link);
-}
-
-static void xwayland_destroy(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, destroy);
-    if (toplevel->associated) {
-        wl_list_remove(&toplevel->map.link);
-        wl_list_remove(&toplevel->unmap.link);
-    }
-    wl_list_remove(&toplevel->x_associate.link);
-    wl_list_remove(&toplevel->x_dissociate.link);
-    wl_list_remove(&toplevel->x_configure.link);
-    wl_list_remove(&toplevel->x_activate.link);
-    wl_list_remove(&toplevel->x_geometry.link);
-    wl_list_remove(&toplevel->x_decorations.link);
-    wl_list_remove(&toplevel->x_attention.link);
-    wl_list_remove(&toplevel->x_hints.link);
-    free_toplevel(toplevel);
-}
-
-static bool xwayland_managed(struct sh_toplevel *toplevel) {
-    return toplevel_mapped(toplevel) && !toplevel->unmanaged;
-}
-
-static void xwayland_set_decorations(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, x_decorations);
-    if (xwayland_managed(toplevel))
-        refresh_decoration(toplevel);
-}
-
-static void xwayland_request_configure(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, x_configure);
-    struct wlr_xwayland_surface_configure_event *event = data;
-    if (!xwayland_managed(toplevel)) {
-        wlr_xwayland_surface_configure(toplevel->xsurface, event->x, event->y, event->width,
-                                       event->height);
-        if (toplevel->scene_tree)
-            wlr_scene_node_set_position(&toplevel->scene_tree->node, event->x, event->y);
-        return;
-    }
-    // Placement belongs to the compositor; floating windows may still choose their size.
-    if (toplevel->fullscreen || toplevel->arranged || toplevel->tiled) {
-        toplevel_refresh(toplevel);
-        return;
-    }
-    toplevel_configure(toplevel, toplevel->scene_tree->node.x, toplevel->scene_tree->node.y,
-                       event->width, event->height);
-}
-
-static void xwayland_set_geometry(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, x_geometry);
-    if (toplevel->unmanaged && toplevel->scene_tree)
-        wlr_scene_node_set_position(&toplevel->scene_tree->node, toplevel->xsurface->x,
-                                    toplevel->xsurface->y);
-    else if (xwayland_managed(toplevel))
-        refresh_frame(toplevel);
-}
-
-static void xwayland_request_activate(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, x_activate);
-    if (xwayland_managed(toplevel))
-        activation_requested(toplevel);
-}
-
-/* _NET_WM_STATE_DEMANDS_ATTENTION and the urgency flag of WM_HINTS ask for attention the way
- * xdg-activation does; a client clears them (or the window is focused) when it is done. */
-static void xwayland_attention(struct sh_toplevel *toplevel, bool wanted) {
-    if (!xwayland_managed(toplevel))
-        return;
-    if (!wanted)
-        set_urgent(toplevel, false);
-    else if (toplevel->server->focused_toplevel != toplevel)
-        activation_requested(toplevel);
-}
-
-static void xwayland_demands_attention(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, x_attention);
-    xwayland_attention(toplevel, toplevel->xsurface->demands_attention);
-}
-
-static void xwayland_set_hints(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, x_hints);
-    const xcb_icccm_wm_hints_t *hints = toplevel->xsurface->hints;
-    bool urgent = hints && (hints->flags & XCB_ICCCM_WM_HINT_X_URGENCY);
-    if (urgent == toplevel->x_hint_urgent)
-        return;
-    toplevel->x_hint_urgent = urgent;
-    xwayland_attention(toplevel, urgent);
-}
-
-/* X11 grab requests carry no serial; accept them only while a button is held. */
-static void xwayland_request_move(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, request_move);
-    if (xwayland_managed(toplevel) && toplevel->server->seat->pointer_state.button_count > 0)
-        begin_interactive(toplevel, SH_CURSOR_MOVE, 0);
-}
-
-static void xwayland_request_resize(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, request_resize);
-    struct wlr_xwayland_resize_event *event = data;
-    if (xwayland_managed(toplevel) && toplevel->server->seat->pointer_state.button_count > 0)
-        begin_interactive(toplevel, SH_CURSOR_RESIZE, event->edges);
-}
-
-static void xwayland_request_maximize(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, request_maximize);
-    if (!xwayland_managed(toplevel) || toplevel->fullscreen)
-        return;
-    maximize_toplevel(toplevel,
-                      toplevel->xsurface->maximized_horz || toplevel->xsurface->maximized_vert);
-}
-
-static void xwayland_request_fullscreen(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, request_fullscreen);
-    if (xwayland_managed(toplevel))
-        set_client_fullscreen(toplevel, toplevel->xsurface->fullscreen);
-}
-
-static void xwayland_request_minimize(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, request_minimize);
-    struct wlr_xwayland_minimize_event *event = data;
-    if (!xwayland_managed(toplevel))
-        return;
-    if (event->minimize)
-        minimize_toplevel(toplevel);
-    else
-        focus_toplevel(toplevel);
-}
-
-static void server_new_xwayland_surface(struct wl_listener *listener, void *data) {
-    struct sh_server *server = wl_container_of(listener, server, new_xwayland_surface);
-    struct wlr_xwayland_surface *xsurface = data;
-    struct sh_toplevel *toplevel = calloc(1, sizeof(*toplevel));
-    if (!toplevel) {
-        wlr_xwayland_surface_close(xsurface);
-        return;
-    }
-    toplevel->server = server;
-    toplevel->xsurface = xsurface;
-    toplevel->node = (struct sh_node){SH_NODE_TOPLEVEL, toplevel};
-    xsurface->data = toplevel;
-    add_listener(&xsurface->events.associate, &toplevel->x_associate, xwayland_associate);
-    add_listener(&xsurface->events.dissociate, &toplevel->x_dissociate, xwayland_dissociate);
-    add_listener(&xsurface->events.destroy, &toplevel->destroy, xwayland_destroy);
-    add_listener(&xsurface->events.request_configure, &toplevel->x_configure,
-                 xwayland_request_configure);
-    add_listener(&xsurface->events.request_activate, &toplevel->x_activate,
-                 xwayland_request_activate);
-    add_listener(&xsurface->events.set_geometry, &toplevel->x_geometry, xwayland_set_geometry);
-    add_listener(&xsurface->events.set_decorations, &toplevel->x_decorations,
-                 xwayland_set_decorations);
-    add_listener(&xsurface->events.request_demands_attention, &toplevel->x_attention,
-                 xwayland_demands_attention);
-    add_listener(&xsurface->events.set_hints, &toplevel->x_hints, xwayland_set_hints);
-    add_listener(&xsurface->events.set_title, &toplevel->title_changed, toplevel_title_changed);
-    add_listener(&xsurface->events.set_class, &toplevel->app_id_changed, toplevel_app_id_changed);
-    add_listener(&xsurface->events.request_move, &toplevel->request_move, xwayland_request_move);
-    add_listener(&xsurface->events.request_resize, &toplevel->request_resize,
-                 xwayland_request_resize);
-    add_listener(&xsurface->events.request_maximize, &toplevel->request_maximize,
-                 xwayland_request_maximize);
-    add_listener(&xsurface->events.request_fullscreen, &toplevel->request_fullscreen,
-                 xwayland_request_fullscreen);
-    add_listener(&xsurface->events.request_minimize, &toplevel->request_minimize,
-                 xwayland_request_minimize);
-}
-
-#if SHAODESK_XWM_WAKER
-/* wlroots' XWM can strand X events: xcb reads them into its queue during flushes
- * and round-trips outside the event handler, and the handler's post-dispatch
- * check ignores that queue (packaging/patches/wlroots-xwm-drain.patch fixes it).
- * That strands the first MapRequest after Xwayland starts, among others. While
- * Xwayland runs, a periodic client message from a separate connection, sent only
- * to the XWM's own window, makes its socket readable so the handler drains the queue. */
-enum { XWM_WAKE_INTERVAL_MS = 250 };
-
-static void close_xwm_waker(struct sh_server *server) {
-    if (server->waker_timer)
-        wl_event_source_remove(server->waker_timer);
-    if (server->waker_input)
-        wl_event_source_remove(server->waker_input);
-    if (server->xwm_waker)
-        xcb_disconnect(server->xwm_waker);
-    server->waker_timer = server->waker_input = NULL;
-    server->xwm_waker = NULL;
-}
-
-static int xwm_waker_tick(void *data) {
-    struct sh_server *server = data;
-    xcb_client_message_event_t message = {.response_type = XCB_CLIENT_MESSAGE,
-                                          .format = 32,
-                                          .window = server->xwm_window,
-                                          .type = server->waker_atom};
-    // An empty event mask delivers the message only to the window's creator: the XWM.
-    xcb_send_event(server->xwm_waker, false, server->xwm_window, XCB_EVENT_MASK_NO_EVENT,
-                   (const char *)&message);
-    xcb_flush(server->xwm_waker);
-    wl_event_source_timer_update(server->waker_timer, XWM_WAKE_INTERVAL_MS);
-    return 0;
-}
-
-static int xwm_waker_input(int fd, uint32_t mask, void *data) {
-    struct sh_server *server = data;
-    xcb_generic_event_t *event;
-    while ((event = xcb_poll_for_event(server->xwm_waker)))
-        free(event); // Only errors can arrive; no events are selected.
-    if ((mask & (WL_EVENT_HANGUP | WL_EVENT_ERROR)) || xcb_connection_has_error(server->xwm_waker))
-        close_xwm_waker(server);
-    return 0;
-}
-
-static void open_xwm_waker(struct sh_server *server) {
-    close_xwm_waker(server);
-    server->xwm_waker = xcb_connect(server->xwayland->display_name, NULL);
-    if (xcb_connection_has_error(server->xwm_waker)) {
-        xcb_disconnect(server->xwm_waker);
-        server->xwm_waker = NULL;
-        wlr_log(WLR_ERROR, "Cannot connect XWM waker; X11 windows may appear late");
-        return;
-    }
-    xcb_atom_t atoms[2] = {XCB_ATOM_NONE, XCB_ATOM_NONE};
-    const char *names[2] = {"_SHAODESK_XWM_WAKE", "_NET_SUPPORTING_WM_CHECK"};
-    for (int i = 0; i < 2; ++i) {
-        xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(
-            server->xwm_waker,
-            xcb_intern_atom(server->xwm_waker, false, strlen(names[i]), names[i]), NULL);
-        if (reply)
-            atoms[i] = reply->atom;
-        free(reply);
-    }
-    server->waker_atom = atoms[0];
-    // Like the XWM's connection, this one must not keep an idle Xwayland running.
-    xcb_xfixes_query_version_reply_t *xfixes = xcb_xfixes_query_version_reply(
-        server->xwm_waker, xcb_xfixes_query_version(server->xwm_waker, 6, 0), NULL);
-    if (xfixes && xfixes->major_version >= 6)
-        xcb_xfixes_set_client_disconnect_mode(server->xwm_waker,
-                                              XCB_XFIXES_CLIENT_DISCONNECT_FLAGS_TERMINATE);
-    free(xfixes);
-    server->xwm_window = XCB_WINDOW_NONE;
-    xcb_screen_t *screen = xcb_setup_roots_iterator(xcb_get_setup(server->xwm_waker)).data;
-    xcb_get_property_reply_t *check = xcb_get_property_reply(
-        server->xwm_waker,
-        xcb_get_property(server->xwm_waker, false, screen->root, atoms[1], XCB_ATOM_WINDOW, 0, 1),
-        NULL);
-    if (check && xcb_get_property_value_length(check) == sizeof(xcb_window_t))
-        server->xwm_window = *(xcb_window_t *)xcb_get_property_value(check);
-    free(check);
-    struct wl_event_loop *loop = wl_display_get_event_loop(server->wl_display);
-    server->waker_input = wl_event_loop_add_fd(loop, xcb_get_file_descriptor(server->xwm_waker),
-                                               WL_EVENT_READABLE, xwm_waker_input, server);
-    server->waker_timer = wl_event_loop_add_timer(loop, xwm_waker_tick, server);
-    if (server->waker_atom == XCB_ATOM_NONE || server->xwm_window == XCB_WINDOW_NONE ||
-        !server->waker_input || !server->waker_timer) {
-        wlr_log(WLR_ERROR, "Cannot set up XWM waker; X11 windows may appear late");
-        close_xwm_waker(server);
-        return;
-    }
-    xwm_waker_tick(server); // drain whatever the XWM stranded while attaching
-}
-#endif
-
-static void xwayland_ready(struct wl_listener *listener, void *data) {
-    struct sh_server *server = wl_container_of(listener, server, xwayland_ready);
-    wlr_log(WLR_INFO, "XWayland ready on DISPLAY=%s", server->xwayland->display_name);
-    wlr_xwayland_set_seat(server->xwayland, server->seat);
-#if SHAODESK_XWM_WAKER
-    open_xwm_waker(server);
-#endif
-    if (wlr_xcursor_manager_load(server->cursor_mgr, 1)) {
-        struct wlr_xcursor *xcursor =
-            wlr_xcursor_manager_get_xcursor(server->cursor_mgr, "default", 1);
-        if (xcursor) {
-            struct wlr_xcursor_image *image = xcursor->images[0];
-            wlr_xwayland_set_cursor(server->xwayland, wlr_xcursor_image_get_buffer(image),
-                                    image->hotspot_x, image->hotspot_y);
-        }
-    }
-}
-#endif
 
 static void xdg_popup_commit(struct wl_listener *listener, void *data) {
     struct sh_popup *popup = wl_container_of(listener, popup, commit);
