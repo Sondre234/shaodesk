@@ -609,9 +609,6 @@ void focus_last(struct sh_server *server);
 void focus_top_on(struct sh_server *server, struct wlr_output *output);
 void focus_desktop(struct sh_server *server, struct wlr_output *output);
 void focus_layer(struct sh_layer *layer);
-void minimize_toplevel(struct sh_toplevel *toplevel);
-struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *output);
-struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel);
 struct sh_toplevel *current_toplevel(struct sh_server *server);
 void switch_workspace(struct sh_server *server, struct wlr_output *output, int workspace);
 void set_sticky(struct sh_toplevel *toplevel, bool sticky, bool retile);
@@ -885,6 +882,9 @@ void server_new_decoration(struct wl_listener *listener, void *data);
 void create_popup(struct sh_server *server, struct wlr_xdg_popup *xdg_popup,
                   struct wlr_scene_tree *parent_tree);
 void server_new_xdg_popup(struct wl_listener *listener, void *data);
+void minimize_toplevel(struct sh_toplevel *toplevel);
+struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *output);
+struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel);
 
 /* xwayland.c */
 #if WLR_HAS_XWAYLAND

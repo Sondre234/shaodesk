@@ -445,34 +445,6 @@ void focus_layer(struct sh_layer *layer) {
     keyboard_enter(server->seat, layer->surface->surface);
 }
 
-void minimize_toplevel(struct sh_toplevel *toplevel) {
-    group_detach(toplevel); // a minimized window keeps no slot to share
-    toplevel->minimized = true;
-    untile_toplevel(toplevel, false);
-    wlr_scene_node_set_enabled(&toplevel->scene_tree->node, false);
-    if (toplevel->foreign)
-        wlr_foreign_toplevel_handle_v1_set_minimized(toplevel->foreign, true);
-    if (toplevel->server->focused_toplevel == toplevel)
-        focus_previous(toplevel->server);
-}
-
-/* Fullscreen the client asked for covers the whole output; fullscreen from a binding or the
- * title bar leaves the panels' exclusive zones shown. */
-struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *output) {
-    struct wlr_box box;
-    if (toplevel->fullscreen_cover) {
-        wlr_output_layout_get_box(toplevel->server->output_layout, output, &box);
-        return box;
-    }
-    struct sh_rect area = usable_area(toplevel->server, output);
-    return (struct wlr_box){area.x, area.y, area.width, area.height};
-}
-
-struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel) {
-    return toplevel->fullscreen_cover ? toplevel->server->fullscreen_cover
-                                      : toplevel->server->fullscreen;
-}
-
 /* The window keyboard actions apply to: the focused one, else the topmost visible. */
 struct sh_toplevel *current_toplevel(struct sh_server *server) {
     if (server->focused_toplevel)
