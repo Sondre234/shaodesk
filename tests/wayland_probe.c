@@ -3,6 +3,7 @@
 #include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
 #include "xdg-activation-v1-client-protocol.h"
+#include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -55,6 +56,7 @@ struct probe {
     bool maximize; // --maximize: ask to maximize the matching window instead of closing it
     struct zwlr_foreign_toplevel_handle_v1 *close_target;
     struct xdg_activation_v1 *activation;
+    struct zxdg_decoration_manager_v1 *decorations;
     bool commands; // --commands: an external-control window that obeys lines on standard input
 };
 static void die(const char *message) {
@@ -162,6 +164,9 @@ static void global(void *data, struct wl_registry *registry, uint32_t name, cons
         wl_output_add_listener(probe->output, &output_listener, probe);
     } else if (!strcmp(interface, "xdg_activation_v1")) {
         probe->activation = wl_registry_bind(registry, name, &xdg_activation_v1_interface, 1);
+    } else if (!strcmp(interface, "zxdg_decoration_manager_v1")) {
+        probe->decorations =
+            wl_registry_bind(registry, name, &zxdg_decoration_manager_v1_interface, 1);
     } else if (!strcmp(interface, "xdg_wm_base")) {
         probe->shell = wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
         xdg_wm_base_add_listener(probe->shell, &shell_listener, probe);
@@ -519,6 +524,11 @@ int main(int argc, char **argv) {
     xdg_surface_add_listener(probe.xdg_surface, &surface_listener, &probe);
     probe.toplevel = xdg_surface_get_toplevel(probe.xdg_surface);
     xdg_toplevel_add_listener(probe.toplevel, &toplevel_listener, &probe);
+    // SHAODESK_PROBE_SSD leaves the frame to the compositor, as kitty does.
+    if (getenv("SHAODESK_PROBE_SSD") && probe.decorations)
+        zxdg_toplevel_decoration_v1_set_mode(
+            zxdg_decoration_manager_v1_get_toplevel_decoration(probe.decorations, probe.toplevel),
+            ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
     if (getenv("SHAODESK_PROBE_MOVE") || getenv("SHAODESK_PROBE_RESIZE")) {
         const char *edge = getenv("SHAODESK_PROBE_RESIZE");
         if (edge) { // top, bottom, left, right, or two of them joined by "_"
