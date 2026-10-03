@@ -319,6 +319,20 @@ void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool maximized)
                 y = place.y;
             }
         }
+        // The first window after a button binding spawned a program opens centered on the
+        // click, kept inside the area.
+        bool clicked = server->spawn_until && now_ms() < server->spawn_until &&
+                       server->spawn_x >= area.x && server->spawn_x < area.x + area.width &&
+                       server->spawn_y >= area.y && server->spawn_y < area.y + area.height;
+        server->spawn_until = 0;
+        if (clicked && !(ruled && rule.position != SH_RULE_POSITION_UNSET)) {
+            x = (int)server->spawn_x - width / 2;
+            y = (int)server->spawn_y - height / 2;
+            x = x + width > area.x + area.width ? area.x + area.width - width : x;
+            y = y + height > area.y + area.height ? area.y + area.height - height : y;
+            x = x < area.x ? area.x : x;
+            y = y < area.y ? area.y : y;
+        }
         if (ruled && rule.position == SH_RULE_POSITION_CENTER) {
             x = area.x + (area.width - width) / 2;
             y = area.y + (area.height - height) / 2;

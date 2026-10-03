@@ -205,6 +205,10 @@ struct sh_server {
     bool running;
     uint32_t grab_button;
     uint32_t bound_buttons; /* bit (code - BTN_MOUSE): pressed buttons a binding consumed */
+    /* Where a button binding last spawned a program: the next window to open before
+     * `spawn_until` (now_ms) is centered there. */
+    double spawn_x, spawn_y;
+    int64_t spawn_until;
     struct wlr_scene_tree *backgrounds;
     struct wlr_scene_tree *windows;
     struct wlr_scene_tree *fullscreen;
