@@ -38,6 +38,7 @@ add_executable(shaode-shell main.cpp ${SHAODE_NOTIFY_SOURCES} controller.cpp con
     task_filter.cpp task_filter.hpp icons.cpp icons.hpp wallpapers.cpp wallpapers.hpp view.cpp view.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp
     ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
     ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h)
+add_dependencies(shaode-shell shaode_wlr_client_protocols)
 set_target_properties(shaode-shell PROPERTIES AUTOMOC ON RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 target_include_directories(shaode-shell PRIVATE ${PROJECT_BINARY_DIR})
 target_link_libraries(shaode-shell PRIVATE shaode_config Qt6::Core Qt6::Gui Qt6::Network Qt6::Qml Qt6::Quick

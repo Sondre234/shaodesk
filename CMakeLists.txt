@@ -137,6 +137,10 @@ if(SHAODE_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-protocol.c)
     endforeach()
+    # A custom command's rule is only generated for targets in this directory, but shaode-shell
+    # (in shell/) uses the client files too. Without the tests, no target here uses them, so
+    # this target carries the rule and shaode-shell depends on it.
+    add_custom_target(shaode_wlr_client_protocols DEPENDS ${WLR_CLIENT_PROTOCOL_SOURCES})
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.h
         COMMAND ${WAYLAND_SCANNER} server-header
         ${PROTOCOL_DIR}/stable/xdg-shell/xdg-shell.xml
