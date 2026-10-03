@@ -607,14 +607,18 @@ void focus_urgent(struct sh_server *server);
 bool hover_focuses(struct sh_server *server, struct sh_toplevel *toplevel);
 void focus_previous(struct sh_server *server);
 void focus_last(struct sh_server *server);
+void focus_top_on(struct sh_server *server, struct wlr_output *output);
 void focus_desktop(struct sh_server *server, struct wlr_output *output);
 void focus_layer(struct sh_layer *layer);
 void minimize_toplevel(struct sh_toplevel *toplevel);
 struct sh_rect usable_area(struct sh_server *server, struct wlr_output *output);
 struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *output);
+struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel);
 struct sh_toplevel *current_toplevel(struct sh_server *server);
 void switch_workspace(struct sh_server *server, struct wlr_output *output, int workspace);
 void set_sticky(struct sh_toplevel *toplevel, bool sticky, bool retile);
+void move_toplevel_to_workspace(struct sh_server *server, struct sh_toplevel *toplevel,
+                                int workspace);
 void move_to_workspace(struct sh_server *server, int workspace);
 struct sh_toplevel *toplevel_toward(struct sh_toplevel *from_toplevel, bool horizontal,
                                     int sign, bool tiles_only);
@@ -642,21 +646,6 @@ void switcher_open(struct sh_server *server, bool backward, uint32_t modifiers,
                    xkb_keysym_t key);
 void switcher_forget(struct sh_toplevel *toplevel);
 void switcher_key(struct sh_server *server, uint32_t modifiers, xkb_keysym_t sym);
-size_t overview_describe(struct sh_server *server, char *text, size_t size);
-void overview_select(struct sh_server *server, int index);
-void overview_touch(struct sh_server *server, bool relayout);
-void overview_forget(struct sh_toplevel *toplevel);
-void overview_open(struct sh_server *server);
-void overview_close(struct sh_server *server, struct sh_toplevel *chosen, int workspace);
-void overview_dismiss(struct sh_server *server);
-void overview_confirm(struct sh_server *server, int index);
-void overview_view(struct sh_server *server, int workspace);
-void overview_set_filter(struct sh_server *server, const char *text);
-void overview_key(struct sh_server *server, uint32_t modifiers, xkb_keysym_t sym);
-bool overview_button(struct sh_server *server, const struct wlr_pointer_button_event *event);
-bool overview_motion(struct sh_server *server);
-void overview_hot_corner(struct sh_server *server);
-bool overview_axis(struct sh_server *server, const struct wlr_pointer_axis_event *event);
 void reload_config(struct sh_server *server);
 
 /* actions.c */
@@ -778,6 +767,23 @@ void schedule_evacuation(struct sh_server *server, struct sh_output *output);
 void return_home_windows(struct sh_server *server);
 void move_workspace_to_output(struct sh_server *server, const char *target);
 void swap_output_workspaces(struct sh_server *server, const char *target);
+
+/* overview.c */
+size_t overview_describe(struct sh_server *server, char *text, size_t size);
+void overview_select(struct sh_server *server, int index);
+void overview_touch(struct sh_server *server, bool relayout);
+void overview_forget(struct sh_toplevel *toplevel);
+void overview_open(struct sh_server *server);
+void overview_close(struct sh_server *server, struct sh_toplevel *chosen, int workspace);
+void overview_dismiss(struct sh_server *server);
+void overview_confirm(struct sh_server *server, int index);
+void overview_view(struct sh_server *server, int workspace);
+void overview_set_filter(struct sh_server *server, const char *text);
+void overview_key(struct sh_server *server, uint32_t modifiers, xkb_keysym_t sym);
+bool overview_button(struct sh_server *server, const struct wlr_pointer_button_event *event);
+bool overview_motion(struct sh_server *server);
+void overview_hot_corner(struct sh_server *server);
+bool overview_axis(struct sh_server *server, const struct wlr_pointer_axis_event *event);
 
 /* placement.c */
 struct sh_rect gap_area(const struct sh_settings *settings, struct sh_rect area,
