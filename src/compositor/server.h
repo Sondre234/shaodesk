@@ -622,11 +622,13 @@ struct sh_toplevel *swallow_host(struct sh_toplevel *child, bool terminals_only)
 bool swallow_wanted(struct sh_toplevel *child);
 void swallow_attach(struct sh_toplevel *host, struct sh_toplevel *child);
 void swallow_end(struct sh_toplevel *toplevel);
+void switcher_close(struct sh_server *server, int index);
 void switcher_forget(struct sh_toplevel *toplevel);
 size_t overview_describe(struct sh_server *server, char *text, size_t size);
 void overview_select(struct sh_server *server, int index);
 void overview_touch(struct sh_server *server, bool relayout);
 void overview_forget(struct sh_toplevel *toplevel);
+void overview_dismiss(struct sh_server *server);
 void overview_view(struct sh_server *server, int workspace);
 void overview_set_filter(struct sh_server *server, const char *text);
 void hide_in_scratchpad(struct sh_toplevel *toplevel);
@@ -642,6 +644,7 @@ int64_t now_ms(void);
 double zoom_level(struct sh_server *server, int64_t now);
 void refresh_frame(struct sh_toplevel *toplevel);
 void forget_decoration(struct sh_toplevel *toplevel);
+void process_cursor_motion(struct sh_server *server, uint32_t time);
 bool output_named(const struct sh_output *output, const char *name);
 void output_description(const struct wlr_output *output, char *text, size_t size);
 bool output_key_matches(const char *key, const struct wlr_output *output);
@@ -670,6 +673,15 @@ void unpublish_toplevel(struct sh_toplevel *toplevel);
 /* layer_shell.c */
 void arrange_layers(struct sh_server *server);
 void server_new_layer_surface(struct wl_listener *listener, void *data);
+
+/* lock.c */
+void send_locked_if_presented(struct sh_server *server);
+void lock_output_presented(struct sh_output *output);
+void server_new_lock(struct wl_listener *listener, void *data);
+#if WLR_HAS_SESSION
+void session_active(struct wl_listener *listener, void *data);
+#endif
+void server_new_inhibitor(struct wl_listener *listener, void *data);
 
 /* output_moves.c */
 void evacuate_output(struct sh_server *server, const char *name, struct wlr_box gone,

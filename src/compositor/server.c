@@ -16,16 +16,13 @@ _Static_assert((unsigned)SH_EDGE_TOP == (unsigned)WLR_EDGE_TOP &&
 /* BEGIN FORWARD */
 static struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel);
 static void swallow_release(struct sh_toplevel *child);
-static void switcher_close(struct sh_server *server, int index);
 static void center_scratchpad(struct sh_toplevel *toplevel, struct wlr_output *output);
 static void set_default_cursor(struct sh_server *server);
 static void refresh_tabs(struct sh_toplevel *toplevel);
 static void night_light_update(struct sh_server *server);
 static void zoom_by(struct sh_server *server, int steps);
 static void set_peek(struct sh_server *server, bool on);
-static void process_cursor_motion(struct sh_server *server, uint32_t time);
 static void process_pointer_target(struct sh_server *server, uint32_t time);
-static void lock_output_presented(struct sh_output *output);
 static void reload_config(struct sh_server *server);
 /* END FORWARD */
 
@@ -1308,7 +1305,7 @@ static void switcher_select(struct sh_server *server, int selected) {
 }
 
 /* Focuses the window at `index` in the list (or none, below 0) and closes the switcher. */
-static void switcher_close(struct sh_server *server, int index) {
+void switcher_close(struct sh_server *server, int index) {
     if (!server->switcher.open)
         return;
     struct sh_toplevel *chosen =
@@ -2019,7 +2016,7 @@ static void overview_close(struct sh_server *server, struct sh_toplevel *chosen,
 }
 
 /* Closes at once, without the glide: the session locks, or the output goes. */
-static void overview_dismiss(struct sh_server *server) {
+void overview_dismiss(struct sh_server *server) {
     struct sh_overview *overview = &server->overview;
     if (overview->open)
         overview_close(server, NULL, -1);
@@ -4494,7 +4491,7 @@ static void deco_activate(struct sh_toplevel *toplevel, enum sh_deco_part part) 
     }
 }
 
-static void process_cursor_motion(struct sh_server *server, uint32_t time) {
+void process_cursor_motion(struct sh_server *server, uint32_t time) {
     hot_corner_check(server);
     zoom_moved(server);
     if (server->seat->drag)
@@ -4926,173 +4923,6 @@ static void update_backgrounds(struct sh_server *server) {
         wlr_scene_node_set_position(&output->lock_blank->node, box.x, box.y);
         wlr_scene_rect_set_size(output->lock_blank, box.width, box.height);
     }
-}
-
-/* ext-session-lock-v1: an opaque cover hides the desktop from the moment a lock
- * starts; lock surfaces sit above it, and `locked` is sent once every output has
- * presented a covered frame. */
-static void send_locked_if_presented(struct sh_server *server) {
-    struct sh_lock *lock = server->lock;
-    if (!lock || lock->locked_sent)
-        return;
-    struct sh_output *output;
-    wl_list_for_each(output, &server->outputs, link) {
-        if (!output->lock_presented)
-            return;
-    }
-    lock->locked_sent = true;
-    wlr_session_lock_v1_send_locked(lock->lock);
-}
-
-static void lock_output_presented(struct sh_output *output) {
-    if (!output->server->locked || output->lock_presented)
-        return;
-    output->lock_presented = true;
-    send_locked_if_presented(output->server);
-}
-
-static void lock_surface_map(struct wl_listener *listener, void *data) {
-    struct sh_lock_surface *lock_surface = wl_container_of(listener, lock_surface, map);
-    struct sh_server *server = lock_surface->server;
-    if (server->locked && !server->seat->keyboard_state.focused_surface)
-        keyboard_enter(server->seat, lock_surface->surface->surface);
-    process_cursor_motion(server, 0);
-}
-
-static void lock_surface_destroy(struct wl_listener *listener, void *data) {
-    struct sh_lock_surface *lock_surface = wl_container_of(listener, lock_surface, destroy);
-    struct sh_server *server = lock_surface->server;
-    if (server->seat->keyboard_state.focused_surface == lock_surface->surface->surface) {
-        wlr_seat_keyboard_clear_focus(server->seat);
-        // Hand the keyboard to another lock surface, if one remains.
-        struct wlr_session_lock_surface_v1 *other;
-        if (server->lock) {
-            wl_list_for_each(other, &server->lock->lock->surfaces, link) {
-                if (other != lock_surface->surface && other->surface->mapped) {
-                    keyboard_enter(server->seat, other->surface);
-                    break;
-                }
-            }
-        }
-    }
-    wl_list_remove(&lock_surface->map.link);
-    wl_list_remove(&lock_surface->destroy.link);
-    wlr_scene_node_destroy(&lock_surface->tree->node);
-    free(lock_surface);
-}
-
-static void lock_new_surface(struct wl_listener *listener, void *data) {
-    struct sh_lock *lock = wl_container_of(listener, lock, new_surface);
-    struct sh_server *server = lock->server;
-    struct wlr_session_lock_surface_v1 *surface = data;
-    struct sh_lock_surface *lock_surface = calloc(1, sizeof(*lock_surface));
-    if (!lock_surface)
-        return;
-    lock_surface->server = server;
-    lock_surface->surface = surface;
-    lock_surface->tree = wlr_scene_subsurface_tree_create(server->lock_tree, surface->surface);
-    if (!lock_surface->tree) {
-        free(lock_surface);
-        return;
-    }
-    struct wlr_box box;
-    wlr_output_layout_get_box(server->output_layout, surface->output, &box);
-    wlr_scene_node_set_position(&lock_surface->tree->node, box.x, box.y);
-    wlr_session_lock_surface_v1_configure(surface, box.width, box.height);
-    add_listener(&surface->surface->events.map, &lock_surface->map, lock_surface_map);
-    add_listener(&surface->events.destroy, &lock_surface->destroy, lock_surface_destroy);
-}
-
-static void lock_unlock(struct wl_listener *listener, void *data) {
-    struct sh_lock *lock = wl_container_of(listener, lock, unlock);
-    struct sh_server *server = lock->server;
-    server->locked = false;
-    wlr_scene_node_set_enabled(&server->lock_tree->node, false);
-    wlr_seat_keyboard_clear_focus(server->seat);
-    if (server->focused_toplevel && !server->focused_toplevel->minimized)
-        focus_toplevel(server->focused_toplevel);
-    else
-        focus_previous(server);
-    process_cursor_motion(server, 0);
-    wlr_log(WLR_INFO, "Session unlocked");
-}
-
-static void lock_destroy(struct wl_listener *listener, void *data) {
-    struct sh_lock *lock = wl_container_of(listener, lock, destroy);
-    struct sh_server *server = lock->server;
-    if (server->locked)
-        wlr_log(WLR_ERROR, "Lock client vanished; the session stays locked until a new lock");
-    wl_list_remove(&lock->new_surface.link);
-    wl_list_remove(&lock->unlock.link);
-    wl_list_remove(&lock->destroy.link);
-    server->lock = NULL;
-    free(lock);
-}
-
-static void server_new_lock(struct wl_listener *listener, void *data) {
-    struct sh_server *server = wl_container_of(listener, server, new_lock);
-    struct wlr_session_lock_v1 *wlr_lock = data;
-    struct sh_lock *lock = server->lock ? NULL : calloc(1, sizeof(*lock));
-    if (!lock) {
-        wlr_session_lock_v1_destroy(wlr_lock); // Another locker is active: `finished`.
-        return;
-    }
-    lock->server = server;
-    lock->lock = wlr_lock;
-    switcher_close(server, -1);
-    overview_dismiss(server);
-    add_listener(&wlr_lock->events.new_surface, &lock->new_surface, lock_new_surface);
-    add_listener(&wlr_lock->events.unlock, &lock->unlock, lock_unlock);
-    add_listener(&wlr_lock->events.destroy, &lock->destroy, lock_destroy);
-    server->lock = lock;
-    bool relock = server->locked;
-    server->locked = true;
-    if (server->grabbed_toplevel)
-        reset_cursor_mode(server);
-    wlr_seat_keyboard_clear_focus(server->seat);
-    wlr_seat_pointer_clear_focus(server->seat);
-    wlr_scene_node_set_enabled(&server->lock_tree->node, true);
-    wlr_log(WLR_INFO, "Session locked");
-    struct sh_output *output;
-    wl_list_for_each(output, &server->outputs, link) {
-        // A replacement locker for an abandoned lock finds the cover already shown.
-        output->lock_presented = relock;
-        wlr_output_schedule_frame(output->wlr_output);
-    }
-    send_locked_if_presented(server);
-}
-
-static void inhibitor_destroy(struct wl_listener *listener, void *data) {
-    struct sh_inhibitor *inhibitor = wl_container_of(listener, inhibitor, destroy);
-    struct sh_server *server = inhibitor->server;
-    wl_list_remove(&inhibitor->destroy.link);
-    free(inhibitor);
-    wlr_idle_notifier_v1_set_inhibited(server->idle_notifier, --server->inhibitors > 0);
-}
-
-#if WLR_HAS_SESSION
-/* The machine stays awake while this VT is in front; switching away lets it sleep again. */
-static void session_active(struct wl_listener *listener, void *data) {
-    struct sh_server *server = wl_container_of(listener, server, session_active);
-    if (server->session->active && server->sleep_inhibitor < 0) {
-        server->sleep_inhibitor = sh_sleep_inhibit();
-    } else if (!server->session->active && server->sleep_inhibitor >= 0) {
-        close(server->sleep_inhibitor);
-        server->sleep_inhibitor = -1;
-    }
-}
-#endif
-
-/* Video players and games keep the session awake while any inhibitor exists. */
-static void server_new_inhibitor(struct wl_listener *listener, void *data) {
-    struct sh_server *server = wl_container_of(listener, server, new_inhibitor);
-    struct wlr_idle_inhibitor_v1 *wlr_inhibitor = data;
-    struct sh_inhibitor *inhibitor = calloc(1, sizeof(*inhibitor));
-    if (!inhibitor)
-        return;
-    inhibitor->server = server;
-    add_listener(&wlr_inhibitor->events.destroy, &inhibitor->destroy, inhibitor_destroy);
-    wlr_idle_notifier_v1_set_inhibited(server->idle_notifier, ++server->inhibitors > 0);
 }
 
 bool output_named(const struct sh_output *output, const char *name) {
