@@ -13,7 +13,7 @@ jobs:
       - name: Python syntax check of the test drivers
         run: python3 -m py_compile tests/*.py
       - name: Shellcheck the helper scripts
-        run: shellcheck -S warning -x tools/*.sh tools/gentoo-vm/*.sh
+        run: shellcheck -S warning -x tools/*.sh
 
   build:
     # wlroots is pinned to the 0.20 series, which Arch ships as its own package.

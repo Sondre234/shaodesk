@@ -3,9 +3,7 @@
 shaoDe is being developed for a personal Gentoo desktop. It currently has a
 working nested compositor and an experimental standalone backend. The physical
 DRM/input session has run on an Arch laptop; the actual Gentoo build has only been
-tested in the VM below. There is no dependency on systemd in shaoDe itself.
-For a reproducible Gentoo test machine, see the QEMU/KVM VM scripts in
-[tools/gentoo-vm](../tools/gentoo-vm/README.md).
+tested in a VM. There is no dependency on systemd in shaoDe itself.
 
 ## Dependencies
 
