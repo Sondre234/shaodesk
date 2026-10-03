@@ -600,6 +600,7 @@ void deactivate_toplevel(struct sh_server *server);
 void keyboard_enter(struct wlr_seat *seat, struct wlr_surface *surface);
 void focus_toplevel_raise(struct sh_toplevel *toplevel, bool raise);
 void focus_toplevel(struct sh_toplevel *toplevel);
+float urgent_pulse(struct sh_toplevel *toplevel, int64_t now);
 void set_urgent(struct sh_toplevel *toplevel, bool urgent);
 void activation_requested(struct sh_toplevel *toplevel);
 bool hover_focuses(struct sh_server *server, struct sh_toplevel *toplevel);
@@ -616,6 +617,7 @@ struct sh_toplevel *toplevel_toward(struct sh_toplevel *from_toplevel, bool hori
                                     int sign, bool tiles_only);
 void pointer_follow(struct sh_toplevel *toplevel);
 bool groups_enabled(struct sh_server *server);
+int group_size(struct sh_server *server, unsigned group);
 int group_index(struct sh_toplevel *from);
 void group_follow(struct sh_toplevel *toplevel);
 void group_show(struct sh_toplevel *toplevel);
@@ -644,13 +646,9 @@ bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, cha
                      size_t error_size);
 void run_action(struct sh_server *server, enum sh_action action, int argument);
 void set_default_cursor(struct sh_server *server);
-enum wlr_xdg_toplevel_decoration_v1_mode
-decoration_mode(struct wlr_xdg_toplevel_decoration_v1 *decoration);
-bool wants_decoration(struct sh_toplevel *toplevel);
-bool in_deco_corner(struct sh_toplevel *toplevel, double x, double y);
-void refresh_decoration(struct sh_toplevel *toplevel);
-void refresh_tabs(struct sh_toplevel *toplevel);
+void fade_update(void *data);
 int64_t now_ms(void);
+void update_dim(struct sh_toplevel *toplevel);
 bool tick_effects(struct sh_server *server);
 void hot_corner_check(struct sh_server *server);
 double zoom_level(struct sh_server *server, int64_t now);
@@ -660,8 +658,6 @@ void output_release_zoom(struct sh_output *output);
 bool output_commit_zoomed(struct sh_output *output, struct wlr_scene_output *scene_output,
                           const struct wlr_scene_output_state_options *options,
                           double level);
-void refresh_frame(struct sh_toplevel *toplevel);
-void forget_decoration(struct sh_toplevel *toplevel);
 
 /* control.c */
 void notify_subscribers(struct sh_server *server);
@@ -690,6 +686,16 @@ void toplevel_app_id_changed(struct wl_listener *listener, void *data);
 void server_new_capture_request(struct wl_listener *listener, void *data);
 void publish_toplevel(struct sh_toplevel *toplevel);
 void unpublish_toplevel(struct sh_toplevel *toplevel);
+
+/* frame.c */
+enum wlr_xdg_toplevel_decoration_v1_mode
+decoration_mode(struct wlr_xdg_toplevel_decoration_v1 *decoration);
+bool wants_decoration(struct sh_toplevel *toplevel);
+bool in_deco_corner(struct sh_toplevel *toplevel, double x, double y);
+void refresh_decoration(struct sh_toplevel *toplevel);
+void refresh_tabs(struct sh_toplevel *toplevel);
+void refresh_frame(struct sh_toplevel *toplevel);
+void forget_decoration(struct sh_toplevel *toplevel);
 
 /* grab.c */
 void reset_cursor_mode(struct sh_server *server);
