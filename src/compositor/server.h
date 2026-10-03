@@ -580,4 +580,44 @@ struct sh_keyboard {
 static const uint32_t ALL_EDGES = WLR_EDGE_TOP | WLR_EDGE_BOTTOM | WLR_EDGE_LEFT | WLR_EDGE_RIGHT;
 
 /* BEGIN PROTOTYPES */
+
+/* server.c */
+const struct sh_settings *server_settings(struct sh_server *server);
+struct wlr_box toplevel_geometry(struct sh_toplevel *toplevel);
+const char *toplevel_title(struct sh_toplevel *toplevel);
+const char *toplevel_app_id(struct sh_toplevel *toplevel);
+int *output_workspace(struct sh_server *server, const char *name);
+bool toplevel_visible(struct sh_toplevel *toplevel);
+struct wlr_output *focused_output(struct sh_server *server);
+size_t overview_describe(struct sh_server *server, char *text, size_t size);
+void overview_select(struct sh_server *server, int index);
+void overview_touch(struct sh_server *server, bool relayout);
+void overview_view(struct sh_server *server, int workspace);
+void overview_set_filter(struct sh_server *server, const char *text);
+bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, char *error,
+                     size_t error_size);
+void run_action(struct sh_server *server, enum sh_action action, int argument);
+int64_t now_ms(void);
+double zoom_level(struct sh_server *server, int64_t now);
+void output_description(const struct wlr_output *output, char *text, size_t size);
+struct wlr_output *find_output(struct sh_server *server, const char *name);
+bool output_tiles(struct sh_server *server, struct wlr_output *output);
+bool session_save(struct sh_server *server, const char *name, int *windows, char *error,
+                  size_t error_size);
+bool session_restore(struct sh_server *server, const char *name, bool launch,
+                     int *restored, int *launched, int *missing, char *error,
+                     size_t error_size);
+int session_name_compare(const struct dirent **a, const struct dirent **b);
+int session_name_filter(const struct dirent *entry);
+
+/* control.c */
+void notify_subscribers(struct sh_server *server);
+void send_event(struct sh_server *server, const char *text, size_t length);
+void request_shell(struct sh_server *server, const char *what);
+void send_shell_line(struct sh_server *server, const char *line);
+void request_launcher(struct sh_server *server);
+void request_palette(struct sh_server *server);
+void open_control_socket(struct sh_server *server, const char *wayland_socket);
+void close_control_socket(struct sh_server *server);
+
 /* END PROTOTYPES */
