@@ -56,7 +56,9 @@ while dragging, while a menu or popup is open, or while a panel or launcher has 
 
 A window you fullscreen with a binding or its title bar fills its monitor except the panel and
 other bars, which stay shown. Fullscreen a program asks for itself, like a video player or a
-browser's fullscreen video, covers the whole monitor, panels included, while it has focus.
+browser's fullscreen video, covers the whole monitor, panels included, and keeps covering it
+while you work on another monitor; bringing another window forward on its monitor puts it
+behind that window and shows the panels again.
 
 Limitations: snapping is keyboard-driven, without edge-drag previews. Window
 placement during interactive resize is immediate, without waiting for the
