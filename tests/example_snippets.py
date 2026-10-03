@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The examples in the documentation work as written: each binding config/init.lua offers in a
 comment, added to the default bindings, is accepted (no duplicate key, no unknown action), and so
-is every Lua block of the README, on top of the default configuration."""
+is every Lua block of the README and docs/features.md, on top of the default configuration."""
 import os
 from pathlib import Path
 import re
@@ -39,10 +39,12 @@ with tempfile.TemporaryDirectory(prefix="shaode-snippets-") as directory:
                                 capture_output=True, text=True, timeout=30)
         if result.returncode != 0:
             failures.append((snippet, (result.stdout + result.stderr).strip()))
-    # The README's Lua blocks: whole configurations, or the entries of one (bindings included).
-    readme = (example.parent.parent / "README.md").read_text()
-    blocks = re.findall(r"```lua\n(.*?)```", readme, re.S)
-    assert len(blocks) >= 5, f"found only {len(blocks)} Lua blocks in the README"
+    # The documentation's Lua blocks: whole configurations, or the entries of one (bindings
+    # included).
+    root = example.parent.parent
+    docs = (root / "README.md").read_text() + (root / "docs/features.md").read_text()
+    blocks = re.findall(r"```lua\n(.*?)```", docs, re.S)
+    assert len(blocks) >= 5, f"found only {len(blocks)} Lua blocks in the documentation"
     for block in blocks:
         if block.lstrip().startswith("return"):
             source = block
@@ -61,4 +63,4 @@ with tempfile.TemporaryDirectory(prefix="shaode-snippets-") as directory:
 for snippet, message in failures:
     print(f"rejected: {snippet}\n  {message}", file=sys.stderr)
 assert not failures, f"{len(failures)} documentation examples are rejected"
-print(f"{len(snippets)} commented bindings and {len(blocks)} README blocks are accepted")
+print(f"{len(snippets)} commented bindings and {len(blocks)} documentation blocks are accepted")
