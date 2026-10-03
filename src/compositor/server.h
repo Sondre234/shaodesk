@@ -678,6 +678,8 @@ void reset_cursor_mode(struct sh_server *server);
 void finish_grab(struct sh_server *server);
 void process_cursor_move(struct sh_server *server);
 void process_cursor_resize(struct sh_server *server);
+void begin_interactive(struct sh_toplevel *toplevel, enum sh_cursor_mode mode,
+                       uint32_t edges);
 
 /* group.c */
 bool groups_enabled(struct sh_server *server);
@@ -853,8 +855,6 @@ void maximize_toplevel(struct sh_toplevel *toplevel, bool maximized);
 void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool maximized);
 void unmap_toplevel(struct sh_toplevel *toplevel);
 void free_toplevel(struct sh_toplevel *toplevel);
-void begin_interactive(struct sh_toplevel *toplevel, enum sh_cursor_mode mode,
-                       uint32_t edges);
 void fit_fullscreen(struct sh_toplevel *toplevel);
 void refit_fullscreen(struct sh_server *server);
 void set_fullscreen(struct sh_toplevel *toplevel, bool fullscreen);
