@@ -586,6 +586,7 @@ uint64_t now_ns(void);
 void add_listener(struct wl_signal *signal, struct wl_listener *listener,
                   wl_notify_func_t notify);
 const struct sh_settings *server_settings(struct sh_server *server);
+struct wlr_output *first_output(struct sh_server *server);
 int *output_workspace(struct sh_server *server, const char *name);
 bool toplevel_visible(struct sh_toplevel *toplevel);
 struct wlr_output *focused_output(struct sh_server *server);
@@ -597,6 +598,7 @@ void focus_toplevel(struct sh_toplevel *toplevel);
 void set_urgent(struct sh_toplevel *toplevel, bool urgent);
 void activation_requested(struct sh_toplevel *toplevel);
 void focus_previous(struct sh_server *server);
+void focus_layer(struct sh_layer *layer);
 void minimize_toplevel(struct sh_toplevel *toplevel);
 struct sh_rect usable_area(struct sh_server *server, struct wlr_output *output);
 struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *output);
@@ -670,6 +672,10 @@ void request_launcher(struct sh_server *server);
 void request_palette(struct sh_server *server);
 void open_control_socket(struct sh_server *server, const char *wayland_socket);
 void close_control_socket(struct sh_server *server);
+
+/* layer_shell.c */
+void arrange_layers(struct sh_server *server);
+void server_new_layer_surface(struct wl_listener *listener, void *data);
 
 /* session.c */
 pid_t toplevel_pid(struct sh_toplevel *toplevel);
