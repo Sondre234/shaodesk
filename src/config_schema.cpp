@@ -86,6 +86,10 @@ const Option options[] = {
      "`shaodesk msg workspace web`) accept them."},
     {"layout.tiling", "boolean", "false", "false", none, none,
      "Start every monitor with automatic tiling; `outputs.monitors.<name>.tiling` overrides it."},
+    {"layout.tiling_per_workspace", "boolean", "false", "false", none, none,
+     "Toggling tiling (`toggle_tiling`, the panel button) turns it on or off for the current "
+     "workspace only, instead of every workspace of the monitor; workspaces not toggled follow "
+     "the monitor's setting."},
     {"layout.tile_layout", "enum", "\"dwindle\"", "\"dwindle\"", none, none,
      "Tiling layout: `\"dwindle\"`, `\"master\"`, `\"spiral\"`, `\"monocle\"`, or "
      "`\"scroll\"`."},

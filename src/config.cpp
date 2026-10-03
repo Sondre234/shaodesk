@@ -1005,6 +1005,8 @@ Config read(lua_State *L, size_t own = SIZE_MAX) {
         config.settings.gap_inner = integer(L, "gap_inner", gap, 0, 100);
         config.settings.gap_outer = integer(L, "gap_outer", gap, 0, 100);
         boolean(L, "tiling", "layout.tiling", config.settings.tiling);
+        boolean(L, "tiling_per_workspace", "layout.tiling_per_workspace",
+                config.settings.tiling_per_workspace);
         config.settings.workspaces = integer(L, "workspaces", 4, 1, 10);
         lua_getfield(L, -1, "workspace_names");
         if (!lua_isnil(L, -1)) {
