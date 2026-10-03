@@ -369,6 +369,12 @@ layout = { tiling = false },
 outputs = { monitors = { ["DP-3"] = { tiling = true } } }, -- only DP-3 tiles
 ```
 
+With `layout.tiling_per_workspace = true`, toggling switches only the workspace the monitor
+shows: the others keep their own state, and workspaces never toggled follow the monitor's
+setting. A window moved to another workspace tiles or floats as that workspace does, and
+swapping workspaces between monitors takes their tiling state along. Turning the setting off
+again puts every workspace back on its monitor's setting.
+
 A monitor keeps its toggled state across reloads, and across being unplugged, until its
 configured setting changes; a reload then applies the new setting. Tiling follows Hyprland's default *dwindle*
 layout: every output and workspace has its own binary split tree, each split divides

@@ -56,6 +56,7 @@ return {
         workspaces = 4,
         tiling = false, -- automatic tiling on every monitor; outputs.monitors can override it,
         -- and each monitor's panel button toggles it there
+        tiling_per_workspace = false, -- toggling tiling affects only the current workspace
         -- Layout a workspace tiles with until layout_next and friends change it: "dwindle",
         -- "master", "spiral", "monocle" or "scroll"; master_ratio is the master column's share of the
         -- width (also a spiral's first tile), master_count the windows in that column.

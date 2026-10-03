@@ -138,6 +138,7 @@ struct Config {
                          .keyboard_options = "",
                          .xwayland = true,
                          .tiling = false,
+                         .tiling_per_workspace = false,
                          .tile_layout = 0,
                          .master_ratio = 0.55F,
                          .master_count = 1,

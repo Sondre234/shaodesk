@@ -68,6 +68,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `layout.workspaces` | integer | 4 | 1 to 10 | Workspaces per monitor. |
 | `layout.workspace_names` | list of strings | unset | - | Names for workspaces 1, 2, ...; at most `workspaces` of them, each up to 32 characters, not a number and not repeated ("" leaves one unnamed). The panel shows them, and `workspace` and `move_to_workspace` (bindings with `workspace = "web"`, or `shaodesk msg workspace web`) accept them. |
 | `layout.tiling` | boolean | false | - | Start every monitor with automatic tiling; `outputs.monitors.<name>.tiling` overrides it. |
+| `layout.tiling_per_workspace` | boolean | false | - | Toggling tiling (`toggle_tiling`, the panel button) turns it on or off for the current workspace only, instead of every workspace of the monitor; workspaces not toggled follow the monitor's setting. |
 | `layout.tile_layout` | enum | "dwindle" | - | Tiling layout: `"dwindle"`, `"master"`, `"spiral"`, `"monocle"`, or `"scroll"`. |
 | `layout.master_ratio` | number | 0.55 | 0.1 to 0.9 | Share of the screen the master area takes in the master layout. |
 | `layout.master_count` | integer | 1 | 1 to 8 | Windows in the master area. |

@@ -224,6 +224,7 @@ struct sh_settings {
     char keyboard_options[128];
     bool xwayland; /* read at startup; changing it needs a restart */
     bool tiling;   /* automatic tiling on outputs without their own; toggled per output */
+    bool tiling_per_workspace; /* toggling tiling turns it on or off for one workspace */
     int tile_layout;     /* enum sh_tile_layout of workspaces that have not chosen another */
     float master_ratio;  /* share of the width of the master column and of a spiral's first tile */
     int master_count;    /* windows in the master column */
