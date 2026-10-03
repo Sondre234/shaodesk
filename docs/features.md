@@ -689,6 +689,10 @@ browsers keep their own back and forward:
   command = { "kitty" } },
 ```
 
+The first window to open within five seconds of a button binding's `spawn` opens centered on
+the click, kept inside the area the panels leave free, unless a window rule gives its
+`position` (`tests/spawn_at_pointer_smoke.py`). A tile still goes where the layout puts it.
+
 ### Nested sessions
 
 The host compositor can consume shortcuts before the nested compositor receives
