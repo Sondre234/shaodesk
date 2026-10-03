@@ -628,6 +628,7 @@ bool groups_enabled(struct sh_server *server);
 int group_size(struct sh_server *server, unsigned group);
 int group_index(struct sh_toplevel *from);
 void group_follow(struct sh_toplevel *toplevel);
+void hand_over_slot(struct sh_toplevel *from, struct sh_toplevel *to);
 void group_show(struct sh_toplevel *toplevel);
 void group_detach(struct sh_toplevel *toplevel);
 bool groupable(struct sh_toplevel *toplevel);
@@ -636,11 +637,6 @@ void group_toggle(struct sh_server *server, struct sh_toplevel *current);
 void group_cycle(struct sh_server *server, struct sh_toplevel *current, int step);
 void ungroup(struct sh_server *server, struct sh_toplevel *current);
 void group_merge(struct sh_server *server, enum sh_action action);
-struct sh_toplevel *swallow_host(struct sh_toplevel *child, bool terminals_only);
-bool swallow_wanted(struct sh_toplevel *child);
-void swallow_attach(struct sh_toplevel *host, struct sh_toplevel *child);
-void swallow_end(struct sh_toplevel *toplevel);
-void swallow_toggle(struct sh_server *server, struct sh_toplevel *current);
 void reload_config(struct sh_server *server);
 
 /* actions.c */
@@ -816,6 +812,14 @@ int session_name_compare(const struct dirent **a, const struct dirent **b);
 int session_name_filter(const struct dirent *entry);
 bool session_claim(struct sh_server *server, struct sh_toplevel *toplevel,
                    struct sh_window_rule *rule, bool ruled);
+
+/* swallow.c */
+struct sh_toplevel *swallow_host(struct sh_toplevel *child, bool terminals_only);
+bool swallow_wanted(struct sh_toplevel *child);
+void swallow_attach(struct sh_toplevel *host, struct sh_toplevel *child);
+void swallow_release(struct sh_toplevel *child);
+void swallow_end(struct sh_toplevel *toplevel);
+void swallow_toggle(struct sh_server *server, struct sh_toplevel *current);
 
 /* switcher.c */
 void switcher_close(struct sh_server *server, int index);
