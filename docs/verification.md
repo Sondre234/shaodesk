@@ -63,7 +63,7 @@ Physical-device testing, hotplug, multi-monitor behavior, fractional scaling,
 clipboard interoperability, client-side title-bar grabs, and extended soak tests
 remain. The compositor checkpoint did not include shell UI, workspaces, persistent tiling,
 fullscreen handling, XWayland, portals, or session locking (all were added later;
-see the checkpoints below and the README). Interactive resize
+see the checkpoints below and [features.md](features.md)). Interactive resize
 positions are applied before clients submit their replacement buffers. This is
 a development checkpoint for nested use, not a complete desktop session.
 
