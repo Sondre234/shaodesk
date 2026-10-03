@@ -2010,7 +2010,7 @@ Config load_config_or_default(const std::filesystem::path &path, std::string &er
     } catch (const std::exception &failure) {
         error = failure.what();
     }
-    for (const std::filesystem::path fallback : {default_config_path(),
+    for (const std::filesystem::path &fallback : {default_config_path(),
                                                   std::filesystem::path(SHAODESK_SOURCE_CONFIG)}) {
         std::error_code failure;
         if (!std::filesystem::exists(fallback, failure) ||
