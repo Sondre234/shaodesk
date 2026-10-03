@@ -586,25 +586,6 @@ uint64_t now_ns(void);
 void add_listener(struct wl_signal *signal, struct wl_listener *listener,
                   wl_notify_func_t notify);
 const struct sh_settings *server_settings(struct sh_server *server);
-void deactivate_toplevel(struct sh_server *server);
-void keyboard_enter(struct wlr_seat *seat, struct wlr_surface *surface);
-void focus_toplevel_raise(struct sh_toplevel *toplevel, bool raise);
-void focus_toplevel(struct sh_toplevel *toplevel);
-float urgent_pulse(struct sh_toplevel *toplevel, int64_t now);
-void set_urgent(struct sh_toplevel *toplevel, bool urgent);
-void activation_requested(struct sh_toplevel *toplevel);
-void focus_urgent(struct sh_server *server);
-bool hover_focuses(struct sh_server *server, struct sh_toplevel *toplevel);
-void focus_previous(struct sh_server *server);
-void focus_last(struct sh_server *server);
-void focus_top_on(struct sh_server *server, struct wlr_output *output);
-void focus_desktop(struct sh_server *server, struct wlr_output *output);
-void focus_layer(struct sh_layer *layer);
-struct sh_toplevel *current_toplevel(struct sh_server *server);
-struct sh_toplevel *toplevel_toward(struct sh_toplevel *from_toplevel, bool horizontal,
-                                    int sign, bool tiles_only);
-void pointer_follow(struct sh_toplevel *toplevel);
-void focus_direction(struct sh_server *server, enum sh_action action);
 void reload_config(struct sh_server *server);
 
 /* actions.c */
@@ -651,6 +632,28 @@ bool output_commit_zoomed(struct sh_output *output, struct wlr_scene_output *sce
                           const struct wlr_scene_output_state_options *options,
                           double level);
 void set_peek(struct sh_server *server, bool on);
+
+/* focus.c */
+void deactivate_toplevel(struct sh_server *server);
+void keyboard_enter(struct wlr_seat *seat, struct wlr_surface *surface);
+void focus_toplevel_raise(struct sh_toplevel *toplevel, bool raise);
+void focus_toplevel(struct sh_toplevel *toplevel);
+float urgent_pulse(struct sh_toplevel *toplevel, int64_t now);
+int urgent_tick(void *data);
+void set_urgent(struct sh_toplevel *toplevel, bool urgent);
+void activation_requested(struct sh_toplevel *toplevel);
+void focus_urgent(struct sh_server *server);
+bool hover_focuses(struct sh_server *server, struct sh_toplevel *toplevel);
+void focus_previous(struct sh_server *server);
+void focus_last(struct sh_server *server);
+void focus_top_on(struct sh_server *server, struct wlr_output *output);
+void focus_desktop(struct sh_server *server, struct wlr_output *output);
+void focus_layer(struct sh_layer *layer);
+struct sh_toplevel *current_toplevel(struct sh_server *server);
+struct sh_toplevel *toplevel_toward(struct sh_toplevel *from_toplevel, bool horizontal,
+                                    int sign, bool tiles_only);
+void pointer_follow(struct sh_toplevel *toplevel);
+void focus_direction(struct sh_server *server, enum sh_action action);
 
 /* foreign_toplevel.c */
 void toplevel_request_minimize(struct wl_listener *listener, void *data);
