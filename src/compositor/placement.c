@@ -3,9 +3,7 @@
  * grid, reflowing arranged windows and tiles, and moving and resizing by keyboard. */
 #include "server.h"
 
-/* BEGIN FORWARD */
 static struct wlr_output *box_output(struct sh_server *server, struct wlr_box box);
-/* END FORWARD */
 
 /* Layouts put their gap at the edges as well as between windows. Laying out with gap_inner
  * in an area grown or shrunk by the difference leaves gap_outer at the edges. Maximized

@@ -579,15 +579,13 @@ struct sh_keyboard {
 
 static const uint32_t ALL_EDGES = WLR_EDGE_TOP | WLR_EDGE_BOTTOM | WLR_EDGE_LEFT | WLR_EDGE_RIGHT;
 
-/* BEGIN PROTOTYPES */
-
 /* server.c */
 uint64_t now_ns(void);
+int64_t now_ms(void);
 void add_listener(struct wl_signal *signal, struct wl_listener *listener,
                   wl_notify_func_t notify);
 const struct sh_settings *server_settings(struct sh_server *server);
 void reload_config(struct sh_server *server);
-int64_t now_ms(void);
 
 /* actions.c */
 bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, char *error,
@@ -895,5 +893,3 @@ void close_xwm_waker(struct sh_server *server);
 #endif
 void xwayland_ready(struct wl_listener *listener, void *data);
 #endif
-
-/* END PROTOTYPES */

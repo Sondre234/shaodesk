@@ -4,9 +4,7 @@
  * strip. */
 #include "server.h"
 
-/* BEGIN FORWARD */
 static void fade_update(void *data);
-/* END FORWARD */
 
 /* Windows are decorated by the server (no title bar, just the window controls) unless they ask to draw
  * their own frame, as frameless Electron apps like Discord do. */

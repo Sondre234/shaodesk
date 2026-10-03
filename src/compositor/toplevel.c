@@ -3,10 +3,8 @@
  * opening new windows by the window rules, and maximize, fullscreen and minimize. */
 #include "server.h"
 
-/* BEGIN FORWARD */
 static void set_fullscreen_focus(struct sh_toplevel *toplevel, bool fullscreen, bool focus);
 static void toplevel_request_minimize(struct wl_listener *listener, void *data);
-/* END FORWARD */
 
 /* Window operations shared by xdg-shell and XWayland toplevels. */
 struct wlr_surface *toplevel_surface(struct sh_toplevel *toplevel) {

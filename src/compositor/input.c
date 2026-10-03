@@ -4,10 +4,8 @@
  * drag-and-drop and pointer constraints. */
 #include "server.h"
 
-/* BEGIN FORWARD */
 static bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, uint32_t modifiers,
                               xkb_keysym_t sym);
-/* END FORWARD */
 
 static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) {
     struct sh_keyboard *keyboard = wl_container_of(listener, keyboard, modifiers);

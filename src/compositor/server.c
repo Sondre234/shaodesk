@@ -21,6 +21,11 @@ uint64_t now_ns(void) {
     return (uint64_t)now.tv_sec * 1000000000u + (uint64_t)now.tv_nsec;
 }
 
+int64_t now_ms(void) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+}
 
 void add_listener(struct wl_signal *signal, struct wl_listener *listener,
                   wl_notify_func_t notify) {
@@ -504,10 +509,4 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     wl_display_destroy(server.wl_display);
     sh_tiling_destroy(server.tiling);
     return 0;
-}
-
-int64_t now_ms(void) {
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
 }

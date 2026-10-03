@@ -3,9 +3,7 @@
  * bands it acts on, button bindings, scrolling, and the cursor image. */
 #include "server.h"
 
-/* BEGIN FORWARD */
 static void process_pointer_target(struct sh_server *server, uint32_t time);
-/* END FORWARD */
 
 /* Whether `node` is a window's rounded frame and the layout position is inside its hole. */
 static bool in_frame_hole(struct wlr_scene_node *node, double lx, double ly) {
