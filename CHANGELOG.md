@@ -5,6 +5,9 @@ tagged release yet; everything below is on `main`.
 
 ## Unreleased (2026-10-03)
 
+- `layout.tiling_per_workspace = true` makes tiling a setting of each workspace rather than
+  each monitor: Super + S, the panel button and `toggle_tiling` then switch only the current
+  workspace, and a window moved to another workspace tiles or floats as that one does.
 - Fullscreen a program asks for itself, like a browser's fullscreen video, stays over the
   panels when it loses focus, so a video on one monitor no longer shows the taskbar over it
   while you work on another. Raising another window on the same monitor still lowers it
