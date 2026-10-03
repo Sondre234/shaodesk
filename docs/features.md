@@ -287,8 +287,8 @@ under it, so it opens over them. Settings are in the `overview` table (`enabled`
 Scripts can drive it: `shaodesk msg toggle_overview`, `overview_confirm [N]`, `overview_cancel`,
 `overview filter TEXT`, `overview select N`, `overview view N` (from 1), and `get overview`,
 which lists the state, the selection and the rectangle of every thumbnail and strip cell.
-Subscribers get `overview` lines (see `overview_describe` in `src/backend.c`) as it opens
-and changes.
+Subscribers get `overview` lines (see `overview_describe` in `src/compositor/overview.c`) as
+it opens and changes.
 
 ## Command palette
 
