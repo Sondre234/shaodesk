@@ -582,49 +582,69 @@ static const uint32_t ALL_EDGES = WLR_EDGE_TOP | WLR_EDGE_BOTTOM | WLR_EDGE_LEFT
 /* BEGIN PROTOTYPES */
 
 /* server.c */
+uint64_t now_ns(void);
 void add_listener(struct wl_signal *signal, struct wl_listener *listener,
                   wl_notify_func_t notify);
 const struct sh_settings *server_settings(struct sh_server *server);
-bool toplevel_mapped(struct sh_toplevel *toplevel);
-struct wlr_box toplevel_geometry(struct sh_toplevel *toplevel);
-void toplevel_configure(struct sh_toplevel *toplevel, int x, int y, int width, int height);
-void toplevel_configure_box(struct sh_toplevel *toplevel, struct wlr_box box);
-struct wlr_box toplevel_box(struct sh_toplevel *toplevel);
-void toplevel_set_states(struct sh_toplevel *toplevel, bool maximized, uint32_t tiled);
-void toplevel_refresh(struct sh_toplevel *toplevel);
-const char *toplevel_title(struct sh_toplevel *toplevel);
-const char *toplevel_app_id(struct sh_toplevel *toplevel);
 int *output_workspace(struct sh_server *server, const char *name);
 bool toplevel_visible(struct sh_toplevel *toplevel);
 struct wlr_output *focused_output(struct sh_server *server);
 void set_toplevel_output(struct sh_toplevel *toplevel, struct wlr_output *output);
+void follow_output(struct sh_toplevel *toplevel);
+void deactivate_toplevel(struct sh_server *server);
 void keyboard_enter(struct wlr_seat *seat, struct wlr_surface *surface);
 void focus_toplevel(struct sh_toplevel *toplevel);
 void set_urgent(struct sh_toplevel *toplevel, bool urgent);
 void activation_requested(struct sh_toplevel *toplevel);
+void focus_previous(struct sh_server *server);
 void minimize_toplevel(struct sh_toplevel *toplevel);
 struct sh_rect usable_area(struct sh_server *server, struct wlr_output *output);
+struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *output);
 void switch_workspace(struct sh_server *server, struct wlr_output *output, int workspace);
 void set_sticky(struct sh_toplevel *toplevel, bool sticky, bool retile);
+bool groups_enabled(struct sh_server *server);
+void group_show(struct sh_toplevel *toplevel);
+void group_detach(struct sh_toplevel *toplevel);
+bool groupable(struct sh_toplevel *toplevel);
+void group_join(struct sh_toplevel *toplevel, unsigned group);
+struct sh_toplevel *swallow_host(struct sh_toplevel *child, bool terminals_only);
+bool swallow_wanted(struct sh_toplevel *child);
+void swallow_attach(struct sh_toplevel *host, struct sh_toplevel *child);
+void swallow_end(struct sh_toplevel *toplevel);
+void switcher_forget(struct sh_toplevel *toplevel);
 size_t overview_describe(struct sh_server *server, char *text, size_t size);
 void overview_select(struct sh_server *server, int index);
 void overview_touch(struct sh_server *server, bool relayout);
+void overview_forget(struct sh_toplevel *toplevel);
 void overview_view(struct sh_server *server, int workspace);
 void overview_set_filter(struct sh_server *server, const char *text);
 void hide_in_scratchpad(struct sh_toplevel *toplevel);
 bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, char *error,
                      size_t error_size);
 void run_action(struct sh_server *server, enum sh_action action, int argument);
+uint32_t corner_edges(struct sh_toplevel *toplevel, uint32_t edges);
+void reset_cursor_mode(struct sh_server *server);
+enum wlr_xdg_toplevel_decoration_v1_mode
+decoration_mode(struct wlr_xdg_toplevel_decoration_v1 *decoration);
 void refresh_decoration(struct sh_toplevel *toplevel);
 int64_t now_ms(void);
 double zoom_level(struct sh_server *server, int64_t now);
 void refresh_frame(struct sh_toplevel *toplevel);
+void forget_decoration(struct sh_toplevel *toplevel);
+bool output_named(const struct sh_output *output, const char *name);
 void output_description(const struct wlr_output *output, char *text, size_t size);
+struct sh_rect gap_area(const struct sh_settings *settings, struct sh_rect area,
+                        enum sh_action action);
+struct sh_rect inside_border(struct sh_server *server, struct sh_rect rect);
+struct wlr_output *toplevel_output(struct sh_toplevel *toplevel);
 struct wlr_box rebase_box(struct sh_server *server, struct wlr_box box,
                           struct wlr_output *output);
+void restore_toplevel(struct sh_toplevel *toplevel);
+void place_maximized(struct sh_toplevel *toplevel);
 void place_by_hand(struct sh_toplevel *toplevel, enum sh_action action);
 void reflow_output(struct sh_server *server, struct wlr_output *output);
 struct wlr_output *find_output(struct sh_server *server, const char *name);
+struct wlr_output *tiled_output(struct sh_toplevel *toplevel);
 bool output_default_tiling(struct sh_server *server, struct wlr_output *output);
 bool output_tiles(struct sh_server *server, struct wlr_output *output);
 struct wlr_output *home_output(struct sh_toplevel *toplevel);
@@ -635,16 +655,11 @@ void tile_toplevel(struct sh_toplevel *toplevel, struct wlr_output *output,
 void untile_toplevel(struct sh_toplevel *toplevel, bool restore);
 void set_output_tiling(struct sh_server *server, struct wlr_output *output, bool enabled);
 void unarrange_in_place(struct sh_toplevel *toplevel);
+void toplevel_request_minimize(struct wl_listener *listener, void *data);
 void toplevel_title_changed(struct wl_listener *listener, void *data);
 void toplevel_app_id_changed(struct wl_listener *listener, void *data);
-void maximize_toplevel(struct sh_toplevel *toplevel, bool maximized);
-void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool maximized);
-void unmap_toplevel(struct sh_toplevel *toplevel);
-void free_toplevel(struct sh_toplevel *toplevel);
-void begin_interactive(struct sh_toplevel *toplevel, enum sh_cursor_mode mode,
-                       uint32_t edges);
-void set_fullscreen(struct sh_toplevel *toplevel, bool fullscreen);
-void set_client_fullscreen(struct sh_toplevel *toplevel, bool fullscreen);
+void publish_toplevel(struct sh_toplevel *toplevel);
+void unpublish_toplevel(struct sh_toplevel *toplevel);
 
 /* control.c */
 void notify_subscribers(struct sh_server *server);
@@ -668,16 +683,43 @@ int session_name_filter(const struct dirent *entry);
 bool session_claim(struct sh_server *server, struct sh_toplevel *toplevel,
                    struct sh_window_rule *rule, bool ruled);
 
+/* toplevel.c */
+struct wlr_surface *toplevel_surface(struct sh_toplevel *toplevel);
+bool toplevel_mapped(struct sh_toplevel *toplevel);
+struct wlr_box toplevel_geometry(struct sh_toplevel *toplevel);
+void toplevel_set_activated(struct sh_toplevel *toplevel, bool activated);
+void toplevel_configure(struct sh_toplevel *toplevel, int x, int y, int width, int height);
+void toplevel_configure_box(struct sh_toplevel *toplevel, struct wlr_box box);
+struct wlr_box toplevel_box(struct sh_toplevel *toplevel);
+void toplevel_set_position(struct sh_toplevel *toplevel, int x, int y);
+void toplevel_set_states(struct sh_toplevel *toplevel, bool maximized, uint32_t tiled);
+void toplevel_refresh(struct sh_toplevel *toplevel);
+void toplevel_close(struct sh_toplevel *toplevel);
+const char *toplevel_title(struct sh_toplevel *toplevel);
+const char *toplevel_app_id(struct sh_toplevel *toplevel);
+bool toplevel_accepts_keyboard(struct sh_toplevel *toplevel);
+void maximize_toplevel(struct sh_toplevel *toplevel, bool maximized);
+void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool maximized);
+void unmap_toplevel(struct sh_toplevel *toplevel);
+void free_toplevel(struct sh_toplevel *toplevel);
+void begin_interactive(struct sh_toplevel *toplevel, enum sh_cursor_mode mode,
+                       uint32_t edges);
+void fit_fullscreen(struct sh_toplevel *toplevel);
+void refit_fullscreen(struct sh_server *server);
+void set_fullscreen(struct sh_toplevel *toplevel, bool fullscreen);
+void set_client_fullscreen(struct sh_toplevel *toplevel, bool fullscreen);
+void server_new_xdg_toplevel(struct wl_listener *listener, void *data);
+void server_new_decoration(struct wl_listener *listener, void *data);
+void create_popup(struct sh_server *server, struct wlr_xdg_popup *xdg_popup,
+                  struct wlr_scene_tree *parent_tree);
+void server_new_xdg_popup(struct wl_listener *listener, void *data);
+
 /* xwayland.c */
 #if WLR_HAS_XWAYLAND
 void server_new_xwayland_surface(struct wl_listener *listener, void *data);
-#endif
-#if WLR_HAS_XWAYLAND
 #if SHAODESK_XWM_WAKER
 void close_xwm_waker(struct sh_server *server);
 #endif
-#endif
-#if WLR_HAS_XWAYLAND
 void xwayland_ready(struct wl_listener *listener, void *data);
 #endif
 

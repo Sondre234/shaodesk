@@ -5,7 +5,6 @@
 static int64_t monotonic_ms(void);
 /* END FORWARD */
 
-
 /* Sessions: `session save NAME` writes what every output and window is doing to a file (see
  * shaodesk/session.h); `session restore NAME [launch]` puts matching windows back, and with
  * `launch` starts the applications that are missing, placing their windows as they open. */
