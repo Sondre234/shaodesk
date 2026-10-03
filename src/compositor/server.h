@@ -646,18 +646,6 @@ bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, cha
                      size_t error_size);
 void run_action(struct sh_server *server, enum sh_action action, int argument);
 void set_default_cursor(struct sh_server *server);
-void fade_update(void *data);
-int64_t now_ms(void);
-void update_dim(struct sh_toplevel *toplevel);
-bool tick_effects(struct sh_server *server);
-void hot_corner_check(struct sh_server *server);
-double zoom_level(struct sh_server *server, int64_t now);
-void zoom_by(struct sh_server *server, int steps);
-void zoom_moved(struct sh_server *server);
-void output_release_zoom(struct sh_output *output);
-bool output_commit_zoomed(struct sh_output *output, struct wlr_scene_output *scene_output,
-                          const struct wlr_scene_output_state_options *options,
-                          double level);
 
 /* control.c */
 void notify_subscribers(struct sh_server *server);
@@ -678,6 +666,24 @@ void server_cursor_motion_absolute(struct wl_listener *listener, void *data);
 void server_cursor_button(struct wl_listener *listener, void *data);
 void server_cursor_axis(struct wl_listener *listener, void *data);
 void server_cursor_frame(struct wl_listener *listener, void *data);
+
+/* effects.c */
+void fade_update(void *data);
+int64_t now_ms(void);
+void update_dim(struct sh_toplevel *toplevel);
+bool tick_effects(struct sh_server *server);
+void night_light_update(struct sh_server *server);
+int night_light_tick(void *data);
+void hot_corner_check(struct sh_server *server);
+int hot_corner_tick(void *data);
+double zoom_level(struct sh_server *server, int64_t now);
+void zoom_by(struct sh_server *server, int steps);
+void zoom_moved(struct sh_server *server);
+void output_release_zoom(struct sh_output *output);
+bool output_commit_zoomed(struct sh_output *output, struct wlr_scene_output *scene_output,
+                          const struct wlr_scene_output_state_options *options,
+                          double level);
+void set_peek(struct sh_server *server, bool on);
 
 /* foreign_toplevel.c */
 void toplevel_request_minimize(struct wl_listener *listener, void *data);
