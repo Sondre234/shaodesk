@@ -146,7 +146,34 @@ if(SHAODESK_BUILD_COMPOSITOR)
         ${PROTOCOL_DIR}/stable/xdg-shell/xdg-shell.xml
         ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.h
         DEPENDS ${PROTOCOL_DIR}/stable/xdg-shell/xdg-shell.xml)
-    add_executable(shaodesk src/main.cpp src/compositor/server.c src/compositor/focus.c src/compositor/workspace.c src/compositor/group.c src/compositor/swallow.c src/compositor/switcher.c src/compositor/overview.c src/compositor/scratchpad.c src/compositor/actions.c src/compositor/input.c src/compositor/effects.c src/compositor/frame.c src/compositor/cursor.c src/compositor/grab.c src/compositor/output.c src/compositor/lock.c src/compositor/output_moves.c src/compositor/tiling.c src/compositor/placement.c src/compositor/foreign_toplevel.c src/compositor/layer_shell.c src/compositor/toplevel.c src/compositor/xwayland.c src/compositor/session.c src/compositor/control.c src/decoration.c src/animation.c src/effects_scene.c src/sleep.c
+    set(SHAODESK_COMPOSITOR_SOURCES
+        src/compositor/server.c
+        src/compositor/actions.c
+        src/compositor/control.c
+        src/compositor/cursor.c
+        src/compositor/effects.c
+        src/compositor/focus.c
+        src/compositor/foreign_toplevel.c
+        src/compositor/frame.c
+        src/compositor/grab.c
+        src/compositor/group.c
+        src/compositor/input.c
+        src/compositor/layer_shell.c
+        src/compositor/lock.c
+        src/compositor/output.c
+        src/compositor/output_moves.c
+        src/compositor/overview.c
+        src/compositor/placement.c
+        src/compositor/scratchpad.c
+        src/compositor/session.c
+        src/compositor/swallow.c
+        src/compositor/switcher.c
+        src/compositor/tiling.c
+        src/compositor/toplevel.c
+        src/compositor/workspace.c
+        src/compositor/xwayland.c
+    )
+    add_executable(shaodesk src/main.cpp ${SHAODESK_COMPOSITOR_SOURCES} src/decoration.c src/animation.c src/effects_scene.c src/sleep.c
         ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.h ${WLR_PROTOCOL_HEADERS})
     target_sources(shaodesk PRIVATE src/overview_scene.c)
     target_include_directories(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
