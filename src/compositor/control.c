@@ -13,6 +13,11 @@ struct sh_control_client {
     char request[512];
 };
 
+/* BEGIN FORWARD */
+static int session_name_compare(const struct dirent **a, const struct dirent **b);
+static int session_name_filter(const struct dirent *entry);
+/* END FORWARD */
+
 static void control_reply(int fd, const char *text) {
     size_t length = strlen(text);
     while (length > 0) {
@@ -908,4 +913,11 @@ void close_control_socket(struct sh_server *server) {
         close(server->control_fd);
     if (server->control_path[0])
         unlink(server->control_path);
+}
+
+static int session_name_compare(const struct dirent **a, const struct dirent **b) {
+    return strcmp((*a)->d_name, (*b)->d_name);
+}
+static int session_name_filter(const struct dirent *entry) {
+    return sh_session_valid_name(entry->d_name);
 }

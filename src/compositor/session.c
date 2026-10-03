@@ -357,13 +357,6 @@ bool session_restore(struct sh_server *server, const char *name, bool launch,
     return true;
 }
 
-int session_name_compare(const struct dirent **a, const struct dirent **b) {
-    return strcmp((*a)->d_name, (*b)->d_name);
-}
-int session_name_filter(const struct dirent *entry) {
-    return sh_session_valid_name(entry->d_name);
-}
-
 static int64_t monotonic_ms(void) {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);

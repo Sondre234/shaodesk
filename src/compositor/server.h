@@ -792,8 +792,6 @@ bool session_save(struct sh_server *server, const char *name, int *windows, char
 bool session_restore(struct sh_server *server, const char *name, bool launch,
                      int *restored, int *launched, int *missing, char *error,
                      size_t error_size);
-int session_name_compare(const struct dirent **a, const struct dirent **b);
-int session_name_filter(const struct dirent *entry);
 bool session_claim(struct sh_server *server, struct sh_toplevel *toplevel,
                    struct sh_window_rule *rule, bool ruled);
 
