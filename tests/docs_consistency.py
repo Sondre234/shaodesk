@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The documentation matches the code: every binding action the configuration accepts is
-described in the README, and every action the example configuration binds exists."""
+described in the README or docs/features.md, and every action the example configuration binds
+exists."""
 from pathlib import Path
 import re
 import sys
@@ -12,10 +13,10 @@ table = table[:table.index("};")]
 actions = re.findall(r'\{"([a-z_0-9]+)",\s*SH_', table)
 assert len(actions) > 80, f"the action table was not found ({len(actions)} entries)"
 
-readme = (root / "README.md").read_text()
+docs = (root / "README.md").read_text() + (root / "docs/features.md").read_text()
 missing = [name for name in actions
-           if not re.search(rf"(?<![a-z_0-9]){name}(?![a-z_0-9])", readme)]
-assert not missing, f"actions the README never mentions: {missing}"
+           if not re.search(rf"(?<![a-z_0-9]){name}(?![a-z_0-9])", docs)]
+assert not missing, f"actions the README and docs/features.md never mention: {missing}"
 
 example = (root / "config/init.lua").read_text()
 active = [line for line in example.splitlines() if not line.lstrip().startswith("--")]
