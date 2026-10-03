@@ -598,10 +598,13 @@ void set_toplevel_output(struct sh_toplevel *toplevel, struct wlr_output *output
 void follow_output(struct sh_toplevel *toplevel);
 void deactivate_toplevel(struct sh_server *server);
 void keyboard_enter(struct wlr_seat *seat, struct wlr_surface *surface);
+void focus_toplevel_raise(struct sh_toplevel *toplevel, bool raise);
 void focus_toplevel(struct sh_toplevel *toplevel);
 void set_urgent(struct sh_toplevel *toplevel, bool urgent);
 void activation_requested(struct sh_toplevel *toplevel);
+bool hover_focuses(struct sh_server *server, struct sh_toplevel *toplevel);
 void focus_previous(struct sh_server *server);
+void focus_desktop(struct sh_server *server, struct wlr_output *output);
 void focus_layer(struct sh_layer *layer);
 void minimize_toplevel(struct sh_toplevel *toplevel);
 struct sh_rect usable_area(struct sh_server *server, struct wlr_output *output);
@@ -613,6 +616,7 @@ struct sh_toplevel *toplevel_toward(struct sh_toplevel *from_toplevel, bool hori
                                     int sign, bool tiles_only);
 void pointer_follow(struct sh_toplevel *toplevel);
 bool groups_enabled(struct sh_server *server);
+int group_index(struct sh_toplevel *from);
 void group_follow(struct sh_toplevel *toplevel);
 void group_show(struct sh_toplevel *toplevel);
 void group_detach(struct sh_toplevel *toplevel);
@@ -631,24 +635,33 @@ void overview_forget(struct sh_toplevel *toplevel);
 void overview_dismiss(struct sh_server *server);
 void overview_view(struct sh_server *server, int workspace);
 void overview_set_filter(struct sh_server *server, const char *text);
+bool overview_button(struct sh_server *server, const struct wlr_pointer_button_event *event);
+bool overview_motion(struct sh_server *server);
+void overview_hot_corner(struct sh_server *server);
+bool overview_axis(struct sh_server *server, const struct wlr_pointer_axis_event *event);
 void hide_in_scratchpad(struct sh_toplevel *toplevel);
 bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, char *error,
                      size_t error_size);
 void run_action(struct sh_server *server, enum sh_action action, int argument);
-uint32_t corner_edges(struct sh_toplevel *toplevel, uint32_t edges);
+void set_default_cursor(struct sh_server *server);
 enum wlr_xdg_toplevel_decoration_v1_mode
 decoration_mode(struct wlr_xdg_toplevel_decoration_v1 *decoration);
+bool wants_decoration(struct sh_toplevel *toplevel);
+bool in_deco_corner(struct sh_toplevel *toplevel, double x, double y);
 void refresh_decoration(struct sh_toplevel *toplevel);
+void refresh_tabs(struct sh_toplevel *toplevel);
 int64_t now_ms(void);
 bool tick_effects(struct sh_server *server);
+void hot_corner_check(struct sh_server *server);
 double zoom_level(struct sh_server *server, int64_t now);
+void zoom_by(struct sh_server *server, int steps);
+void zoom_moved(struct sh_server *server);
 void output_release_zoom(struct sh_output *output);
 bool output_commit_zoomed(struct sh_output *output, struct wlr_scene_output *scene_output,
                           const struct wlr_scene_output_state_options *options,
                           double level);
 void refresh_frame(struct sh_toplevel *toplevel);
 void forget_decoration(struct sh_toplevel *toplevel);
-void process_cursor_motion(struct sh_server *server, uint32_t time);
 
 /* control.c */
 void notify_subscribers(struct sh_server *server);
@@ -659,6 +672,16 @@ void request_launcher(struct sh_server *server);
 void request_palette(struct sh_server *server);
 void open_control_socket(struct sh_server *server, const char *wayland_socket);
 void close_control_socket(struct sh_server *server);
+
+/* cursor.c */
+uint32_t corner_edges(struct sh_toplevel *toplevel, uint32_t edges);
+void cursor_request_set_shape(struct wl_listener *listener, void *data);
+void process_cursor_motion(struct sh_server *server, uint32_t time);
+void server_cursor_motion(struct wl_listener *listener, void *data);
+void server_cursor_motion_absolute(struct wl_listener *listener, void *data);
+void server_cursor_button(struct wl_listener *listener, void *data);
+void server_cursor_axis(struct wl_listener *listener, void *data);
+void server_cursor_frame(struct wl_listener *listener, void *data);
 
 /* foreign_toplevel.c */
 void toplevel_request_minimize(struct wl_listener *listener, void *data);
