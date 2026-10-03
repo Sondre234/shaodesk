@@ -786,6 +786,7 @@ void read_windows(lua_State *L, Config &config) {
             unknown("placement", name, {"cascade", "center", "smart"}, "=" + name);
     }
     lua_pop(L, 1);
+    config.settings.drag_strip = integer(L, "drag_strip", config.settings.drag_strip, 0, 100);
     lua_getfield(L, -1, "rules");
     if (!lua_isnil(L, -1)) {
         auto size = array_size(L, -1, 256);

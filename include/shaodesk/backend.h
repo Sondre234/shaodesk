@@ -315,6 +315,9 @@ struct sh_settings {
     float magnet_guide_color[4]; /* premultiplied RGBA */
     /* windows.placement: enum sh_place_mode, where new floating windows open. */
     int placement;
+    /* windows.drag_strip: how many pixels along the top of a window without a title bar move
+     * it when dragged. */
+    int drag_strip;
 };
 
 /* What a mouse button was pressed over. */

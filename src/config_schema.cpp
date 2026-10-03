@@ -215,6 +215,10 @@ const Option options[] = {
      "opens it in the middle of the screen's free area, `\"smart\"` where it covers the other "
      "windows least, centered in the largest gap that holds it, and cascading when nothing is "
      "free."},
+    {"windows.drag_strip", "integer", "6", "24", 0, 100,
+     "Pixels along the top of a window without a title bar (kitty, X11 applications) that move "
+     "it when dragged, as a title bar would; they no longer reach the application. 0 turns "
+     "this off."},
     {"windows.buttons", "string", "\"appmenu:minimize,maximize,close\"",
      "\"appmenu:minimize,maximize,close\"", none, none,
      "GTK button layout for windows that draw their own frame; lowercase letters, `_`, `,` "
