@@ -657,11 +657,6 @@ void tile_toplevel(struct sh_toplevel *toplevel, struct wlr_output *output,
 void untile_toplevel(struct sh_toplevel *toplevel, bool restore);
 void set_output_tiling(struct sh_server *server, struct wlr_output *output, bool enabled);
 void unarrange_in_place(struct sh_toplevel *toplevel);
-void toplevel_request_minimize(struct wl_listener *listener, void *data);
-void toplevel_title_changed(struct wl_listener *listener, void *data);
-void toplevel_app_id_changed(struct wl_listener *listener, void *data);
-void publish_toplevel(struct sh_toplevel *toplevel);
-void unpublish_toplevel(struct sh_toplevel *toplevel);
 
 /* control.c */
 void notify_subscribers(struct sh_server *server);
@@ -672,6 +667,14 @@ void request_launcher(struct sh_server *server);
 void request_palette(struct sh_server *server);
 void open_control_socket(struct sh_server *server, const char *wayland_socket);
 void close_control_socket(struct sh_server *server);
+
+/* foreign_toplevel.c */
+void toplevel_request_minimize(struct wl_listener *listener, void *data);
+void toplevel_title_changed(struct wl_listener *listener, void *data);
+void toplevel_app_id_changed(struct wl_listener *listener, void *data);
+void server_new_capture_request(struct wl_listener *listener, void *data);
+void publish_toplevel(struct sh_toplevel *toplevel);
+void unpublish_toplevel(struct sh_toplevel *toplevel);
 
 /* layer_shell.c */
 void arrange_layers(struct sh_server *server);
