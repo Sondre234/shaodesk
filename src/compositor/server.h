@@ -787,7 +787,6 @@ void scratchpad_show(struct sh_server *server);
 void empty_scratchpad(struct sh_server *server);
 
 /* session.c */
-pid_t toplevel_pid(struct sh_toplevel *toplevel);
 bool session_save(struct sh_server *server, const char *name, int *windows, char *error,
                   size_t error_size);
 bool session_restore(struct sh_server *server, const char *name, bool launch,
@@ -871,6 +870,7 @@ void server_new_xdg_popup(struct wl_listener *listener, void *data);
 void minimize_toplevel(struct sh_toplevel *toplevel);
 struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *output);
 struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel);
+pid_t toplevel_pid(struct sh_toplevel *toplevel);
 
 /* workspace.c */
 int output_slot(struct sh_server *server, const char *name);

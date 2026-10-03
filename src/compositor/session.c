@@ -1,23 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
 #include "server.h"
 
-/* BEGIN FORWARD */
-static int64_t monotonic_ms(void);
-/* END FORWARD */
-
 /* Sessions: `session save NAME` writes what every output and window is doing to a file (see
  * shaodesk/session.h); `session restore NAME [launch]` puts matching windows back, and with
  * `launch` starts the applications that are missing, placing their windows as they open. */
-pid_t toplevel_pid(struct sh_toplevel *toplevel) {
-#if WLR_HAS_XWAYLAND
-    if (toplevel->xsurface)
-        return toplevel->xsurface->pid;
-#endif
-    pid_t pid = 0;
-    wl_client_get_credentials(wl_resource_get_client(toplevel->xdg_toplevel->resource), &pid,
-                              NULL, NULL);
-    return pid;
-}
+
+/* BEGIN FORWARD */
+static int64_t monotonic_ms(void);
+/* END FORWARD */
 
 static void session_read_command(struct sh_toplevel *toplevel, struct sh_session_window *window) {
     pid_t pid = toplevel_pid(toplevel);

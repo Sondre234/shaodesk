@@ -848,3 +848,14 @@ static void toplevel_request_minimize(struct wl_listener *listener, void *data) 
     if (toplevel_mapped(toplevel))
         minimize_toplevel(toplevel);
 }
+
+pid_t toplevel_pid(struct sh_toplevel *toplevel) {
+#if WLR_HAS_XWAYLAND
+    if (toplevel->xsurface)
+        return toplevel->xsurface->pid;
+#endif
+    pid_t pid = 0;
+    wl_client_get_credentials(wl_resource_get_client(toplevel->xdg_toplevel->resource), &pid,
+                              NULL, NULL);
+    return pid;
+}
