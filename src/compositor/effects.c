@@ -1,12 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
 #include "server.h"
 
-int64_t now_ms(void) {
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
-}
-
 /* Asks every output for a frame, so that fades keep advancing while nothing else changes. */
 static void schedule_frames(struct sh_server *server) {
     struct sh_output *output;

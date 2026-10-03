@@ -503,3 +503,9 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     sh_tiling_destroy(server.tiling);
     return 0;
 }
+
+int64_t now_ms(void) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+}

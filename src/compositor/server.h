@@ -587,6 +587,7 @@ void add_listener(struct wl_signal *signal, struct wl_listener *listener,
                   wl_notify_func_t notify);
 const struct sh_settings *server_settings(struct sh_server *server);
 void reload_config(struct sh_server *server);
+int64_t now_ms(void);
 
 /* actions.c */
 bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, char *error,
@@ -614,7 +615,6 @@ void server_cursor_axis(struct wl_listener *listener, void *data);
 void server_cursor_frame(struct wl_listener *listener, void *data);
 
 /* effects.c */
-int64_t now_ms(void);
 void update_dim(struct sh_toplevel *toplevel);
 bool tick_effects(struct sh_server *server);
 void night_light_update(struct sh_server *server);
