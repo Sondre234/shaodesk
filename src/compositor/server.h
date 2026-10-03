@@ -592,8 +592,6 @@ void reload_config(struct sh_server *server);
 bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, char *error,
                      size_t error_size);
 void run_action(struct sh_server *server, enum sh_action action, int argument);
-bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, uint32_t modifiers,
-                       xkb_keysym_t sym);
 
 /* control.c */
 void notify_subscribers(struct sh_server *server);

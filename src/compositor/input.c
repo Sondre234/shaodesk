@@ -1,6 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
 #include "server.h"
 
+/* BEGIN FORWARD */
+static bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, uint32_t modifiers,
+                              xkb_keysym_t sym);
+/* END FORWARD */
+
 static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) {
     struct sh_keyboard *keyboard = wl_container_of(listener, keyboard, modifiers);
 
@@ -347,4 +352,82 @@ void seat_keyboard_focus_change(struct wl_listener *listener, void *data) {
                                       ? wlr_pointer_constraints_v1_constraint_for_surface(
                                             server->constraints, event->new_surface, server->seat)
                                       : NULL);
+}
+
+#if WLR_HAS_SESSION
+// Returns the VT a key switches to, or 0. Ctrl+AltGr+Fn counts as Ctrl+Alt+Fn: some keyboards'
+// only Alt key is Right Alt, which AltGr layouts turn into Level3 instead of Alt.
+static unsigned vt_for_key(uint32_t modifiers, xkb_keysym_t sym) {
+    if (sym >= XKB_KEY_XF86Switch_VT_1 && sym <= XKB_KEY_XF86Switch_VT_12)
+        return sym - XKB_KEY_XF86Switch_VT_1 + 1;
+    if ((modifiers & WLR_MODIFIER_CTRL) && (modifiers & (WLR_MODIFIER_ALT | WLR_MODIFIER_MOD5)) &&
+        sym >= XKB_KEY_F1 && sym <= XKB_KEY_F12)
+        return sym - XKB_KEY_F1 + 1;
+    return 0;
+}
+#endif
+
+static bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, uint32_t modifiers,
+                              xkb_keysym_t sym) {
+    struct sh_server *server = keyboard->server;
+#if WLR_HAS_SESSION
+    unsigned vt = vt_for_key(modifiers, sym);
+    if (server->session && vt) {
+        wlr_session_change_vt(server->session, vt);
+        return true;
+    }
+#endif
+    if (server->locked)
+        return false; // Every other key belongs to the lock screen.
+    if (server->switcher.open) {
+        switcher_key(server, modifiers, sym);
+        return true;
+    }
+    if (server->overview.open) {
+        // The overview's own bindings (toggling it again) work as bound; other keys are its.
+        int bound_argument = 0;
+        enum sh_action bound =
+            modifiers & (WLR_MODIFIER_CTRL | WLR_MODIFIER_ALT | WLR_MODIFIER_LOGO)
+                ? server->callbacks->key(server->callbacks->userdata, modifiers, sym,
+                                         &bound_argument)
+                : SH_NONE;
+        if (bound == SH_OVERVIEW_TOGGLE || bound == SH_OVERVIEW_CONFIRM ||
+            bound == SH_OVERVIEW_CANCEL)
+            run_action(server, bound, bound_argument);
+        else
+            overview_key(server, modifiers, sym);
+        return true;
+    }
+    int argument = 0;
+    enum sh_action action =
+        server->callbacks->key(server->callbacks->userdata, modifiers, sym, &argument);
+    if (action == SH_NONE)
+        return false;
+    if (action == SH_PEEK) {
+        // Held: the desktop shows until the key comes back up.
+        server->peek_keycode = keycode;
+        server->peek_keyboard = keyboard;
+        set_peek(server, true);
+        server->peek_keycode = keycode; // set_peek only forgets it when peeking ends
+        return true;
+    }
+    if (action == SH_SWITCHER_NEXT || action == SH_SWITCHER_PREV) {
+        // Held, the binding's modifiers keep it open. Shift may come and go to step backward.
+        uint32_t held =
+            WLR_MODIFIER_CTRL | WLR_MODIFIER_ALT | WLR_MODIFIER_LOGO | WLR_MODIFIER_MOD5;
+        switcher_open(server, action == SH_SWITCHER_PREV, modifiers & held,
+                      xkb_keysym_to_lower(sym));
+        return true;
+    }
+    run_action(server, action, argument);
+    int rate = keyboard->wlr_keyboard->repeat_info.rate;
+    if (action >= SH_RESIZE_LEFT && action <= SH_RESIZE_DOWN && rate > 0 &&
+        keyboard->repeat_timer) {
+        keyboard->repeat_keycode = keycode;
+        keyboard->repeat_action = action;
+        keyboard->repeat_argument = argument;
+        wl_event_source_timer_update(keyboard->repeat_timer,
+                                     keyboard->wlr_keyboard->repeat_info.delay);
+    }
+    return true;
 }
