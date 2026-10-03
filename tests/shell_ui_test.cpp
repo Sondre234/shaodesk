@@ -291,12 +291,12 @@ int main(int argc, char **argv) {
         std::cerr << "clicking a workspace did not switch to it\n";
         return 1;
     }
-    auto scroll = [&](int delta) {
-        const QPoint at = centre(workspace(2));
+    auto scrollAt = [&](QPoint at, int delta) {
         QWheelEvent event(at, view.mapToGlobal(at), QPoint(), QPoint(0, delta), Qt::NoButton,
                           Qt::NoModifier, Qt::NoScrollPhase, false);
         QCoreApplication::sendEvent(&view, &event);
     };
+    auto scroll = [&](int delta) { scrollAt(centre(workspace(2)), delta); };
     scroll(-120); // down: the next workspace
     if (!QTest::qWaitFor([&] { return workspace(4)->property("current").toBool(); })) {
         std::cerr << "scrolling down did not page to the next workspace\n";
@@ -309,6 +309,14 @@ int main(int argc, char **argv) {
         switches.size() != 3 || switches.last() != "output " + output + " workspace 3") {
         std::cerr << "scrolling up did not page back one workspace: "
                   << switches.join(", ").toStdString() << '\n';
+        return 1;
+    }
+    // The bar's empty space, left of its first button, pages workspaces too.
+    auto *bar = find(view.rootObject(), "bar");
+    scrollAt(bar->mapToScene(QPointF(3, bar->height() / 2)).toPoint(), -120);
+    if (!QTest::qWaitFor([&] { return workspace(4)->property("current").toBool(); }) ||
+        switches.size() != 4 || switches.last() != "output " + output + " workspace 4") {
+        std::cerr << "scrolling the bar's empty space did not page workspaces\n";
         return 1;
     }
     // A window asking for attention marks its workspace in the indicator (and is listed); when
