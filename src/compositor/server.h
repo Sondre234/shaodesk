@@ -838,6 +838,7 @@ void move_tile(struct sh_toplevel *toplevel, struct sh_toplevel *neighbour,
 void configure_layouts(struct sh_server *server);
 void apply_output_layout(struct sh_server *server, const struct wlr_output *output);
 void reconfigure_tiling(struct sh_server *server);
+void layout_action(struct sh_server *server, enum sh_action action);
 
 /* toplevel.c */
 struct wlr_surface *toplevel_surface(struct sh_toplevel *toplevel);
