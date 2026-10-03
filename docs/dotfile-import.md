@@ -1,13 +1,13 @@
 # Dotfile import
 
-Goal: point shaoDe at a directory of existing dotfiles (Hyprland, Waybar, pywal,
+Goal: point shaodesk at a directory of existing dotfiles (Hyprland, Waybar, pywal,
 HyDE/wallbash, …) and carry over their *look and hardware settings*: monitors, color
 scheme, bar appearance, gaps, borders, rounding, and transparency. Behaviour (key
-bindings, dispatchers, scripts that call `hyprctl`) is out of scope; shaoDe keeps its own.
+bindings, dispatchers, scripts that call `hyprctl`) is out of scope; shaodesk keeps its own.
 
 ## Design
 
-- `shaode import DIR` finds the files it recognizes, writes a generated `theme.lua`
+- `shaodesk import DIR` finds the files it recognizes, writes a generated `theme.lua`
   next to the configuration, and prints a report: each imported value with the file
   and line it came from, and everything it skipped.
 - `init.lua` loads the generated file and can override any of it. Reimporting
@@ -27,15 +27,15 @@ bindings, dispatchers, scripts that call `hyprctl`) is out of scope; shaoDe keep
 ## Using it
 
 ```sh
-shaode import ~/.config              # writes theme.lua beside ~/.config/shaode/init.lua
-shaode import --dry-run ~/.config    # prints theme.lua and the report instead
-shaode import --config PATH DIR      # writes theme.lua beside PATH
+shaodesk import ~/.config              # writes theme.lua beside ~/.config/shaodesk/init.lua
+shaodesk import --dry-run ~/.config    # prints theme.lua and the report instead
+shaodesk import --config PATH DIR      # writes theme.lua beside PATH
 ```
 
 `init.lua` names the theme with `theme = "theme.lua"` (the shipped default does). The theme
 fills in every setting `init.lua` leaves out: records merge key by key, while lists such as
 `windows.rules` and values `init.lua` sets itself stay as `init.lua` has them. A missing
-theme file is not an error. After writing, `shaode import` lists the imported settings that
+theme file is not an error. After writing, `shaodesk import` lists the imported settings that
 `init.lua` overrides.
 
 Where settings come from, lowest precedence first:
@@ -60,7 +60,7 @@ count. Hyprland window rules match the whole class, so imported patterns are anc
 
 ## Order
 
-1. Monitor settings in shaoDe (mode, refresh, scale, position, disable).
+1. Monitor settings in shaodesk (mode, refresh, scale, position, disable).
 2. Color scheme plus bar look (position, height, margins, radius, font).
 3. Window gaps (inner/outer), borders, rounding, and opacity, including per-app opacity.
 4. The importer itself: Hyprland Lua sandbox, hyprlang parser, Waybar, wallbash/pywal. Done.
@@ -68,13 +68,13 @@ count. Hyprland window rules match the whole class, so imported patterns are anc
 
 ## Settings tracker
 
-Status: **done** = in shaoDe's Lua config, **missing** = needs implementing in
-shaoDe before it can be imported, **won't** = deliberately not carried over.
-"Importer" says whether `shaode import` reads the setting yet.
+Status: **done** = in shaodesk's Lua config, **missing** = needs implementing in
+shaodesk before it can be imported, **won't** = deliberately not carried over.
+"Importer" says whether `shaodesk import` reads the setting yet.
 
 ### Monitors
 
-| Setting | Source | shaoDe setting | Status | Importer |
+| Setting | Source | shaodesk setting | Status | Importer |
 | --- | --- | --- | --- | --- |
 | Left-to-right order | `monitor =` positions | `outputs.order` | done | yes |
 | Primary output | — | `outputs.primary` | done | — |
@@ -89,7 +89,7 @@ shaoDe before it can be imported, **won't** = deliberately not carried over.
 
 ### Colors and wallpaper
 
-| Setting | Source | shaoDe setting | Status | Importer |
+| Setting | Source | shaodesk setting | Status | Importer |
 | --- | --- | --- | --- | --- |
 | Background color | wallbash, pywal background | `appearance.background` | done | yes |
 | Accent / panel / text colors | wallbash, pywal, waybar `@define-color` | `shell.accent`, `panel_color`, `text_color` | done | yes |
@@ -99,7 +99,7 @@ shaoDe before it can be imported, **won't** = deliberately not carried over.
 
 ### Bar
 
-| Setting | Source | shaoDe setting | Status | Importer |
+| Setting | Source | shaodesk setting | Status | Importer |
 | --- | --- | --- | --- | --- |
 | Height | waybar `height` | `shell.panel_height` | done | yes |
 | Top or bottom | waybar `position` | `shell.panel_position` | done | yes |
@@ -109,7 +109,7 @@ shaoDe before it can be imported, **won't** = deliberately not carried over.
 
 ### Windows
 
-| Setting | Source | shaoDe setting | Status | Importer |
+| Setting | Source | shaodesk setting | Status | Importer |
 | --- | --- | --- | --- | --- |
 | Outer gap | `general:gaps_out` | `layout.gap_outer` | done | yes |
 | Inner gap | `general:gaps_in` (×2: Hyprland adds it on both sides) | `layout.gap_inner` | done | yes |
@@ -127,7 +127,7 @@ shaoDe before it can be imported, **won't** = deliberately not carried over.
 
 ### Input
 
-| Setting | Source | shaoDe setting | Status | Importer |
+| Setting | Source | shaodesk setting | Status | Importer |
 | --- | --- | --- | --- | --- |
 | Keyboard layout, options | `input:kb_layout`, `kb_options` | `keyboard.layout`, `options` | done | yes |
 | Keyboard variant, keymap file | `input:kb_variant`, `kb_file` | — | missing | no |

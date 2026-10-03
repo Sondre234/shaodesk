@@ -12,7 +12,7 @@ from harness import wait_for
 
 compositor, probe, example = (str(Path(p).resolve()) for p in sys.argv[1:4])
 
-with tempfile.TemporaryDirectory(prefix="shaode-sticky-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-sticky-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     source = (Path(example).read_text().replace("xwayland = true", "xwayland = false")
@@ -21,7 +21,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-sticky-test-") as directory:
     config.write_text(source)
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words, ok=True):
@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-sticky-test-") as directory:
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), processes, "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             assert "takes no argument" in msg("toggle_sticky", "1", ok=False)
 
             client = subprocess.Popen([probe, "--external-control"], env=env,
@@ -69,7 +69,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-sticky-test-") as directory:
             assert msg("get", "workspaces").split("\t")[3] == "3", msg("get", "workspaces")
 
             # Activating it from the taskbar leaves the workspace alone.
-            subprocess.run([probe, "--activate", "shaode-probe"], env=env, check=True,
+            subprocess.run([probe, "--activate", "shaodesk-probe"], env=env, check=True,
                            timeout=30, stdout=subprocess.DEVNULL)
             assert workspace() == 3 and window() == (3, True, False, True, True), window()
 

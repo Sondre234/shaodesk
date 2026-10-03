@@ -20,7 +20,7 @@
 #include <gio/gdesktopappinfo.h>
 #include <iostream>
 #include <memory>
-#if SHAODE_DBUS
+#if SHAODESK_DBUS
 #include "notification_service.hpp"
 #endif
 
@@ -198,7 +198,7 @@ QString ShellController::pinsPath() {
     auto state = qEnvironmentVariable("XDG_STATE_HOME");
     if (state.isEmpty() || QDir::isRelativePath(state))
         state = QDir::homePath() + "/.local/state";
-    return state + "/shaode/pinned";
+    return state + "/shaodesk/pinned";
 }
 void ShellController::savePins() {
     const auto path = pinsPath();
@@ -394,7 +394,7 @@ void ShellController::reload() {
 }
 void ShellController::loadConfig() {
     std::string error;
-    auto next = shaode::load_config_or_default(path_, error);
+    auto next = shaodesk::load_config_or_default(path_, error);
     config_ = std::move(next);
     configError_ = QString::fromStdString(error);
     if (!error.empty())
@@ -402,7 +402,7 @@ void ShellController::loadConfig() {
                   << '\n';
 }
 void ShellController::subscribe() {
-    const auto path = qEnvironmentVariable("SHAODE_SOCKET");
+    const auto path = qEnvironmentVariable("SHAODESK_SOCKET");
     if (path.isEmpty())
         return;
     state_ = new QLocalSocket(this);
@@ -680,7 +680,7 @@ bool ShellController::startNotifications() {
 void ShellController::updateNotificationService() {
     if (!serveNotifications_)
         return;
-#if SHAODE_DBUS
+#if SHAODESK_DBUS
     if (config_.notifications.enabled && !notificationService_) {
         // Without an address libdbus would start a bus of its own ("autolaunch") that no other
         // program knows of; a session with no bus has no notifications to serve.
@@ -688,16 +688,16 @@ void ShellController::updateNotificationService() {
                              QFileInfo::exists(qEnvironmentVariable("XDG_RUNTIME_DIR") + "/bus");
         if (!haveBus) {
             if (!noBusReported_)
-                std::cerr << "shaoDe notifications: no session bus (DBUS_SESSION_BUS_ADDRESS is unset)\n";
+                std::cerr << "shaodesk notifications: no session bus (DBUS_SESSION_BUS_ADDRESS is unset)\n";
             noBusReported_ = true;
             return;
         }
         auto *service = new NotificationService(notifications_, this);
         if (service->start()) {
             notificationService_ = service;
-            std::cerr << "shaoDe notifications: serving org.freedesktop.Notifications\n";
+            std::cerr << "shaodesk notifications: serving org.freedesktop.Notifications\n";
         } else {
-            std::cerr << "shaoDe notifications: " << service->error().toStdString() << '\n';
+            std::cerr << "shaodesk notifications: " << service->error().toStdString() << '\n';
             delete service;
         }
     } else if (!config_.notifications.enabled && notificationService_) {
@@ -738,7 +738,7 @@ void ShellController::clearOverview() {
 void ShellController::switcherPick(int index) {
     if (index >= 0 && index < switcherWindows_.size())
         request(QString("switcher_confirm %1\n").arg(index + 1).toUtf8(),
-                "The window switcher needs a running shaoDe session.");
+                "The window switcher needs a running shaodesk session.");
 }
 QString ShellController::iconFor(const QString &windowAppId) const {
     const auto id = appFor(windowAppId);
@@ -753,18 +753,18 @@ QString ShellController::iconFor(const QString &windowAppId) const {
 void ShellController::toggleTiling(const QString &output) {
     request(output.isEmpty() ? QByteArray("toggle_tiling\n")
                              : QString("output %1 toggle_tiling\n").arg(output).toUtf8(),
-            "Tiling needs a running shaoDe session.");
+            "Tiling needs a running shaodesk session.");
 }
 void ShellController::showWorkspace(const QString &output, int number) {
     if (!output.isEmpty() && number >= 1 && number <= workspaceCount())
         request(QString("output %1 workspace %2\n").arg(output).arg(number).toUtf8(),
-                "Workspaces need a running shaoDe session.");
+                "Workspaces need a running shaodesk session.");
 }
 void ShellController::send(const QString &line) {
-    request(line.toUtf8() + "\n", "The compositor needs a running shaoDe session.");
+    request(line.toUtf8() + "\n", "The compositor needs a running shaodesk session.");
 }
 void ShellController::ask(const QByteArray &line, std::function<void(const QByteArray &)> done) {
-    const auto path = qEnvironmentVariable("SHAODE_SOCKET");
+    const auto path = qEnvironmentVariable("SHAODESK_SOCKET");
     if (path.isEmpty())
         return;
     auto *socket = new QLocalSocket(this);
@@ -784,7 +784,7 @@ void ShellController::ask(const QByteArray &line, std::function<void(const QByte
     socket->connectToServer(path);
 }
 void ShellController::request(const QByteArray &line, const QString &unavailable) {
-    const auto path = qEnvironmentVariable("SHAODE_SOCKET");
+    const auto path = qEnvironmentVariable("SHAODESK_SOCKET");
     if (path.isEmpty()) {
         report(unavailable);
         return;

@@ -1,12 +1,12 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
--- shaoDe configuration, API version 1.
+-- shaodesk configuration, API version 1.
 --
--- Copy this file to ~/.config/shaode/init.lua and edit it. Every setting is optional; a
+-- Copy this file to ~/.config/shaodesk/init.lua and edit it. Every setting is optional; a
 -- line that is commented out shows the default. The full list of settings, types, defaults
 -- and ranges is in docs/config-reference.md.
 --
 -- Check a file without starting the compositor:
---     shaode --config init.lua --check-config
+--     shaodesk --config init.lua --check-config
 -- A misspelled setting, a value of the wrong type, or one out of range is reported with
 -- its file and line (and a "did you mean" hint). Saving the file reloads it (auto_reload);
 -- while it has an error, the default configuration stands in and the error shows across
@@ -25,14 +25,14 @@ local mod = "Super"
 
 return {
     version = 1,
-    -- `shaode import ~/.config` writes theme.lua from Hyprland, Waybar, wallbash, or pywal
+    -- `shaodesk import ~/.config` writes theme.lua from Hyprland, Waybar, wallbash, or pywal
     -- files. It fills in whatever this file leaves out, so the look settings below are
     -- comments showing their defaults; set one here to override the import.
     theme = "theme.lua",
     -- appearance = { background = "#19212e" },
     -- Appearance profiles: each lays its appearance, windows and shell settings over the rest
     -- of the configuration while it is in use. Pick one from the panel's right-click menu
-    -- ("Appearance"), the command palette, or `shaode msg profile NAME|next|prev`; the choice
+    -- ("Appearance"), the command palette, or `shaodesk msg profile NAME|next|prev`; the choice
     -- is kept across restarts. `profile` is the one to start with.
     profile = "default",
     profiles = {
@@ -95,7 +95,7 @@ return {
         --            bypass = "Shift" },
         -- Buttons of windows that draw their own (Firefox's tab strip, GTK apps), in GTK's
         -- button-layout format; "" keeps the desktop's setting. Applications started from
-        -- shaoDe see it; restart to change:
+        -- shaodesk see it; restart to change:
         -- buttons = "appmenu:minimize,maximize,close",
         -- Per application, by app_id and/or title (regular expressions; X11 windows match
         -- their class as app_id). Opacity comes from the first match that sets it. Actions

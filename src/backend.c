@@ -1,17 +1,17 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
 /* Derived from wlroots TinyWL 0.20.2; see vendor/tinywl/LICENSE. */
 #define _GNU_SOURCE // accept4
-#include "shaode/backend.h"
-#include "shaode/effects.h"
-#include "shaode/effects_scene.h"
-#include "shaode/animation.h"
-#include "shaode/curve.h"
-#include "shaode/decoration.h"
-#include "shaode/session.h"
-#include "shaode/overview.h"
-#include "shaode/overview_scene.h"
-#include "shaode/tabs.h"
-#include "shaode/sleep.h"
+#include "shaodesk/backend.h"
+#include "shaodesk/effects.h"
+#include "shaodesk/effects_scene.h"
+#include "shaodesk/animation.h"
+#include "shaodesk/curve.h"
+#include "shaodesk/decoration.h"
+#include "shaodesk/session.h"
+#include "shaodesk/overview.h"
+#include "shaodesk/overview_scene.h"
+#include "shaodesk/tabs.h"
+#include "shaodesk/sleep.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -101,7 +101,7 @@
 #if WLR_HAS_XWAYLAND
 #include <wlr/xwayland.h>
 #include <xcb/xcb_icccm.h>
-#if SHAODE_XWM_WAKER
+#if SHAODESK_XWM_WAKER
 #include <xcb/xfixes.h>
 #endif
 #endif
@@ -234,7 +234,7 @@ struct sh_server {
 #if WLR_HAS_XWAYLAND
     struct wlr_xwayland *xwayland;
     struct wl_listener xwayland_ready, new_xwayland_surface;
-#if SHAODE_XWM_WAKER
+#if SHAODESK_XWM_WAKER
     xcb_connection_t *xwm_waker;
     xcb_atom_t waker_atom;
     xcb_window_t xwm_window;
@@ -5038,7 +5038,7 @@ static void refresh_frame(struct sh_toplevel *toplevel) {
     int radius = mapped && output_tiles(server, output) && !frameless(toplevel, output)
                      ? settings->corner_radius
                      : 0;
-#ifdef SHAODE_ROUNDED_CORNERS
+#ifdef SHAODESK_ROUNDED_CORNERS
     wlr_scene_tree_set_rounded_clip(
         toplevel->content, radius > 0 ? &(struct wlr_box){0, 0, g.width, g.height} : NULL, radius);
 #else
@@ -5085,7 +5085,7 @@ static void refresh_frame(struct sh_toplevel *toplevel) {
     for (int i = 0; i < 4; ++i) {
         wlr_scene_node_set_position(&toplevel->border[i]->node, sides[i].x, sides[i].y);
         wlr_scene_rect_set_size(toplevel->border[i], sides[i].width, sides[i].height);
-#ifdef SHAODE_ROUNDED_CORNERS
+#ifdef SHAODESK_ROUNDED_CORNERS
         wlr_scene_rect_set_rounding(toplevel->border[i],
                                     i == 0 && radius > 0 ? radius + (inset ? 0 : b) : 0,
                                     i == 0 && radius > 0 ? b : 0);
@@ -6428,7 +6428,7 @@ static void server_new_output(struct wl_listener *listener, void *data) {
     apply_output_layout(server, wlr_output);
     configure_output(server, output);
     if (wlr_output_is_wl(wlr_output))
-        wlr_wl_output_set_title(wlr_output, "shaoDe — nested desktop");
+        wlr_wl_output_set_title(wlr_output, "shaodesk — nested desktop");
     arrange_outputs(server);
     return_home_windows(server);
 }
@@ -8751,7 +8751,7 @@ static void server_new_xwayland_surface(struct wl_listener *listener, void *data
                  xwayland_request_minimize);
 }
 
-#if SHAODE_XWM_WAKER
+#if SHAODESK_XWM_WAKER
 /* wlroots' XWM can strand X events: xcb reads them into its queue during flushes
  * and round-trips outside the event handler, and the handler's post-dispatch
  * check ignores that queue (packaging/patches/wlroots-xwm-drain.patch fixes it).
@@ -8805,7 +8805,7 @@ static void open_xwm_waker(struct sh_server *server) {
         return;
     }
     xcb_atom_t atoms[2] = {XCB_ATOM_NONE, XCB_ATOM_NONE};
-    const char *names[2] = {"_SHAODE_XWM_WAKE", "_NET_SUPPORTING_WM_CHECK"};
+    const char *names[2] = {"_SHAODESK_XWM_WAKE", "_NET_SUPPORTING_WM_CHECK"};
     for (int i = 0; i < 2; ++i) {
         xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(
             server->xwm_waker,
@@ -8849,7 +8849,7 @@ static void xwayland_ready(struct wl_listener *listener, void *data) {
     struct sh_server *server = wl_container_of(listener, server, xwayland_ready);
     wlr_log(WLR_INFO, "XWayland ready on DISPLAY=%s", server->xwayland->display_name);
     wlr_xwayland_set_seat(server->xwayland, server->seat);
-#if SHAODE_XWM_WAKER
+#if SHAODESK_XWM_WAKER
     open_xwm_waker(server);
 #endif
     if (wlr_xcursor_manager_load(server->cursor_mgr, 1)) {
@@ -9058,7 +9058,7 @@ static void control_describe_output(struct sh_server *server, int fd, struct sh_
 }
 
 /* Sessions: `session save NAME` writes what every output and window is doing to a file (see
- * shaode/session.h); `session restore NAME [launch]` puts matching windows back, and with
+ * shaodesk/session.h); `session restore NAME [launch]` puts matching windows back, and with
  * `launch` starts the applications that are missing, placing their windows as they open. */
 static pid_t toplevel_pid(struct sh_toplevel *toplevel) {
 #if WLR_HAS_XWAYLAND
@@ -10165,7 +10165,7 @@ static void open_control_socket(struct sh_server *server, const char *wayland_so
     const char *runtime = getenv("XDG_RUNTIME_DIR");
     struct sockaddr_un address = {.sun_family = AF_UNIX};
     if (!runtime || !*runtime ||
-        snprintf(server->control_path, sizeof(server->control_path), "%s/shaode.%s.sock", runtime,
+        snprintf(server->control_path, sizeof(server->control_path), "%s/shaodesk.%s.sock", runtime,
                  wayland_socket) >= (int)sizeof(server->control_path) ||
         strlen(server->control_path) >= sizeof(address.sun_path)) {
         wlr_log(WLR_ERROR, "No usable XDG_RUNTIME_DIR; control socket disabled");
@@ -10185,7 +10185,7 @@ static void open_control_socket(struct sh_server *server, const char *wayland_so
     server->control_fd = fd;
     server->control_source = wl_event_loop_add_fd(wl_display_get_event_loop(server->wl_display), fd,
                                                   WL_EVENT_READABLE, control_accept, server);
-    setenv("SHAODE_SOCKET", server->control_path, true);
+    setenv("SHAODESK_SOCKET", server->control_path, true);
     wlr_log(WLR_INFO, "Control socket: %s", server->control_path);
 }
 
@@ -10273,10 +10273,10 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     sh_fade_init(&server.zoom_fade, 1);
     server.zoom_target = 1;
     server.night_clock = -1;
-    if (getenv("SHAODE_NIGHT_LIGHT_TIME")) {
+    if (getenv("SHAODESK_NIGHT_LIGHT_TIME")) {
         // A fixed clock, so tests can run at any hour.
         double minutes = 0;
-        if (sh_parse_clock(getenv("SHAODE_NIGHT_LIGHT_TIME"), &minutes))
+        if (sh_parse_clock(getenv("SHAODESK_NIGHT_LIGHT_TIME"), &minutes))
             server.night_clock = minutes;
     }
     server.night_timer = wl_event_loop_add_timer(loop, night_light_tick, &server);
@@ -10488,7 +10488,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
 
     setenv("WAYLAND_DISPLAY", socket, true);
     open_control_socket(&server, socket);
-    setenv("XDG_CURRENT_DESKTOP", "shaoDe", true);
+    setenv("XDG_CURRENT_DESKTOP", "shaodesk", true);
     setenv("XDG_SESSION_TYPE", "wayland", true);
     // Firefox, Electron (Discord, VS Code), and Java would otherwise need to be told to use
     // Wayland or to cope without a reparenting window manager. The user's own values win.
@@ -10526,7 +10526,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     wl_event_source_remove(sigchld);
 
 #if WLR_HAS_XWAYLAND
-#if SHAODE_XWM_WAKER
+#if SHAODESK_XWM_WAKER
     close_xwm_waker(&server);
 #endif
     if (server.xwayland) {

@@ -140,7 +140,7 @@ void Audio::toggleStreamMute(int id) {
     }
 }
 
-#if !SHAODE_PULSE
+#if !SHAODESK_PULSE
 namespace {
 class NoAudio : public Audio {
   public:

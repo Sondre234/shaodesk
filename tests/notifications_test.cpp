@@ -13,8 +13,8 @@ Notification make(const QString &summary, int timeout = -1, int urgency = Notifi
     n.urgency = urgency;
     return n;
 }
-shaode::NotificationsConfig config() {
-    shaode::NotificationsConfig c;
+shaodesk::NotificationsConfig config() {
+    shaodesk::NotificationsConfig c;
     c.timeout = 5000;
     return c;
 }
@@ -389,7 +389,7 @@ class NotificationsTest : public QObject {
     void layoutProperties() {
         NotificationCenter center;
         auto c = config();
-        c.position = shaode::Corner::BottomLeft;
+        c.position = shaodesk::Corner::BottomLeft;
         c.width = 420;
         center.configure(c);
         QVERIFY(center.bottom() && center.left());

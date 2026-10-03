@@ -49,10 +49,10 @@ QStringList NotificationsAdaptor::GetCapabilities() {
 }
 QString NotificationsAdaptor::GetServerInformation(QString &vendor, QString &version,
                                                    QString &spec_version) {
-    vendor = "shaoDe";
+    vendor = "shaodesk";
     version = "1";
     spec_version = "1.2";
-    return "shaoDe";
+    return "shaodesk";
 }
 void NotificationsAdaptor::CloseNotification(uint id) { center_.closeFromApplication(id); }
 Notification NotificationsAdaptor::parse(const QString &app, const QString &icon,

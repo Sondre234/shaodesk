@@ -11,13 +11,13 @@ from harness import wait_for
 
 compositor, probe, example = (str(Path(p).resolve()) for p in sys.argv[1:4])
 
-with tempfile.TemporaryDirectory(prefix="shaode-workspace-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-workspace-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(Path(example).read_text().replace("xwayland = true", "xwayland = false"))
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words, ok=True):
@@ -38,7 +38,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-workspace-test-") as directory:
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), processes, "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             assert msg("get", "workspace") == "1\n"
             assert "needs a workspace from 1 to 4" in msg("workspace", "9", ok=False)
             assert "unknown action" in msg("bogus", ok=False)
@@ -47,27 +47,27 @@ with tempfile.TemporaryDirectory(prefix="shaode-workspace-test-") as directory:
             window = subprocess.Popen([probe, "--external-control"], env=env,
                                       stdout=subprocess.DEVNULL)
             processes.append(window)
-            wait_for(lambda: windows().get("shaode-probe") == (1, True), processes,
+            wait_for(lambda: windows().get("shaodesk-probe") == (1, True), processes,
                      "window focused on workspace 1")
 
             msg("move_to_workspace", "2")
-            assert windows()["shaode-probe"] == (2, False), windows()
+            assert windows()["shaodesk-probe"] == (2, False), windows()
             assert msg("get", "workspace") == "1\n"
             msg("workspace", "2")
             assert msg("get", "workspace") == "2\n"
-            assert windows()["shaode-probe"] == (2, True), windows()
+            assert windows()["shaodesk-probe"] == (2, True), windows()
             msg("workspace_next")
             assert msg("get", "workspace") == "3\n"
-            assert windows()["shaode-probe"] == (2, False)
+            assert windows()["shaodesk-probe"] == (2, False)
             msg("workspace_prev")
             msg("workspace_prev")
             assert msg("get", "workspace") == "1\n"
 
             # Activating a window from the taskbar switches to its workspace.
-            subprocess.run([probe, "--activate", "shaode-probe"], env=env, check=True,
+            subprocess.run([probe, "--activate", "shaodesk-probe"], env=env, check=True,
                            timeout=30, stdout=subprocess.DEVNULL)
             wait_for(lambda: msg("get", "workspace") == "2\n", processes, "taskbar switch")
-            assert windows()["shaode-probe"] == (2, True)
+            assert windows()["shaodesk-probe"] == (2, True)
 
             # Keyboard window actions target only the current workspace.
             msg("workspace", "1")
@@ -81,7 +81,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-workspace-test-") as directory:
 
             server.terminate()
             assert server.wait(timeout=30) == 0, log.read_text()
-            assert not Path(env["SHAODE_SOCKET"]).exists(), "control socket left behind"
+            assert not Path(env["SHAODESK_SOCKET"]).exists(), "control socket left behind"
             print("Workspaces, control socket, taskbar switching, and scoped actions passed")
         except Exception:
             print(log.read_text(), file=sys.stderr)

@@ -5,7 +5,7 @@
 #include "notifications.hpp"
 #include "osd.hpp"
 #include "palette.hpp"
-#include "shaode/config.hpp"
+#include "shaodesk/config.hpp"
 #include "system_status.hpp"
 #include "task_model.hpp"
 #include <QColor>
@@ -147,7 +147,7 @@ class ShellController : public QObject {
     TaskModel *tasks() { return &tasks_; }
     Audio *audio() { return audio_.get(); }
     Palette *palette() { return &palette_; }
-    // Sends the compositor a request (an action, or "session restore NAME"), as `shaode msg`
+    // Sends the compositor a request (an action, or "session restore NAME"), as `shaodesk msg`
     // would; `done` gets its whole reply. Without a session, `done` is not called.
     void ask(const QByteArray &line, std::function<void(const QByteArray &)> done);
     Q_INVOKABLE void send(const QString &line);
@@ -234,7 +234,7 @@ class ShellController : public QObject {
   private:
     struct App {
         QString id, name, icon;
-        shaode::Command command;
+        shaodesk::Command command;
         GAppInfo *info = nullptr;
         bool pinned = false;
         QString wmClass;
@@ -242,16 +242,16 @@ class ShellController : public QObject {
     // Loads the configuration, or the default one with configError_ set when it has an error.
     void loadConfig();
     std::filesystem::path path_;
-    shaode::Config config_;
+    shaodesk::Config config_;
     TaskModel tasks_;
     Palette palette_{*this};
     std::unique_ptr<Audio> audio_ = makeAudio();
     SystemStatus status_{"/sys", nullptr, true};
     NotificationCenter notifications_;
     Osd osd_;
-    // $SHAODE_SYSFS names another sysfs tree, polled, for tests.
-    Backlight backlight_{qEnvironmentVariable("SHAODE_SYSFS", "/sys"), !qEnvironmentVariableIsSet("SHAODE_SYSFS"),
-                         qEnvironmentVariableIsSet("SHAODE_SYSFS") ? 100 : 0};
+    // $SHAODESK_SYSFS names another sysfs tree, polled, for tests.
+    Backlight backlight_{qEnvironmentVariable("SHAODESK_SYSFS", "/sys"), !qEnvironmentVariableIsSet("SHAODESK_SYSFS"),
+                         qEnvironmentVariableIsSet("SHAODESK_SYSFS") ? 100 : 0};
     QString focusedOutput_, cardsOutput_;
     QObject *notificationService_ = nullptr;
     bool serveNotifications_ = false, noBusReported_ = false;
@@ -268,7 +268,7 @@ class ShellController : public QObject {
     QString error_;
     QString configError_;
     QQmlEngine *engine_ = nullptr;
-    // Compositor state from its control socket ($SHAODE_SOCKET), kept open by "subscribe".
+    // Compositor state from its control socket ($SHAODESK_SOCKET), kept open by "subscribe".
     QLocalSocket *state_ = nullptr;
     bool subscribed_ = false, tiling_ = false;
     QVariantMap workspaces_, nextWorkspaces_;

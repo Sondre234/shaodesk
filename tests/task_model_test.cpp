@@ -35,8 +35,8 @@ int main(int argc, char **argv) {
         auto value = [&](int role) { return model.data(model.index(0), role); };
         wait([&] { return model.rowCount() == 1 && value(TaskModel::Active).toBool(); },
              "task did not appear with active state");
-        if (value(TaskModel::Title).toString() != "shaoDe protocol probe" ||
-            value(TaskModel::AppId).toString() != "shaode-probe")
+        if (value(TaskModel::Title).toString() != "shaodesk protocol probe" ||
+            value(TaskModel::AppId).toString() != "shaodesk-probe")
             throw std::runtime_error("task metadata incorrect");
         int id = value(TaskModel::TaskId).toInt();
         model.activate(id); // Clicking the active task minimizes it.
@@ -65,13 +65,13 @@ int main(int argc, char **argv) {
                          });
         if (value(TaskModel::Urgent).toBool())
             throw std::runtime_error("a task is urgent before anything asked");
-        model.setUrgent({{"shaode-probe", "another title"}, {"other-app", "shaoDe protocol probe"}});
+        model.setUrgent({{"shaodesk-probe", "another title"}, {"other-app", "shaodesk protocol probe"}});
         if (value(TaskModel::Urgent).toBool() || urgentSignals != 0)
             throw std::runtime_error("an urgent window with another title or app marked the task");
-        model.setUrgent({{"shaode-probe", "shaoDe protocol probe"}});
+        model.setUrgent({{"shaodesk-probe", "shaodesk protocol probe"}});
         if (!value(TaskModel::Urgent).toBool() || urgentSignals != 1)
             throw std::runtime_error("the urgent window did not mark its task");
-        model.setUrgent({{"shaode-probe", "shaoDe protocol probe"}});
+        model.setUrgent({{"shaodesk-probe", "shaodesk protocol probe"}});
         if (urgentSignals != 1)
             throw std::runtime_error("an unchanged urgent list announced a change");
         model.setUrgent({});
@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
             throw std::runtime_error("clearing the urgent list did not unmark the task");
         if (model.roleNames().value(TaskModel::Urgent) != "urgent")
             throw std::runtime_error("the urgent role is not named for QML");
-        model.setUrgent({{"shaode-probe", "shaoDe protocol probe"}});
+        model.setUrgent({{"shaodesk-probe", "shaodesk protocol probe"}});
         model.close(id);
         wait([&] { return model.rowCount() == 0; }, "closed task was not removed");
         if ((client.state() != QProcess::NotRunning && !client.waitForFinished(2000)) ||

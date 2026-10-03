@@ -16,9 +16,6 @@ taskbar, launcher and notifications, and a Lua configuration that reloads when y
 
 </div>
 
-shaodesk is a fork of shaoDe. The executables (`shaode`, `shaode-shell`), the configuration
-path (`~/.config/shaode`) and the code keep the shaoDe name, so the documentation does too.
-
 > **Status:** early development. It runs real applications nested in another Wayland session
 > and, experimentally, as a standalone session from a TTY, but it is not yet a replacement for
 > a full desktop.
@@ -39,9 +36,9 @@ path (`~/.config/shaode`) and the code keep the shaoDe name, so the documentatio
   night light, a magnifier, and hot corners.
 - **Lua configuration** that is validated with file and line, reloads on save, can extend
   the defaults instead of copying them, and switches between appearance profiles.
-  `shaode import` carries over an existing Hyprland/Waybar setup.
+  `shaodesk import` carries over an existing Hyprland/Waybar setup.
 - **Scriptable:** every action, plus queries and an event stream, over a control socket
-  (`shaode msg`).
+  (`shaodesk msg`).
 - **Works with everyday applications:** XWayland, screen sharing through portals,
   `ext-session-lock` lockers, idle daemons, clipboard managers, and the protocols browsers,
   Electron applications and games look for.
@@ -62,7 +59,7 @@ Requirements:
 - Python 3 for the tests
 
 ```sh
-cmake -S . -B build -G Ninja -DSHAODE_BUILD_COMPOSITOR=ON
+cmake -S . -B build -G Ninja -DSHAODESK_BUILD_COMPOSITOR=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
@@ -73,21 +70,21 @@ debug build. Installing honours the usual prefix and `DESTDIR`. Gentoo setup is 
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| `SHAODE_BUILD_COMPOSITOR` | `ON` | Build the wlroots compositor; `OFF` builds only the configuration, placement and tiling code and tests |
-| `SHAODE_BUILD_SHELL` | `ON` | Build the Qt Quick shell |
-| `SHAODE_SHELL_PREVIEW_ONLY` | `OFF` | Build only a shell UI preview, without LayerShellQt (see [Development](#development)) |
-| `SHAODE_NOTIFICATIONS` | `ON` | Build the shell's notification daemon (needs Qt DBus) |
-| `SHAODE_INSTALL_SESSION` | `OFF` | Install the display-manager session entry |
-| `SHAODE_XWM_WAKER` | `ON` | Work around lost X11 windows; turn off with wlroots patched by `packaging/patches/wlroots-xwm-drain.patch` |
+| `SHAODESK_BUILD_COMPOSITOR` | `ON` | Build the wlroots compositor; `OFF` builds only the configuration, placement and tiling code and tests |
+| `SHAODESK_BUILD_SHELL` | `ON` | Build the Qt Quick shell |
+| `SHAODESK_SHELL_PREVIEW_ONLY` | `OFF` | Build only a shell UI preview, without LayerShellQt (see [Development](#development)) |
+| `SHAODESK_NOTIFICATIONS` | `ON` | Build the shell's notification daemon (needs Qt DBus) |
+| `SHAODESK_INSTALL_SESSION` | `OFF` | Install the display-manager session entry |
+| `SHAODESK_XWM_WAKER` | `ON` | Work around lost X11 windows; turn off with wlroots patched by `packaging/patches/wlroots-xwm-drain.patch` |
 
 ## Running
 
 ```sh
-./build/shaode --config config/init.lua --check-config   # validate a configuration
-./build/shaode --config config/init.lua --exec kitty     # run nested, starting kitty
+./build/shaodesk --config config/init.lua --check-config   # validate a configuration
+./build/shaodesk --config config/init.lua --exec kitty     # run nested, starting kitty
 ```
 
-By default shaoDe opens as a window inside the current Wayland session. Other modes:
+By default shaodesk opens as a window inside the current Wayland session. Other modes:
 
 - `--session` runs it standalone on DRM/libinput from a TTY. This is experimental: it has run
   on an AMD laptop and on an NVIDIA desktop with three monitors; hotplug is tested only with
@@ -104,7 +101,7 @@ service may also open in the host session instead.
 
 ## Configuration
 
-shaoDe reads `$XDG_CONFIG_HOME/shaode/init.lua` (`~/.config/shaode/init.lua`), else the
+shaodesk reads `$XDG_CONFIG_HOME/shaodesk/init.lua` (`~/.config/shaodesk/init.lua`), else the
 installed example, [config/init.lua](config/init.lua); it never writes a personal
 configuration for you. A configuration only needs what it changes when it extends the
 defaults:
@@ -128,7 +125,7 @@ whole.
 Settings are checked before they apply, and a mistake is reported with its file and line.
 Saving the file reloads it (`auto_reload = false` turns that off); a file with an error loads
 the default configuration instead and shows the error across the top of every monitor until
-it is fixed. `shaode --check-config` checks a file without starting anything. SIGHUP or
+it is fixed. `shaodesk --check-config` checks a file without starting anything. SIGHUP or
 Super + Shift + R also reload; a reload does not rerun startup commands.
 
 Lua can compute settings with the base, table, string, math and UTF-8 libraries; process and
@@ -138,7 +135,7 @@ for untrusted scripts.
 - [docs/config-reference.md](docs/config-reference.md): every setting and binding action,
   generated from the schema
 - [docs/features.md](docs/features.md): what the settings do, with examples
-- [docs/dotfile-import.md](docs/dotfile-import.md): `shaode import ~/.config` for Hyprland/Waybar setups
+- [docs/dotfile-import.md](docs/dotfile-import.md): `shaodesk import ~/.config` for Hyprland/Waybar setups
 
 ## Default bindings
 
@@ -151,7 +148,7 @@ Edit them in [config/init.lua](config/init.lua).
 | Super + R | Application menu on the monitor under the pointer |
 | Super + P | [Command palette](docs/features.md#command-palette) |
 | Super + C | Close the focused window |
-| Super + M | Exit shaoDe |
+| Super + M | Exit shaodesk |
 | Super + V | Float or tile the focused window |
 | Super + F | Fullscreen |
 | Super + T | Arrange the monitor's windows in a grid (floating mode) |
@@ -185,14 +182,14 @@ Edit them in [config/init.lua](config/init.lua).
 
 ## Scripting
 
-`shaode msg` runs any binding action, and queries state, over the compositor's control socket
-(`SHAODE_SOCKET`, set for everything the session starts):
+`shaodesk msg` runs any binding action, and queries state, over the compositor's control socket
+(`SHAODESK_SOCKET`, set for everything the session starts):
 
 ```sh
-shaode msg workspace 2
-shaode msg output HDMI-A-1 toggle_tiling
-shaode msg spawn foot
-shaode msg get windows
+shaodesk msg workspace 2
+shaodesk msg output HDMI-A-1 toggle_tiling
+shaodesk msg spawn foot
+shaodesk msg get windows
 ```
 
 A client that sends `subscribe` receives a line for every change of workspaces, tiling, the
@@ -210,10 +207,10 @@ hardware, and what has not.
 To work on the shell UI without LayerShellQt, build the preview:
 
 ```sh
-cmake -S . -B build-preview -G Ninja -DSHAODE_SHELL_PREVIEW_ONLY=ON
+cmake -S . -B build-preview -G Ninja -DSHAODESK_SHELL_PREVIEW_ONLY=ON
 cmake --build build-preview
-./build-preview/shaode-shell --config config/init.lua --preview
-./build-preview/shaode-shell --config config/init.lua --preview --preview-desktop
+./build-preview/shaodesk-shell --config config/init.lua --preview
+./build-preview/shaodesk-shell --config config/init.lua --preview --preview-desktop
 ```
 
 Preview windows show the UI and can launch applications, but do not manage windows or reserve
@@ -237,7 +234,7 @@ Lua extension APIs for custom layouts and shell widgets.
 
 ## License
 
-shaoDe is free software, licensed under the GNU General Public License, version 3 or (at your
+shaodesk is free software, licensed under the GNU General Public License, version 3 or (at your
 option) any later version. See [LICENSE](LICENSE).
 
 The compositor adapter derives from TinyWL, whose MIT license is kept in

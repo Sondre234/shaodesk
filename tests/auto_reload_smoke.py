@@ -13,14 +13,14 @@ from harness import wait_for
 
 compositor = str(Path(sys.argv[1]).resolve())
 
-with tempfile.TemporaryDirectory(prefix="shaode-auto-reload-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-auto-reload-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text("return { xwayland = false, layout = { gap = -1 } }")
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
-               SHAODE_AUTO_RELOAD="1", SHAODE_DEFAULT_CONFIG=str(Path(sys.argv[2]).resolve()))
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+               SHAODESK_AUTO_RELOAD="1", SHAODESK_DEFAULT_CONFIG=str(Path(sys.argv[2]).resolve()))
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def reloads():

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "shaode/session.h"
+#include "shaodesk/session.h"
 #include <ctype.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-static const char magic[] = "shaode-session 1";
+static const char magic[] = "shaodesk-session 1";
 
 bool sh_session_valid_name(const char *name) {
     size_t length = name ? strlen(name) : 0;
@@ -26,10 +26,10 @@ bool sh_session_path(const char *name, char *path, size_t size) {
     const char *state = getenv("XDG_STATE_HOME"), *home = getenv("HOME");
     int length;
     if (state && state[0] == '/')
-        length = snprintf(path, size, "%s/shaode/sessions%s%s", state, name ? "/" : "",
+        length = snprintf(path, size, "%s/shaodesk/sessions%s%s", state, name ? "/" : "",
                           name ? name : "");
     else if (home && home[0] == '/')
-        length = snprintf(path, size, "%s/.local/state/shaode/sessions%s%s", home,
+        length = snprintf(path, size, "%s/.local/state/shaodesk/sessions%s%s", home,
                           name ? "/" : "", name ? name : "");
     else
         return false;
@@ -226,7 +226,7 @@ bool sh_session_read(struct sh_session *session, FILE *file, char *error, size_t
     char line[8192];
     int number = 0;
     if (!fgets(line, sizeof(line), file) || strncmp(line, magic, strlen(magic)) != 0) {
-        snprintf(error, error_size, "not a shaoDe session file");
+        snprintf(error, error_size, "not a shaodesk session file");
         return false;
     }
     number = 1;

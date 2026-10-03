@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <tuple>
 
-namespace shaode::import {
+namespace shaodesk::import {
 namespace {
 bool inside(const fs::path &path, const fs::path &root) {
     if (root.empty())
@@ -366,4 +366,4 @@ class JsonParser {
 } // namespace
 
 Json parse_json(std::string_view text) { return JsonParser(text).document(); }
-} // namespace shaode::import
+} // namespace shaodesk::import

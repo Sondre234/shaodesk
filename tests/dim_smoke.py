@@ -26,13 +26,13 @@ def settings(dim, duration, animations=True):
 }}"""
 
 
-with tempfile.TemporaryDirectory(prefix="shaode-dim-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-dim-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(settings(0.4, 700))
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words):
@@ -70,7 +70,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-dim-test-") as directory:
                              "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             assert dims() == []
 
             # A lone window has focus: never dimmed, and it has no node to draw.

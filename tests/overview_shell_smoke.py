@@ -22,7 +22,7 @@ CONFIG = """return {
     outputs = { monitors = { ["HEADLESS-1"] = { mode = "1280x720" } } },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaode-overview-shell-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-overview-shell-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(CONFIG)
@@ -52,16 +52,16 @@ with tempfile.TemporaryDirectory(prefix="shaode-overview-shell-test-") as direct
                      "compositor startup")
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)",
                                                compositor_log.read_text())[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)",
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)",
                                              compositor_log.read_text())[1]
             processes.append(subprocess.Popen([shell, "--config", str(config)], env=env,
                                               stdout=shell_out, stderr=shell_out))
-            wait_for(lambda: "shaoDe surface rendered: shaoDe taskbar" in shell_log.read_text(),
+            wait_for(lambda: "shaodesk surface rendered: shaodesk taskbar" in shell_log.read_text(),
                      "the panel rendered")
             for title in ("Terminal", "Notes"):
                 processes.append(subprocess.Popen(
-                    [probe, "--window-only"], env=dict(env, SHAODE_PROBE_TITLE=title,
-                                                       SHAODE_PROBE_APP_ID="zz"),
+                    [probe, "--window-only"], env=dict(env, SHAODESK_PROBE_TITLE=title,
+                                                       SHAODESK_PROBE_APP_ID="zz"),
                     stdout=subprocess.DEVNULL))
                 wait_for(lambda: title in msg("get", "windows"), f"{title} mapped")
 
@@ -69,7 +69,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-overview-shell-test-") as direct
             def opened():
                 msg("toggle_overview")
                 try:
-                    harness.wait_for(lambda: "shaoDe overview shown" in shell_log.read_text(),
+                    harness.wait_for(lambda: "shaodesk overview shown" in shell_log.read_text(),
                                      processes, "overlay", timeout=1)
                     return True
                 except AssertionError:
@@ -78,7 +78,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-overview-shell-test-") as direct
             for _ in range(10):
                 if opened():
                     break
-            assert "shaoDe overview shown on HEADLESS-1" in shell_log.read_text()
+            assert "shaodesk overview shown on HEADLESS-1" in shell_log.read_text()
 
             grim = shutil.which("grim")
             if grim:
@@ -100,7 +100,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-overview-shell-test-") as direct
                 wait_for(titled, "titles and the search box drawn")
                 print("Text checked")
             msg("overview_cancel")
-            wait_for(lambda: "shaoDe overview hidden" in shell_log.read_text(), "overlay hidden")
+            wait_for(lambda: "shaodesk overview hidden" in shell_log.read_text(), "overlay hidden")
             print("Overview shell passed")
         finally:
             for process in reversed(processes):

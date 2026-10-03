@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "shaode/sleep.h"
+#include "shaodesk/sleep.h"
 #include <wlr/util/log.h>
 
-#if SHAODE_SDBUS_SYSTEMD
+#if SHAODESK_SDBUS_SYSTEMD
 #include <systemd/sd-bus.h>
-#elif SHAODE_SDBUS_ELOGIND
+#elif SHAODESK_SDBUS_ELOGIND
 #include <elogind/sd-bus.h>
-#elif SHAODE_SDBUS_BASU
+#elif SHAODESK_SDBUS_BASU
 #include <basu/sd-bus.h>
 #endif
 
-#if SHAODE_SDBUS_SYSTEMD || SHAODE_SDBUS_ELOGIND || SHAODE_SDBUS_BASU
+#if SHAODESK_SDBUS_SYSTEMD || SHAODESK_SDBUS_ELOGIND || SHAODESK_SDBUS_BASU
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
@@ -29,7 +29,7 @@ int sh_sleep_inhibit(void) {
     sd_bus_set_method_call_timeout(bus, 2 * 1000 * 1000);
     ret = sd_bus_call_method(bus, "org.freedesktop.login1", "/org/freedesktop/login1",
                              "org.freedesktop.login1.Manager", "Inhibit", &error, &reply, "ssss",
-                             "sleep", "shaoDe", "The desktop is on screen", "block");
+                             "sleep", "shaodesk", "The desktop is on screen", "block");
     int held;
     if (ret < 0) {
         wlr_log(WLR_ERROR, "Cannot keep the machine awake: %s", error.message);

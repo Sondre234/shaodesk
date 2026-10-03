@@ -1,9 +1,9 @@
-# Running shaoDe on Gentoo
+# Running shaodesk on Gentoo
 
-shaoDe is being developed for a personal Gentoo desktop. It currently has a
+shaodesk is being developed for a personal Gentoo desktop. It currently has a
 working nested compositor and an experimental standalone backend. The physical
 DRM/input session has run on an Arch laptop; the actual Gentoo build has only been
-tested in a VM. There is no dependency on systemd in shaoDe itself.
+tested in a VM. There is no dependency on systemd in shaodesk itself.
 
 ## Dependencies
 
@@ -20,7 +20,7 @@ between release series. Relevant Gentoo packages are:
 - Optional: `media-libs/libpulse` for the panel's volume control (PipeWire's
   `sound-server` USE flag serves it); without it the control is left out
 - `sys-auth/elogind` (or systemd), whose sd-bus keeps other desktops' idle daemons from
-  suspending the machine while shaoDe is on screen
+  suspending the machine while shaodesk is on screen
 - `dev-build/cmake`, `dev-build/ninja`, and `virtual/pkgconfig`
 - A compiler supporting C11 and C++20
 - Python 3 for the automated tests; a Wayland terminal for interactive testing
@@ -34,12 +34,12 @@ between release series. Relevant Gentoo packages are:
 
 Standalone operation requires wlroots built with `drm`, `libinput`, and `session`
 USE flags. X11 applications additionally need wlroots with the `X` USE flag and
-`x11-base/xwayland`; shaoDe then links `x11-libs/libxcb` and enables XWayland
+`x11-base/xwayland`; shaodesk then links `x11-libs/libxcb` and enables XWayland
 automatically (the XWM waker also needs `xcb-xfixes`, part of libxcb). To fix wlroots' lost X11 windows at the source, copy
 `packaging/patches/wlroots-xwm-drain.patch` into `/etc/portage/patches/gui-libs/wlroots/`,
-re-emerge wlroots, and configure shaoDe with `-DSHAODE_XWM_WAKER=OFF`. Rounded corners on
+re-emerge wlroots, and configure shaodesk with `-DSHAODESK_XWM_WAKER=OFF`. Rounded corners on
 tiled windows (`windows.corner_radius`) need
-`packaging/patches/wlroots-rounded-corners.patch` in the same directory; shaoDe finds the
+`packaging/patches/wlroots-rounded-corners.patch` in the same directory; shaodesk finds the
 patched wlroots by itself when it is next configured, and keeps windows square without it.
 Portage applies these patches only when it builds from source: with binary packages enabled,
 re-emerge with `emerge --oneshot --usepkg=n gui-libs/wlroots:0.20`. A GLES2-capable graphics stack is needed. The upstream Gentoo ebuild
@@ -66,7 +66,7 @@ GPU rendering. An installed icon theme supplies application icons; missing icons
 have a built-in fallback. `xdg-open` and a file manager are optional for the Home
 shortcut; edit the Lua launcher commands to match your installed applications.
 
-These are instructions for the target machine; shaoDe's build does not run
+These are instructions for the target machine; shaodesk's build does not run
 Portage, modify USE flags, install services, or alter your session configuration.
 
 ## Build, verify, and install as your user
@@ -76,19 +76,19 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DCMAKE_INSTALL_PREFIX="$HOME/.local"
 cmake --build build
 ctest --test-dir build --output-on-failure
-./build/shaode --config config/init.lua --check-config
-./build/shaode --config config/init.lua --exec foot
+./build/shaodesk --config config/init.lua --check-config
+./build/shaodesk --config config/init.lua --exec foot
 cmake --install build
 ```
 
 Replace `foot` with an installed Wayland terminal. Change the terminal command in
 `config/init.lua` too: the example uses Kitty. The executable uses the installed
 example configuration when no personal config exists. To customize it, create
-`~/.config/shaode/init.lua` holding `extends = "default"` and your changes (see the
+`~/.config/shaodesk/init.lua` holding `extends = "default"` and your changes (see the
 README); installation never overwrites this personal file. For a custom location use `--config /path/to/init.lua`.
 
-The normal build includes `shaode-shell` alongside `shaode`. For compositor-only
-development add `-DSHAODE_BUILD_SHELL=OFF`; Qt, GIO, and LayerShellQt are then
+The normal build includes `shaodesk-shell` alongside `shaodesk`. For compositor-only
+development add `-DSHAODESK_BUILD_SHELL=OFF`; Qt, GIO, and LayerShellQt are then
 unnecessary. `--no-shell` skips shell startup at runtime. Lua's `shell` table
 controls its colors, panel height, wallpaper path, and pinned launchers;
 `layout.tiling = true` starts with automatic tiling, which the panel button and
@@ -97,14 +97,14 @@ loads the default configuration and shows the error across the top of the screen
 
 `BUILD_TESTING=OFF` omits the test tools/Python requirement. `DESTDIR` staging and
 GNU install directories are supported for packaging. The display-manager session
-entry is optional and disabled by default (`SHAODE_INSTALL_SESSION=ON` enables
+entry is optional and disabled by default (`SHAODESK_INSTALL_SESSION=ON` enables
 it at install time). No system service is provided or required by the project.
 
 ## Standalone session from a TTY
 
 First arrange device access using the session provider appropriate to your
 Gentoo installation: elogind/systemd-logind or seatd via libseat. This is a host
-configuration choice; shaoDe neither starts nor enables those services. An active
+configuration choice; shaodesk neither starts nor enables those services. An active
 login session must provide a private, writable `XDG_RUNTIME_DIR`. With seatd,
 ensure your user has permission to its socket according to your system setup.
 
@@ -112,7 +112,7 @@ From a text login outside any existing graphical session, run as your normal
 user:
 
 ```sh
-dbus-run-session -- "$HOME/.local/bin/shaode" --session
+dbus-run-session -- "$HOME/.local/bin/shaodesk" --session
 ```
 
 `--session` selects DRM and libinput explicitly. The default stays nested;
@@ -123,17 +123,17 @@ works too, for keyboards whose only Alt key is Right Alt); the Lua quit
 binding is Super+M. Do not launch the compositor with sudo.
 
 Switching to another VT pauses the session; wlroots removes every output until you
-return, and shaoDe, the shell, and open windows carry on. On laptops whose F-keys
+return, and shaodesk, the shell, and open windows carry on. On laptops whose F-keys
 default to media functions, hold Fn for the VT keys (`sudo chvt N` also works).
 
 For a first run on new hardware, `tools/tty-session-test.sh` runs the build tree's
-`--session` with a log at `~/.local/state/shaode/tty-test-latest.log`. It has no
-time limit; set `SHAODE_TEST_LIMIT` to a number of seconds to quit on its own in
+`--session` with a log at `~/.local/state/shaodesk/tty-test-latest.log`. It has no
+time limit; set `SHAODESK_TEST_LIMIT` to a number of seconds to quit on its own in
 case input does not work.
-`SHAODE_TEST_TERM` picks the terminal it opens (default foot).
-It asks which profile to run: a directory in `~/.config/shaode/profiles` holding an
+`SHAODESK_TEST_TERM` picks the terminal it opens (default foot).
+It asks which profile to run: a directory in `~/.config/shaodesk/profiles` holding an
 `init.lua` (with `extends = "default"` it layers over this tree's `config/init.lua`) and the `theme.lua`
-that `shaode import --config ~/.config/shaode/profiles/NAME/init.lua ~/.config` writes.
+that `shaodesk import --config ~/.config/shaodesk/profiles/NAME/init.lua ~/.config` writes.
 Enter takes the one used last. `-p NAME` skips the question, and `-n` runs a fresh
 session from the example configuration alone, as a first install sees it.
 

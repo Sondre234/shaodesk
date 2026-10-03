@@ -95,6 +95,6 @@ class Audio : public QObject {
     const Output *current() const;
 };
 
-// The PulseAudio (or PipeWire's pulse) backend, or one that stays unavailable when shaoDe was
+// The PulseAudio (or PipeWire's pulse) backend, or one that stays unavailable when shaodesk was
 // built without libpulse.
 std::unique_ptr<Audio> makeAudio();

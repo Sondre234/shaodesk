@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include "shaode/backend.h"
+#include "shaodesk/backend.h"
 #include <array>
 #include <filesystem>
 #include <optional>
@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-namespace shaode {
+namespace shaodesk {
 using Command = std::vector<std::string>;
 // Pixels a resize_* action moves an edge by, unless its binding or request gives `amount`.
 constexpr int default_resize_amount = 40;
@@ -118,7 +118,7 @@ struct NotificationsConfig {
 };
 
 struct OsdConfig {
-    bool enabled = true;      // the on-screen display for volume, brightness and `shaode msg osd`
+    bool enabled = true;      // the on-screen display for volume, brightness and `shaodesk msg osd`
     bool top = false;         // position = "top": near the top edge instead of the bottom
     int timeout = 1500;       // milliseconds shown before it fades out
     bool volume = true;       // show it when the default output's volume or mute changes
@@ -282,11 +282,11 @@ sh_screenshot_mode parse_screenshot_mode(const std::string &name);
 // Parse into a fresh value; callers replace the active configuration only on success.
 // A configuration's `theme = "FILE"` (relative to `directory`) supplies every setting it omits.
 // `extends = "default"` then supplies what both omit from the default configuration
-// ($SHAODE_DEFAULT_CONFIG, else the installed one); its bindings yield to the configuration's own
+// ($SHAODESK_DEFAULT_CONFIG, else the installed one); its bindings yield to the configuration's own
 // on the same keys, and a binding with action = "none" removes a default one.
 Config load_config(const std::filesystem::path &path);
 // load_config, except that a configuration with an error gives the default one instead
-// ($SHAODE_DEFAULT_CONFIG, else the installed one, else the source tree's when shaoDe runs
+// ($SHAODESK_DEFAULT_CONFIG, else the installed one, else the source tree's when shaodesk runs
 // uninstalled, else the built-in values). `error` receives
 // what was wrong, or "" when `path` loaded.
 Config load_config_or_default(const std::filesystem::path &path, std::string &error);
@@ -294,8 +294,8 @@ Config load_config_or_default(const std::filesystem::path &path, std::string &er
 // profile, else the one `profile` names. load_config chooses the saved profile.
 Config parse_config(const std::string &source, const std::string &name = "config",
                     const std::filesystem::path &directory = {}, const std::string &chosen = {});
-// Where the profile picked from the shell or `shaode msg profile` is kept:
-// $XDG_STATE_HOME/shaode/profile, else ~/.local/state/shaode/profile; empty without either.
+// Where the profile picked from the shell or `shaodesk msg profile` is kept:
+// $XDG_STATE_HOME/shaodesk/profile, else ~/.local/state/shaodesk/profile; empty without either.
 std::filesystem::path profile_state_path();
 // The saved profile name, or "" when none was saved.
 std::string saved_profile();
@@ -304,4 +304,4 @@ void save_profile(const std::string &name);
 // Settings, as "shell.accent", that the configuration at `path` sets itself although its theme
 // file sets them too. Nothing when the configuration names no theme.
 std::optional<std::vector<std::string>> shadowed_settings(const std::filesystem::path &path);
-} // namespace shaode
+} // namespace shaodesk

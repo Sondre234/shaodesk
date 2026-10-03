@@ -36,7 +36,7 @@ command -v ninja > /dev/null && generator=(-G Ninja)
 
 configure_and_build() { # directory, extra cmake arguments...
     local dir=$1; shift
-    cmake -S "$root" -B "$dir" "${generator[@]}" -DSHAODE_BUILD_COMPOSITOR=ON "$@"
+    cmake -S "$root" -B "$dir" "${generator[@]}" -DSHAODESK_BUILD_COMPOSITOR=ON "$@"
     cmake --build "$dir"
 }
 

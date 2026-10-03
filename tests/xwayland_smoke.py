@@ -11,7 +11,7 @@ from harness import wait_for
 
 compositor, x11_probe, wayland_probe, example = (str(Path(p).resolve()) for p in sys.argv[1:5])
 
-with tempfile.TemporaryDirectory(prefix="shaode-xwayland-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-xwayland-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     source = Path(example).read_text()
@@ -53,7 +53,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-xwayland-test-") as directory:
             processes.append(client)
             assert client.stdout.readline().strip() == "X11 window mapped and focused"
             assert client.stdout.readline().strip() == "waiting for close"
-            subprocess.run([wayland_probe, "--close", "shaode-x11-probe"], env=env, check=True,
+            subprocess.run([wayland_probe, "--close", "shaodesk-x11-probe"], env=env, check=True,
                            timeout=30)
             assert client.wait(timeout=30) == 0
             processes.remove(client)

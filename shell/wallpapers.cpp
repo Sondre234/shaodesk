@@ -105,7 +105,7 @@ QImage Thumbnails::thumbnail(const QString &path) {
         image = image.scaled(thumbnailSize, thumbnailSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
     image.setText("Thumb::URI", QString::fromUtf8(uri));
     image.setText("Thumb::MTime", mtime);
-    image.setText("Software", "shaoDe");
+    image.setText("Software", "shaodesk");
     QDir().mkpath(QFileInfo(cached).path());
     QSaveFile out(cached);
     // The specification has thumbnails readable only by their owner.

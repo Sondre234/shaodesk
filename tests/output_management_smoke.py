@@ -13,14 +13,14 @@ from harness import wait_for
 
 compositor, probe = (str(Path(p).resolve()) for p in sys.argv[1:3])
 
-with tempfile.TemporaryDirectory(prefix="shaode-randr-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-randr-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text("return { xwayland = false }")
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                WLR_HEADLESS_OUTPUTS="3")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def outputs():
@@ -43,7 +43,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-randr-test-") as directory:
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), [server], "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
 
             heads = {line.split()[0]: line.split() for line in randr("list")}
             assert sorted(heads) == ["HEADLESS-1", "HEADLESS-2", "HEADLESS-3"], heads

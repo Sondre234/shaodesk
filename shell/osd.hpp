@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-#include "shaode/config.hpp"
+#include "shaodesk/config.hpp"
 #include <QObject>
 #include <QString>
 #include <QTimer>
@@ -19,8 +19,8 @@ class Osd : public QObject {
     Q_PROPERTY(bool top READ top NOTIFY configChanged)
   public:
     explicit Osd(QObject *parent = nullptr);
-    void configure(const shaode::OsdConfig &config);
-    const shaode::OsdConfig &config() const { return config_; }
+    void configure(const shaodesk::OsdConfig &config);
+    const shaodesk::OsdConfig &config() const { return config_; }
     bool active() const { return active_; }
     QString output() const { return output_; }
     QString text() const { return text_; }
@@ -36,7 +36,7 @@ class Osd : public QObject {
     void configChanged();
 
   private:
-    shaode::OsdConfig config_;
+    shaodesk::OsdConfig config_;
     QTimer timer_;
     bool active_ = false;
     QString output_, text_, kind_ = "text";

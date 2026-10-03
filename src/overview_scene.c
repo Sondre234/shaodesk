@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-#include "shaode/overview_scene.h"
+#include "shaodesk/overview_scene.h"
 #include <math.h>
 #include <string.h>
 #include <wlr/types/wlr_scene.h>

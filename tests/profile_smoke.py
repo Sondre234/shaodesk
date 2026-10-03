@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""`shaode msg profile NAME|next|prev` saves the chosen appearance profile and reloads with it;
+"""`shaodesk msg profile NAME|next|prev` saves the chosen appearance profile and reloads with it;
 an unknown name is refused, and a restart keeps the choice."""
 import os
 from pathlib import Path
@@ -23,16 +23,16 @@ CONFIG = """return {
     },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaode-profile-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-profile-test-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(CONFIG)
     state = root / "state"
-    saved = state / "shaode" / "profile"
+    saved = state / "shaodesk" / "profile"
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, XDG_STATE_HOME=str(state),
                WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words, ok=True):
@@ -43,13 +43,13 @@ with tempfile.TemporaryDirectory(prefix="shaode-profile-test-") as directory:
 
     def start(processes):
         output = log.open("w")
-        env.pop("SHAODE_SOCKET", None)
+        env.pop("SHAODESK_SOCKET", None)
         server = subprocess.Popen([compositor, "--headless", "--config", str(init)],
                                   env=env, stdout=output, stderr=output)
         processes[:] = [process for process in processes if process.poll() is None] + [server]
         harness.wait_for(lambda: "Running Wayland compositor" in log.read_text(), processes,
                          "startup")
-        env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", log.read_text())[1]
+        env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", log.read_text())[1]
         return server
 
     def reloads():

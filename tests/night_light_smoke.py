@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Night light: the compositor picks a colour temperature from the schedule (with the clock
-fixed by SHAODE_NIGHT_LIGHT_TIME) and follows configuration and the toggle actions. The headless
+fixed by SHAODESK_NIGHT_LIGHT_TIME) and follows configuration and the toggle actions. The headless
 backend has no gamma hardware and its screen capture is taken before the colour transform, so
 what the screen shows needs a real output and is not covered here."""
 import os
@@ -29,8 +29,8 @@ def start(directory, config, clock):
     """A compositor with the clock fixed at `clock`; returns (process, env, msg)."""
     log = Path(directory) / f"compositor-{clock.replace(':', '')}.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
-               SHAODE_NIGHT_LIGHT_TIME=clock, TZ="UTC")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+               SHAODESK_NIGHT_LIGHT_TIME=clock, TZ="UTC")
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
     output = log.open("w")
     server = subprocess.Popen([compositor, "--headless", "--config", str(config)], env=env,
@@ -38,7 +38,7 @@ def start(directory, config, clock):
     harness.wait_for(lambda: "Running Wayland compositor" in log.read_text(), [server], "startup")
     text = log.read_text()
     env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-    env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+    env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
 
     def msg(*words):
         return subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
@@ -51,7 +51,7 @@ def state(msg):
     return tuple(int(n) for n in msg("get", "night_light").splitlines()[0].split("\t"))
 
 
-with tempfile.TemporaryDirectory(prefix="shaode-night-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-night-test-") as directory:
     config = Path(directory) / "init.lua"
     manual = "enabled = true, night_temperature = 3400, sunrise = '07:00', sunset = '20:00', transition = 60"
 

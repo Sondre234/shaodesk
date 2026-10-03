@@ -32,14 +32,14 @@ ACTIONS = ["group_toggle", "group_toggle", "ungroup", "group_next", "group_prev"
            "layout_next", "layout_scroll", "layout_dwindle", "move_to_scratchpad",
            "scratchpad_show", "toggle_overview", "overview_cancel", "workspace_back"]
 
-with tempfile.TemporaryDirectory(prefix="shaode-group-fuzz-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-group-fuzz-test-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(CONFIG)
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                WLR_HEADLESS_OUTPUTS="2")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def run(*words):
@@ -79,7 +79,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-group-fuzz-test-") as directory:
                              processes, "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             rng = random.Random(seed)
             counter = 0
 
@@ -88,7 +88,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-group-fuzz-test-") as directory:
                 counter += 1
                 clients.append(subprocess.Popen(
                     [probe, "--window-only"],
-                    env=dict(env, SHAODE_PROBE_TITLE=f"win{counter}"),
+                    env=dict(env, SHAODESK_PROBE_TITLE=f"win{counter}"),
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
 
             for _ in range(4):

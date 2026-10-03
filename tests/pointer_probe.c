@@ -72,7 +72,7 @@ static void make_keyboard(struct wl_display *display) {
     if (!keyboard_manager)
         return;
     keyboard = zwp_virtual_keyboard_manager_v1_create_virtual_keyboard(keyboard_manager, seat);
-    int fd = memfd_create("shaode-test-keymap", MFD_CLOEXEC);
+    int fd = memfd_create("shaodesk-test-keymap", MFD_CLOEXEC);
     if (fd < 0 || ftruncate(fd, sizeof(keymap)) != 0 || write(fd, keymap, sizeof(keymap)) < 0) {
         fprintf(stderr, "cannot make the keymap\n");
         exit(1);

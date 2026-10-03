@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The gdb half of a sampling profiler for hosts without perf: run as `gdb -batch -x
-gdb_sampler.py --args shaode ...`. Each SIGURG that bench.py sends the compositor stops it
+gdb_sampler.py --args shaodesk ...`. Each SIGURG that bench.py sends the compositor stops it
 here; the call stack is recorded and the compositor continues. On exit the counts go to
-$SHAODE_SAMPLES. (The compositor takes SIGINT itself, and gdb's Python threads do not run
+$SHAODESK_SAMPLES. (The compositor takes SIGINT itself, and gdb's Python threads do not run
 while it waits for the inferior, hence the signal comes from outside.) Sampling slows the
 compositor down: read the shares, not the times.
 """
@@ -11,8 +11,8 @@ import os
 
 import gdb
 
-output = os.environ.get("SHAODE_SAMPLES", "samples.txt")
-depth = int(os.environ.get("SHAODE_SAMPLE_DEPTH", "30"))
+output = os.environ.get("SHAODESK_SAMPLES", "samples.txt")
+depth = int(os.environ.get("SHAODESK_SAMPLE_DEPTH", "30"))
 self_time = collections.Counter()
 inclusive = collections.Counter()
 total = [0]

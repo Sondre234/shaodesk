@@ -35,13 +35,13 @@ def near(pixel, want, tolerance=3):
     return all(abs(a - b) <= tolerance for a, b in zip(pixel, want))
 
 
-with tempfile.TemporaryDirectory(prefix="shaode-urgent-border-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-border-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(settings(3))
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words):
@@ -58,7 +58,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-urgent-border-test-") as directo
         return harness.grab(grim, env).at(x + (1 if inside else -2), y + h // 2)
 
     def start(app_id):
-        client = subprocess.Popen([probe, "--commands"], env=dict(env, SHAODE_PROBE_APP_ID=app_id),
+        client = subprocess.Popen([probe, "--commands"], env=dict(env, SHAODESK_PROBE_APP_ID=app_id),
                                   stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, text=True)
         processes.append(client)
         harness.wait_for(lambda: windows().get(app_id, [0, "0"])[1] == "1", processes,
@@ -81,7 +81,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-urgent-border-test-") as directo
                              "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             a = start("urgent-a")
             b = start("urgent-b")
             # Move the windows apart so neither's edge is under the other: b right, a left.

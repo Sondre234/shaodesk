@@ -37,7 +37,7 @@ class OsdTest : public QObject {
   private Q_SLOTS:
     void showsThenHides() {
         Osd osd;
-        shaode::OsdConfig c;
+        shaodesk::OsdConfig c;
         c.timeout = 200;
         osd.configure(c);
         QVERIFY(!osd.active());
@@ -53,7 +53,7 @@ class OsdTest : public QObject {
     }
     void showingAgainRestartsTheTime() {
         Osd osd;
-        shaode::OsdConfig c;
+        shaodesk::OsdConfig c;
         c.timeout = 300;
         osd.configure(c);
         osd.show("A", "one", -1);
@@ -76,7 +76,7 @@ class OsdTest : public QObject {
     }
     void disabledStaysHidden() {
         Osd osd;
-        shaode::OsdConfig c;
+        shaodesk::OsdConfig c;
         c.enabled = false;
         osd.configure(c);
         osd.show("A", "x", 1);

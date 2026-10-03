@@ -13,7 +13,7 @@ from harness import wait_for
 
 compositor, shell, probe, example = (str(Path(p).resolve()) for p in sys.argv[1:])
 
-with tempfile.TemporaryDirectory(prefix="shaode-shell-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-shell-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     # The example leaves the bar's look to theme.lua; spell it out so it can be edited here.
@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-shell-test-") as directory:
     compositor_log, shell_log = root / "compositor.log", root / "shell.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                QT_QPA_PLATFORM="wayland", QT_QUICK_BACKEND="software", QT_FORCE_STDERR_LOGGING="1",
-               XDG_DATA_HOME=directory, XDG_DATA_DIRS=directory, SHAODE_DEFAULT_CONFIG=example,
+               XDG_DATA_HOME=directory, XDG_DATA_DIRS=directory, SHAODESK_DEFAULT_CONFIG=example,
                DBUS_SESSION_BUS_ADDRESS="disabled:")  # the shell must not use the real session bus
     env.pop("DISPLAY", None)
     env.pop("WAYLAND_DISPLAY", None)
@@ -38,14 +38,14 @@ with tempfile.TemporaryDirectory(prefix="shaode-shell-test-") as directory:
                      processes, "compositor startup")
             env["WAYLAND_DISPLAY"] = re.search(
                 r"WAYLAND_DISPLAY=(\S+)", compositor_log.read_text())[1]
-            env["SHAODE_SOCKET"] = re.search(
+            env["SHAODESK_SOCKET"] = re.search(
                 r"Control socket: (\S+)", compositor_log.read_text())[1]
             desktop = subprocess.Popen([shell, "--config", str(config)], env=env,
                                        stdout=shell_output, stderr=shell_output)
             processes.append(desktop)
-            marker = "shaoDe surface rendered: shaoDe taskbar"
+            marker = "shaodesk surface rendered: shaodesk taskbar"
             wait_for(lambda: marker in shell_log.read_text(), processes, "panel rendering")
-            assert "shaoDe surface rendered: shaoDe desktop" in shell_log.read_text()
+            assert "shaodesk surface rendered: shaodesk desktop" in shell_log.read_text()
 
             def check_panel(height):
                 # A render marker can precede the compositor applying the new layer state.
@@ -66,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-shell-test-") as directory:
                                capture_output=True, timeout=30)
 
             def opened():
-                return "shaoDe launcher opened on" in shell_log.read_text()
+                return "shaodesk launcher opened on" in shell_log.read_text()
 
             # The shell subscribes asynchronously: resend until the first request arrives.
             for _ in range(10):
@@ -78,23 +78,23 @@ with tempfile.TemporaryDirectory(prefix="shaode-shell-test-") as directory:
                     pass
             assert opened() and "launcher closed" not in shell_log.read_text()
             launcher()
-            wait_for(lambda: "shaoDe launcher closed on" in shell_log.read_text(),
+            wait_for(lambda: "shaodesk launcher closed on" in shell_log.read_text(),
                      processes, "launcher closed")
             # The palette action opens the command palette as an overlay holding the keyboard;
             # Escape (typed with wtype where it is installed) closes it again.
             subprocess.run([compositor, "msg", "palette"], env=env, check=True,
                            capture_output=True, timeout=30)
-            wait_for(lambda: "shaoDe palette shown on" in shell_log.read_text(), processes,
+            wait_for(lambda: "shaodesk palette shown on" in shell_log.read_text(), processes,
                      "palette shown")
             def layers():
                 return subprocess.run([compositor, "msg", "get", "layers"], env=env, check=True,
                                       capture_output=True, text=True, timeout=30).stdout
-            wait_for(lambda: "shaode-palette" in layers(), processes, "palette surface mapped",
+            wait_for(lambda: "shaodesk-palette" in layers(), processes, "palette surface mapped",
                      detail=layers)
             wtype = shutil.which("wtype")
             if wtype:
                 subprocess.run([wtype, "-k", "Escape"], env=env, check=True, timeout=30)
-                wait_for(lambda: "shaoDe palette hidden on" in shell_log.read_text(), processes,
+                wait_for(lambda: "shaodesk palette hidden on" in shell_log.read_text(), processes,
                          "palette closed with Escape")
             else:
                 subprocess.run([compositor, "msg", "palette"], env=env, check=True,
@@ -125,7 +125,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-shell-test-") as directory:
             # the error shown across the top until the file is fixed.
             config.write_text("return { shell = { panel_height = -1 } }")
             desktop.send_signal(signal.SIGHUP)
-            wait_for(lambda: "shaoDe configuration error shown on" in shell_log.read_text(),
+            wait_for(lambda: "shaodesk configuration error shown on" in shell_log.read_text(),
                      processes, "configuration error banner")
             assert "panel_height" in shell_log.read_text()
             check_panel(52)

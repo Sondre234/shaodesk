@@ -3,7 +3,7 @@
 leaves free or of another window lands on it and stays held, a guide line shows the edge, the
 bypass modifier and windows.magnet turn it off, and dropping at the top still maximizes.
 Driven by a virtual pointer and keyboard (pointer_probe); the window asks for the move the way a
-client-decorated one does (wayland_probe with SHAODE_PROBE_MOVE)."""
+client-decorated one does (wayland_probe with SHAODESK_PROBE_MOVE)."""
 import os
 from pathlib import Path
 import re
@@ -30,13 +30,13 @@ def config(magnet=""):
 }""" % magnet
 
 
-with tempfile.TemporaryDirectory(prefix="shaode-magnet-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-magnet-test-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(config())
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words):
@@ -75,7 +75,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-magnet-test-") as directory:
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             virtual = subprocess.Popen([pointer_probe, str(SCREEN[0]), str(SCREEN[1])], env=env,
                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
             processes.append(virtual)
@@ -83,11 +83,11 @@ with tempfile.TemporaryDirectory(prefix="shaode-magnet-test-") as directory:
 
             # A panel along the bottom (with a window of its own, "P"), and the window to drag.
             panel = subprocess.Popen([probe, "--external-control"], env=dict(
-                env, SHAODE_PROBE_TITLE="P"), stdout=subprocess.DEVNULL)
+                env, SHAODESK_PROBE_TITLE="P"), stdout=subprocess.DEVNULL)
             processes.append(panel)
             wait_for(lambda: "P" in windows(), "panel client mapped")
             client = subprocess.Popen([probe, "--window-only"], env=dict(
-                env, SHAODE_PROBE_TITLE="W", SHAODE_PROBE_MOVE="1"), stdout=subprocess.DEVNULL)
+                env, SHAODESK_PROBE_TITLE="W", SHAODESK_PROBE_MOVE="1"), stdout=subprocess.DEVNULL)
             processes.append(client)
             wait_for(lambda: "W" in windows(), "window mapped")
             px, py, pw, ph, _ = windows()["P"]
@@ -205,7 +205,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-magnet-test-") as directory:
             processes.remove(client)
             wait_for(lambda: "W" not in windows(), "window closed")
             client = subprocess.Popen([probe, "--window-only"], env=dict(
-                env, SHAODE_PROBE_TITLE="W", SHAODE_PROBE_RESIZE="bottom_right"),
+                env, SHAODESK_PROBE_TITLE="W", SHAODESK_PROBE_RESIZE="bottom_right"),
                 stdout=subprocess.DEVNULL)
             processes.append(client)
             wait_for(lambda: "W" in windows(), "window mapped")

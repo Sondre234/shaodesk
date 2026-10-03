@@ -22,14 +22,14 @@ CONFIG = """return {
 }"""
 LAYOUT = (2080, 720)
 
-with tempfile.TemporaryDirectory(prefix="shaode-panel-focus-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-panel-focus-test-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(CONFIG)
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                WLR_HEADLESS_OUTPUTS="2")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words):
@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-panel-focus-test-") as directory
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             virtual = subprocess.Popen([pointer_probe, str(LAYOUT[0]), str(LAYOUT[1])], env=env,
                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
             processes.append(virtual)
@@ -70,7 +70,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-panel-focus-test-") as directory
             # The probe's window opens on the first monitor and its 48 pixel bottom panel on the
             # second.
             processes.append(subprocess.Popen(
-                [probe, "--external-control"], env=dict(env, SHAODE_PROBE_TITLE="A"),
+                [probe, "--external-control"], env=dict(env, SHAODESK_PROBE_TITLE="A"),
                 stdout=subprocess.DEVNULL))
             wait_for(lambda: focused() == "A", "A focused")
             assert windows()["A"]["output"] == "HEADLESS-1", windows()

@@ -35,14 +35,14 @@ def settings(enabled):
 }}"""
 
 
-with tempfile.TemporaryDirectory(prefix="shaode-rules-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-rules-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(settings(True))
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                WLR_HEADLESS_OUTPUTS="2")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words):
@@ -63,7 +63,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-rules-test-") as directory:
     def open_window(app_id, title):
         processes.append(subprocess.Popen(
             [probe, "--window-only"], stdout=subprocess.DEVNULL,
-            env=dict(env, SHAODE_PROBE_APP_ID=app_id, SHAODE_PROBE_TITLE=title)))
+            env=dict(env, SHAODESK_PROBE_APP_ID=app_id, SHAODESK_PROBE_TITLE=title)))
         wait_for(lambda: title in windows(), f"{title} opens")
 
     def window(title):
@@ -78,14 +78,14 @@ with tempfile.TemporaryDirectory(prefix="shaode-rules-test-") as directory:
                              "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             first = next(line for line in msg("get", "outputs").splitlines()
                          if line.startswith("HEADLESS-1\t"))
             _, _, x, y, width, height, *_ = first.split("\t")
             assert (int(x), int(y), int(width), int(height)) == (0, 0, 1280, 720), first
             width, height = 1280, 720
 
-            open_window("shaode-probe", "Plain")
+            open_window("shaodesk-probe", "Plain")
             wait_for(lambda: window("Plain")[:3] == (1, True, True) and
                      window("Plain")[5] == "HEADLESS-1", "plain window tiles")
 
@@ -104,7 +104,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-rules-test-") as directory:
             assert msg("get", "workspace") == "1\n"
             assert window("Floating")[1], "a window on another workspace took focus"
 
-            open_window("shaode-probe", "Pinned window")
+            open_window("shaodesk-probe", "Pinned window")
             wait_for(lambda: window("Pinned window")[:5] == (1, True, False, (20, 30, 200, 100),
                                                              True),
                      "title rule places the window at 20, 30")

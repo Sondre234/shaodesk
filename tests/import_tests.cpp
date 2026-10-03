@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// `shaode import` against the fixture dotfiles in tests/import, and theme.lua merging.
-#include "shaode/config.hpp"
-#include "shaode/import.hpp"
+// `shaodesk import` against the fixture dotfiles in tests/import, and theme.lua merging.
+#include "shaodesk/config.hpp"
+#include "shaodesk/import.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -18,7 +18,7 @@ void require(bool condition, const std::string &message) {
 bool contains(const std::string &text, const std::string &part) {
     return text.find(part) != std::string::npos;
 }
-const sh_monitor *monitor(const shaode::Config &config, const std::string &name) {
+const sh_monitor *monitor(const shaodesk::Config &config, const std::string &name) {
     for (int i = 0; i < config.settings.monitor_count; ++i)
         if (name == config.settings.monitors[i].name)
             return &config.settings.monitors[i];
@@ -28,8 +28,8 @@ bool near(float a, float b) { return a > b - 0.005F && a < b + 0.005F; }
 
 // hyprland.conf through `source` and $variables, Waybar as a plain bar, pywal colors.
 void hyprlang(const fs::path &root) {
-    auto result = shaode::import_dotfiles(root / "conf/.config");
-    auto config = shaode::parse_config(result.theme, "theme.lua");
+    auto result = shaodesk::import_dotfiles(root / "conf/.config");
+    auto config = shaodesk::parse_config(result.theme, "theme.lua");
     const auto &s = config.settings;
     require(s.gap_inner == 6 && s.gap_outer == 5,
             "gaps: gaps_in doubles, gaps_out takes its first value");
@@ -96,8 +96,8 @@ void hyprlang(const fs::path &root) {
 
 // hyprland.lua in the sandbox, a HyDE-style Waybar, wallbash colors and wallpaper.
 void lua(const fs::path &root) {
-    auto result = shaode::import_dotfiles(root / "lua/.config");
-    auto config = shaode::parse_config(result.theme, "theme.lua");
+    auto result = shaodesk::import_dotfiles(root / "lua/.config");
+    auto config = shaodesk::parse_config(result.theme, "theme.lua");
     const auto &s = config.settings;
     auto *dp1 = monitor(config, "DP-1");
     require(dp1 && dp1->width == 3840 && near(dp1->scale, 2),
@@ -130,7 +130,7 @@ void lua(const fs::path &root) {
 
 // init.lua's `theme` fills in only what init.lua leaves out.
 void merge(const fs::path &root) {
-    auto config = shaode::load_config(root / "merge/init.lua");
+    auto config = shaodesk::load_config(root / "merge/init.lua");
     require(config.shell.accent == "#111111", "init.lua should win over the theme");
     require(config.shell.text_color == "#333333", "theme should fill in what init.lua omits");
     require(config.settings.gap_inner == 3 && config.settings.gap_outer == 9,
@@ -138,23 +138,23 @@ void merge(const fs::path &root) {
     require(config.settings.border_width == 3, "theme-only section not merged");
     require(config.window_rules.size() == 1 && config.window_rules[0].app_id == "^a$",
             "lists should come whole from init.lua");
-    auto shadowed = shaode::shadowed_settings(root / "merge/init.lua");
+    auto shadowed = shaodesk::shadowed_settings(root / "merge/init.lua");
     require(shadowed && *shadowed == std::vector<std::string>{"layout.gap_inner", "shell.accent",
                                                               "windows.rules"},
             "shadowed settings wrong");
-    auto missing = shaode::parse_config("return { theme = 'missing.lua', layout = { gap = 2 } }",
+    auto missing = shaodesk::parse_config("return { theme = 'missing.lua', layout = { gap = 2 } }",
                                         "init.lua", root / "merge");
     require(missing.settings.gap_inner == 2, "a missing theme file should be ignored");
     bool nested = false;
     try {
-        (void)shaode::parse_config("return { theme = 'init.lua' }", "init.lua", root / "merge");
+        (void)shaodesk::parse_config("return { theme = 'init.lua' }", "init.lua", root / "merge");
     } catch (const std::exception &) {
         nested = true;
     }
     require(nested, "a theme that names another theme should be rejected");
     bool empty = false;
     try {
-        (void)shaode::import_dotfiles(root / "merge");
+        (void)shaodesk::import_dotfiles(root / "merge");
     } catch (const std::exception &) {
         empty = true;
     }

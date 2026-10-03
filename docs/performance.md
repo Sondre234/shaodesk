@@ -1,16 +1,16 @@
 # Compositor performance
 
-Numbers come from `tools/bench/bench.py`, a headless benchmark: it starts `shaode --headless`
+Numbers come from `tools/bench/bench.py`, a headless benchmark: it starts `shaodesk --headless`
 with the pixman renderer (no GPU, no real session), maps N clients, drives the compositor
 through the control socket, and reports round-trip times and the compositor's own CPU time
 from `/proc`. Nothing here touches a real display.
 
-    cmake -S . -B build -G Ninja -DSHAODE_BUILD_COMPOSITOR=ON && cmake --build build
-    python3 tools/bench/bench.py --compositor build/shaode \
-        --client build/shaode-bench-client --windows 40 [--json out.json]
+    cmake -S . -B build -G Ninja -DSHAODESK_BUILD_COMPOSITOR=ON && cmake --build build
+    python3 tools/bench/bench.py --compositor build/shaodesk \
+        --client build/shaodesk-bench-client --windows 40 [--json out.json]
 
 `--quick` runs a few seconds of it and is what the `bench_smoke` test uses. The compositor
-counts frames, commits and placements (`shaode msg get stats`), which the benchmark reads to
+counts frames, commits and placements (`shaodesk msg get stats`), which the benchmark reads to
 report time per commit and per frame.
 
 Absolute numbers depend on the host and are noisy below a millisecond; compare runs made on
@@ -49,7 +49,7 @@ host; the tool needs only gdb). With 40 windows and a request stream of `toggle_
 - `toplevel_configure`, layout computation (`sh_tiling::layout`) and animation setup are
   around 5-15% each;
 - freeing the clients' old shm buffers (`close`) and libwayland/libffi dispatch are most of
-  the rest. Neither is in shaoDe's code.
+  the rest. Neither is in shaodesk's code.
 
 The compositor's own code is a small part of the total, so a further large win in these
 paths would have to come from doing fewer scene mutations per window (each move or resize of
@@ -84,7 +84,7 @@ the frames stop and the idle gap that follows would read as a stall; the scenari
 over the windows, and the same while layout changes keep every window gliding, reported as
 compositor time per motion event.
 
-    python3 tools/bench/bench.py --compositor build/shaode --client build/shaode-bench-client \
+    python3 tools/bench/bench.py --compositor build/shaodesk --client build/shaodesk-bench-client \
         --pointer-probe build/pointer_probe --only smooth pointer --seconds 10
 
 What changed, each measured against the commit before it, `RelWithDebInfo`, 1920x1080 headless
@@ -110,7 +110,7 @@ scatter by tens of percent; the tables give the range over repeated back-to-back
 Measured and left alone:
 
 - **Scene updates per window.** `refresh_frame` already skips unchanged work: wlroots' scene
-  setters return early for an unchanged position, size, colour or opacity, and shaoDe raises its
+  setters return early for an unchanged position, size, colour or opacity, and shaodesk raises its
   border and controls only when something was stacked above them. What is left is the scene
   updates for real changes, about 45 us per commit during `layout_next` (6 border updates for a
   size change), 1.8 ms of a 10 to 17 ms request. A microbenchmark on a bare wlroots scene shows
@@ -134,7 +134,7 @@ Measured and left alone:
   cheap: motion over an empty desktop takes 0.3 us in total.
 - **Build type.** With the load on this machine a build with no optimisation flags and a
   `RelWithDebInfo` one could not be told apart on the request round trips or pointer motion, since
-  wlroots, libwayland and pixman come from the system already optimised and shaoDe's own code
+  wlroots, libwayland and pixman come from the system already optimised and shaodesk's own code
   is a small part. The default is `RelWithDebInfo` because an unoptimised compositor is the wrong
   default for a package, not because a number moved.
 

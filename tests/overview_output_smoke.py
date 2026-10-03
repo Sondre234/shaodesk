@@ -25,14 +25,14 @@ CONFIG = """return {
 }"""
 LAYOUT = (2080, 720)
 
-with tempfile.TemporaryDirectory(prefix="shaode-overview-output-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-overview-output-test-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(CONFIG)
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                WLR_HEADLESS_OUTPUTS="2")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words):
@@ -70,7 +70,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-overview-output-test-") as direc
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             virtual = subprocess.Popen([pointer_probe, str(LAYOUT[0]), str(LAYOUT[1])], env=env,
                                        stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
             processes.append(virtual)
@@ -84,8 +84,8 @@ with tempfile.TemporaryDirectory(prefix="shaode-overview-output-test-") as direc
             # A's client also puts a 48 pixel panel on the second monitor: the overview keeps clear of it.
             for title in ("A", "C", "D"):
                 processes.append(subprocess.Popen(
-                    [probe, "--external-control" if title == "A" else "--window-only"], env=dict(env, SHAODE_PROBE_TITLE=title,
-                                                       SHAODE_PROBE_APP_ID="zz"),
+                    [probe, "--external-control" if title == "A" else "--window-only"], env=dict(env, SHAODESK_PROBE_TITLE=title,
+                                                       SHAODESK_PROBE_APP_ID="zz"),
                     stdout=subprocess.DEVNULL))
                 wait_for(lambda: title in windows() and focused() == title, f"{title} focused")
             assert windows()["C"]["output"] == "HEADLESS-2", windows()

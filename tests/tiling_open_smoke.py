@@ -14,14 +14,14 @@ import harness
 compositor, probe, example = (str(Path(p).resolve()) for p in sys.argv[1:4])
 CONFIGURE = re.compile(r"xdg_toplevel#\d+\.configure\((-?\d+), (-?\d+),")
 
-with tempfile.TemporaryDirectory(prefix="shaode-tiling-open-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-tiling-open-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(Path(example).read_text().replace("xwayland = true", "xwayland = false")
                       .replace("tiling = false", "tiling = true"))
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET", "WAYLAND_DEBUG"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET", "WAYLAND_DEBUG"):
         env.pop(name, None)
 
     def windows():
@@ -63,7 +63,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-tiling-open-test-") as directory
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
 
             counts = []
             for opened in range(3):
@@ -91,7 +91,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-tiling-open-test-") as directory
             subprocess.run([compositor, "msg", "fullscreen"], env=env, check=True, timeout=30)
             full = [(0, 0, *map(int, re.search(r"(\d+)x(\d+)", output).groups()))]
             wait_for(lambda: windows()[2] == full[0], "focused window fullscreen")
-            subprocess.run([probe, "--maximize", "shaode-probe"], env=env, check=True,
+            subprocess.run([probe, "--maximize", "shaodesk-probe"], env=env, check=True,
                            capture_output=True, timeout=30)
             subprocess.run([probe, "--globals"], env=env, capture_output=True, timeout=30)
             assert windows()[2] == full[0], windows()

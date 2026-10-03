@@ -20,14 +20,14 @@ CONFIG = """return {
     features = { workspace_back_and_forth = %s },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaode-workspace-back-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-workspace-back-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(CONFIG % "false")
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                WLR_HEADLESS_OUTPUTS="2")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words, ok=True):
@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-workspace-back-test-") as direct
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), processes, "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             wait_for(lambda: len(current()) == 2, processes, "two outputs")
             assert "takes no argument" in msg("workspace_back", "2", ok=False)
 
@@ -82,12 +82,12 @@ with tempfile.TemporaryDirectory(prefix="shaode-workspace-back-test-") as direct
             window = subprocess.Popen([probe, "--external-control"], env=env,
                                       stdout=subprocess.DEVNULL)
             processes.append(window)
-            wait_for(lambda: "shaode-probe" in windows(), processes, "window mapped")
-            _, home, _ = windows()["shaode-probe"]
+            wait_for(lambda: "shaodesk-probe" in windows(), processes, "window mapped")
+            _, home, _ = windows()["shaodesk-probe"]
             msg("move_to_workspace", "4")
             assert on(home, "workspace", "1") == 1
-            assert windows()["shaode-probe"] == (4, home, False), windows()
-            subprocess.run([probe, "--activate", "shaode-probe"], env=env, check=True,
+            assert windows()["shaodesk-probe"] == (4, home, False), windows()
+            subprocess.run([probe, "--activate", "shaodesk-probe"], env=env, check=True,
                            timeout=30, stdout=subprocess.DEVNULL)
             wait_for(lambda: current()[home] == 4, processes, "taskbar switch")
             assert on(home, "workspace_back") == 1

@@ -113,11 +113,11 @@ class PulseAudio : public Audio {
         Locked lock(loop_);
         dropContext();
         auto *props = pa_proplist_new();
-        pa_proplist_sets(props, PA_PROP_APPLICATION_NAME, "shaoDe");
-        pa_proplist_sets(props, PA_PROP_APPLICATION_ID, "shaode-shell");
+        pa_proplist_sets(props, PA_PROP_APPLICATION_NAME, "shaodesk");
+        pa_proplist_sets(props, PA_PROP_APPLICATION_ID, "shaodesk-shell");
         pa_proplist_sets(props, PA_PROP_APPLICATION_ICON_NAME, "audio-volume-high");
         context_ =
-            pa_context_new_with_proplist(pa_threaded_mainloop_get_api(loop_), "shaoDe", props);
+            pa_context_new_with_proplist(pa_threaded_mainloop_get_api(loop_), "shaodesk", props);
         pa_proplist_free(props);
         outstanding_ = 0;
         again_ = false;

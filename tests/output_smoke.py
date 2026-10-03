@@ -40,14 +40,14 @@ THIRD = """return {
                              ["HEADLESS-3"] = { enabled = false } } },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaode-output-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-output-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(FIRST)
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                WLR_HEADLESS_OUTPUTS="3")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def outputs():
@@ -75,7 +75,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-output-test-") as directory:
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), [server], "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             state = outputs()
             # 1600x900 at 1.25 is 1280x720 logical; the unpositioned rotated output follows
             # the rightmost positioned one. The layout shifts right by 1280 so it starts at 0:

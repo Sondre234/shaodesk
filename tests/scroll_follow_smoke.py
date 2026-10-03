@@ -24,13 +24,13 @@ CONFIG = """return {
 EXPECTED = {"edge": 0, "center": 320, "never": -640}
 
 for follow, expected in EXPECTED.items():
-    with tempfile.TemporaryDirectory(prefix="shaode-scroll-follow-test-") as directory:
+    with tempfile.TemporaryDirectory(prefix="shaodesk-scroll-follow-test-") as directory:
         root = Path(directory)
         init = root / "init.lua"
         init.write_text(CONFIG % follow)
         log = root / "compositor.log"
         env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-        for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+        for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
             env.pop(name, None)
 
         def windows():
@@ -50,12 +50,12 @@ for follow, expected in EXPECTED.items():
                 wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
                 text = log.read_text()
                 env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-                env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+                env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
                 for title in ("A", "B", "C"):
                     processes.append(subprocess.Popen(
                         [probe, "--window-only"],
-                        env=dict(env, SHAODE_PROBE_TITLE=title,
-                                 SHAODE_PROBE_APP_ID=f"app-{title.lower()}"),
+                        env=dict(env, SHAODESK_PROBE_TITLE=title,
+                                 SHAODESK_PROBE_APP_ID=f"app-{title.lower()}"),
                         stdout=subprocess.DEVNULL))
                     wait_for(lambda: title in windows() and windows()[title][0], f"{title} focused")
                 # New windows move the view in every mode: C is the rightmost column, in view.

@@ -30,14 +30,14 @@ CONFIG = """return {
     },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaode-switcher-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-switcher-test-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(CONFIG)
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                WLR_HEADLESS_OUTPUTS="2")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words):
@@ -63,7 +63,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-switcher-test-") as directory:
 
         def __init__(self):
             self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            self.sock.connect(env["SHAODE_SOCKET"])
+            self.sock.connect(env["SHAODESK_SOCKET"])
             self.sock.sendall(b"subscribe\n")
             self.sock.settimeout(0.05)
             self.buffer = b""
@@ -110,12 +110,12 @@ with tempfile.TemporaryDirectory(prefix="shaode-switcher-test-") as directory:
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             events = Events()
 
             def open_window(title):
                 clients[title] = subprocess.Popen([probe, "--window-only"],
-                                                  env=dict(env, SHAODE_PROBE_TITLE=title),
+                                                  env=dict(env, SHAODESK_PROBE_TITLE=title),
                                                   stdout=subprocess.DEVNULL)
                 processes.append(clients[title])
                 wait_for(lambda: title in windows(), f"{title} mapped")

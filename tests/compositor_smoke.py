@@ -23,7 +23,7 @@ for arguments, expected in [
                             capture_output=True, text=True, timeout=30)
     assert result.returncode != 0 and expected in result.stderr, result.stderr
 
-with tempfile.TemporaryDirectory(prefix="shaode-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(Path(example).read_text())

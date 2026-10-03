@@ -1,8 +1,8 @@
 <!-- Generated from src/config_schema.cpp by tests/config_diagnostics_tests.cpp. Do not edit by
-     hand: change the schema, then run `SHAODE_UPDATE_DOCS=1 ctest -R config`. -->
+     hand: change the schema, then run `SHAODESK_UPDATE_DOCS=1 ctest -R config`. -->
 # Configuration reference
 
-shaoDe reads a Lua file that returns a table (`config/init.lua` is a commented example). Every setting is optional. An unknown setting, a value of the wrong type, or a value out of range is an error naming the file and line, with a suggestion for a misspelled name; `shaode --check-config` reports it. The running desktop reloads the file when it is saved; one with an error loads the default configuration instead and shows the error across the top of the screen until the file is fixed.
+shaodesk reads a Lua file that returns a table (`config/init.lua` is a commented example). Every setting is optional. An unknown setting, a value of the wrong type, or a value out of range is an error naming the file and line, with a suggestion for a misspelled name; `shaodesk --check-config` reports it. The running desktop reloads the file when it is saved; one with an error loads the default configuration instead and shows the error across the top of the screen until the file is fixed.
 
 Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 
@@ -12,8 +12,8 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | --- | --- | --- | --- | --- |
 | `version` | integer | 1 | - | Configuration API version; only 1 exists. |
 | `extends` | string | unset | - | `"default"` layers this file over the shipped default configuration: it supplies every setting and binding this file omits, and a binding with `action = "none"` removes a default one. |
-| `theme` | string | unset | - | A Lua file, relative to this one, that supplies every setting this file omits; `shaode import` writes one. A missing file is ignored. |
-| `profile` | string | unset | - | The appearance profile to start with, a name from `profiles`. One picked from the panel's menu, the command palette or `shaode msg profile NAME` replaces it until another is picked; that choice is kept in `$XDG_STATE_HOME/shaode/profile`. |
+| `theme` | string | unset | - | A Lua file, relative to this one, that supplies every setting this file omits; `shaodesk import` writes one. A missing file is ignored. |
+| `profile` | string | unset | - | The appearance profile to start with, a name from `profiles`. One picked from the panel's menu, the command palette or `shaodesk msg profile NAME` replaces it until another is picked; that choice is kept in `$XDG_STATE_HOME/shaodesk/profile`. |
 | `profiles` | table of tables | unset | - | Appearance profiles, keyed by a name of up to 32 letters, digits, `-` and `_` (not `next` or `prev`), at most 32. Each holds `appearance`, `windows` and `shell` settings that replace this file's own (and its theme's and defaults') while the profile is in use, e.g. `light = { shell = { panel_color = "#f2f4f8" } }`. Every profile is checked as the file loads. A file with `extends = "default"` gets the default configuration's profiles only when it has none of its own. |
 | `xwayland` | boolean | true | - | Run X11 applications; Xwayland starts on first use. Restart to change. |
 | `auto_reload` | boolean | true | - | Reload when this file, or another `.lua` file in its directory, is saved. A file with an error loads the default configuration instead and shows the error on screen. |
@@ -66,7 +66,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `layout.gap_inner` | integer | `gap` | 0 to 100 | Pixels between tiled windows. |
 | `layout.gap_outer` | integer | `gap` | 0 to 100 | Pixels between tiles and the edges. |
 | `layout.workspaces` | integer | 4 | 1 to 10 | Workspaces per monitor. |
-| `layout.workspace_names` | list of strings | unset | - | Names for workspaces 1, 2, ...; at most `workspaces` of them, each up to 32 characters, not a number and not repeated ("" leaves one unnamed). The panel shows them, and `workspace` and `move_to_workspace` (bindings with `workspace = "web"`, or `shaode msg workspace web`) accept them. |
+| `layout.workspace_names` | list of strings | unset | - | Names for workspaces 1, 2, ...; at most `workspaces` of them, each up to 32 characters, not a number and not repeated ("" leaves one unnamed). The panel shows them, and `workspace` and `move_to_workspace` (bindings with `workspace = "web"`, or `shaodesk msg workspace web`) accept them. |
 | `layout.tiling` | boolean | false | - | Start every monitor with automatic tiling; `outputs.monitors.<name>.tiling` overrides it. |
 | `layout.tile_layout` | enum | "dwindle" | - | Tiling layout: `"dwindle"`, `"master"`, `"spiral"`, `"monocle"`, or `"scroll"`. |
 | `layout.master_ratio` | number | 0.55 | 0.1 to 0.9 | Share of the screen the master area takes in the master layout. |
@@ -106,7 +106,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | --- | --- | --- | --- | --- |
 | `windows` | table | - | - | Window borders, opacity, and rules. |
 | `windows.border_width` | integer | 0 | 0 to 20 | Border in pixels around each window; tiles shrink to keep it in their slot. |
-| `windows.corner_radius` | integer | 10 | 0 to 40 | Radius in pixels of the corners of windows on a monitor with tiling on, floating ones included, and of their border; 0 keeps them square. Needs wlroots built with shaoDe's rounded-corners patch. |
+| `windows.corner_radius` | integer | 10 | 0 to 40 | Radius in pixels of the corners of windows on a monitor with tiling on, floating ones included, and of their border; 0 keeps them square. Needs wlroots built with shaodesk's rounded-corners patch. |
 | `windows.border_color` | color | "#7da8ff" | - | Focused window border, `#RRGGBB` or `#RRGGBBAA`. |
 | `windows.border_inactive_color` | color | "#404a5c" | - | Other windows' border, `#RRGGBB` or `#RRGGBBAA`. |
 | `windows.opacity` | number | 1.0 | 0.05 to 1 | Focused window opacity. |
@@ -168,7 +168,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 
 | Setting | Type | Default | Range | Description |
 | --- | --- | --- | --- | --- |
-| `hot_corners` | table | - | - | Hot corners: pushing the pointer into a screen corner and leaving it there runs a request, written as for `shaode msg` (an action name and its argument, or `spawn PROGRAM ARGS`). Nothing runs over a fullscreen window or while a button is held. |
+| `hot_corners` | table | - | - | Hot corners: pushing the pointer into a screen corner and leaving it there runs a request, written as for `shaodesk msg` (an action name and its argument, or `spawn PROGRAM ARGS`). Nothing runs over a fullscreen window or while a button is held. |
 | `hot_corners.size` | integer | 2 | 1 to 64 | Side of the corner square in pixels. |
 | `hot_corners.delay` | integer | 150 | 0 to 5000 | Milliseconds the pointer must stay in the corner; it must leave before the corner can run again. |
 | `hot_corners.top_left` | string | unset | - | What the top-left corner runs, for instance `toggle_overview` or `workspace 2`. |
@@ -250,7 +250,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 
 | Setting | Type | Default | Range | Description |
 | --- | --- | --- | --- | --- |
-| `notifications` | table | - | - | Notifications: the shell serves `org.freedesktop.Notifications` on the session bus and shows each one as a card on the focused monitor; clicking a card runs its default action, hovering pauses its timer, and the panel's bell keeps a history. Critical notifications stay until dismissed. The actions `dnd_toggle`, `dnd_on` and `dnd_off` (or `shaode msg dnd toggle`) silence the cards. |
+| `notifications` | table | - | - | Notifications: the shell serves `org.freedesktop.Notifications` on the session bus and shows each one as a card on the focused monitor; clicking a card runs its default action, hovering pauses its timer, and the panel's bell keeps a history. Critical notifications stay until dismissed. The actions `dnd_toggle`, `dnd_on` and `dnd_off` (or `shaodesk msg dnd toggle`) silence the cards. |
 | `notifications.enabled` | boolean | true | - | Serve notifications. Turn it off to run another daemon such as mako or dunst. |
 | `notifications.position` | enum | "top-right" | - | Corner of the focused monitor the cards stack from: `"top-right"`, `"top-left"`, `"bottom-right"` or `"bottom-left"`. |
 | `notifications.timeout` | integer | 6000 | 0 to 600000 | Milliseconds before a card goes when the application asked for the default; 0 keeps cards until dismissed. An application's own timeout wins, and critical ones never expire. |
@@ -263,7 +263,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 
 | Setting | Type | Default | Range | Description |
 | --- | --- | --- | --- | --- |
-| `osd` | table | - | - | On-screen display: a small pill near the bottom centre of the focused monitor that shows a label and a level for volume and brightness changes and for `shaode msg osd TEXT [PERCENT]`, then fades out. |
+| `osd` | table | - | - | On-screen display: a small pill near the bottom centre of the focused monitor that shows a label and a level for volume and brightness changes and for `shaodesk msg osd TEXT [PERCENT]`, then fades out. |
 | `osd.enabled` | boolean | true | - | Show the display. |
 | `osd.position` | enum | "bottom" | - | `"bottom"` or `"top"` edge of the monitor. |
 | `osd.timeout` | integer | 1500 | 200 to 10000 | Milliseconds the display stays before it fades out. |

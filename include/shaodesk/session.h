@@ -9,10 +9,10 @@
 extern "C" {
 #endif
 
-/* A saved arrangement of windows (`shaode msg session save NAME`): which workspace, layout and
+/* A saved arrangement of windows (`shaodesk msg session save NAME`): which workspace, layout and
  * tiling state each output was in, and for every window its output, workspace, place and
  * state, with the matchers (app ID and title) and the command that restore it later. Kept as
- * plain text under $XDG_STATE_HOME/shaode/sessions/NAME, one record per line. */
+ * plain text under $XDG_STATE_HOME/shaodesk/sessions/NAME, one record per line. */
 enum {
     SH_SESSION_MAX_WINDOWS = 128,
     SH_SESSION_MAX_OUTPUTS = 16,
@@ -77,7 +77,7 @@ struct sh_session {
 /* Session names are 1 to 63 characters of letters, digits, '.', '_' and '-', not starting with
  * a dot: they name a file. */
 bool sh_session_valid_name(const char *name);
-/* Fills `path` with the file of a session, creating no directories: $XDG_STATE_HOME/shaode/
+/* Fills `path` with the file of a session, creating no directories: $XDG_STATE_HOME/shaodesk/
  * sessions/NAME, or under ~/.local/state. False when the name is invalid or no directory can be
  * determined. With a NULL `name` gives the directory itself. */
 bool sh_session_path(const char *name, char *path, size_t size);

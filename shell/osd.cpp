@@ -6,7 +6,7 @@ Osd::Osd(QObject *parent) : QObject(parent) {
     timer_.setSingleShot(true);
     connect(&timer_, &QTimer::timeout, this, &Osd::hide);
 }
-void Osd::configure(const shaode::OsdConfig &config) {
+void Osd::configure(const shaodesk::OsdConfig &config) {
     config_ = config;
     if (!config_.enabled)
         hide();
