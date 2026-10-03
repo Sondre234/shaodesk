@@ -645,7 +645,8 @@ void hide_in_scratchpad(struct sh_toplevel *toplevel);
 bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, char *error,
                      size_t error_size);
 void run_action(struct sh_server *server, enum sh_action action, int argument);
-void set_default_cursor(struct sh_server *server);
+bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, uint32_t modifiers,
+                       xkb_keysym_t sym);
 
 /* control.c */
 void notify_subscribers(struct sh_server *server);
@@ -708,6 +709,23 @@ void reset_cursor_mode(struct sh_server *server);
 void finish_grab(struct sh_server *server);
 void process_cursor_move(struct sh_server *server);
 void process_cursor_resize(struct sh_server *server);
+
+/* input.c */
+bool configure_keyboard(struct sh_server *server, struct wlr_keyboard *keyboard);
+void configure_pointer(struct sh_server *server, struct wlr_input_device *device);
+void server_new_input(struct wl_listener *listener, void *data);
+void server_new_virtual_keyboard(struct wl_listener *listener, void *data);
+void server_new_virtual_pointer(struct wl_listener *listener, void *data);
+void seat_request_cursor(struct wl_listener *listener, void *data);
+void set_default_cursor(struct sh_server *server);
+void seat_pointer_focus_change(struct wl_listener *listener, void *data);
+void seat_request_set_selection(struct wl_listener *listener, void *data);
+void seat_request_set_primary_selection(struct wl_listener *listener, void *data);
+void seat_request_start_drag(struct wl_listener *listener, void *data);
+void seat_start_drag(struct wl_listener *listener, void *data);
+void request_activate(struct wl_listener *listener, void *data);
+void server_new_constraint(struct wl_listener *listener, void *data);
+void seat_keyboard_focus_change(struct wl_listener *listener, void *data);
 
 /* layer_shell.c */
 void arrange_layers(struct sh_server *server);
