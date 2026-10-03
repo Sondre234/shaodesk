@@ -10,7 +10,7 @@
 #include <fnmatch.h>
 #include <lua.hpp>
 
-namespace shaode::import {
+namespace shaodesk::import {
 namespace {
 // hyprland.lua is code. It runs with hl.* functions that only record their arguments, no way
 // to write files or start processes, reads limited to the imported directory, and a budget.
@@ -652,4 +652,4 @@ std::optional<Hyprland> read_hyprland(const Files &files, Report &report) {
     }
     return hypr;
 }
-} // namespace shaode::import
+} // namespace shaodesk::import

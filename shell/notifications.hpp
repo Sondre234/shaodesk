@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-#include "shaode/config.hpp"
+#include "shaodesk/config.hpp"
 #include <QAbstractListModel>
 #include <QDateTime>
 #include <QHash>
@@ -101,7 +101,7 @@ class NotificationCenter : public QObject {
     explicit NotificationCenter(QObject *parent = nullptr);
     // Applies the settings; do-not-disturb comes from them on the first call only, so a reload
     // keeps what the user toggled.
-    void configure(const shaode::NotificationsConfig &config);
+    void configure(const shaodesk::NotificationsConfig &config);
     NotificationModel *cards() { return &cards_; }
     NotificationModel *history() { return &history_; }
     int unread() const { return unread_; }
@@ -111,12 +111,12 @@ class NotificationCenter : public QObject {
     void setServing(bool serving);
     int cardWidth() const { return config_.width; }
     bool bottom() const {
-        return config_.position == shaode::Corner::BottomLeft ||
-               config_.position == shaode::Corner::BottomRight;
+        return config_.position == shaodesk::Corner::BottomLeft ||
+               config_.position == shaodesk::Corner::BottomRight;
     }
     bool left() const {
-        return config_.position == shaode::Corner::TopLeft ||
-               config_.position == shaode::Corner::BottomLeft;
+        return config_.position == shaodesk::Corner::TopLeft ||
+               config_.position == shaodesk::Corner::BottomLeft;
     }
     bool enabled() const { return config_.enabled; }
     // Takes a notification and returns its id: a new one, or that of the one it replaces
@@ -159,7 +159,7 @@ class NotificationCenter : public QObject {
         int remaining = 0;
     };
     NotificationModel cards_, history_;
-    shaode::NotificationsConfig config_;
+    shaodesk::NotificationsConfig config_;
     bool dnd_ = false, configured_ = false, serving_ = false;
     int unread_ = 0;
     uint lastId_ = 0;

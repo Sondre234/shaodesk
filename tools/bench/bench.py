@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Headless benchmark of the compositor's hot paths.
 
-Starts `shaode --headless` (pixman renderer, no GPU, no real session), opens N windows with
-shaode-bench-client, then drives it through the control socket and reports timings:
+Starts `shaodesk --headless` (pixman renderer, no GPU, no real session), opens N windows with
+shaodesk-bench-client, then drives it through the control socket and reports timings:
 
   open     time to map N windows, and compositor CPU per window
   idle     compositor CPU and thread wakeups per second with nothing happening
@@ -20,7 +20,7 @@ shaode-bench-client, then drives it through the control socket and reports timin
 CPU is the compositor's scheduler run time from /proc, so it counts only the compositor
 process, not the clients or this script. Nothing here touches a real display.
 
-  tools/bench/bench.py --compositor build/shaode --client build/shaode-bench-client
+  tools/bench/bench.py --compositor build/shaodesk --client build/shaodesk-bench-client
   tools/bench/bench.py ... --windows 60 --json before.json
   tools/bench/bench.py ... --quick        (a few seconds; what ctest runs)
   tools/bench/bench.py ... --profile layout_next,focus_next   (where the compositor spends
@@ -64,7 +64,7 @@ class Compositor:
         self.binary = str(binary)
         self.directory = directory
         self.env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-        for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+        for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
             self.env.pop(name, None)
         self.log_path = Path(directory) / "compositor.log"
         self.log = self.log_path.open("w")
@@ -77,14 +77,14 @@ class Compositor:
             time.sleep(0.02)
         text = self.log_path.read_text()
         self.env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-        self.env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+        self.env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
         self.clients = []
 
     def request(self, line):
         """(reply body, seconds from sending the request to its reply)"""
         with socket.socket(socket.AF_UNIX) as sock:
             sock.settimeout(10)
-            sock.connect(self.env["SHAODE_SOCKET"])
+            sock.connect(self.env["SHAODESK_SOCKET"])
             started = time.perf_counter()
             sock.sendall(line.encode() + b"\n")
             reply = b""
@@ -378,8 +378,8 @@ def profile(args):
     import signal
     import threading
     requests = args.profile.split(",")
-    with tempfile.TemporaryDirectory(prefix="shaode-prof-") as directory:
-        os.environ["SHAODE_SAMPLES"] = str(Path(directory) / "samples.txt")
+    with tempfile.TemporaryDirectory(prefix="shaodesk-prof-") as directory:
+        os.environ["SHAODESK_SAMPLES"] = str(Path(directory) / "samples.txt")
         config = Path(directory) / "init.lua"
         config.write_text(config_text(args.animations, not args.no_rules, args.output))
         sampler = Path(__file__).with_name("gdb_sampler.py")
@@ -427,8 +427,8 @@ def profile(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--compositor", required=True, help="path to the shaode binary")
-    parser.add_argument("--client", required=True, help="path to shaode-bench-client")
+    parser.add_argument("--compositor", required=True, help="path to the shaodesk binary")
+    parser.add_argument("--client", required=True, help="path to shaodesk-bench-client")
     parser.add_argument("--windows", type=int, default=40, help="windows to open (default 40)")
     parser.add_argument("--iterations", type=int, default=30, help="repeats of each operation")
     parser.add_argument("--animated", type=int, default=8, help="windows redrawing every frame")
@@ -462,7 +462,7 @@ def main():
     wanted = set(args.only or ["open", "idle", "ops", "animate", "smooth", "pointer"])
 
     results = {"windows": args.windows, "output": args.output, "rules": not args.no_rules}
-    with tempfile.TemporaryDirectory(prefix="shaode-bench-") as directory:
+    with tempfile.TemporaryDirectory(prefix="shaodesk-bench-") as directory:
         config = Path(directory) / "init.lua"
         config.write_text(config_text(args.animations, not args.no_rules, args.output))
         comp = Compositor(args.compositor, directory, config)
@@ -506,7 +506,7 @@ def main():
 
 
 def report(results):
-    print(f"shaode benchmark: {results['windows']} windows, {results['output']} headless, "
+    print(f"shaodesk benchmark: {results['windows']} windows, {results['output']} headless, "
           f"window rules {'on' if results['rules'] else 'off'}")
     if "open" in results:
         o = results["open"]

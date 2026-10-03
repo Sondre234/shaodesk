@@ -19,16 +19,16 @@ CONFIG = """return {
     outputs = { monitors = { ["HEADLESS-1"] = { mode = "1280x720" } } },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaode-session-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-session-test-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(CONFIG)
     log = root / "compositor.log"
     state = root / "state"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, XDG_STATE_HOME=str(state),
-               WLR_RENDERER="pixman", SHAODE_PROBE_TITLE="Relaunched",
-               SHAODE_PROBE_APP_ID="app-b")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+               WLR_RENDERER="pixman", SHAODESK_PROBE_TITLE="Relaunched",
+               SHAODESK_PROBE_APP_ID="app-b")
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words, ok=True):
@@ -63,7 +63,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-session-test-") as directory:
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
 
             assert "usage" in msg("session", ok=False)
             assert "no session named" in msg("session", "restore", "nothing", ok=False)
@@ -73,8 +73,8 @@ with tempfile.TemporaryDirectory(prefix="shaode-session-test-") as directory:
 
             for title in ("A", "B", "C"):
                 clients[title] = subprocess.Popen([probe, "--window-only"],
-                                                  env=dict(env, SHAODE_PROBE_TITLE=title,
-                                                      SHAODE_PROBE_APP_ID=f"app-{title.lower()}"),
+                                                  env=dict(env, SHAODESK_PROBE_TITLE=title,
+                                                      SHAODESK_PROBE_APP_ID=f"app-{title.lower()}"),
                                                   stdout=subprocess.DEVNULL)
                 processes.append(clients[title])
                 wait_for(lambda: title in windows() and windows()[title]["focused"],
@@ -97,8 +97,8 @@ with tempfile.TemporaryDirectory(prefix="shaode-session-test-") as directory:
             out = msg("session", "save", "work")
             assert "saved work: 3 windows" in out, out
 
-            saved = (state / "shaode" / "sessions" / "work").read_text()
-            assert saved.startswith("shaode-session 1\n"), saved
+            saved = (state / "shaodesk" / "sessions" / "work").read_text()
+            assert saved.startswith("shaodesk-session 1\n"), saved
             assert saved.count("\nwindow\t") == 3 and "\nlayout\tHEADLESS-1\t0\t1\t" in saved
             assert "wayland_probe" in saved and "--window-only" in saved, saved
             listing = msg("session", "list").split("\t")
@@ -152,15 +152,15 @@ with tempfile.TemporaryDirectory(prefix="shaode-session-test-") as directory:
             # must not add records to the file or make it unreadable.
             hostile = subprocess.Popen(
                 [probe, "--window-only"],
-                env=dict(env, SHAODE_PROBE_TITLE="T\t%41\nwindow\tforged\t1",
-                         SHAODE_PROBE_APP_ID="odd id%zz\n"),
+                env=dict(env, SHAODESK_PROBE_TITLE="T\t%41\nwindow\tforged\t1",
+                         SHAODESK_PROBE_APP_ID="odd id%zz\n"),
                 stdout=subprocess.DEVNULL)
             processes.append(hostile)
             wait_for(lambda: any(t.startswith("T ") for t in windows()), "the odd window mapped")
             count = len(windows())
             out = msg("session", "save", "odd")
             assert f"saved odd: {count} windows" in out, out
-            lines = (state / "shaode" / "sessions" / "odd").read_text().split("\n")[:-1]
+            lines = (state / "shaodesk" / "sessions" / "odd").read_text().split("\n")[:-1]
             kinds = [line.split("\t")[0] for line in lines[1:]]
             assert set(kinds) <= {"output", "layout", "window"}, kinds
             assert kinds.count("window") == count, (kinds, count)

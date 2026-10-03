@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=shaodesk (experimental)
+Comment=Lua-configured Wayland desktop
+Exec=@CMAKE_INSTALL_FULL_BINDIR@/shaodesk --session
+TryExec=@CMAKE_INSTALL_FULL_BINDIR@/shaodesk
+Type=Application
+DesktopNames=shaodesk

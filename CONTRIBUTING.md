@@ -12,7 +12,7 @@ git switch -c feat/<name> main
 ## Building and testing
 
 ```sh
-cmake -S . -B build -G Ninja -DSHAODE_BUILD_COMPOSITOR=ON
+cmake -S . -B build -G Ninja -DSHAODESK_BUILD_COMPOSITOR=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
@@ -63,13 +63,13 @@ by hand; record what was and was not checked in [docs/verification.md](docs/veri
 
 `origin` (github.com/Sondre234/shaodesk) is public. Do not commit LAN addresses, host
 keys, passwords, home-directory paths, or machine-specific access details. Personal
-key bindings and themes belong in `~/.config/shaode`, not in the repository.
+key bindings and themes belong in `~/.config/shaodesk`, not in the repository.
 
 ## Lua settings
 
 The settings the configuration accepts are listed in `src/config_schema.cpp`; the parser
 takes its allowed names from that list, so a new setting or table key needs an entry there
 (type, default, an example value, its range) as well as code in `src/config.cpp`. Then
-regenerate the reference with `SHAODE_UPDATE_DOCS=1 ctest --test-dir build -R config` and
+regenerate the reference with `SHAODESK_UPDATE_DOCS=1 ctest --test-dir build -R config` and
 commit `docs/config-reference.md`; the `config_diagnostics` test fails while they differ. A
 new action name goes in the action table in `src/config.cpp`, which the reference reads.

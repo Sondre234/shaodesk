@@ -19,13 +19,13 @@ CONFIG = """return {
     features = { groups = %s },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaode-group-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-group-test-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(CONFIG % "true")
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words):
@@ -61,7 +61,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-group-test-") as directory:
 
     def open_window(title):
         clients[title] = subprocess.Popen([probe, "--window-only"],
-                                          env=dict(env, SHAODE_PROBE_TITLE=title),
+                                          env=dict(env, SHAODESK_PROBE_TITLE=title),
                                           stdout=subprocess.DEVNULL)
         processes.append(clients[title])
         wait_for(lambda: title in windows() and windows()[title]["focused"], f"{title} mapped")
@@ -88,7 +88,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-group-test-") as directory:
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             open_window("A")
             open_window("B")
             settled("A", "B")

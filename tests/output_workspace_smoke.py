@@ -25,14 +25,14 @@ CONFIG = """return {
     },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaode-output-workspace-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-output-workspace-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(CONFIG % "HEADLESS-1")
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                WLR_HEADLESS_OUTPUTS="2")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words, ok=True):
@@ -61,11 +61,11 @@ with tempfile.TemporaryDirectory(prefix="shaode-output-workspace-test-") as dire
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), processes, "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
 
             # A subscriber sees each output's workspace and those holding windows.
             stream = socket.socket(socket.AF_UNIX)
-            stream.connect(env["SHAODE_SOCKET"])
+            stream.connect(env["SHAODESK_SOCKET"])
             stream.sendall(b"subscribe\n")
             stream.settimeout(.05)
             received = []

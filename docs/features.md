@@ -1,6 +1,6 @@
 # Features
 
-What shaoDe does, area by area. The default key bindings are in the [README](../README.md#default-bindings),
+What shaodesk does, area by area. The default key bindings are in the [README](../README.md#default-bindings),
 and every Lua setting, with its type, default and range, is in the
 [configuration reference](config-reference.md).
 
@@ -20,7 +20,7 @@ number or `{ top, right, bottom, left }`), corner radius, font and text size, co
 (`#RRGGBB`, or `#RRGGBBAA` for a translucent panel), wallpaper, and pinned commands. Pinned commands run from your home directory. Installed applications can also be
 pinned to the taskbar from a window's menu or the application menu, and unpinned
 by right-clicking their button; those pins are kept in
-`$XDG_STATE_HOME/shaode/pinned` (`~/.local/state/shaode/pinned`), one desktop id per
+`$XDG_STATE_HOME/shaodesk/pinned` (`~/.local/state/shaodesk/pinned`), one desktop id per
 line, and stay off the desktop. An application's windows share one taskbar button, stacked
 with a count when there are several: clicking it cycles through them, and hovering lists them
 to pick or close one. `group_windows = false` gives every window its own button. The workspace indicator lists the monitor's workspaces (click one to switch, scroll to page
@@ -170,7 +170,7 @@ The group's windows are drawn as a strip of tabs, a thin bar over the top edge o
 window, one segment per member with the shown one lit. A click on a segment brings that window
 forward. The strip carries no titles: the compositor has no text rendering, so the taskbar (which
 lists every member, and switches tabs when a hidden one is activated) and the window switcher
-name the windows. `shaode msg get windows` ends each line with the window's group number (0 for
+name the windows. `shaodesk msg get windows` ends each line with the window's group number (0 for
 none). Hidden members are off the screen, in no tiling, and follow the shown window to another
 workspace or monitor. `features.groups = false` turns the actions off and dissolves every group
 on reload. `session save` keeps only the shown window of a group, not the group.
@@ -193,12 +193,12 @@ and then holds it, also on windows without a `border_width`, where a two pixel f
 inside the window's edge without moving anything. Its taskbar button (or the stack it is in) gets
 a tinted background and a pulsing dot, the workspace indicator marks its workspace, the overview
 frames its thumbnail and colours its workspace, the window switcher puts a dot on its icon,
-and the command palette lists it first with "needs attention". `focus_urgent` (Super + U, `shaode msg focus_urgent`) focuses the window that
+and the command palette lists it first with "needs attention". `focus_urgent` (Super + U, `shaodesk msg focus_urgent`) focuses the window that
 has been urgent the longest, switching workspace and showing it if it was minimized or in the
 scratchpad; a window that gets focus any other way, or closes, is no longer urgent. The focused
 window is never urgent, and a client that clears its X11 hint or demand ends it too.
 
-`shaode msg get urgent` prints the urgent windows, the longest waiting first, in the columns of
+`shaodesk msg get urgent` prints the urgent windows, the longest waiting first, in the columns of
 `get windows`. Subscribers to the control socket receive `urgent COUNT` in every state, then an
 `urgent-output NAME 1,3` line per monitor with the workspaces holding urgent windows and an
 `urgent-window OUTPUT WORKSPACE APP_ID TITLE` line (tab-separated after the name) for each of the
@@ -230,7 +230,7 @@ floated, moved and resized), and the terminal returns to wherever it is when it 
 terminal closes first, the window keeps the place. `swallow_toggle` (no default binding; it
 works with `enabled = false` too) does it by hand: pressed on a window that swallowed a terminal it
 gives the terminal a place beside it again, otherwise the window takes the place of the terminal
-it was started from, or of the terminal last focused on the workspace. `shaode msg get swallow`
+it was started from, or of the terminal last focused on the workspace. `shaodesk msg get swallow`
 lists each window with whether it is swallowed and its partner. Only applications that stay
 descendants of the terminal can be swallowed: one that hands the request to a running instance
 (a browser opening a new window) belongs to the other process. This is checked headless with
@@ -249,7 +249,7 @@ it. While the switcher is open, keys do not reach applications. The compositor k
 switcher and the shell draws it, only once it has been open for a moment, so a quick
 Alt + Tab flips between two windows without it flashing up; without the shell it still
 switches, unseen. Bound to a key without modifiers, or sent as
-`shaode msg switcher`, it stays open until `switcher_confirm [N]` (the Nth window in the
+`shaodesk msg switcher`, it stays open until `switcher_confirm [N]` (the Nth window in the
 list), `switcher_cancel`, Return, or Escape. `cycle` is the older action that raises the
 least recently focused window on the spot.
 
@@ -282,7 +282,7 @@ you pick something:
 Keys and the mouse do not reach applications while it is open. Fullscreen windows are lowered
 under it, so it opens over them. Settings are in the `overview` table (`enabled`, `gap`,
 `animation`, `duration`, `strip`, `hot_corner`, `dim`; see the [configuration reference](config-reference.md)).
-Scripts can drive it: `shaode msg toggle_overview`, `overview_confirm [N]`, `overview_cancel`,
+Scripts can drive it: `shaodesk msg toggle_overview`, `overview_confirm [N]`, `overview_cancel`,
 `overview filter TEXT`, `overview select N`, `overview view N` (from 1), and `get overview`,
 which lists the state, the selection and the rectangle of every thumbnail and strip cell.
 Subscribers get `overview` lines (see `overview_describe` in `src/backend.c`) as it opens
@@ -290,7 +290,7 @@ and changes.
 
 ## Command palette
 
-`palette` (Super + P, or `shaode msg palette`) opens a search box in the shell, on the monitor
+`palette` (Super + P, or `shaodesk msg palette`) opens a search box in the shell, on the monitor
 under the pointer, that reaches everything from one place: open windows, installed applications,
 workspaces (switching to one, or moving the focused window there), compositor actions such as
 `layout_monocle` or `group_toggle`, and saved sessions (restore, restore and launch what is
@@ -299,7 +299,7 @@ word must match, in any order, as letters in sequence of the title or its small 
 runs of letters and word starts (`gc` finds Google Chrome, `lay mon` finds Layout: monocle).
 Up and Down, Tab and Shift + Tab, Ctrl + N and Ctrl + P, or the pointer select; Enter or a click
 runs the entry; Escape, or clicking elsewhere, closes it. A leading `>` searches only actions, `@`
-windows, `#` workspaces and `%` sessions. The palette needs the shell (`shaode-shell`), which
+windows, `#` workspaces and `%` sessions. The palette needs the shell (`shaodesk-shell`), which
 draws it, and the compositor's control socket for actions and sessions. On a machine with 600
 entries a keystroke re-ranks them in under a millisecond (an optimized build; see
 `tests/palette_test.cpp`). Super + P used to toggle sticky windows; that moved to Super + Shift + P.
@@ -317,7 +317,7 @@ panel on each monitor shows that monitor's workspaces, marking the current one a
 with windows; scrolling over it pages through them and clicking a number switches to it.
 `layout.workspace_names = { "web", "code" }` labels workspaces 1, 2, ...: the panel shows the name
 instead of the number, and `workspace` and `move_to_workspace` accept it, in bindings
-(`workspace = "web"`) and from the control socket (`shaode msg workspace web`; a name with spaces
+(`workspace = "web"`) and from the control socket (`shaodesk msg workspace web`; a name with spaces
 is written as is).
 The taskbar lists windows from every workspace, and activating one switches its monitor
 to its workspace. Window shortcuts act only on visible windows.
@@ -346,7 +346,7 @@ windows back to the current workspace.
 ### Sticky windows
 
 A sticky window, as with sway's `sticky enable`, shows on every workspace of its monitor:
-`toggle_sticky` (Super + Shift + P, `shaode msg toggle_sticky`, or a mouse button binding for the
+`toggle_sticky` (Super + Shift + P, `shaodesk msg toggle_sticky`, or a mouse button binding for the
 window under the pointer) floats it, and switching that monitor's workspace keeps it shown
 and raises it over the workspace's windows. Moved to another monitor, it stays sticky there;
 `move_to_workspace` unsticks it and moves it. Unsticking a window that was a tile tiles it
@@ -358,8 +358,8 @@ off, and a reload that sets it returns sticky windows to their monitor's current
 
 Tiling is a setting of each monitor. The tiling button on a monitor's panel (next to the
 clock) switches that monitor between floating windows and automatic tiling; Super + S
-or `shaode msg toggle_tiling` switches the focused monitor, and
-`shaode msg output HDMI-A-1 toggle_tiling` a named one. Lua `layout.tiling = true` starts
+or `shaodesk msg toggle_tiling` switches the focused monitor, and
+`shaodesk msg output HDMI-A-1 toggle_tiling` a named one. Lua `layout.tiling = true` starts
 every monitor tiled, and `tiling` in a monitor's `outputs.monitors` entry overrides it:
 
 ```lua
@@ -395,7 +395,7 @@ space back to its neighbour.
   `focus_follows` on, these and Alt+Tab put the pointer just inside the window's bottom-right
   corner, out of the way.
 - Super + Ctrl + Shift + arrows (`resize_left`, `resize_right`, `resize_up`, `resize_down`) resize from the keyboard, by
-  40 pixels or the binding's `amount` (`shaode msg resize_right 80`). On a tile the arrow
+  40 pixels or the binding's `amount` (`shaodesk msg resize_right 80`). On a tile the arrow
   moves a split beside it that way: the one on that side of the tile if there is one, growing
   it, else the one on its other side, shrinking it. With two tiles side by side, Right always
   moves the line between them right. A tile in the middle of three columns only grows this
@@ -423,7 +423,7 @@ place, so nothing is merged or lost. `swap_workspaces` trades all workspaces of 
 with them what each one shows. Both take a target: `left` or `right` (the neighbouring monitor
 that way), `next` or `prev` (left to right, wrapping), a connector name, or `desc:` and the start
 of "make model serial". Bind them with `output = ...` (`swap_workspaces` defaults to `next`), or
-run `shaode msg move_workspace_to_output left`, `shaode msg output DP-1 swap_workspaces DP-2`.
+run `shaodesk msg move_workspace_to_output left`, `shaodesk msg output DP-1 swap_workspaces DP-2`.
 Super + Ctrl + comma / period are bound to the first with `left` / `right`; `swap_workspaces` has
 no default binding.
 
@@ -437,8 +437,8 @@ scratchpad stay with their monitor.
 Dwindle is the default, but every output and workspace can tile with another layout, chosen
 with `layout_next` / `layout_prev` (Super + Space, Super + Shift + Space), which cycle
 dwindle, master, spiral, monocle, scroll, or by name with `layout_dwindle`, `layout_master`,
-`layout_spiral`, `layout_monocle` and `layout_scroll` (unbound by default; `shaode msg layout_master` works
-too). `shaode msg get layout` prints the focused monitor's current workspace as `NAME RATIO
+`layout_spiral`, `layout_monocle` and `layout_scroll` (unbound by default; `shaodesk msg layout_master` works
+too). `shaodesk msg get layout` prints the focused monitor's current workspace as `NAME RATIO
 MASTER_COUNT`.
 
 - **master**: the first `master_count` tiles share a column on the left, `master_ratio` of
@@ -489,7 +489,7 @@ layout = {
 
 These apply to the monitor's workspaces that were not set by hand (a layout chosen with an
 action, or a ratio changed, is kept), also to windows already open when the configuration is
-reloaded, and again when the monitor is plugged back in. `shaode msg get layout OUTPUT
+reloaded, and again when the monitor is plugged back in. `shaodesk msg get layout OUTPUT
 [WORKSPACE]` prints another monitor's or workspace's values.
 
 ### Scrolling layout
@@ -544,7 +544,7 @@ when they close (drawn from a copy of their last frame). Tiles glide to their ne
 the layout changes; their new size shows as soon as the application draws it. The scene graph
 has no transform for a whole window, so the scaling resizes each of its surfaces about the
 window's center. `animations = { enabled = false }` turns this off, and `duration` sets the
-length in milliseconds (default 120, 10–1000). Window positions reported by `shaode msg` are
+length in milliseconds (default 120, 10–1000). Window positions reported by `shaodesk msg` are
 always the final ones, and clicks and hovering use them too: input never waits for an
 animation or lands in the middle of one.
 
@@ -575,26 +575,26 @@ through the black to the window.
 
 **Peek.** Bind `peek` to a key and every window fades to `peek.opacity` (0.12 by default; 0 hides
 them) for as long as the key is held, showing the desktop behind them; borders, the panel and
-dimming go with it. `peek_toggle` (and `shaode msg peek_toggle`) switches it on and off instead.
+dimming go with it. `peek_toggle` (and `shaodesk msg peek_toggle`) switches it on and off instead.
 The fade takes `peek.duration` milliseconds.
 
 **Night light.** `night_light = { enabled = true, night_temperature = 3400 }` turns the screen
 warm in the evening and neutral again in the morning, easing over `transition` minutes around
 sunset and sunrise. Give the times (`sunrise = "06:30"`, `sunset = "21:00"`) or a `latitude` and
-`longitude` and shaoDe works them out for each day. The actions `night_light_toggle`,
+`longitude` and shaodesk works them out for each day. The actions `night_light_toggle`,
 `night_light_on`, `night_light_off` and `night_light_auto` (back to the schedule) override it,
-also as `shaode msg night_light_toggle`; `shaode msg get night_light` prints the temperature in
+also as `shaodesk msg night_light_toggle`; `shaodesk msg get night_light` prints the temperature in
 kelvin, the override (0 schedule, 1 neutral, 2 warm) and whether the schedule is enabled. The
 colours go through the output's gamma table, the way `wlsunset` does it, and a client using
 `wlr-gamma-control` still works alongside.
 
-**Magnifier.** `zoom_in`, `zoom_out` and `zoom_reset` (bind them, or `shaode msg zoom_in`)
+**Magnifier.** `zoom_in`, `zoom_out` and `zoom_reset` (bind them, or `shaodesk msg zoom_in`)
 magnify the screen by `zoom.step` (1.25) per step up to `zoom.max` (8), easing over
 `zoom.duration` milliseconds. The view follows the pointer and keeps it over the point it clicks:
 the pointer moving across the screen pans across the whole desktop. With `zoom.scroll_modifier =
 "Super"`, Super plus the scroll wheel steps in and out. Only the output the pointer is on is
 magnified, and outputs that are rotated stay at 1x. Screenshots and screen recordings of the
-output see the magnified picture. `shaode msg get zoom` prints the level and its target in
+output see the magnified picture. `shaodesk msg get zoom` prints the level and its target in
 thousandths.
 
 **Hot corners.** Push the pointer into a screen corner and leave it there for
@@ -609,7 +609,7 @@ hot_corners = {
 }
 ```
 
-A request is written as for `shaode msg`: an action with its argument, or `spawn PROGRAM ARGS`.
+A request is written as for `shaodesk msg`: an action with its argument, or `spawn PROGRAM ARGS`.
 The corner is `hot_corners.size` pixels (2) square. Nothing runs while a button is held, a drag is
 under way, the session is locked, or a fullscreen window covers the output.
 
@@ -637,11 +637,11 @@ resolution wins. `scale` is fractional, `transform` takes Hyprland's (and Waylan
 0–7, `enabled = false` turns a monitor off (never the last one), `vrr = true` enables
 adaptive sync where the monitor supports it, and `tiling` overrides `layout.tiling` (see
 [Tiling](#tiling)). A key such as `["desc:ASUSTek COMPUTER INC
-VG27AQ3A"]` matches the start of a monitor's "make model serial" (listed by `shaode msg get
+VG27AQ3A"]` matches the start of a monitor's "make model serial" (listed by `shaodesk msg get
 outputs`), as Hyprland's `desc:` does; a connector-name key wins over it. Monitors with a
 `position` go there, in logical pixels after scaling; the rest follow in a row to their
 right. The whole layout then shifts so its top-left corner is 0, 0, because X11 apps
-get no input at negative coordinates; windows move with their monitor. `shaode msg get
+get no input at negative coordinates; windows move with their monitor. `shaodesk msg get
 outputs` prints what each monitor ended up with. Reloading
 applies changes without restarting.
 
@@ -710,9 +710,9 @@ Pick one from the panel: the profile button beside the tiling button (three swat
 current accent, background and text colours) lists them, the one in use marked, whenever there
 are two or more (`shell.widgets.profiles = false` hides it). Right-clicking empty bar space and
 choosing **Appearance: NAME …** lists them too (the one in use is ticked). The command palette (Super + P) lists them as
-**Appearance: NAME** too, and scripts and hot corners can use `shaode msg profile NAME`, or
+**Appearance: NAME** too, and scripts and hot corners can use `shaodesk msg profile NAME`, or
 `profile next` and `profile prev` to step through them in name order. A pick is saved in
-`$XDG_STATE_HOME/shaode/profile` (`~/.local/state/shaode/profile`) and reloads the
+`$XDG_STATE_HOME/shaodesk/profile` (`~/.local/state/shaodesk/profile`) and reloads the
 configuration, so the compositor and the shell change together, and it stays after a restart.
 While that file names a profile the configuration still has, it wins over `profile`; delete it
 to go back to `profile`. Every profile is checked when the configuration loads, so a mistake in
@@ -722,13 +722,13 @@ one that is not in use is still reported, with its line. The example configurati
 
 ## Importing a Hyprland setup
 
-`shaode import ~/.config` carries an existing Hyprland/Waybar setup over: monitors, colors
+`shaodesk import ~/.config` carries an existing Hyprland/Waybar setup over: monitors, colors
 (wallbash or pywal), bar look, gaps, borders, opacity, input, animations on/off, and
 wallpaper. It runs
 `hyprland.lua` in a sandbox (or parses `hyprland.conf`), writes `theme.lua` beside the
 configuration, and reports where each value came from and what it skipped. `init.lua` loads
 it with `theme = "theme.lua"` and overrides any of it; `--dry-run` only prints. See
-[docs/dotfile-import.md](dotfile-import.md) for the details and for the settings shaoDe
+[docs/dotfile-import.md](dotfile-import.md) for the details and for the settings shaodesk
 still lacks (rounding, blur, shadows).
 
 ## Notifications and on-screen display
@@ -736,7 +736,7 @@ still lacks (rounding, blur, shadows).
 The shell is a notification daemon. It owns `org.freedesktop.Notifications` on the session bus
 (spec 1.2: `Notify`, `CloseNotification`, `GetCapabilities`, `GetServerInformation`, and the
 `NotificationClosed` and `ActionInvoked` signals), so `notify-send`, browsers, chat clients and
-`shaode`'s own screenshot message reach it without setup. Each notification is a card in the top
+`shaodesk`'s own screenshot message reach it without setup. Each notification is a card in the top
 right corner of the monitor that has the focus (`notifications.position` moves it to another
 corner); further cards stack under it and slide in and out.
 
@@ -755,7 +755,7 @@ corner); further cards stack under it and slide in and out.
 - The bell in the panel keeps the last `notifications.history` notifications. Its badge counts
   those not yet seen; opening the list marks them seen. Clicking an entry runs its default action,
   × removes it, Clear empties the list. It opens with `notification_history` too (Super + N).
-- Do-not-disturb (`dnd_toggle`, `dnd_on`, `dnd_off`, `shaode msg dnd [on|off|toggle]`, a
+- Do-not-disturb (`dnd_toggle`, `dnd_on`, `dnd_off`, `shaodesk msg dnd [on|off|toggle]`, a
   right-click on the bell, or the switch in the list, or `notifications.dnd = true` to start that
   way) keeps cards away and lets everything reach the history; critical notifications still show.
   A reload of the configuration does not undo what was toggled.
@@ -765,8 +765,8 @@ a label and a level, which fades out after `osd.timeout` (1.5 s). It appears whe
 sound output's volume or mute changes, whether from the panel's volume control, a media key bound
 to `wpctl` or `pactl`, or another program; when a backlight's brightness changes (a laptop's
 keys, `brightnessctl`); when do-not-disturb changes; and for
-`shaode msg osd TEXT [PERCENT]`, where a last word from 0 to 100 (optionally with `%`) is the
-level, e.g. `shaode msg osd "Keyboard light" 60`. Set `osd.enabled = false`, or only
+`shaodesk msg osd TEXT [PERCENT]`, where a last word from 0 to 100 (optionally with `%`) is the
+level, e.g. `shaodesk msg osd "Keyboard light" 60`. Set `osd.enabled = false`, or only
 `osd.volume`/`osd.brightness` to false, to turn it off.
 
 ```lua
@@ -777,7 +777,7 @@ osd = { position = "bottom", timeout = 1500 },
 Set `notifications.enabled = false` to run another daemon (mako, dunst): the shell then leaves
 the bus name alone, and if another daemon already holds it the shell logs that and serves
 nothing (the bell hides). The daemon needs Qt's D-Bus module at build time; without it (or with
-`-DSHAODE_NOTIFICATIONS=OFF`) the shell builds without notifications and the display still works.
+`-DSHAODESK_NOTIFICATIONS=OFF`) the shell builds without notifications and the display still works.
 Settings are in the [configuration reference](config-reference.md).
 
 The tests start a dbus-daemon of their own on a private address and never touch the session bus:
@@ -787,8 +787,8 @@ do-not-disturb, the display and the history), and the configuration tests.
 
 ## Sessions
 
-`shaode msg session save NAME` writes what the desktop looks like to
-`$XDG_STATE_HOME/shaode/sessions/NAME` (`~/.local/state/shaode/sessions`): each monitor's
+`shaodesk msg session save NAME` writes what the desktop looks like to
+`$XDG_STATE_HOME/shaodesk/sessions/NAME` (`~/.local/state/shaodesk/sessions`): each monitor's
 current workspace, tiling on or off and the tiling layouts of its workspaces, and for every
 window its monitor, workspace, floating place, tiled, floating, minimized, sticky, maximized,
 fullscreen, scratchpad and focus state, the app ID and title to find it by, and the command line
@@ -810,21 +810,21 @@ as usual, right of the focused column.
 ## Control socket
 
 A control socket runs any Lua action from scripts or other tools:
-`shaode msg workspace 2`, `shaode msg toggle_tiling`, `shaode msg spawn foot`,
-`shaode msg screenshot window`, `shaode msg resize_left 80`. Prefixing
+`shaodesk msg workspace 2`, `shaodesk msg toggle_tiling`, `shaodesk msg spawn foot`,
+`shaodesk msg screenshot window`, `shaodesk msg resize_left 80`. Prefixing
 `output NAME` makes workspace and tiling actions switch that monitor instead of the focused
-one: `shaode msg output HDMI-A-1 workspace_next`. The query
-`shaode msg get workspace` prints the focused monitor's workspace, `shaode msg get workspaces`
+one: `shaodesk msg output HDMI-A-1 workspace_next`. The query
+`shaodesk msg get workspace` prints the focused monitor's workspace, `shaodesk msg get workspaces`
 prints one tab-separated line per monitor (name, current workspace, focused, the
 workspaces holding windows, such as `1,3`, or `-`, and tiling, `on` or `off`),
-`shaode msg get tiling` prints `on` or `off` for the focused monitor, `shaode msg get outputs` prints one tab-separated line per monitor (name,
+`shaodesk msg get tiling` prints `on` or `off` for the focused monitor, `shaodesk msg get outputs` prints one tab-separated line per monitor (name,
 enabled, x, y, logical width and height, scale, transform, mode, and "make model serial"), and
-`shaode msg get windows` prints one tab-separated line per window:
+`shaodesk msg get windows` prints one tab-separated line per window:
 workspace, focused, minimized, tiled, x, y, width, height, app ID, title, monitor,
 visible, scratchpad (a window hidden there is also minimized), sticky, and its window group
-(a number; 0 for none). `shaode msg get layers` prints one line per panel or other layer-shell surface:
+(a number; 0 for none). `shaodesk msg get layers` prints one line per panel or other layer-shell surface:
 namespace, output, layer (0 background to 3 overlay), and whether it is shown.
-`shaode msg get animations` prints the number of running animations and of window trees in
+`shaodesk msg get animations` prints the number of running animations and of window trees in
 the scene (closing windows count until their animation ends), and of focus fades, mainly
 for tests. A client
 that sends `subscribe` keeps its connection and receives `tiling on|off` and
@@ -833,7 +833,7 @@ that sends `subscribe` keeps its connection and receives `tiling on|off` and
 (Super + R) asks the panel on that monitor to open or close its application menu; the panel uses this. The window switcher sends `switcher OUTPUT SELECTED COUNT` followed by
 COUNT lines `switcher-window APP_ID TITLE OUTPUT WORKSPACE MINIMIZED URGENT` (tab-separated) when it
 opens or a listed window closes, `switcher-select N` as the selection moves (both counting
-from 0), and `switcher-close`. Children of the session find the socket through `SHAODE_SOCKET`. Actions are
+from 0), and `switcher-close`. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
 refused while the session is locked.
 
 ## Screen locking and idle
@@ -850,7 +850,7 @@ This needs sd-bus from libsystemd, libelogind, or basu at build time.
 
 ## Screenshots and screen sharing
 
-The `screenshot` action (Print, or `shaode msg screenshot region|output|window`) runs
+The `screenshot` action (Print, or `shaodesk msg screenshot region|output|window`) runs
 [`grim`](https://sr.ht/~emersion/grim/), with [`slurp`](https://github.com/emersion/slurp)
 to select a region, and saves `Screenshot_<date>_<time>.png` in `$XDG_PICTURES_DIR/Screenshots`
 (from the environment or `user-dirs.dirs`), else `~/Pictures/Screenshots`. The `output` mode
@@ -859,7 +859,7 @@ screen, including anything overlapping it. It also copies the image to the clipb
 `wl-copy` and announces the file with `notify-send`, when they are installed. Lua
 `screenshots = { directory = "~/Shots", clipboard = false, notify = false }` changes that; in a
 binding, `mode = "output"` picks the mode (default `region`). Without grim (or slurp for a
-region), `shaode msg screenshot` fails with a message and a key binding logs one.
+region), `shaodesk msg screenshot` fails with a message and a key binding logs one.
 
 Screenshots and screen sharing use wlr-screencopy, export-dmabuf, and
 ext-image-copy-capture, so `grim` works directly and Discord, OBS, or a browser share a
@@ -875,12 +875,12 @@ viewporter, fractional scaling, presentation timing, xdg-output, middle-click pa
 (primary selection), clipboard managers (`wl-clipboard`, data-control), drag-and-drop,
 pointer lock and relative motion for games, and xdg-foreign for portal dialogs.
 xdg-activation lets an application raise itself, so a link clicked in a chat brings the
-browser forward; shaoDe honours every valid token and does not prevent focus stealing.
+browser forward; shaodesk honours every valid token and does not prevent focus stealing.
 Popup menus are kept on the output of their window.
 
 Firefox and GTK applications draw their own minimize, maximize, and close buttons, laid
 out by GTK's `button-layout` setting, which desktops without title bar buttons (HyDE on
-Hyprland, for one) leave empty. shaoDe gives the applications it starts a dconf profile
+Hyprland, for one) leave empty. shaodesk gives the applications it starts a dconf profile
 (`DCONF_PROFILE`) that locks that one setting to `windows.buttons`, by default
 `"appmenu:minimize,maximize,close"`; `""` keeps the desktop's value. Every other GTK
 setting still comes from, and is saved to, your own dconf database, so other sessions
@@ -890,10 +890,10 @@ see no change. This needs `dconf` at startup.
 
 Portals run as D-Bus services, started with the bus's environment rather than the
 compositor's. A standalone `--session` therefore exports `WAYLAND_DISPLAY`, `DISPLAY`,
-`XDG_CURRENT_DESKTOP=shaoDe`, `XDG_SESSION_TYPE`, and `SHAODE_SOCKET` with
+`XDG_CURRENT_DESKTOP=shaodesk`, `XDG_SESSION_TYPE`, and `SHAODESK_SOCKET` with
 `dbus-update-activation-environment --systemd` before it starts anything; the nested mode
 leaves the host's portals alone, so its applications share and pick files through the host.
-The installed `shaode-portals.conf` selects `xdg-desktop-portal-wlr` for screen sharing and
+The installed `shaodesk-portals.conf` selects `xdg-desktop-portal-wlr` for screen sharing and
 screenshots and `xdg-desktop-portal-gtk` for everything else. Install both, plus PipeWire
 and `slurp` (the wlr portal's monitor picker on multi-monitor setups). An
 `xdg-desktop-portal` that is already running keeps the desktop it started with; after
@@ -910,7 +910,7 @@ starts when the first X11 client connects and exits again once idle (Lua
 part in focus, the taskbar, snapping, maximize, and fullscreen like Wayland windows.
 
 wlroots' X11 window manager can leave events unprocessed, which loses the
-first window after Xwayland starts. Until wlroots fixes this, shaoDe nudges the
+first window after Xwayland starts. Until wlroots fixes this, shaodesk nudges the
 window manager every 250 ms while Xwayland runs. With wlroots patched by
 `packaging/patches/wlroots-xwm-drain.patch`, configure with
-`-DSHAODE_XWM_WAKER=OFF` to drop the workaround.
+`-DSHAODESK_XWM_WAKER=OFF` to drop the workaround.

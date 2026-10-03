@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "shaode/config_schema.hpp"
+#include "shaodesk/config_schema.hpp"
 
 #include <algorithm>
 #include <cstdint>
 #include <sstream>
 #include <string_view>
 
-namespace shaode {
+namespace shaodesk {
 namespace {
 constexpr double none = 0;
 // Order is the order of the generated reference.
@@ -18,11 +18,11 @@ const Option options[] = {
      "default one."},
     {"theme", "string", "unset", "\"theme.lua\"", none, none,
      "A Lua file, relative to this one, that supplies every setting this file omits; "
-     "`shaode import` writes one. A missing file is ignored."},
+     "`shaodesk import` writes one. A missing file is ignored."},
     {"profile", "string", "unset", "", none, none,
      "The appearance profile to start with, a name from `profiles`. One picked from the "
-     "panel's menu, the command palette or `shaode msg profile NAME` replaces it until "
-     "another is picked; that choice is kept in `$XDG_STATE_HOME/shaode/profile`."},
+     "panel's menu, the command palette or `shaodesk msg profile NAME` replaces it until "
+     "another is picked; that choice is kept in `$XDG_STATE_HOME/shaodesk/profile`."},
     {"profiles", "table of tables", "unset", "", none, none,
      "Appearance profiles, keyed by a name of up to 32 letters, digits, `-` and `_` (not "
      "`next` or `prev`), at most 32. Each holds `appearance`, `windows` and `shell` settings "
@@ -83,7 +83,7 @@ const Option options[] = {
      "Names for workspaces 1, 2, ...; at most `workspaces` of them, each up to 32 characters, "
      "not a number and not repeated (\"\" leaves one unnamed). The panel shows them, and "
      "`workspace` and `move_to_workspace` (bindings with `workspace = \"web\"`, or "
-     "`shaode msg workspace web`) accept them."},
+     "`shaodesk msg workspace web`) accept them."},
     {"layout.tiling", "boolean", "false", "false", none, none,
      "Start every monitor with automatic tiling; `outputs.monitors.<name>.tiling` overrides it."},
     {"layout.tile_layout", "enum", "\"dwindle\"", "\"dwindle\"", none, none,
@@ -152,7 +152,7 @@ const Option options[] = {
      "Border in pixels around each window; tiles shrink to keep it in their slot."},
     {"windows.corner_radius", "integer", "10", "10", 0, 40,
      "Radius in pixels of the corners of windows on a monitor with tiling on, floating ones "
-     "included, and of their border; 0 keeps them square. Needs wlroots built with shaoDe's rounded-corners patch."},
+     "included, and of their border; 0 keeps them square. Needs wlroots built with shaodesk's rounded-corners patch."},
     {"windows.border_color", "color", "\"#7da8ff\"", "\"#7da8ff\"", none, none,
      "Focused window border, `#RRGGBB` or `#RRGGBBAA`."},
     {"windows.border_inactive_color", "color", "\"#404a5c\"", "\"#404a5c\"", none, none,
@@ -276,7 +276,7 @@ const Option options[] = {
 
     {"hot_corners", "table", "", "", none, none,
      "Hot corners: pushing the pointer into a screen corner and leaving it there runs a request, "
-     "written as for `shaode msg` (an action name and its argument, or `spawn PROGRAM ARGS`). "
+     "written as for `shaodesk msg` (an action name and its argument, or `spawn PROGRAM ARGS`). "
      "Nothing runs over a fullscreen window or while a button is held."},
     {"hot_corners.size", "integer", "2", "2", 1, 64,
      "Side of the corner square in pixels."},
@@ -400,7 +400,7 @@ const Option options[] = {
      "Notifications: the shell serves `org.freedesktop.Notifications` on the session bus and shows "
      "each one as a card on the focused monitor; clicking a card runs its default action, "
      "hovering pauses its timer, and the panel's bell keeps a history. Critical notifications "
-     "stay until dismissed. The actions `dnd_toggle`, `dnd_on` and `dnd_off` (or `shaode msg "
+     "stay until dismissed. The actions `dnd_toggle`, `dnd_on` and `dnd_off` (or `shaodesk msg "
      "dnd toggle`) silence the cards."},
     {"notifications.enabled", "boolean", "true", "true", none, none,
      "Serve notifications. Turn it off to run another daemon such as mako or dunst."},
@@ -420,7 +420,7 @@ const Option options[] = {
 
     {"osd", "table", "", "", none, none,
      "On-screen display: a small pill near the bottom centre of the focused monitor that shows "
-     "a label and a level for volume and brightness changes and for `shaode msg osd TEXT "
+     "a label and a level for volume and brightness changes and for `shaodesk msg osd TEXT "
      "[PERCENT]`, then fades out."},
     {"osd.enabled", "boolean", "true", "true", none, none, "Show the display."},
     {"osd.position", "enum", "\"bottom\"", "\"bottom\"", none, none,
@@ -591,12 +591,12 @@ std::string closest_match(const std::string &word, const std::vector<std::string
 std::string config_reference_markdown() {
     std::ostringstream out;
     out << "<!-- Generated from src/config_schema.cpp by tests/config_diagnostics_tests.cpp. Do not edit by\n"
-           "     hand: change the schema, then run `SHAODE_UPDATE_DOCS=1 ctest -R config`. -->\n"
+           "     hand: change the schema, then run `SHAODESK_UPDATE_DOCS=1 ctest -R config`. -->\n"
            "# Configuration reference\n\n"
-           "shaoDe reads a Lua file that returns a table (`config/init.lua` is a commented "
+           "shaodesk reads a Lua file that returns a table (`config/init.lua` is a commented "
            "example). Every setting is optional. An unknown setting, a value of the wrong type, "
            "or a value out of range is an error naming the file and line, with a suggestion "
-           "for a misspelled name; `shaode --check-config` reports it. The running desktop "
+           "for a misspelled name; `shaodesk --check-config` reports it. The running desktop "
            "reloads the file when it is saved; one with an error loads the default "
            "configuration instead and shows the error across the top of the screen until "
            "the file is fixed.\n\n"
@@ -647,4 +647,4 @@ std::string config_reference_markdown() {
     out << ".\n";
     return out.str();
 }
-} // namespace shaode
+} // namespace shaodesk

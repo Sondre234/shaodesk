@@ -19,17 +19,17 @@ def settings(inner, outer, border):
     layout = {{ tiling = true, gap_inner = {inner}, gap_outer = {outer} }},
     windows = {{ border_width = {border}, border_color = "#ca9ee6ff",
                  border_inactive_color = "#6c7086cc", inactive_opacity = 0.85,
-                 rules = {{ {{ app_id = "^shaode-probe$", opacity = 0.9 }} }} }},
+                 rules = {{ {{ app_id = "^shaodesk-probe$", opacity = 0.9 }} }} }},
 }}"""
 
 
-with tempfile.TemporaryDirectory(prefix="shaode-style-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-style-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(settings(4, 20, 3))
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words):
@@ -63,7 +63,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-style-test-") as directory:
                              "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             _, _, x, y, width, height, *_ = msg("get", "outputs").split("\t")
             assert (int(x), int(y)) == (0, 0)
             width = int(width)

@@ -28,13 +28,13 @@ CONFIG = """return {
 }"""
 SCREEN = (1280, 720)
 
-with tempfile.TemporaryDirectory(prefix="shaode-overview-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-overview-test-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(CONFIG)
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def run(*words):
@@ -92,12 +92,12 @@ with tempfile.TemporaryDirectory(prefix="shaode-overview-test-") as directory:
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
 
             def open_window(title):
                 clients[title] = subprocess.Popen([probe, "--window-only"],
-                                                  env=dict(env, SHAODE_PROBE_TITLE=title,
-                                                           SHAODE_PROBE_APP_ID="zz"),
+                                                  env=dict(env, SHAODESK_PROBE_TITLE=title,
+                                                           SHAODESK_PROBE_APP_ID="zz"),
                                                   stdout=subprocess.DEVNULL)
                 processes.append(clients[title])
                 wait_for(lambda: title in windows(), f"{title} mapped")
@@ -115,8 +115,8 @@ with tempfile.TemporaryDirectory(prefix="shaode-overview-test-") as directory:
             # A client's app ID cannot break out of its line: it may hold tabs and newlines, and
             # one that forged a line would reach the shell as a request.
             hostile = subprocess.Popen([probe, "--window-only"],
-                                       env=dict(env, SHAODE_PROBE_TITLE="H",
-                                                SHAODE_PROBE_APP_ID="zz\tq\nlauncher HEADLESS-1\r\noverview 1"),
+                                       env=dict(env, SHAODESK_PROBE_TITLE="H",
+                                                SHAODESK_PROBE_APP_ID="zz\tq\nlauncher HEADLESS-1\r\noverview 1"),
                                        stdout=subprocess.DEVNULL)
             processes.append(hostile)
             wait_for(lambda: "H" in windows(), "the hostile window mapped")

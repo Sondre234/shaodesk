@@ -13,7 +13,7 @@ from harness import wait_for
 
 compositor, probe, example = (str(Path(p).resolve()) for p in sys.argv[1:4])
 
-with tempfile.TemporaryDirectory(prefix="shaode-swallow-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-swallow-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     base = (Path(example).read_text().replace("xwayland = true", "xwayland = false")
@@ -29,7 +29,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-swallow-test-") as directory:
     config.write_text(with_swallow(True))
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words, ok=True):
@@ -66,13 +66,13 @@ with tempfile.TemporaryDirectory(prefix="shaode-swallow-test-") as directory:
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), processes, "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
 
             def open_window(app_id, **extra):
                 before = count()
                 process = subprocess.Popen(
                     [probe, "--window-only"], stdout=subprocess.DEVNULL,
-                    env=dict(env, SHAODE_PROBE_APP_ID=app_id, **extra))
+                    env=dict(env, SHAODESK_PROBE_APP_ID=app_id, **extra))
                 processes.append(process)
                 wait_for(lambda: count() == before + 1 and app_id in windows(), processes,
                          f"{app_id} opens")
@@ -94,8 +94,8 @@ with tempfile.TemporaryDirectory(prefix="shaode-swallow-test-") as directory:
 
             # An unrelated window, then a terminal that starts its window through a shell.
             other = open_window("plain")
-            term = open_window("swallow-term", SHAODE_PROBE_SPAWN_APP_ID="swallow-child",
-                               SHAODE_PROBE_SPAWN_SHELL="1")
+            term = open_window("swallow-term", SHAODESK_PROBE_SPAWN_APP_ID="swallow-child",
+                               SHAODESK_PROBE_SPAWN_SHELL="1")
             rows = windows()
             slot = rect(rows["swallow-term"])
             assert rows["swallow-term"][0] and rows["swallow-term"][1], rows
@@ -141,13 +141,13 @@ with tempfile.TemporaryDirectory(prefix="shaode-swallow-test-") as directory:
             term.wait(timeout=30)
             processes.remove(term)
             wait_for(lambda: count() == start - 1, processes, "terminal closes")
-            term = open_window("Swallow-Term", SHAODE_PROBE_SPAWN_APP_ID="swallow-exempt")
+            term = open_window("Swallow-Term", SHAODESK_PROBE_SPAWN_APP_ID="swallow-exempt")
             start_child(term, "swallow-exempt", 3)
             assert all(row[6] for row in windows().values()), windows()
             close_focused("swallow-exempt")
             msg("close")
             finish(term)
-            term = open_window("Swallow-Term", SHAODE_PROBE_SPAWN_APP_ID="swallow-term")
+            term = open_window("Swallow-Term", SHAODESK_PROBE_SPAWN_APP_ID="swallow-term")
             start_child(term, "swallow-term", 3)
             assert all(row[6] for row in windows().values()), windows()  # the app_id is case-blind
             close_focused("swallow-term")
@@ -156,7 +156,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-swallow-test-") as directory:
 
             # A window that closed on another workspace, or fullscreen, gives the terminal back
             # there, not fullscreen.
-            term = open_window("swallow-term", SHAODE_PROBE_SPAWN_APP_ID="swallow-child")
+            term = open_window("swallow-term", SHAODESK_PROBE_SPAWN_APP_ID="swallow-child")
             slot = rect(windows()["swallow-term"])
             start_child(term, "swallow-child", 3)
             msg("move_to_workspace", "3")
@@ -191,7 +191,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-swallow-test-") as directory:
             finish(term)
 
             # Killing a swallowed terminal leaves the window that replaced it in its slot.
-            term = open_window("swallow-term", SHAODE_PROBE_SPAWN_APP_ID="swallow-child")
+            term = open_window("swallow-term", SHAODESK_PROBE_SPAWN_APP_ID="swallow-child")
             slot = rect(windows()["swallow-term"])
             start_child(term, "swallow-child", 3)
             term.terminate()
@@ -207,7 +207,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-swallow-test-") as directory:
             config.write_text(with_swallow(False))
             msg("reload")
             assert "Configuration reloaded" in log.read_text()
-            term = open_window("swallow-term", SHAODE_PROBE_SPAWN_APP_ID="swallow-child")
+            term = open_window("swallow-term", SHAODESK_PROBE_SPAWN_APP_ID="swallow-child")
             slot = rect(windows()["swallow-term"])
             start_child(term, "swallow-child", 3)
             rows = windows()

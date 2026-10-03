@@ -49,8 +49,8 @@ struct probe {
     int width, height, stage;
     bool maximized, fullscreen, handle_fullscreen, done, external_control, external_panel;
     const char *close_app_id;
-    bool move_on_press; // SHAODE_PROBE_MOVE: a button press on the window starts an interactive move
-    int resize_edges;   // SHAODE_PROBE_RESIZE=EDGE: ... or a resize (xdg_toplevel_resize_edge, or 0)
+    bool move_on_press; // SHAODESK_PROBE_MOVE: a button press on the window starts an interactive move
+    int resize_edges;   // SHAODESK_PROBE_RESIZE=EDGE: ... or a resize (xdg_toplevel_resize_edge, or 0)
     bool activate; // --activate: activate the matching window instead of closing it
     bool maximize; // --maximize: ask to maximize the matching window instead of closing it
     struct zwlr_foreign_toplevel_handle_v1 *close_target;
@@ -68,7 +68,7 @@ static const struct xdg_wm_base_listener shell_listener = {.ping = ping};
 static void handle_title(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle,
                          const char *title) {
     struct probe *probe = data;
-    probe->title_seen = !strcmp(title, "shaoDe protocol probe");
+    probe->title_seen = !strcmp(title, "shaodesk protocol probe");
 }
 static void handle_app_id(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle,
                           const char *app_id) {
@@ -306,7 +306,7 @@ static struct wl_buffer *make_buffer(struct probe *probe, int width, int height)
     if (!buffer)
         die("out of memory");
     buffer->size = (size_t)width * height * 4;
-    int fd = memfd_create("shaode-test-buffer", MFD_CLOEXEC);
+    int fd = memfd_create("shaodesk-test-buffer", MFD_CLOEXEC);
     if (fd < 0 || ftruncate(fd, buffer->size) != 0)
         die("cannot allocate shm buffer");
     buffer->pixels = mmap(NULL, buffer->size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
@@ -380,8 +380,8 @@ static void toplevel_close(void *data, struct xdg_toplevel *toplevel) {
 }
 static const struct xdg_toplevel_listener toplevel_listener = {.configure = toplevel_configure,
                                                                .close = toplevel_close};
-/* SHAODE_PROBE_SPAWN_APP_ID (or SHAODE_PROBE_SPAWN_PROGRAM, a program that takes "wait-close"): on SIGUSR1 start another probe window with that app_id as a child
- * of this process (through a shell that stays in between when SHAODE_PROBE_SPAWN_SHELL is set),
+/* SHAODESK_PROBE_SPAWN_APP_ID (or SHAODESK_PROBE_SPAWN_PROGRAM, a program that takes "wait-close"): on SIGUSR1 start another probe window with that app_id as a child
+ * of this process (through a shell that stays in between when SHAODESK_PROBE_SPAWN_SHELL is set),
  * like an application started from a terminal. */
 extern char **environ;
 static char *spawn_argv[8], **spawn_envp;
@@ -400,22 +400,22 @@ static void prepare_spawn(const char *self, const char *app_id) {
     spawn_envp = calloc(count + 3, sizeof(char *));
     size_t used = 0;
     for (size_t i = 0; i < count; ++i)
-        if (strncmp(environ[i], "SHAODE_PROBE_APP_ID=", 20) &&
-            strncmp(environ[i], "SHAODE_PROBE_SPAWN_", 19))
+        if (strncmp(environ[i], "SHAODESK_PROBE_APP_ID=", 22) &&
+            strncmp(environ[i], "SHAODESK_PROBE_SPAWN_", 21))
             spawn_envp[used++] = environ[i];
     char *entry = malloc(strlen(app_id) + 32);
-    sprintf(entry, "SHAODE_PROBE_APP_ID=%s", app_id);
+    sprintf(entry, "SHAODESK_PROBE_APP_ID=%s", app_id);
     spawn_envp[used++] = entry;
-    if (getenv("SHAODE_PROBE_SPAWN_TITLE")) {
-        entry = malloc(strlen(getenv("SHAODE_PROBE_SPAWN_TITLE")) + 32);
-        sprintf(entry, "SHAODE_PROBE_TITLE=%s", getenv("SHAODE_PROBE_SPAWN_TITLE"));
+    if (getenv("SHAODESK_PROBE_SPAWN_TITLE")) {
+        entry = malloc(strlen(getenv("SHAODESK_PROBE_SPAWN_TITLE")) + 32);
+        sprintf(entry, "SHAODESK_PROBE_TITLE=%s", getenv("SHAODESK_PROBE_SPAWN_TITLE"));
         spawn_envp[used++] = entry;
     }
-    if (getenv("SHAODE_PROBE_SPAWN_PROGRAM")) { // another kind of client, e.g. the X11 probe
-        spawn_program = getenv("SHAODE_PROBE_SPAWN_PROGRAM");
+    if (getenv("SHAODESK_PROBE_SPAWN_PROGRAM")) { // another kind of client, e.g. the X11 probe
+        spawn_program = getenv("SHAODESK_PROBE_SPAWN_PROGRAM");
         spawn_argv[0] = (char *)spawn_program;
         spawn_argv[1] = "wait-close";
-    } else if (getenv("SHAODE_PROBE_SPAWN_SHELL")) {
+    } else if (getenv("SHAODESK_PROBE_SPAWN_SHELL")) {
         spawn_program = "/bin/sh";
         spawn_argv[0] = "sh";
         spawn_argv[1] = "-c";
@@ -458,13 +458,13 @@ int main(int argc, char **argv) {
     struct wl_display *display = wl_display_connect(NULL);
     if (!display)
         die("cannot connect to compositor");
-    if (getenv("SHAODE_PROBE_SPAWN_APP_ID") || getenv("SHAODE_PROBE_SPAWN_PROGRAM")) {
+    if (getenv("SHAODESK_PROBE_SPAWN_APP_ID") || getenv("SHAODESK_PROBE_SPAWN_PROGRAM")) {
         static char self[4096];
         ssize_t length = readlink("/proc/self/exe", self, sizeof(self) - 1);
         if (length <= 0)
             die("cannot find the probe's own path");
         self[length] = '\0';
-        prepare_spawn(self, getenv("SHAODE_PROBE_SPAWN_APP_ID") ? getenv("SHAODE_PROBE_SPAWN_APP_ID")
+        prepare_spawn(self, getenv("SHAODESK_PROBE_SPAWN_APP_ID") ? getenv("SHAODESK_PROBE_SPAWN_APP_ID")
                                                                : "");
     }
     struct wl_registry *registry = wl_display_get_registry(display);
@@ -500,7 +500,7 @@ int main(int argc, char **argv) {
         probe.panel_surface = wl_compositor_create_surface(probe.compositor);
         probe.panel = zwlr_layer_shell_v1_get_layer_surface(
             probe.layer_shell, probe.panel_surface, probe.output, ZWLR_LAYER_SHELL_V1_LAYER_TOP,
-            "shaode-test-panel");
+            "shaodesk-test-panel");
         zwlr_layer_surface_v1_add_listener(probe.panel, &panel_listener, &probe);
         zwlr_layer_surface_v1_set_size(probe.panel, 0, 48);
         zwlr_layer_surface_v1_set_anchor(probe.panel, ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM |
@@ -519,8 +519,8 @@ int main(int argc, char **argv) {
     xdg_surface_add_listener(probe.xdg_surface, &surface_listener, &probe);
     probe.toplevel = xdg_surface_get_toplevel(probe.xdg_surface);
     xdg_toplevel_add_listener(probe.toplevel, &toplevel_listener, &probe);
-    if (getenv("SHAODE_PROBE_MOVE") || getenv("SHAODE_PROBE_RESIZE")) {
-        const char *edge = getenv("SHAODE_PROBE_RESIZE");
+    if (getenv("SHAODESK_PROBE_MOVE") || getenv("SHAODESK_PROBE_RESIZE")) {
+        const char *edge = getenv("SHAODESK_PROBE_RESIZE");
         if (edge) { // top, bottom, left, right, or two of them joined by "_"
             probe.resize_edges = (strstr(edge, "top") ? XDG_TOPLEVEL_RESIZE_EDGE_TOP : 0) |
                                  (strstr(edge, "bottom") ? XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM : 0) |
@@ -530,11 +530,11 @@ int main(int argc, char **argv) {
         probe.move_on_press = true;
         wl_pointer_add_listener(wl_seat_get_pointer(probe.seat), &pointer_listener, &probe);
     }
-    // Tests telling several probes apart name them through SHAODE_PROBE_TITLE, and window
-    // rule tests through SHAODE_PROBE_APP_ID.
-    const char *title = getenv("SHAODE_PROBE_TITLE"), *app_id = getenv("SHAODE_PROBE_APP_ID");
-    xdg_toplevel_set_title(probe.toplevel, title && *title ? title : "shaoDe protocol probe");
-    xdg_toplevel_set_app_id(probe.toplevel, app_id && *app_id ? app_id : "shaode-probe");
+    // Tests telling several probes apart name them through SHAODESK_PROBE_TITLE, and window
+    // rule tests through SHAODESK_PROBE_APP_ID.
+    const char *title = getenv("SHAODESK_PROBE_TITLE"), *app_id = getenv("SHAODESK_PROBE_APP_ID");
+    xdg_toplevel_set_title(probe.toplevel, title && *title ? title : "shaodesk protocol probe");
+    xdg_toplevel_set_app_id(probe.toplevel, app_id && *app_id ? app_id : "shaodesk-probe");
     wl_surface_commit(probe.surface);
     if (probe.commands)
         run_commands(display, &probe);

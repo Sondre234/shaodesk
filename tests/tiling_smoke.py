@@ -13,13 +13,13 @@ import harness
 compositor, probe, example = (str(Path(p).resolve()) for p in sys.argv[1:4])
 GAP = 8
 
-with tempfile.TemporaryDirectory(prefix="shaode-tiling-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-tiling-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(Path(example).read_text().replace("xwayland = true", "xwayland = false"))
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words):
@@ -68,10 +68,10 @@ with tempfile.TemporaryDirectory(prefix="shaode-tiling-test-") as directory:
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), processes, "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             assert msg("get", "tiling") == "off\n"
             subscriber = socket.socket(socket.AF_UNIX)
-            subscriber.connect(env["SHAODE_SOCKET"])
+            subscriber.connect(env["SHAODESK_SOCKET"])
             subscriber.sendall(b"subscribe\n")
             wait_for(lambda: received("ok\ntiling off\nworkspace 1\n"), processes,
                      "subscription state")
@@ -162,7 +162,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-tiling-test-") as directory:
             # Off and on within one dispatch: no client has committed its floating size yet.
             burst = [socket.socket(socket.AF_UNIX) for _ in range(2)]
             for connection in burst:
-                connection.connect(env["SHAODE_SOCKET"])
+                connection.connect(env["SHAODESK_SOCKET"])
             for connection in burst:
                 connection.sendall(b"toggle_tiling\n")
             for connection in burst:

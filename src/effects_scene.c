@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "shaode/effects_scene.h"
+#include "shaodesk/effects_scene.h"
 #include <drm_fourcc.h>
 #include <stdint.h>
 #include <stdlib.h>

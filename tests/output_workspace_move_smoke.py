@@ -29,14 +29,14 @@ def config(primary="HEADLESS-1", second_tiling="true"):
 }}"""
 
 
-with tempfile.TemporaryDirectory(prefix="shaode-workspace-move-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-workspace-move-test-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(config())
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                WLR_HEADLESS_OUTPUTS="2")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def run(*words):
@@ -92,7 +92,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-workspace-move-test-") as direct
     def launch(title):
         processes.append(subprocess.Popen(
             [probe, "--window-only"],
-            env=dict(env, SHAODE_PROBE_TITLE=title, SHAODE_PROBE_APP_ID=f"app-{title.lower()}"),
+            env=dict(env, SHAODESK_PROBE_TITLE=title, SHAODESK_PROBE_APP_ID=f"app-{title.lower()}"),
             stdout=subprocess.DEVNULL))
         wait_for(lambda: title in windows(), f"{title} mapped")
 
@@ -107,7 +107,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-workspace-move-test-") as direct
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
 
             # HEADLESS-1: A and B on workspace 1 in the master layout, C on workspace 2.
             # HEADLESS-2: D on workspace 1.

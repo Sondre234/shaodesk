@@ -22,7 +22,7 @@ TOOLS = {
     "notify-send": 'echo "notify-send $*" >> "$TOOL_LOG"',
 }
 
-with tempfile.TemporaryDirectory(prefix="shaode-screenshot-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-screenshot-test-") as directory:
     root = Path(directory)
     tools = root / "bin"
     tools.mkdir()
@@ -40,7 +40,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-screenshot-test-") as directory:
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                PATH=str(tools), TOOL_LOG=str(tool_log))
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words, ok=True):
@@ -63,7 +63,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-screenshot-test-") as directory:
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), processes, "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             assert "no focused window" in msg("screenshot", "window", ok=False)
             assert "mode must be" in msg("screenshot", "screen", ok=False)
             assert "one mode" in msg("screenshot", "window", "output", ok=False)
@@ -79,7 +79,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-screenshot-test-") as directory:
             assert first.read_text() == "fake png\n"
             assert calls() == [f"grim -o {output_name} {first}",
                                "wl-copy --type image/png <fake png>",
-                               f"notify-send -a shaoDe -i {first} Screenshot saved {first}"], \
+                               f"notify-send -a shaodesk -i {first} Screenshot saved {first}"], \
                 calls()
             assert f"Screenshot saved: {first}" in log.read_text()
 

@@ -62,13 +62,13 @@ int main(int argc, char **argv) {
     // One installed application, found by its StartupWMClass, and a private pin store. GLib
     // caches these directories on first use, so they are set before anything starts.
     QDir(screens.path()).mkpath("data/applications");
-    QFile desktopFile(screens.filePath("data/applications/shaode-test-app.desktop"));
+    QFile desktopFile(screens.filePath("data/applications/shaodesk-test-app.desktop"));
     if (!desktopFile.open(QIODevice::WriteOnly) ||
         desktopFile.write("[Desktop Entry]\nType=Application\nName=Fake app\nExec=true\n"
                           "StartupWMClass=Fake\n") < 0)
         return 1;
     desktopFile.close();
-    QFile otherFile(screens.filePath("data/applications/shaode-test-other.desktop"));
+    QFile otherFile(screens.filePath("data/applications/shaodesk-test-other.desktop"));
     if (!otherFile.open(QIODevice::WriteOnly) ||
         otherFile.write("[Desktop Entry]\nType=Application\nName=Other app\nExec=true\n") < 0)
         return 1;
@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
     qputenv("XDG_DATA_DIRS", screens.filePath("none").toLocal8Bit());
     qputenv("XDG_STATE_HOME", screens.filePath("state").toLocal8Bit());
     qputenv("XDG_CACHE_HOME", screens.filePath("cache").toLocal8Bit());
-    const auto pins = screens.filePath("state/shaode/pinned");
+    const auto pins = screens.filePath("state/shaodesk/pinned");
     QGuiApplication app(argc, argv);
     if (argc != 2)
         return 1;
@@ -175,10 +175,10 @@ int main(int argc, char **argv) {
     });
     if (!compositor.listen(directory.filePath("control.sock")))
         return 1;
-    qputenv("SHAODE_SOCKET", compositor.fullServerName().toLocal8Bit());
+    qputenv("SHAODESK_SOCKET", compositor.fullServerName().toLocal8Bit());
     ShellController controller(config.toStdString());
     pickProfile = [&controller](const QString &name) {
-        shaode::save_profile(name.toStdString());
+        shaodesk::save_profile(name.toStdString());
         controller.reload();
     };
     ShellView view(controller, app.primaryScreen(), false, true);
@@ -582,8 +582,8 @@ int main(int argc, char **argv) {
         QFile file(pins);
         return file.open(QIODevice::ReadOnly) ? QString::fromUtf8(file.readAll()) : QString();
     };
-    auto pinned = [&] { return find(view.rootObject(), "pinned:shaode-test-app.desktop"); };
-    auto pinnedTask = [&] { return find(view.rootObject(), "pinnedTask:shaode-test-app.desktop"); };
+    auto pinned = [&] { return find(view.rootObject(), "pinned:shaodesk-test-app.desktop"); };
+    auto pinnedTask = [&] { return find(view.rootObject(), "pinnedTask:shaodesk-test-app.desktop"); };
     QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, center(task));
     if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Pin to taskbar"); })) {
         std::cerr << "a task's menu did not offer to pin its application\n";
@@ -591,8 +591,8 @@ int main(int argc, char **argv) {
     }
     QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(menuItem("Pin to taskbar")));
     if (!QTest::qWaitFor([&] { return pinned() != nullptr; }) ||
-        !controller.isPinned("shaode-test-app.desktop") ||
-        readPins() != "shaode-test-app.desktop\n") {
+        !controller.isPinned("shaodesk-test-app.desktop") ||
+        readPins() != "shaodesk-test-app.desktop\n") {
         std::cerr << "pinning a task's application did not add and save a taskbar button\n";
         return 1;
     }
@@ -608,8 +608,8 @@ int main(int argc, char **argv) {
         return 1;
     }
     // Dragging a pinned slot's window onto another pinned slot moves the pin there.
-    controller.pin("shaode-test-other.desktop");
-    auto other = [&] { return find(view.rootObject(), "pinned:shaode-test-other.desktop"); };
+    controller.pin("shaodesk-test-other.desktop");
+    auto other = [&] { return find(view.rootObject(), "pinned:shaodesk-test-other.desktop"); };
     if (!QTest::qWaitFor([&] {
             return other() && other()->isVisible() &&
                    center(other()).x() > center(pinnedTask()).x();
@@ -625,7 +625,7 @@ int main(int argc, char **argv) {
         QTest::mouseRelease(&view, Qt::LeftButton, Qt::NoModifier, to);
     }
     if (!QTest::qWaitFor(
-            [&] { return readPins() == "shaode-test-other.desktop\nshaode-test-app.desktop\n"; }) ||
+            [&] { return readPins() == "shaodesk-test-other.desktop\nshaodesk-test-app.desktop\n"; }) ||
         !QTest::qWaitFor([&] {
             return pinnedTask() && other() &&
                    other()->mapToScene({0, 0}).x() < pinnedTask()->mapToScene({0, 0}).x();
@@ -633,7 +633,7 @@ int main(int argc, char **argv) {
         std::cerr << "dragging a pinned window onto another pinned slot did not move its pin\n";
         return 1;
     }
-    controller.unpin("shaode-test-other.desktop");
+    controller.unpin("shaodesk-test-other.desktop");
     editTasks("model.remove(0)");
     if (!QTest::qWaitFor([&] { return !pinnedTask() && pinned()->isVisible(); })) {
         std::cerr << "a pinned slot did not show its launcher again once its window closed\n";
@@ -648,7 +648,7 @@ int main(int argc, char **argv) {
     QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier,
                       center(menuItem("Unpin from taskbar")));
     if (!QTest::qWaitFor([&] { return pinned() == nullptr; }) || !readPins().isEmpty() ||
-        controller.isPinned("shaode-test-app.desktop")) {
+        controller.isPinned("shaodesk-test-app.desktop")) {
         std::cerr << "unpinning did not remove and forget the taskbar button\n";
         return 1;
     }
@@ -786,7 +786,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(wallpaperItem("two")));
-    const auto picked = screens.filePath("state/shaode/wallpapers");
+    const auto picked = screens.filePath("state/shaodesk/wallpapers");
     auto pickedText = [&picked] {
         QFile f(picked);
         return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()) : QString();

@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace shaode {
+namespace shaodesk {
 // One configuration setting. The schema is the single list of what a configuration may
 // contain: the parser takes its accepted keys from it, docs/config-reference.md is generated
 // from it, and tests probe every entry against the parser.
@@ -32,4 +32,4 @@ std::vector<std::string> config_button_names();
 std::string closest_match(const std::string &word, const std::vector<std::string> &candidates);
 // docs/config-reference.md, generated from the schema.
 std::string config_reference_markdown();
-} // namespace shaode
+} // namespace shaodesk

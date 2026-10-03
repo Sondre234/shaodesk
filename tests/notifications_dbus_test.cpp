@@ -35,8 +35,8 @@ class NotificationsDbusTest : public QObject {
     QTemporaryDir dir_;
     QProcess bus_;
     QString address_;
-    QString serverName_ = "shaode-test-server-" + QUuid::createUuid().toString(QUuid::Id128);
-    QString clientName_ = "shaode-test-client-" + QUuid::createUuid().toString(QUuid::Id128);
+    QString serverName_ = "shaodesk-test-server-" + QUuid::createUuid().toString(QUuid::Id128);
+    QString clientName_ = "shaodesk-test-client-" + QUuid::createUuid().toString(QUuid::Id128);
     NotificationCenter center_;
     NotificationService *server_ = nullptr;
     Client client_;
@@ -77,7 +77,7 @@ class NotificationsDbusTest : public QObject {
         QVERIFY(bus_.waitForReadyRead(5000));
         address_ = QString::fromUtf8(bus_.readLine()).trimmed();
         QVERIFY2(address_.startsWith("unix:"), qPrintable(address_));
-        shaode::NotificationsConfig config_;
+        shaodesk::NotificationsConfig config_;
         center_.configure(config_);
         server_ = new NotificationService(center_, this);
         QDBusConnection serverBus = QDBusConnection::connectToBus(address_, serverName_);
@@ -102,7 +102,7 @@ class NotificationsDbusTest : public QObject {
         QDBusMessage reply = call("GetServerInformation", {});
         QCOMPARE(reply.type(), QDBusMessage::ReplyMessage);
         QCOMPARE(reply.arguments().size(), 4);
-        QCOMPARE(reply.arguments()[0].toString(), QString("shaoDe"));
+        QCOMPARE(reply.arguments()[0].toString(), QString("shaodesk"));
         QCOMPARE(reply.arguments()[3].toString(), QString("1.2"));
     }
     void capabilities() {
@@ -304,7 +304,7 @@ class NotificationsDbusTest : public QObject {
     void secondDaemonIsRefused() {
         NotificationCenter other;
         NotificationService second(other);
-        QVERIFY(!second.start(QDBusConnection::connectToBus(address_, "shaode-test-second-" + clientName_)));
+        QVERIFY(!second.start(QDBusConnection::connectToBus(address_, "shaodesk-test-second-" + clientName_)));
         QVERIFY(second.error().contains("another notification daemon"));
         QVERIFY(!other.serving());
         // The first keeps answering.
@@ -316,7 +316,7 @@ class NotificationsDbusTest : public QObject {
         // A name that is taken is not stolen; once the owner goes it can be had.
         delete server_;
         server_ = nullptr;
-        QVERIFY2(transient.start(QDBusConnection::connectToBus(address_, "shaode-test-third-" + clientName_)),
+        QVERIFY2(transient.start(QDBusConnection::connectToBus(address_, "shaodesk-test-third-" + clientName_)),
                  qPrintable(transient.error()));
         QVERIFY(other.serving());
     }

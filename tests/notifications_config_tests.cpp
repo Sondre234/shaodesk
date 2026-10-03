@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Configuration of the notification daemon and the on-screen display.
-#include "shaode/config.hpp"
+#include "shaodesk/config.hpp"
 #include <iostream>
 #include <stdexcept>
 
@@ -10,7 +10,7 @@ static void require(bool condition, const char *message) {
 }
 static void rejects(const std::string &source) {
     try {
-        (void)shaode::parse_config(source);
+        (void)shaodesk::parse_config(source);
     } catch (const std::exception &) {
         return;
     }
@@ -19,8 +19,8 @@ static void rejects(const std::string &source) {
 
 int main() {
     try {
-        using shaode::Corner;
-        auto defaults = shaode::parse_config("return {}");
+        using shaodesk::Corner;
+        auto defaults = shaodesk::parse_config("return {}");
         const auto &n = defaults.notifications;
         require(n.enabled && n.position == Corner::TopRight && n.timeout == 6000 &&
                     n.max_visible == 4 && !n.dnd && n.width == 360 && n.history == 100,
@@ -28,7 +28,7 @@ int main() {
         const auto &o = defaults.osd;
         require(o.enabled && !o.top && o.timeout == 1500 && o.volume && o.brightness,
                 "osd defaults");
-        auto custom = shaode::parse_config(
+        auto custom = shaodesk::parse_config(
             "return {notifications={enabled=false,position='bottom-left',timeout=0,max_visible=2,"
             "dnd=true,width=500,history=0},osd={enabled=false,position='top',timeout=800,"
             "volume=false,brightness=false}}");
@@ -43,7 +43,7 @@ int main() {
         for (auto [name, corner] : {std::pair{"top-left", Corner::TopLeft},
                                     std::pair{"bottom-right", Corner::BottomRight},
                                     std::pair{"top-right", Corner::TopRight}})
-            require(shaode::parse_config(std::string("return {notifications={position='") + name +
+            require(shaodesk::parse_config(std::string("return {notifications={position='") + name +
                                          "'}}")
                             .notifications.position == corner,
                     "position not parsed");

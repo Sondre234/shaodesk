@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Measure shaode-shell startup and idle cost against a private headless compositor.
+"""Measure shaodesk-shell startup and idle cost against a private headless compositor.
 
 usage: tools/shell_perf.py BUILD_DIR [--runs N] [--idle SECONDS] [--private-bus]
 
@@ -68,17 +68,17 @@ def wait_for_text(path, text, process, timeout=20):
 
 
 def run(build, idle, extra_env, private_bus=False):
-    compositor, shell = build / "shaode", build / "shaode-shell"
+    compositor, shell = build / "shaodesk", build / "shaodesk-shell"
     example = Path(__file__).resolve().parent.parent / "config" / "init.lua"
-    with tempfile.TemporaryDirectory(prefix="shaode-perf-") as directory:
+    with tempfile.TemporaryDirectory(prefix="shaodesk-perf-") as directory:
         root = Path(directory)
         env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                    QT_QPA_PLATFORM="wayland", QT_FORCE_STDERR_LOGGING="1",
                    XDG_DATA_HOME=directory, XDG_STATE_HOME=directory, XDG_CACHE_HOME=directory,
                    DBUS_SESSION_BUS_ADDRESS="disabled:")  # never the real session bus
         if os.environ.get("__GLX_VENDOR_LIBRARY_NAME"):
-            env["SHAODE_GLX_VENDOR"] = os.environ["__GLX_VENDOR_LIBRARY_NAME"]
-        env["__GLX_VENDOR_LIBRARY_NAME"] = "shaode-none"  # as the compositor starts the shell
+            env["SHAODESK_GLX_VENDOR"] = os.environ["__GLX_VENDOR_LIBRARY_NAME"]
+        env["__GLX_VENDOR_LIBRARY_NAME"] = "shaodesk-none"  # as the compositor starts the shell
         env.update(extra_env)
         bus = None
         if private_bus:
@@ -100,15 +100,15 @@ def run(build, idle, extra_env, private_bus=False):
                 wait_for_text(clog, "Running Wayland compositor", server)
                 text = clog.read_text()
                 env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-                env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+                env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
                 start = time.monotonic()
                 child = subprocess.Popen([shell, "--config", str(example)], env=env,
                                          stdout=sout, stderr=sout)
                 try:
                     result = {}
-                    for key, marker in (("ready_ms", "shaoDe shell ready"),
-                                        ("panel_ms", "shaoDe surface rendered: shaoDe taskbar"),
-                                        ("desktop_ms", "shaoDe surface rendered: shaoDe desktop")):
+                    for key, marker in (("ready_ms", "shaodesk shell ready"),
+                                        ("panel_ms", "shaodesk surface rendered: shaodesk taskbar"),
+                                        ("desktop_ms", "shaodesk surface rendered: shaodesk desktop")):
                         result[key] = (wait_for_text(slog, marker, child) - start) * 1000
                     time.sleep(4)  # let startup work (the popups made ahead) settle before looking at idle
                     result["rss_mb"], result["pss_mb"] = memory(child.pid)

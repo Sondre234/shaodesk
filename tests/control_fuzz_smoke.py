@@ -27,13 +27,13 @@ ARGUMENTS = ["", "0", "1", "-1", "4", "5", "99999999999999999999", "-99999999999
              "1 2", "1\t2", "0x10", "1e3", "%s%n", "'", "\"", "HEADLESS-1", "nonexistent",
              "workspaces", "windows", "outputs", "tiling", "animations", "x" * 400]
 
-with tempfile.TemporaryDirectory(prefix="shaode-fuzz-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-fuzz-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(Path(example).read_text().replace("xwayland = true", "xwayland = false"))
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def talk(data, read=True):
@@ -67,7 +67,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-fuzz-test-") as directory:
             processes.append(client)
             wait_for(lambda: talk(b"get windows\n").count(b"\n") == 2, processes, "window mapped")
 
-            rng = random.Random(int(os.environ.get("SHAODE_FUZZ_SEED", 1234)))
+            rng = random.Random(int(os.environ.get("SHAODESK_FUZZ_SEED", 1234)))
             for action in ACTIONS:
                 for argument in ARGUMENTS:
                     if action == "subscribe":

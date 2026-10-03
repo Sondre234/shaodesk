@@ -28,13 +28,13 @@ def settings(activation, border=0):
 }}"""
 
 
-with tempfile.TemporaryDirectory(prefix="shaode-urgent-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(settings("urgent"))
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words, ok=True):
@@ -58,7 +58,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-urgent-test-") as directory:
                          detail=lambda: f"urgent {urgent()} focused {focused()}")
 
     def start(app_id):
-        env_app = dict(env, SHAODE_PROBE_APP_ID=app_id, SHAODE_PROBE_TITLE=f"Window {app_id}")
+        env_app = dict(env, SHAODESK_PROBE_APP_ID=app_id, SHAODESK_PROBE_TITLE=f"Window {app_id}")
         client = subprocess.Popen([probe, "--commands"], env=env_app, stdin=subprocess.PIPE,
                                   stdout=subprocess.DEVNULL, text=True)
         processes.append(client)
@@ -74,7 +74,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-urgent-test-") as directory:
 
         def __init__(self):
             self.socket = socket.socket(socket.AF_UNIX)
-            self.socket.connect(env["SHAODE_SOCKET"])
+            self.socket.connect(env["SHAODESK_SOCKET"])
             self.socket.sendall(b"subscribe\n")
             self.socket.settimeout(0.05)
             self.buffer = ""
@@ -97,7 +97,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-urgent-test-") as directory:
                              "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             assert "xdg_activation_v1" in subprocess.run(
                 [probe, "--globals"], env=env, capture_output=True, text=True).stdout
             assert urgent() == []

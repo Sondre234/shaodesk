@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "shaode/curve.h"
+#include "shaodesk/curve.h"
 #include <cmath>
 #include <iostream>
 #include <stdexcept>

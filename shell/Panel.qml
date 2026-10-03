@@ -2,7 +2,7 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
-import ShaoDe
+import Shaodesk
 
 Item {
     id: root
@@ -959,7 +959,7 @@ Item {
                     }
                     Text {
                         Layout.fillWidth: true
-                        text: "shaoDe"
+                        text: "shaodesk"
                         color: Qt.darker(shell.textColor, 1.7)
                         font.pixelSize: 11; font.family: root.uiFont
                     }

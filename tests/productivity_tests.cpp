@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Configuration of workspace names, window groups, and sessions.
-#include "shaode/config.hpp"
-#include "shaode/session.h"
-#include "shaode/tabs.h"
+#include "shaodesk/config.hpp"
+#include "shaodesk/session.h"
+#include "shaodesk/tabs.h"
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
@@ -20,7 +20,7 @@ void require(bool condition, const char *message) {
 }
 void rejects(const std::string &source, const std::string &fragment = "") {
     try {
-        (void)shaode::parse_config(source);
+        (void)shaodesk::parse_config(source);
     } catch (const std::exception &error) {
         if (!fragment.empty() && std::string(error.what()).find(fragment) == std::string::npos)
             throw std::runtime_error("wrong error for " + source + ": " + error.what());
@@ -30,7 +30,7 @@ void rejects(const std::string &source, const std::string &fragment = "") {
 }
 
 void workspace_names() {
-    auto config = shaode::parse_config(
+    auto config = shaodesk::parse_config(
         "return {layout={workspaces=5,workspace_names={'web','code','','chat much'}},"
         "bindings={{mods={'Super'},key='w',action='workspace',workspace='code'},"
         "{mods={'Super'},key='e',action='move_to_workspace',workspace='chat much'},"
@@ -51,7 +51,7 @@ void workspace_names() {
                 config.binding(SH_LOGO, XKB_KEY_e)->workspace == 4 &&
                 config.binding(SH_LOGO, XKB_KEY_r)->workspace == 3,
             "binding workspace names not resolved");
-    require(shaode::parse_config("return {}").workspace_names.empty(), "default has names");
+    require(shaodesk::parse_config("return {}").workspace_names.empty(), "default has names");
     rejects("return {layout={workspaces=2,workspace_names={'a','b','c'}}}", "more names");
     rejects("return {layout={workspace_names={'a','a'}}}", "duplicate");
     rejects("return {layout={workspace_names={'12'}}}", "mistaken for a number");
@@ -176,16 +176,16 @@ void session_file() {
         fclose(file);
         require(!ok && strstr(error, fragment), body);
     };
-    bad("", "not a shaoDe session");
-    bad("something else\n", "not a shaoDe session");
-    bad("shaode-session 1\nbogus\tx\n", "line 2");
-    bad("shaode-session 1\noutput\tDP-1\tx\t1\n", "line 2");
-    bad("shaode-session 1\noutput\tDP-1\t-1\t1\n", "line 2");
-    bad("shaode-session 1\nwindow\tDP-1\t0\t0\t0\t0\t1\n", "line 2");
-    bad("shaode-session 1\nlayout\tDP-1\t0\t1\tnan?\t1\n", "line 2");
-    bad("shaode-session 1\nlayout\tDP-1\t0\t4\t0.5\t1\t0.5,x\n", "line 2");
-    bad("shaode-session 1\nlayout\tDP-1\t0\t4\t0.5\t1\t2\n", "line 2");
-    bad("shaode-session 1\nwindow\tDP-1\t0\t0\t0\t0\t1\t1\ta\tb\t\t0\t1\n", "line 2");
+    bad("", "not a shaodesk session");
+    bad("something else\n", "not a shaodesk session");
+    bad("shaodesk-session 1\nbogus\tx\n", "line 2");
+    bad("shaodesk-session 1\noutput\tDP-1\tx\t1\n", "line 2");
+    bad("shaodesk-session 1\noutput\tDP-1\t-1\t1\n", "line 2");
+    bad("shaodesk-session 1\nwindow\tDP-1\t0\t0\t0\t0\t1\n", "line 2");
+    bad("shaodesk-session 1\nlayout\tDP-1\t0\t1\tnan?\t1\n", "line 2");
+    bad("shaodesk-session 1\nlayout\tDP-1\t0\t4\t0.5\t1\t0.5,x\n", "line 2");
+    bad("shaodesk-session 1\nlayout\tDP-1\t0\t4\t0.5\t1\t2\n", "line 2");
+    bad("shaodesk-session 1\nwindow\tDP-1\t0\t0\t0\t0\t1\t1\ta\tb\t\t0\t1\n", "line 2");
 }
 
 void session_matching() {
@@ -221,24 +221,24 @@ void session_paths() {
     char path[512];
     setenv("XDG_STATE_HOME", "/tmp/state", 1);
     require(sh_session_path("work", path, sizeof(path)) &&
-                !strcmp(path, "/tmp/state/shaode/sessions/work"),
+                !strcmp(path, "/tmp/state/shaodesk/sessions/work"),
             "session path");
     require(sh_session_path(nullptr, path, sizeof(path)) &&
-                !strcmp(path, "/tmp/state/shaode/sessions"),
+                !strcmp(path, "/tmp/state/shaodesk/sessions"),
             "session directory");
     require(!sh_session_path("../x", path, sizeof(path)), "path traversal refused");
     require(!sh_session_path("work", path, 8), "short buffer refused");
     unsetenv("XDG_STATE_HOME");
     setenv("HOME", "/home/x", 1);
     require(sh_session_path("w", path, sizeof(path)) &&
-                !strcmp(path, "/home/x/.local/state/shaode/sessions/w"),
+                !strcmp(path, "/home/x/.local/state/shaodesk/sessions/w"),
             "home fallback");
 }
 
 void group_config() {
-    auto defaults = shaode::parse_config("return {}");
+    auto defaults = shaodesk::parse_config("return {}");
     require(defaults.settings.groups && defaults.settings.group_join_new, "groups off by default");
-    auto config = shaode::parse_config(
+    auto config = shaodesk::parse_config(
         "return {features={groups=false,group_join_new=false},bindings={"
         "{mods={'Super'},key='g',action='group_toggle'},"
         "{mods={'Super'},key='h',action='group_next'},"

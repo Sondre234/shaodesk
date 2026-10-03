@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace shaode::import {
+namespace shaodesk::import {
 namespace {
 std::string lower(std::string text) {
     std::transform(text.begin(), text.end(), text.begin(), ::tolower);
@@ -360,4 +360,4 @@ std::map<std::string, HyprValue> read_waybar(const Files &files, Report &report)
     }
     return result;
 }
-} // namespace shaode::import
+} // namespace shaodesk::import

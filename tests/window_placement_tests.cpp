@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // windows.placement: cascade, center and smart placement of new floating windows.
-#include "shaode/backend.h"
+#include "shaodesk/backend.h"
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>

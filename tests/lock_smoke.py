@@ -10,7 +10,7 @@ import time
 
 compositor, lock_probe, example = (str(Path(p).resolve()) for p in sys.argv[1:4])
 
-with tempfile.TemporaryDirectory(prefix="shaode-lock-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-lock-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(Path(example).read_text().replace("xwayland = true", "xwayland = false"))

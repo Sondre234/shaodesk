@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-#include "shaode/animation.h"
+#include "shaodesk/animation.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>

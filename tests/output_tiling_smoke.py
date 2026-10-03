@@ -29,14 +29,14 @@ def config(primary=None, first="position = { x = 0, y = 0 }", second=""):
 }}"""
 
 
-with tempfile.TemporaryDirectory(prefix="shaode-output-tiling-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-output-tiling-test-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(config())
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                WLR_HEADLESS_OUTPUTS="2")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words):
@@ -89,7 +89,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-output-tiling-test-") as directo
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             assert msg("get", "tiling") == "on\n"
             assert outputs()["HEADLESS-1"] == (True, 0, 0, 2048, 1152), outputs()
 

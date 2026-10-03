@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "shaode/config.hpp"
-#include "shaode/import.hpp"
+#include "shaodesk/config.hpp"
+#include "shaodesk/import.hpp"
 
 #include <cstdio>
 #include <cstdlib>
@@ -29,7 +29,7 @@ bool has_env(const char *name) {
     const char *value = std::getenv(name);
     return value && *value;
 }
-pid_t spawn(const shaode::Command &command, const std::vector<std::string> &extra_env = {}) {
+pid_t spawn(const shaodesk::Command &command, const std::vector<std::string> &extra_env = {}) {
     std::vector<char *> argv;
     for (const auto &arg : command)
         argv.push_back(const_cast<char *>(arg.c_str()));
@@ -72,9 +72,9 @@ pid_t spawn(const shaode::Command &command, const std::vector<std::string> &extr
  * ours, so screen sharing and file choosers need to learn about this session. Only a standalone
  * session may do this: a nested one would point the host's portals at itself. */
 void export_activation_environment() {
-    shaode::Command command{"dbus-update-activation-environment", "--systemd"};
+    shaodesk::Command command{"dbus-update-activation-environment", "--systemd"};
     for (const char *name :
-         {"WAYLAND_DISPLAY", "DISPLAY", "XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE", "SHAODE_SOCKET",
+         {"WAYLAND_DISPLAY", "DISPLAY", "XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE", "SHAODESK_SOCKET",
           "XCURSOR_THEME", "XCURSOR_SIZE"})
         if (has_env(name))
             command.emplace_back(name);
@@ -126,13 +126,13 @@ void set_window_buttons(const std::string &layout) {
     const char *display = std::getenv("WAYLAND_DISPLAY");
     if (layout.empty() || !runtime || *runtime != '/' || !display || !*display)
         return;
-    auto directory = std::filesystem::path(runtime) / ("shaode." + std::string(display) + ".dconf");
+    auto directory = std::filesystem::path(runtime) / ("shaodesk." + std::string(display) + ".dconf");
     std::error_code error;
     std::filesystem::remove_all(directory, error);
     std::filesystem::create_directories(directory / "keyfiles/locks", error);
-    std::ofstream(directory / "keyfiles/shaode")
+    std::ofstream(directory / "keyfiles/shaodesk")
         << "[org/gnome/desktop/wm/preferences]\nbutton-layout='" << layout << "'\n";
-    std::ofstream(directory / "keyfiles/locks/shaode")
+    std::ofstream(directory / "keyfiles/locks/shaodesk")
         << "/org/gnome/desktop/wm/preferences/button-layout\n";
     auto database = directory / "buttons";
     pid_t pid = spawn({"dconf", "compile", database.string(), (directory / "keyfiles").string()});
@@ -197,13 +197,13 @@ if [ "$copy" = 1 ]; then
     wl-copy --type image/png < "$file" || echo "Screenshot not copied: wl-copy failed" >&2
 fi
 if [ "$notify" = 1 ]; then
-    notify-send -a shaoDe -i "$file" "Screenshot saved" "$file"
+    notify-send -a shaodesk -i "$file" "Screenshot saved" "$file"
 fi
 )sh";
 struct Runtime {
     std::filesystem::path path;
-    shaode::Config config;
-    shaode::Command extra_command;
+    shaodesk::Config config;
+    shaodesk::Command extra_command;
     bool allow_shell = false;
     bool standalone = false;
     pid_t shell_pid = -1;
@@ -219,22 +219,22 @@ struct Runtime {
     }
 
     void start_shell() {
-#if SHAODE_HAS_SHELL
+#if SHAODESK_HAS_SHELL
         if (!allow_shell || !config.shell.enabled || shell_pid > 0)
             return;
         try {
             auto binary =
-                std::filesystem::canonical("/proc/self/exe").parent_path() / "shaode-shell";
+                std::filesystem::canonical("/proc/self/exe").parent_path() / "shaodesk-shell";
             // Software rendering never uses GLX, but libGLX loads the GPU vendor's whole GLX
             // driver when the process starts: with NVIDIA that is about 16 MB of memory the shell
             // does not need. A vendor name that matches nothing keeps it out; the shell puts the
-            // original back (SHAODE_GLX_VENDOR) so the applications it launches see no change.
+            // original back (SHAODESK_GLX_VENDOR) so the applications it launches see no change.
             std::vector<std::string> extra_env;
             if (config.shell.software_renderer && !std::getenv("QT_QUICK_BACKEND") &&
                 !std::getenv("QSG_RHI_BACKEND")) {
-                extra_env.push_back("__GLX_VENDOR_LIBRARY_NAME=shaode-none");
+                extra_env.push_back("__GLX_VENDOR_LIBRARY_NAME=shaodesk-none");
                 if (const char *vendor = std::getenv("__GLX_VENDOR_LIBRARY_NAME"))
-                    extra_env.push_back(std::string("SHAODE_GLX_VENDOR=") + vendor);
+                    extra_env.push_back(std::string("SHAODESK_GLX_VENDOR=") + vendor);
             }
             shell_pid = spawn(
                 {binary.string(), "-platform", "wayland", "--config", path.string()}, extra_env);
@@ -275,7 +275,7 @@ struct Runtime {
         if (binding->action == SH_HANDLED)
             spawn(binding->command);
         *argument = binding->action == SH_SCREENSHOT ? binding->screenshot : binding->workspace;
-        if (shaode::action_takes_amount(binding->action))
+        if (shaodesk::action_takes_amount(binding->action))
             *argument = binding->amount;
         self.target = binding->output;
         return binding->action;
@@ -289,7 +289,7 @@ struct Runtime {
         if (binding->action == SH_HANDLED)
             spawn(binding->command);
         *argument = binding->action == SH_SCREENSHOT ? binding->screenshot : binding->workspace;
-        if (shaode::action_takes_amount(binding->action))
+        if (shaodesk::action_takes_amount(binding->action))
             *argument = binding->amount;
         self.target = binding->output;
         return binding->action;
@@ -308,7 +308,7 @@ struct Runtime {
                 throw std::runtime_error("empty request");
             if (words[0] == "profile")
                 return self.pick_profile(words);
-            sh_action action = shaode::parse_action(words[0]);
+            sh_action action = shaodesk::parse_action(words[0]);
             if (action == SH_HANDLED) {
                 if (words.size() < 2)
                     throw std::runtime_error("spawn needs a program");
@@ -316,7 +316,7 @@ struct Runtime {
                     throw std::runtime_error("cannot launch " + words[1]);
                 return action;
             }
-            if (shaode::action_takes_workspace(action)) {
+            if (shaodesk::action_takes_workspace(action)) {
                 // A number, or a name from layout.workspace_names (which may hold spaces).
                 std::string name;
                 for (std::size_t i = 1; i < words.size(); ++i)
@@ -327,14 +327,14 @@ struct Runtime {
                                              std::to_string(self.config.settings.workspaces) +
                                              ", or a workspace name");
                 *argument = number;
-            } else if (shaode::action_takes_output(action)) {
+            } else if (shaodesk::action_takes_output(action)) {
                 // A description may hold spaces.
                 std::string target;
                 for (std::size_t i = 1; i < words.size(); ++i)
                     target += (i > 1 ? " " : "") + words[i];
                 if (words.size() == 1 && action == SH_SWAP_WORKSPACES)
                     target = "next";
-                if (!shaode::valid_output_target(target))
+                if (!shaodesk::valid_output_target(target))
                     throw std::runtime_error(words[0] + " takes one output: left, right, next, "
                                                         "prev, or a connector name");
                 self.target = target;
@@ -342,11 +342,11 @@ struct Runtime {
                 if (words.size() > 2)
                     throw std::runtime_error(
                         "screenshot takes one mode: region, output, or window");
-                *argument = words.size() == 2 ? shaode::parse_screenshot_mode(words[1])
+                *argument = words.size() == 2 ? shaodesk::parse_screenshot_mode(words[1])
                                               : SH_SCREENSHOT_REGION;
-            } else if (shaode::action_takes_amount(action)) {
+            } else if (shaodesk::action_takes_amount(action)) {
                 std::size_t used = 0;
-                int amount = shaode::default_resize_amount;
+                int amount = shaodesk::default_resize_amount;
                 try {
                     if (words.size() == 2)
                         amount = std::stoi(words[1], &used);
@@ -354,9 +354,9 @@ struct Runtime {
                     amount = 0;
                 }
                 if (words.size() > 2 || (words.size() == 2 && used != words[1].size()) ||
-                    amount < 1 || amount > shaode::max_resize_amount)
+                    amount < 1 || amount > shaodesk::max_resize_amount)
                     throw std::runtime_error(words[0] + " takes a size in pixels, from 1 to " +
-                                             std::to_string(shaode::max_resize_amount));
+                                             std::to_string(shaodesk::max_resize_amount));
                 *argument = amount;
             } else if ((action == SH_SWITCHER_CONFIRM || action == SH_OVERVIEW_CONFIRM) &&
                        words.size() == 2) {
@@ -402,7 +402,7 @@ struct Runtime {
                 list += (list.empty() ? "" : ", ") + known;
             throw std::runtime_error("no profile " + name + "; the profiles are " + list);
         }
-        shaode::save_profile(name);
+        shaodesk::save_profile(name);
         return SH_RELOAD;
     }
     static const char *action_target(void *data) {
@@ -416,7 +416,7 @@ struct Runtime {
         auto action = command(data, self.config.hot_corners[corner].c_str(), argument, error,
                               sizeof(error));
         if (action == SH_NONE)
-            std::cerr << "shaode: hot corner: " << error << '\n';
+            std::cerr << "shaodesk: hot corner: " << error << '\n';
         return action;
     }
     std::filesystem::path screenshot_directory() const {
@@ -465,7 +465,7 @@ struct Runtime {
                          std::to_string(box->width) + "x" + std::to_string(box->height);
             static constexpr const char *modes[] = {"region", "output", "window"};
             self.screenshot_pid =
-                spawn({"/bin/sh", "-c", screenshot_script, "shaode-screenshot", file.string(),
+                spawn({"/bin/sh", "-c", screenshot_script, "shaodesk-screenshot", file.string(),
                        modes[mode], target, copy ? "1" : "0", notify ? "1" : "0"});
             if (self.screenshot_pid < 0)
                 throw std::runtime_error("cannot start /bin/sh");
@@ -479,7 +479,7 @@ struct Runtime {
         auto &self = *static_cast<Runtime *>(data);
         try {
             std::string error;
-            auto next = shaode::load_config_or_default(self.path, error);
+            auto next = shaodesk::load_config_or_default(self.path, error);
             self.config = std::move(next);
             // The shell loads the file too, and shows the error.
             if (self.shell_pid > 0)
@@ -556,31 +556,31 @@ struct Runtime {
 };
 std::filesystem::path personal_config() {
     if (const auto *xdg = std::getenv("XDG_CONFIG_HOME"); xdg && *xdg)
-        return std::filesystem::path(xdg) / "shaode/init.lua";
+        return std::filesystem::path(xdg) / "shaodesk/init.lua";
     if (const auto *home = std::getenv("HOME"); home && *home)
-        return std::filesystem::path(home) / ".config/shaode/init.lua";
+        return std::filesystem::path(home) / ".config/shaodesk/init.lua";
     return {};
 }
 std::filesystem::path default_config() {
     auto personal = personal_config();
     if (!personal.empty() && std::filesystem::exists(personal))
         return personal;
-    if (std::filesystem::exists(SHAODE_DEFAULT_CONFIG))
-        return SHAODE_DEFAULT_CONFIG;
+    if (std::filesystem::exists(SHAODESK_DEFAULT_CONFIG))
+        return SHAODESK_DEFAULT_CONFIG;
     throw std::runtime_error(
         "no configuration found; use --config config/init.lua from the source directory");
 }
-/* `shaode msg ...` sends one request to the running compositor's control socket. */
+/* `shaodesk msg ...` sends one request to the running compositor's control socket. */
 int send_message(int argc, char **argv) {
     std::string request;
     for (int i = 2; i < argc; ++i)
         request += (i > 2 ? " " : "") + std::string(argv[i]);
     if (request.empty() || request.find('\n') != std::string::npos)
-        throw std::runtime_error("usage: shaode msg [output NAME] ACTION [ARGUMENT] | "
+        throw std::runtime_error("usage: shaodesk msg [output NAME] ACTION [ARGUMENT] | "
                                  "get workspace|workspaces|tiling|windows|outputs|animations");
-    const char *path = std::getenv("SHAODE_SOCKET");
+    const char *path = std::getenv("SHAODESK_SOCKET");
     if (!path || !*path)
-        throw std::runtime_error("SHAODE_SOCKET is not set; run inside a shaoDe session");
+        throw std::runtime_error("SHAODESK_SOCKET is not set; run inside a shaodesk session");
     sockaddr_un address{};
     address.sun_family = AF_UNIX;
     if (std::strlen(path) >= sizeof(address.sun_path))
@@ -612,10 +612,10 @@ int send_message(int argc, char **argv) {
     if (ok)
         std::cout << body;
     else
-        std::cerr << "shaode: " << (reply.empty() ? "no reply\n" : reply);
+        std::cerr << "shaodesk: " << (reply.empty() ? "no reply\n" : reply);
     return ok ? 0 : 1;
 }
-/* `shaode import [--config PATH] [--dry-run] DIR` writes theme.lua beside the configuration. */
+/* `shaodesk import [--config PATH] [--dry-run] DIR` writes theme.lua beside the configuration. */
 int import_dotfiles(int argc, char **argv) {
     std::filesystem::path config, source;
     bool dry_run = false;
@@ -628,15 +628,15 @@ int import_dotfiles(int argc, char **argv) {
         else if (source.empty() && !arg.starts_with("-"))
             source = arg;
         else
-            throw std::runtime_error("usage: shaode import [--config PATH] [--dry-run] DIR");
+            throw std::runtime_error("usage: shaodesk import [--config PATH] [--dry-run] DIR");
     }
     if (source.empty())
-        throw std::runtime_error("usage: shaode import [--config PATH] [--dry-run] DIR");
+        throw std::runtime_error("usage: shaodesk import [--config PATH] [--dry-run] DIR");
     if (config.empty())
         config = personal_config();
     if (config.empty())
         throw std::runtime_error("cannot tell where the configuration lives; pass --config PATH");
-    auto result = shaode::import_dotfiles(source);
+    auto result = shaodesk::import_dotfiles(source);
     if (dry_run) {
         std::cout << result.theme;
         std::cerr << "Would import " << result.imported << " settings:\n" << result.report;
@@ -661,7 +661,7 @@ int import_dotfiles(int argc, char **argv) {
                   << " yet. Copy the default configuration there; it loads theme.lua.\n";
         return 0;
     }
-    auto shadowed = shaode::shadowed_settings(config);
+    auto shadowed = shaodesk::shadowed_settings(config);
     if (!shadowed)
         std::cout << "\nAdd  theme = \"theme.lua\",  to " << config.string() << " to use it.\n";
     else if (!shadowed->empty()) {
@@ -672,21 +672,21 @@ int import_dotfiles(int argc, char **argv) {
         for (const auto &name : *shadowed)
             std::cout << "  " << name << '\n';
     }
-    (void)shaode::load_config(config);
+    (void)shaodesk::load_config(config);
     return 0;
 }
 void usage() {
     std::cout
-        << "Usage: shaode [--config PATH] [--check-config] [--headless | --session] "
+        << "Usage: shaodesk [--config PATH] [--check-config] [--headless | --session] "
            "[--exec PROGRAM [ARGS...]]\n"
            "Default: nested Wayland compositor. --session: standalone DRM/libinput on a TTY.\n"
-           "Config: $XDG_CONFIG_HOME/shaode/init.lua or ~/.config/shaode/init.lua\n"
+           "Config: $XDG_CONFIG_HOME/shaodesk/init.lua or ~/.config/shaodesk/init.lua\n"
            "Falls back to the installed default; use --config config/init.lua in the source tree.\n"
            "--no-shell disables automatic shell startup; headless mode never starts it.\n"
            "SIGHUP reloads configuration; SIGINT/SIGTERM exits.\n"
-           "shaode msg [output NAME] ACTION [ARGUMENT] runs an action in the running session;\n"
-           "shaode msg get workspace|workspaces|tiling|windows|outputs|animations prints its state.\n"
-           "shaode import [--config PATH] [--dry-run] DIR writes theme.lua beside the\n"
+           "shaodesk msg [output NAME] ACTION [ARGUMENT] runs an action in the running session;\n"
+           "shaodesk msg get workspace|workspaces|tiling|windows|outputs|animations prints its state.\n"
+           "shaodesk import [--config PATH] [--dry-run] DIR writes theme.lua beside the\n"
            "configuration from the Hyprland, Waybar, wallbash, and pywal files in DIR.\n";
 }
 } // namespace
@@ -696,7 +696,7 @@ int main(int argc, char **argv) {
         bool check = false;
         bool no_shell = false;
         sh_backend_mode mode = SH_BACKEND_NESTED;
-        shaode::Command command;
+        shaodesk::Command command;
         if (argc >= 2 && std::string(argv[1]) == "msg")
             return send_message(argc, argv);
         if (argc >= 2 && std::string(argv[1]) == "import")
@@ -708,7 +708,7 @@ int main(int argc, char **argv) {
                 return 0;
             }
             if (arg == "--version") {
-                std::cout << "shaoDe " << SHAODE_VERSION << '\n';
+                std::cout << "shaodesk " << SHAODESK_VERSION << '\n';
                 return 0;
             }
             if (arg == "--config" && i + 1 < argc)
@@ -733,15 +733,15 @@ int main(int argc, char **argv) {
         // that it can be fixed from there; --check-config reports it instead.
         std::string error;
         Runtime runtime{std::filesystem::absolute(path),
-                        check ? shaode::load_config(path)
-                              : shaode::load_config_or_default(path, error),
+                        check ? shaodesk::load_config(path)
+                              : shaodesk::load_config_or_default(path, error),
                         std::move(command)};
         if (!error.empty())
             Runtime::report_error(error);
         runtime.allow_shell = !no_shell && mode != SH_BACKEND_HEADLESS;
         runtime.standalone = mode == SH_BACKEND_SESSION;
         // Tests rewrite their configuration and reload it themselves.
-        runtime.watch = mode != SH_BACKEND_HEADLESS || has_env("SHAODE_AUTO_RELOAD");
+        runtime.watch = mode != SH_BACKEND_HEADLESS || has_env("SHAODESK_AUTO_RELOAD");
         if (check) {
             std::cout << "Configuration valid: " << path << " (" << runtime.config.bindings.size()
                       << " bindings)\n";
@@ -763,7 +763,7 @@ int main(int argc, char **argv) {
             kill(runtime.shell_pid, SIGTERM);
         return result;
     } catch (const std::exception &error) {
-        std::cerr << "shaode: " << error.what() << '\n';
+        std::cerr << "shaodesk: " << error.what() << '\n';
         return 1;
     }
 }

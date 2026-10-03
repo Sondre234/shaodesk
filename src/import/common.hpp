@@ -10,7 +10,7 @@
 #include <string_view>
 #include <vector>
 
-namespace shaode::import {
+namespace shaodesk::import {
 namespace fs = std::filesystem;
 
 struct Origin {
@@ -112,7 +112,7 @@ struct Css {
 void parse_css(const Files &files, const fs::path &path, Css &css, Report &report, int depth = 0);
 std::optional<Color> css_color(std::string_view value, const Css &css, int depth = 0);
 
-// Waybar's bar look, already in shaoDe terms: "position", "height", "margin-top", ...,
+// Waybar's bar look, already in shaodesk terms: "position", "height", "margin-top", ...,
 // "background", "color", "radius", "font", "font_size".
 std::map<std::string, HyprValue> read_waybar(const Files &files, Report &report);
-} // namespace shaode::import
+} // namespace shaodesk::import

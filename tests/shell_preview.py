@@ -11,7 +11,7 @@ import time
 import zlib
 
 executable, config = (str(Path(path).resolve()) for path in sys.argv[1:])
-with tempfile.TemporaryDirectory(prefix="shaode-ui-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-ui-") as directory:
     root = Path(directory)
     applications = root / "applications"
     applications.mkdir()

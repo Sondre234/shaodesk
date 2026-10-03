@@ -14,7 +14,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <wayland-server-core.h>
-#include "shaode/curve.h"
+#include "shaodesk/curve.h"
 
 struct wlr_scene_node;
 struct wlr_scene_tree;

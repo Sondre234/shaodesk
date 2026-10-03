@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "shaode/tabs.h"
+#include "shaodesk/tabs.h"
 
 void sh_tabs_span(int width, int count, int index, int *x, int *length) {
     if (count < 1)

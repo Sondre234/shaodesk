@@ -115,9 +115,9 @@ int main(int argc, char **argv) {
                       200, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, screen->root_visual,
                       XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK, values);
     // Tests telling several windows apart, or matching a window rule, name them.
-    const char *env_title = getenv("SHAODE_PROBE_TITLE");
-    const char *title = env_title && *env_title ? env_title : "shaoDe X11 probe";
-    const char class[] = "shaode-x11-probe\0shaode-x11-probe";
+    const char *env_title = getenv("SHAODESK_PROBE_TITLE");
+    const char *title = env_title && *env_title ? env_title : "shaodesk X11 probe";
+    const char class[] = "shaodesk-x11-probe\0shaodesk-x11-probe";
     xcb_change_property(probe.connection, XCB_PROP_MODE_REPLACE, probe.window, XCB_ATOM_WM_NAME,
                         XCB_ATOM_STRING, 8, strlen(title), title);
     xcb_change_property(probe.connection, XCB_PROP_MODE_REPLACE, probe.window, XCB_ATOM_WM_CLASS,
@@ -128,7 +128,7 @@ int main(int argc, char **argv) {
     uint32_t pid = (uint32_t)getpid();
     xcb_change_property(probe.connection, XCB_PROP_MODE_REPLACE, probe.window,
                         atom(probe.connection, "_NET_WM_PID"), XCB_ATOM_CARDINAL, 32, 1, &pid);
-    if (getenv("SHAODE_PROBE_URGENT_ON_MAP")) {
+    if (getenv("SHAODESK_PROBE_URGENT_ON_MAP")) {
         // Asks for attention before mapping, as an application started in the background does.
         uint32_t hints[9] = {256};
         xcb_change_property(probe.connection, XCB_PROP_MODE_REPLACE, probe.window, probe.hints,
@@ -141,7 +141,7 @@ int main(int argc, char **argv) {
     // The compositor gives newly mapped windows keyboard focus, unless a rule says otherwise
     // (the window that asked for attention before mapping is opened that way).
     double deadline = now() + 5;
-    for (; !getenv("SHAODE_PROBE_URGENT_ON_MAP");) {
+    for (; !getenv("SHAODESK_PROBE_URGENT_ON_MAP");) {
         xcb_get_input_focus_reply_t *focus = xcb_get_input_focus_reply(
             probe.connection, xcb_get_input_focus(probe.connection), NULL);
         bool focused = focus && focus->focus == probe.window;
@@ -153,7 +153,7 @@ int main(int argc, char **argv) {
         struct timespec pause = {0, 20 * 1000 * 1000};
         nanosleep(&pause, NULL);
     }
-    puts(getenv("SHAODE_PROBE_URGENT_ON_MAP") ? "X11 window mapped and focused (not waited for)"
+    puts(getenv("SHAODESK_PROBE_URGENT_ON_MAP") ? "X11 window mapped and focused (not waited for)"
                                               : "X11 window mapped and focused");
 
     if (!strcmp(command, "wait-close")) {

@@ -104,7 +104,7 @@ unused). libseat opened the seat through logind. The user checked rendering,
 touchpad and keyboard input, launching and moving/resizing windows, the shell's
 panel and launcher, and an XWayland application (Discord).
 
-Switching to another VT made shaoDe exit. wlroots 0.20 destroys every DRM output
+Switching to another VT made shaodesk exit. wlroots 0.20 destroys every DRM output
 when the session pauses and recreates them on resume; the compositor took the last
 output's removal to mean its nested window had closed, and the shell quit when its
 last view closed. After the fix, repeated `chvt` round trips kept the compositor,
@@ -136,7 +136,7 @@ left the process outside that logind session: Ctrl+Alt+F1 was refused
 the console's keyboard stayed unusable until a reboot. Start `--session` from the
 console itself. VT switching on NVIDIA therefore remains unverified.
 
-Clients noted that shaoDe lacks xdg-activation, primary selection, fractional
+Clients noted that shaodesk lacks xdg-activation, primary selection, fractional
 scaling, and server-side decorations. The first three were added later (see the browser
 checkpoint below); X11 windows that ask for decorations now get window controls.
 
@@ -158,7 +158,7 @@ session.
 
 Added 2026-09-24. In a headless session on the NVIDIA desktop's GLES2 renderer,
 Firefox 154 and Discord 1.0.158 (Electron, both `--ozone-platform=wayland` and via
-XWayland) mapped, rendered, and appeared in `shaode msg get windows`, using
+XWayland) mapped, rendered, and appeared in `shaodesk msg get windows`, using
 linux-dmabuf and explicit sync. `wl-copy --primary` / `wl-paste --primary` round-tripped
 the primary selection. `grim` captured the output (wlr-screencopy), and `grim -T`
 captured Firefox's window alone through ext-foreign-toplevel-list and the per-window
@@ -196,7 +196,7 @@ mouse or touchpad, and the remembered workspaces across a VT switch.
 ## Screenshot checkpoint
 
 Added 2026-09-25. `config` covers the default Print bindings, the `screenshots` settings, and
-invalid modes and directories. `screenshot_smoke` drives `shaode msg screenshot` in a headless
+invalid modes and directories. `screenshot_smoke` drives `shaodesk msg screenshot` in a headless
 session whose `PATH` holds only stand-ins for grim, slurp, wl-copy, and notify-send: it checks
 `grim -o` with the output under the pointer, `grim -g` with the focused window's box, the region
 from slurp, distinct names for screenshots within one second, saving without wl-copy, and the
@@ -208,7 +208,7 @@ copy, and the notification.
 ## Window animation checkpoint
 
 Added 2026-09-25. `animation_smoke` runs a headless compositor with tiling and a
-1-second duration, and checks through `shaode msg get animations` that opening,
+1-second duration, and checks through `shaodesk msg get animations` that opening,
 the neighbour's glide, and the closing copy each run and then end, that closing copies
 leave no scene trees behind, that a reload turning animations off ends those running,
 and that quitting mid-animation exits cleanly. Under AddressSanitizer and
@@ -247,7 +247,7 @@ Added 2026-09-28. `tiling_tests` checks that an output's layout defaults sit bet
 global defaults and a workspace's own choice. `output_layout_smoke` reloads the configuration
 under two headless outputs and checks that `layout.outputs` reaches windows already open
 without overriding a layout chosen by an action. `output_hotplug_smoke` unplugs and re-plugs
-a headless output (`shaode msg headless_output`) holding tiled windows on two workspaces and
+a headless output (`shaodesk msg headless_output`) holding tiled windows on two workspaces and
 floating windows: they move to the other output, keep their workspaces and tiling, and come
 back, or stay with `outputs.return_windows = false`. Not checked on real hardware: a monitor
 that goes away and comes back through DRM (sleep, cable pull, DisplayPort link retraining),
@@ -335,13 +335,13 @@ runs the default action, `CloseNotification` and timeouts remove the card, hover
 virtual pointer holds the timer past its timeout, replacement keeps the id, do-not-disturb
 silences cards but not critical ones, the display and the cards go to the monitor with the focus
 and cards stay on one monitor while they last, the display's pill and the history popover are
-found as pixels, a change of a fake backlight (`SHAODE_SYSFS`, polled) shows the display, turning `notifications.enabled` off and on by reload releases and retakes the
+found as pixels, a change of a fake backlight (`SHAODESK_SYSFS`, polled) shows the display, turning `notifications.enabled` off and on by reload releases and retakes the
 name, and a real `notify-send -w -A` gets its action back. `shell_ui` drives the bell, the
 badge, the cards' buttons, close button and default click, and the history's switch and Clear
 button through Qt Quick offscreen; `shell_osd` the display's timing, the volume hook (baseline
 quiet, changes shown, mute, output switches quiet) and a fake sysfs backlight. The new tests ran
 repeatedly without a failure, under AddressSanitizer and UBSan without a report, and with
-`-DSHAODE_NOTIFICATIONS=OFF` the shell builds and its tests pass. A search for a bug found one:
+`-DSHAODESK_NOTIFICATIONS=OFF` the shell builds and its tests pass. A search for a bug found one:
 the do-not-disturb switch called a property setter QML could not reach, which `shell_ui` caught.
 
 The display's surface has an empty input region (seen in the Wayland trace), so clicks go through it.

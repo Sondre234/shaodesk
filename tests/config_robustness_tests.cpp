@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Hostile and damaged configuration: the parser must accept or reject it with an exception,
 // never crash, hang, or read out of bounds (run this under AddressSanitizer for the last two).
-#include "shaode/config.hpp"
+#include "shaodesk/config.hpp"
 #include <chrono>
 #include <cstdint>
 #include <fstream>
@@ -18,7 +18,7 @@ void require(bool condition, const char *message) {
 // Returns true when accepted; anything but a std::exception failing escapes and fails the test.
 bool parses(const std::string &source) {
     try {
-        (void)shaode::parse_config(source);
+        (void)shaodesk::parse_config(source);
         return true;
     } catch (const std::exception &) {
         return false;

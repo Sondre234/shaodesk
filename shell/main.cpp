@@ -33,19 +33,19 @@ int main(int argc, char **argv) {
     // The compositor sets this so libGLX skips loading the GPU driver, which software rendering
     // does not need. Applications launched from here get the original value back.
     if (const char *vendor = std::getenv("__GLX_VENDOR_LIBRARY_NAME");
-        vendor && std::string_view(vendor) == "shaode-none") {
-        if (const char *saved = std::getenv("SHAODE_GLX_VENDOR"))
+        vendor && std::string_view(vendor) == "shaodesk-none") {
+        if (const char *saved = std::getenv("SHAODESK_GLX_VENDOR"))
             setenv("__GLX_VENDOR_LIBRARY_NAME", saved, 1);
         else
             unsetenv("__GLX_VENDOR_LIBRARY_NAME");
-        unsetenv("SHAODE_GLX_VENDOR");
+        unsetenv("SHAODESK_GLX_VENDOR");
     }
     QGuiApplication app(argc, argv);
     // Views come and go with outputs (all of them during a VT switch); the shell's lifetime
     // follows the compositor connection instead.
     QGuiApplication::setQuitOnLastWindowClosed(false);
-    QCoreApplication::setApplicationName("shaode-shell");
-    QGuiApplication::setDesktopFileName("shaode-shell");
+    QCoreApplication::setApplicationName("shaodesk-shell");
+    QGuiApplication::setDesktopFileName("shaodesk-shell");
     QCommandLineParser parser;
     parser.addHelpOption();
     parser.addOption({"config", "Lua configuration file", "path"});
@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
     if (!parser.isSet("config"))
         parser.showHelp(1);
     const bool preview = parser.isSet("preview");
-#if !SHAODE_LAYER_SHELL
+#if !SHAODESK_LAYER_SHELL
     if (!preview) {
         std::cerr
             << "This build supports --preview only; build with LayerShellQt for a desktop shell\n";
@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
     }
 #endif
     if (!preview && QGuiApplication::platformName() != "wayland") {
-        std::cerr << "shaode-shell requires the Qt Wayland platform\n";
+        std::cerr << "shaodesk-shell requires the Qt Wayland platform\n";
         return 1;
     }
     try {
@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
             std::cerr << "The compositor must support foreign-toplevel-management\n";
             return 1;
         }
-        qmlRegisterUncreatableType<TaskModel>("ShaoDe", 1, 0, "TaskModel", "Provided by the shell");
+        qmlRegisterUncreatableType<TaskModel>("Shaodesk", 1, 0, "TaskModel", "Provided by the shell");
         std::vector<std::unique_ptr<ShellView>> views;
         std::vector<std::unique_ptr<SwitcherView>> switchers;
         std::vector<std::unique_ptr<PaletteView>> palettes;
@@ -111,7 +111,7 @@ int main(int argc, char **argv) {
                         window, &QQuickWindow::frameSwapped, window,
                         [window] {
                             std::cerr
-                                << "shaoDe surface rendered: " << window->title().toStdString()
+                                << "shaodesk surface rendered: " << window->title().toStdString()
                                 << '\n';
                         },
                         Qt::SingleShotConnection);
@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
             throw std::runtime_error("no output available");
         // The daemon answers once the surfaces to show its cards exist. A preview stays off the
         // session bus unless asked to.
-        if (!preview || qEnvironmentVariableIsSet("SHAODE_PREVIEW_DBUS"))
+        if (!preview || qEnvironmentVariableIsSet("SHAODESK_PREVIEW_DBUS"))
             controller.startNotifications();
         QObject::connect(&app, &QGuiApplication::screenAdded, &app, [&](QScreen *screen) {
             if (preview)
@@ -237,14 +237,14 @@ int main(int argc, char **argv) {
                     app.quit();
             });
         }
-        std::cerr << "shaoDe shell ready: " << views.size() << " surfaces\n";
+        std::cerr << "shaodesk shell ready: " << views.size() << " surfaces\n";
         int result = app.exec();
         signalFd = -1;
         close(pipeFds[0]);
         close(pipeFds[1]);
         return result;
     } catch (const std::exception &error) {
-        std::cerr << "shaode-shell: " << error.what() << '\n';
+        std::cerr << "shaodesk-shell: " << error.what() << '\n';
         return 1;
     }
 }

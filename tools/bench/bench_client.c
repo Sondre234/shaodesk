@@ -71,7 +71,7 @@ static void make_buffer(struct client *client) {
     if (client->pixels)
         munmap(client->pixels, client->mapped);
     size_t size = (size_t)client->width * client->height * 4;
-    int fd = memfd_create("shaode-bench-buffer", MFD_CLOEXEC);
+    int fd = memfd_create("shaodesk-bench-buffer", MFD_CLOEXEC);
     if (fd < 0 || ftruncate(fd, (off_t)size) != 0)
         die("cannot allocate shm buffer");
     client->pixels = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
@@ -137,7 +137,7 @@ static const struct xdg_toplevel_listener toplevel_listener = {.configure = topl
 
 int main(int argc, char **argv) {
     struct client client = {.width = 320, .height = 240};
-    const char *app_id = "shaode-bench", *title = "shaoDe bench";
+    const char *app_id = "shaodesk-bench", *title = "shaodesk bench";
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--animate"))
             client.animate = true;
@@ -146,7 +146,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--title") && i + 1 < argc)
             title = argv[++i];
         else
-            die("usage: shaode-bench-client [--animate] [--app-id ID] [--title TITLE]");
+            die("usage: shaodesk-bench-client [--animate] [--app-id ID] [--title TITLE]");
     }
     struct wl_display *display = wl_display_connect(NULL);
     if (!display)

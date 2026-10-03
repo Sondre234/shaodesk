@@ -19,7 +19,7 @@ Rectangle {
         }
         onStatusChanged: {
             if (status === Image.Error) {
-                console.warn("shaoDe wallpaper failed to load, retrying in "
+                console.warn("shaodesk wallpaper failed to load, retrying in "
                              + retry.interval / 1000 + " s: " + source)
                 retry.start()
             } else if (status === Image.Ready) {

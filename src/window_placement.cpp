@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Where new floating windows open: the policy behind windows.placement.
-#include "shaode/backend.h"
+#include "shaodesk/backend.h"
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>

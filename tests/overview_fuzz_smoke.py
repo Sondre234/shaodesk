@@ -26,14 +26,14 @@ CONFIG = """return {
                              ["HEADLESS-2"] = { mode = "800x600" } } },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaode-overview-fuzz-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-overview-fuzz-test-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(CONFIG)
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                WLR_HEADLESS_OUTPUTS="2")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def run(*words):
@@ -50,7 +50,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-overview-fuzz-test-") as directo
                              processes, "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             rng = random.Random(seed)
             words = ["a", "b", "term", "zz", "note", "x", "e", ""]
             counter = 0
@@ -59,8 +59,8 @@ with tempfile.TemporaryDirectory(prefix="shaode-overview-fuzz-test-") as directo
                 global counter
                 counter += 1
                 clients.append(subprocess.Popen(
-                    [probe, "--window-only"], env=dict(env, SHAODE_PROBE_TITLE=f"win{counter}",
-                                                       SHAODE_PROBE_APP_ID="zz"),
+                    [probe, "--window-only"], env=dict(env, SHAODESK_PROBE_TITLE=f"win{counter}",
+                                                       SHAODESK_PROBE_APP_ID="zz"),
                     stdout=subprocess.DEVNULL))
 
             for _ in range(4):

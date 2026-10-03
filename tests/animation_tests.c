@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* Drives the animator on a bare scene graph with a fake clock: no renderer or display. */
-#include "shaode/animation.h"
+#include "shaodesk/animation.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

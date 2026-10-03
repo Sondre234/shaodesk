@@ -3,7 +3,7 @@
 /* Layout for the overview (Expose): where each window's thumbnail goes, which one lies in a
  * direction from another, and how the workspace strip is spread along the top. Pure geometry,
  * so it is tested without a compositor. */
-#include "shaode/backend.h"
+#include "shaodesk/backend.h"
 
 #ifdef __cplusplus
 extern "C" {

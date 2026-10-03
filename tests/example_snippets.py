@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 
-shaode = str(Path(sys.argv[1]).resolve())
+shaodesk = str(Path(sys.argv[1]).resolve())
 example = Path(sys.argv[2]).resolve()
 lines = example.read_text().splitlines()
 
@@ -31,11 +31,11 @@ assert len(snippets) >= 8, f"found only {len(snippets)} commented bindings"
 
 start = next(n for n, line in enumerate(lines) if re.match(r"\s*bindings = \{", line))
 failures = []
-with tempfile.TemporaryDirectory(prefix="shaode-snippets-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-snippets-") as directory:
     for snippet in snippets:
         path = Path(directory) / "init.lua"
         path.write_text("\n".join(lines[:start + 1] + ["        " + snippet] + lines[start + 1:]))
-        result = subprocess.run([shaode, "--check-config", "--config", str(path)],
+        result = subprocess.run([shaodesk, "--check-config", "--config", str(path)],
                                 capture_output=True, text=True, timeout=30)
         if result.returncode != 0:
             failures.append((snippet, (result.stdout + result.stderr).strip()))
@@ -54,9 +54,9 @@ with tempfile.TemporaryDirectory(prefix="shaode-snippets-") as directory:
             source = f"return {{ version = 1, extends = 'default',\n{block}\n}}"
         path = Path(directory) / "readme.lua"
         path.write_text(source)
-        result = subprocess.run([shaode, "--check-config", "--config", str(path)],
+        result = subprocess.run([shaodesk, "--check-config", "--config", str(path)],
                                 capture_output=True, text=True, timeout=30,
-                                env={**os.environ, "SHAODE_DEFAULT_CONFIG": str(example)})
+                                env={**os.environ, "SHAODESK_DEFAULT_CONFIG": str(example)})
         if result.returncode != 0:
             failures.append((block.strip().splitlines()[0],
                              (result.stdout + result.stderr).strip()))

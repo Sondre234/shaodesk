@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "shaode/config.hpp"
-#include "shaode/effects.h"
-#include "shaode/config_schema.hpp"
+#include "shaodesk/config.hpp"
+#include "shaodesk/effects.h"
+#include "shaodesk/config_schema.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -18,7 +18,7 @@
 #include <string_view>
 #include <xkbcommon/xkbcommon.h>
 
-namespace shaode {
+namespace shaodesk {
 namespace {
 using State = std::unique_ptr<lua_State, decltype(&lua_close)>;
 // Section being read ("shell"), so an error can be placed in the source file.
@@ -1671,7 +1671,7 @@ std::filesystem::path theme_path(lua_State *L, const std::filesystem::path &dire
     return path;
 }
 // `theme = "theme.lua"` fills in every setting the configuration leaves out. A missing theme
-// file is not an error, so a configuration can name one before `shaode import` writes it.
+// file is not an error, so a configuration can name one before `shaodesk import` writes it.
 void include_theme(lua_State *L, const std::filesystem::path &directory) {
     table(L, -1, "configuration result");
     auto path = theme_path(L, directory);
@@ -1686,10 +1686,10 @@ void include_theme(lua_State *L, const std::filesystem::path &directory) {
     merge(L, -2, -1);
     lua_pop(L, 1);
 }
-// The shipped default configuration: $SHAODE_DEFAULT_CONFIG, else the installed one.
+// The shipped default configuration: $SHAODESK_DEFAULT_CONFIG, else the installed one.
 std::filesystem::path default_config_path() {
-    const auto *variable = std::getenv("SHAODE_DEFAULT_CONFIG");
-    return variable && *variable ? variable : SHAODE_DEFAULT_CONFIG;
+    const auto *variable = std::getenv("SHAODESK_DEFAULT_CONFIG");
+    return variable && *variable ? variable : SHAODESK_DEFAULT_CONFIG;
 }
 // `extends = "default"` layers the configuration, theme included, over the shipped default
 // configuration: every setting it leaves out comes from there, its bindings go first, and the
@@ -1746,7 +1746,7 @@ size_t include_defaults(lua_State *L) {
 // Sections a profile may set: how the desktop looks, not how it behaves.
 const std::vector<std::string> profile_sections = {"appearance", "windows", "shell"};
 constexpr size_t max_profiles = 32;
-// Names travel through `shaode msg profile NAME`, so they hold no spaces; "next" and "prev"
+// Names travel through `shaodesk msg profile NAME`, so they hold no spaces; "next" and "prev"
 // mean the neighbouring profile there.
 bool valid_profile_name(const std::string &name) {
     if (name.empty() || name.size() > 32 || name == "next" || name == "prev")
@@ -1966,7 +1966,7 @@ std::filesystem::path profile_state_path() {
         state = std::filesystem::path(home) / ".local/state";
     else
         return {};
-    return state / "shaode/profile";
+    return state / "shaodesk/profile";
 }
 
 std::string saved_profile() {
@@ -2009,7 +2009,7 @@ Config load_config_or_default(const std::filesystem::path &path, std::string &er
         error = failure.what();
     }
     for (const std::filesystem::path fallback : {default_config_path(),
-                                                  std::filesystem::path(SHAODE_SOURCE_CONFIG)}) {
+                                                  std::filesystem::path(SHAODESK_SOURCE_CONFIG)}) {
         std::error_code failure;
         if (!std::filesystem::exists(fallback, failure) ||
             std::filesystem::equivalent(fallback, path, failure))
@@ -2039,4 +2039,4 @@ std::optional<std::vector<std::string>> shadowed_settings(const std::filesystem:
     std::sort(result.begin(), result.end());
     return result;
 }
-} // namespace shaode
+} // namespace shaodesk

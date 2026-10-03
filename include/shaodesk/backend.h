@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "shaode/curve.h"
+#include "shaodesk/curve.h"
 
 #ifdef __cplusplus
 extern "C" {

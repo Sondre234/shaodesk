@@ -7,7 +7,7 @@ namespace {
 struct Action {
     const char *name, *title;
 };
-// The compositor actions the palette offers, run as `shaode msg NAME`.
+// The compositor actions the palette offers, run as `shaodesk msg NAME`.
 constexpr Action actions[] = {
     {"toggle_tiling", "Toggle tiling"},
     {"layout_next", "Next tiling layout"},

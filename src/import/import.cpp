@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Translates what the readers found into shaoDe settings and writes theme.lua.
-#include "shaode/import.hpp"
+// Translates what the readers found into shaodesk settings and writes theme.lua.
+#include "shaodesk/import.hpp"
 
 #include "common.hpp"
-#include "shaode/config.hpp"
+#include "shaodesk/config.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -12,7 +12,7 @@
 #include <set>
 #include <stdexcept>
 
-namespace shaode {
+namespace shaodesk {
 namespace {
 using namespace import;
 
@@ -37,7 +37,7 @@ std::string number(double value) {
     auto end = std::to_chars(text, text + sizeof(text), value).ptr;
     std::string result(text, end);
     if (result.find_first_of(".e") == std::string::npos && std::abs(value) < 1e15)
-        result += ".0"; // keep it a float: shaoDe checks integers strictly
+        result += ".0"; // keep it a float: shaodesk checks integers strictly
     return result;
 }
 std::string lower(std::string text) {
@@ -225,20 +225,20 @@ class Translator {
         if (auto *rounding = option("decoration:rounding");
             rounding && parse_number(rounding->text).value_or(0) > 0)
             report_.skip(files_, rounding->origin,
-                         "rounded corners need a renderer shaoDe lacks so far");
+                         "rounded corners need a renderer shaodesk lacks so far");
         for (const char *effect : {"blur", "shadow"}) {
             auto prefix = std::string("decoration:") + effect + ":";
             if (auto *enabled = option(prefix + "enabled");
                 enabled && parse_bool(enabled->text).value_or(false))
                 report_.skip(files_, enabled->origin,
-                             std::string(effect) + " needs a renderer shaoDe lacks so far");
+                             std::string(effect) + " needs a renderer shaodesk lacks so far");
             for (const auto &[name, value] : hypr.options)
                 if (name.starts_with(prefix))
                     used_.insert(name);
         }
         used_.insert("decoration:rounding_power");
         flag("animations:enabled", {"animations", "enabled"});
-        // Hyprland focuses an activating window only when asked; shaoDe marks it urgent instead
+        // Hyprland focuses an activating window only when asked; shaodesk marks it urgent instead
         // unless windows.activation says "focus".
         if (auto *value = option("misc:focus_on_activate")) {
             if (auto parsed = parse_bool(value->text)) {
@@ -292,7 +292,7 @@ class Translator {
             std::string list;
             for (const auto &name : unused)
                 list += (list.empty() ? "" : ", ") + name;
-            report_.skip(files_, {hypr.file, 0}, "no shaoDe equivalent: " + list);
+            report_.skip(files_, {hypr.file, 0}, "no shaodesk equivalent: " + list);
         }
     }
 
@@ -308,7 +308,7 @@ class Translator {
             auto parsed = parse_number(value->text);
             if (!parsed || *parsed < min || *parsed > max)
                 report_.skip(files_, value->origin,
-                             std::string(key) + " " + value->text + " is outside shaoDe's " +
+                             std::string(key) + " " + value->text + " is outside shaodesk's " +
                                  std::to_string(min) + " to " + std::to_string(max));
             else
                 theme_.set(std::move(path), std::to_string(std::lround(*parsed)), value->origin);
@@ -404,7 +404,7 @@ class Translator {
         auto result = std::lround(*parsed) * factor;
         if (result < min || result > max) {
             report_.skip(files_, value->origin,
-                         std::string(name) + " = " + value->text + " is outside shaoDe's range");
+                         std::string(name) + " = " + value->text + " is outside shaodesk's range");
             return;
         }
         theme_.set(std::move(path), std::to_string(result), value->origin, std::move(note));
@@ -445,7 +445,7 @@ class Translator {
         if (name.empty()) {
             report_.skip(
                 files_, item.origin,
-                "the rule for unlisted monitors: shaoDe already gives them their preferred mode");
+                "the rule for unlisted monitors: shaodesk already gives them their preferred mode");
             return;
         }
         if (name.size() >= 32 && !name.starts_with("desc:")) {
@@ -550,17 +550,17 @@ class Translator {
             if (pattern.empty() || other_match) {
                 report_.skip(
                     files_, item.origin,
-                    "opacity rule matches more than the app ID; shaoDe's rules match app IDs only");
+                    "opacity rule matches more than the app ID; shaodesk's rules match app IDs only");
                 continue;
             }
-            // Hyprland matches the whole class; shaoDe searches, so anchor it.
+            // Hyprland matches the whole class; shaodesk searches, so anchor it.
             if (!pattern.starts_with("^") || !pattern.ends_with("$"))
                 pattern = "^(?:" + pattern + ")$";
             try {
                 std::regex check(pattern, std::regex::ECMAScript);
             } catch (const std::regex_error &) {
                 report_.skip(files_, item.origin,
-                             "class pattern " + pattern + " is not a regex shaoDe understands");
+                             "class pattern " + pattern + " is not a regex shaodesk understands");
                 continue;
             }
             std::vector<double> values;
@@ -571,7 +571,7 @@ class Translator {
                 (values.size() > 1 && (values[1] < 0.05 || values[1] > 1))) {
                 report_.skip(files_, item.origin,
                              "opacity " + opacity->second +
-                                 ": shaoDe keeps windows from 5% to 100% opaque");
+                                 ": shaodesk keeps windows from 5% to 100% opaque");
                 continue;
             }
             if (list.empty())
@@ -648,7 +648,7 @@ std::string render(const Theme &theme, const Files &files) {
         return std::find(sections.begin(), sections.end(), a.key) <
                std::find(sections.begin(), sections.end(), b.key);
     });
-    std::string out = "-- Generated by `shaode import " + files.show({files.source(), 0}) +
+    std::string out = "-- Generated by `shaodesk import " + files.show({files.source(), 0}) +
                       "`. Reimporting replaces this file;\n"
                       "-- init.lua loads it with theme = \"theme.lua\" and overrides any of it.\n"
                       "return {\n";
@@ -714,8 +714,8 @@ ImportResult import_dotfiles(const std::filesystem::path &directory) {
         std::string list;
         for (const auto &[what, count] : report.ignored)
             list += (list.empty() ? "" : ", ") + what + " (" + std::to_string(count) + ")";
-        out += "Left to shaoDe's own configuration: " + list + "\n";
+        out += "Left to shaodesk's own configuration: " + list + "\n";
     }
     return result;
 }
-} // namespace shaode
+} // namespace shaodesk

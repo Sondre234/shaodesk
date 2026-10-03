@@ -25,7 +25,7 @@ CONFIG = """return {
     shell = { panel_height = 52 },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaode-urgent-shell-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-shell-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(CONFIG)
@@ -64,17 +64,17 @@ with tempfile.TemporaryDirectory(prefix="shaode-urgent-shell-test-") as director
                      "compositor startup")
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)",
                                                compositor_log.read_text())[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)",
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)",
                                              compositor_log.read_text())[1]
             processes.append(subprocess.Popen([shell, "--config", str(config)], env=env,
                                               stdout=shell_out, stderr=shell_out))
-            wait_for(lambda: "shaoDe surface rendered: shaoDe taskbar" in shell_log.read_text(),
+            wait_for(lambda: "shaodesk surface rendered: shaodesk taskbar" in shell_log.read_text(),
                      "the panel rendered")
             clients = {}
             for name in ("Alpha", "Beta"):
                 client = subprocess.Popen(
-                    [probe, "--commands"], env=dict(env, SHAODE_PROBE_TITLE=name,
-                                                    SHAODE_PROBE_APP_ID=name.lower()),
+                    [probe, "--commands"], env=dict(env, SHAODESK_PROBE_TITLE=name,
+                                                    SHAODESK_PROBE_APP_ID=name.lower()),
                     stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, text=True)
                 processes.append(client)
                 clients[name] = client
@@ -107,7 +107,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-urgent-shell-test-") as director
 
             def overview_marks():
                 msg("toggle_overview")
-                harness.wait_for(lambda: "shaoDe overview shown" in shell_log.read_text(),
+                harness.wait_for(lambda: "shaodesk overview shown" in shell_log.read_text(),
                                  processes, "the overview's text", timeout=5)
                 harness.wait_for(lambda: rims() and len(rims()) == 2, processes, "two thumbnails")
                 return None

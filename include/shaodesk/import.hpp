@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <string>
 
-namespace shaode {
+namespace shaodesk {
 struct ImportResult {
     std::string theme;  // Lua source for theme.lua, already validated
     std::string report; // what was imported from where, and what was not
@@ -12,7 +12,7 @@ struct ImportResult {
 };
 
 // Reads the Hyprland, Waybar, wallbash, and pywal files under `directory` (a ~/.config, or a
-// copy of one) and translates their look and hardware settings into a shaoDe theme. Throws
+// copy of one) and translates their look and hardware settings into a shaodesk theme. Throws
 // when the directory has none of them.
 ImportResult import_dotfiles(const std::filesystem::path &directory);
-} // namespace shaode
+} // namespace shaodesk

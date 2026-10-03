@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Appearance profiles: `profiles`, `profile`, and the saved choice.
-#include "shaode/config.hpp"
+#include "shaodesk/config.hpp"
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -14,7 +14,7 @@ static void require(bool condition, const std::string &message) {
 }
 static std::string error_of(const std::string &source) {
     try {
-        (void)shaode::parse_config(source, "@test.lua");
+        (void)shaodesk::parse_config(source, "@test.lua");
     } catch (const std::exception &error) {
         return error.what();
     }
@@ -42,14 +42,14 @@ int main(int, char **argv) {
             },
         )";
         // No profile: the file's own settings, and the names for a picker.
-        auto plain = shaode::parse_config("return {" + profiles + "}");
+        auto plain = shaodesk::parse_config("return {" + profiles + "}");
         require(plain.profile.empty(), "a profile was applied unasked");
         require(plain.profiles == std::vector<std::string>{"high-contrast", "light"},
                 "profile names not sorted");
         require(plain.shell.accent == "#111111" && plain.shell.panel_color == "#151e2c",
                 "settings changed without a profile");
         // `profile` starts with one; its settings replace the file's, the rest stays.
-        auto light = shaode::parse_config("return {profile='light'," + profiles + "}");
+        auto light = shaodesk::parse_config("return {profile='light'," + profiles + "}");
         require(light.profile == "light", "starting profile not used");
         require(light.shell.accent == "#222222" && light.shell.panel_color == "#f0f0f0" &&
                     light.shell.panel_height == 40,
@@ -57,12 +57,12 @@ int main(int, char **argv) {
         require(red(light.settings.background) == 1.0F, "profile background not applied");
         require(light.settings.border_width == 2, "unset profile setting replaced the file's");
         // A chosen profile wins over `profile`; an unknown choice falls back to it.
-        auto chosen = shaode::parse_config("return {profile='light'," + profiles + "}", "config",
+        auto chosen = shaodesk::parse_config("return {profile='light'," + profiles + "}", "config",
                                            {}, "high-contrast");
         require(chosen.profile == "high-contrast" && chosen.shell.text_color == "#ffffff" &&
                     chosen.shell.accent == "#111111",
                 "chosen profile not applied");
-        auto stale = shaode::parse_config("return {profile='light'," + profiles + "}", "config",
+        auto stale = shaodesk::parse_config("return {profile='light'," + profiles + "}", "config",
                                           {}, "gone");
         require(stale.profile == "light", "unknown saved profile not ignored");
         // Mistakes, including in a profile not in use, are found as the file loads.
@@ -78,34 +78,34 @@ int main(int, char **argv) {
         expect("return {profiles={dark={shell={panel_height=500}}}}",
                "profile 'dark': shell.panel_height must be between");
 
-        // load_config takes the saved choice from $XDG_STATE_HOME/shaode/profile.
+        // load_config takes the saved choice from $XDG_STATE_HOME/shaodesk/profile.
         auto directory = std::filesystem::temp_directory_path() /
-                         ("shaode-profiles-" + std::to_string(getpid()));
+                         ("shaodesk-profiles-" + std::to_string(getpid()));
         std::filesystem::create_directories(directory);
         setenv("XDG_STATE_HOME", directory.c_str(), 1);
         auto config = directory / "init.lua";
         std::ofstream(config) << "return {profile='light'," << profiles << "}";
-        require(shaode::load_config(config).profile == "light", "starting profile lost");
-        shaode::save_profile("high-contrast");
-        require(shaode::profile_state_path() == directory / "shaode/profile", "state path");
-        require(shaode::saved_profile() == "high-contrast", "saved profile not read back");
-        require(shaode::load_config(config).profile == "high-contrast",
+        require(shaodesk::load_config(config).profile == "light", "starting profile lost");
+        shaodesk::save_profile("high-contrast");
+        require(shaodesk::profile_state_path() == directory / "shaodesk/profile", "state path");
+        require(shaodesk::saved_profile() == "high-contrast", "saved profile not read back");
+        require(shaodesk::load_config(config).profile == "high-contrast",
                 "saved profile not used");
         // A file that extends the default configuration gets its profiles, unless it has its own;
         // then it offers those alone.
-        setenv("SHAODE_DEFAULT_CONFIG", config.c_str(), 1);
+        setenv("SHAODESK_DEFAULT_CONFIG", config.c_str(), 1);
         auto extending = directory / "extending.lua";
         std::ofstream(extending) << "return {extends='default'}";
-        auto extended = shaode::load_config(extending);
+        auto extended = shaodesk::load_config(extending);
         require(extended.profiles.size() == 2 && extended.profile == "high-contrast" &&
                     extended.shell.text_color == "#ffffff",
                 "profiles of the default configuration not offered");
         std::ofstream(extending) << "return {extends='default', profile='mine', profiles={mine={}}}";
-        auto own = shaode::load_config(extending);
+        auto own = shaodesk::load_config(extending);
         require(own.profiles == std::vector<std::string>{"mine"} && own.profile == "mine",
                 "the default configuration's profiles joined a file's own");
         std::ofstream(extending) << "return {extends='default', profiles={mine={}}}";
-        require(shaode::load_config(extending).profile.empty(),
+        require(shaodesk::load_config(extending).profile.empty(),
                 "the default configuration's profile applied to a file with its own profiles");
         std::filesystem::remove_all(directory);
         (void)argv;

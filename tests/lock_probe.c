@@ -67,7 +67,7 @@ static double now(void) {
 
 static struct wl_buffer *make_buffer(struct probe *probe, int width, int height, uint32_t color) {
     size_t size = (size_t)width * height * 4;
-    int fd = memfd_create("shaode-lock-buffer", MFD_CLOEXEC);
+    int fd = memfd_create("shaodesk-lock-buffer", MFD_CLOEXEC);
     if (fd < 0 || ftruncate(fd, size) != 0)
         die("cannot allocate shm buffer");
     uint32_t *pixels = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
@@ -206,7 +206,7 @@ static void map_window(struct probe *probe) {
     xdg_surface_add_listener(xdg_surface, &window_surface_listener, probe);
     struct xdg_toplevel *toplevel = xdg_surface_get_toplevel(xdg_surface);
     xdg_toplevel_add_listener(toplevel, &window_listener, probe);
-    xdg_toplevel_set_app_id(toplevel, "shaode-lock-probe-window");
+    xdg_toplevel_set_app_id(toplevel, "shaodesk-lock-probe-window");
     wl_surface_commit(surface);
     if (!DISPATCH_UNTIL(probe, probe->window_configured, 5))
         die("window was not configured");

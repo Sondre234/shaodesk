@@ -25,12 +25,12 @@ def config(placement, extra="", tiling="false"):
 }""" % (tiling, ('placement = "%s",' % placement) if placement else "", extra)
 
 
-with tempfile.TemporaryDirectory(prefix="shaode-placement-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-placement-test-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words):
@@ -48,11 +48,11 @@ with tempfile.TemporaryDirectory(prefix="shaode-placement-test-") as directory:
     def wait_for(predicate, message):
         harness.wait_for(predicate, processes, message, detail=lambda: f"windows: {windows()}")
 
-    def open_window(title, *, panel=False, app_id="shaode-probe"):
+    def open_window(title, *, panel=False, app_id="shaodesk-probe"):
         before = len(windows())
         client = subprocess.Popen(
             [probe, "--external-control" if panel else "--window-only"],
-            env=dict(env, SHAODE_PROBE_TITLE=title, SHAODE_PROBE_APP_ID=app_id),
+            env=dict(env, SHAODESK_PROBE_TITLE=title, SHAODESK_PROBE_APP_ID=app_id),
             stdout=subprocess.DEVNULL)
         processes.append(client)
         wait_for(lambda: len(windows()) == before + 1 and title in windows(), f"{title} mapped")
@@ -85,7 +85,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-placement-test-") as directory:
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
 
             # Cascade, as before: 40 px in and 32 px for each window.
             clients = [open_window("A", panel=True)]

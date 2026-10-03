@@ -126,11 +126,11 @@ class SystemStatusTest : public QObject {
     // network namespace of its own (unshare -rn), so it can create an interface without touching
     // the real ones.
     void linkChangePromptsRead() {
-        if (!qEnvironmentVariableIsSet("SHAODE_TEST_NETNS")) {
+        if (!qEnvironmentVariableIsSet("SHAODESK_TEST_NETNS")) {
             QProcess child;
             child.setProcessEnvironment([] {
                 auto env = QProcessEnvironment::systemEnvironment();
-                env.insert("SHAODE_TEST_NETNS", "1");
+                env.insert("SHAODESK_TEST_NETNS", "1");
                 return env;
             }());
             child.start("unshare", {"-rn", QCoreApplication::applicationFilePath(), "linkChangePromptsRead"});
@@ -141,9 +141,9 @@ class SystemStatusTest : public QObject {
             QVERIFY2(child.exitCode() == 0, child.readAllStandardOutput().constData());
             return;
         }
-        if (std::system("ip link add name shaodetest0 type dummy >/dev/null 2>&1") != 0)
+        if (std::system("ip link add name shaodesktest0 type dummy >/dev/null 2>&1") != 0)
             std::exit(77);
-        std::system("ip link del shaodetest0 >/dev/null 2>&1");
+        std::system("ip link del shaodesktest0 >/dev/null 2>&1");
         Sysfs sys;
         sys.interface("eth0", "down");
         SystemStatus status(sys.dir.path(), nullptr, true);
@@ -151,7 +151,7 @@ class SystemStatusTest : public QObject {
         QCOMPARE(status.networkState(), QString("disconnected"));
         QSignalSpy changed(&status, &SystemStatus::changed);
         sys.interface("eth0", "up");
-        QVERIFY(std::system("ip link add name shaodetest0 type dummy >/dev/null 2>&1") == 0);
+        QVERIFY(std::system("ip link add name shaodesktest0 type dummy >/dev/null 2>&1") == 0);
         QVERIFY(changed.wait(3000));
         QCOMPARE(status.networkState(), QString("ethernet"));
     }

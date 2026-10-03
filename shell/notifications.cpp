@@ -242,7 +242,7 @@ QString notificationMarkup(const QString &body) {
 
 NotificationCenter::NotificationCenter(QObject *parent) : QObject(parent), cards_(this), history_(this) {}
 
-void NotificationCenter::configure(const shaode::NotificationsConfig &config) {
+void NotificationCenter::configure(const shaodesk::NotificationsConfig &config) {
     config_ = config;
     if (!configured_) {
         configured_ = true;

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Configuration diagnostics: unknown settings, wrong types, ranges, robustness, and the
 // schema that docs/config-reference.md is generated from.
-#include "shaode/config.hpp"
-#include "shaode/config_schema.hpp"
+#include "shaodesk/config.hpp"
+#include "shaodesk/config_schema.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -18,7 +18,7 @@ void require(bool condition, const std::string &message) {
 // The message the parser gives for `source`; fails the test if it is accepted.
 std::string error_of(const std::string &source, const std::string &name = "@test.lua") {
     try {
-        (void)shaode::parse_config(source, name);
+        (void)shaodesk::parse_config(source, name);
     } catch (const std::exception &error) {
         return error.what();
     }
@@ -47,7 +47,7 @@ std::string wrap(const std::string &path, const std::string &value) {
 }
 bool accepted(const std::string &source) {
     try {
-        (void)shaode::parse_config(source);
+        (void)shaodesk::parse_config(source);
         return true;
     } catch (const std::exception &) {
         return false;
@@ -104,7 +104,7 @@ void locations() {
     require(message.find("test.lua:") == std::string::npos ||
                 message.find("shell.panel_height") != std::string::npos,
             "unexpected location: " + message);
-    auto plain = shaode::parse_config("return {}", "@x.lua");
+    auto plain = shaodesk::parse_config("return {}", "@x.lua");
     (void)plain;
 }
 void wrong_types() {
@@ -126,7 +126,7 @@ void ranges() {
     expect("return {outputs={monitors={X={transform=9}}}}", "between 0 and 7");
 }
 void schema_matches_parser() {
-    auto options = shaode::config_options();
+    auto options = shaodesk::config_options();
     size_t probed = 0, ranged = 0;
     for (const auto &option : options) {
         std::string path = option.path;
@@ -171,21 +171,21 @@ void schema_matches_parser() {
                              "touchpad", "layout", "outputs", "windows", "animations", "bindings",
                              "startup", "shell", "xwayland", "screenshots", "features", "overview", "peek", "night_light", "hot_corners", "zoom", "notifications", "osd", "profile", "profiles", "auto_reload"}) {
         bool found = false;
-        for (const auto *child : shaode::config_children(""))
+        for (const auto *child : shaodesk::config_children(""))
             found = found || std::string(child->path) == name;
         require(found, std::string(name) + " missing from the schema");
     }
-    require(shaode::config_children("").size() == 27, "the schema has an unknown top-level key");
+    require(shaodesk::config_children("").size() == 27, "the schema has an unknown top-level key");
     // A key that is in the schema is accepted by keys(), however deeply nested.
     require(accepted("return {windows={rules={{app_id='x',sticky=true,focus=false}}}}"),
             "rule keys rejected");
-    for (const auto &name : shaode::config_action_names())
-        (void)shaode::parse_action(name);
+    for (const auto &name : shaodesk::config_action_names())
+        (void)shaodesk::parse_action(name);
 }
 void robustness() {
     auto throws = [](const std::string &source) {
         try {
-            (void)shaode::parse_config(source, "@bad.lua");
+            (void)shaodesk::parse_config(source, "@bad.lua");
         } catch (const std::exception &) {
             return;
         }
@@ -213,19 +213,19 @@ void robustness() {
     throws(deep + "1" + std::string(300, '}'));
     // A file that is missing or unreadable is an error, not a crash.
     try {
-        (void)shaode::load_config("/nonexistent/dir/init.lua");
+        (void)shaodesk::load_config("/nonexistent/dir/init.lua");
         throw std::runtime_error("a missing file was accepted");
     } catch (const std::runtime_error &error) {
         require(std::string(error.what()).find("cannot open") != std::string::npos,
                 "missing file message");
     }
     // After any failure the next parse works: no state survives a rejected configuration.
-    require(shaode::parse_config("return {layout={gap=3}}").settings.gap_inner == 3,
+    require(shaodesk::parse_config("return {layout={gap=3}}").settings.gap_inner == 3,
             "parsing after a failure broke");
 }
 void reference_in_sync(const std::string &path) {
-    auto generated = shaode::config_reference_markdown();
-    if (std::getenv("SHAODE_UPDATE_DOCS")) {
+    auto generated = shaodesk::config_reference_markdown();
+    if (std::getenv("SHAODESK_UPDATE_DOCS")) {
         std::ofstream(path, std::ios::binary | std::ios::trunc) << generated;
         std::cout << "wrote " << path << '\n';
         return;
@@ -235,11 +235,11 @@ void reference_in_sync(const std::string &path) {
     std::stringstream text;
     text << file.rdbuf();
     require(text.str() == generated,
-            path + " is out of date; regenerate it with SHAODE_UPDATE_DOCS=1 ctest -R config");
-    for (const auto &option : shaode::config_options())
+            path + " is out of date; regenerate it with SHAODESK_UPDATE_DOCS=1 ctest -R config");
+    for (const auto &option : shaodesk::config_options())
         require(generated.find(std::string("`") + option.path + "`") != std::string::npos,
                 std::string("reference lacks ") + option.path);
-    for (const auto &name : shaode::config_action_names())
+    for (const auto &name : shaodesk::config_action_names())
         require(generated.find("`" + name + "`") != std::string::npos, "reference lacks " + name);
 }
 } // namespace
@@ -247,7 +247,7 @@ void reference_in_sync(const std::string &path) {
 int main(int argc, char **argv) {
     try {
         require(argc == 3, "usage: config_diagnostics_tests EXAMPLE DOCS");
-        setenv("SHAODE_DEFAULT_CONFIG", argv[1], 1); // for extends = "default"
+        setenv("SHAODESK_DEFAULT_CONFIG", argv[1], 1); // for extends = "default"
         unknown_settings();
         locations();
         wrong_types();
@@ -256,7 +256,7 @@ int main(int argc, char **argv) {
         robustness();
         reference_in_sync(argv[2]);
         // The shipped example has no unknown or mistyped setting.
-        (void)shaode::load_config(argv[1]);
+        (void)shaodesk::load_config(argv[1]);
         std::cout << "Configuration diagnostics and reference passed\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';

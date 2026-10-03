@@ -2,7 +2,7 @@
 """The notification daemon and the on-screen display in the shell, end to end: a private session
 bus (a dbus-daemon this test starts and kills) and a headless compositor with the shell. Cards
 appear top right, a click runs the default action, hovering holds the timer, do-not-disturb keeps
-them away, `shaode msg osd` draws the pill, and the bell's history opens. The shell never sees
+them away, `shaodesk msg osd` draws the pill, and the bell's history opens. The shell never sees
 the real session bus."""
 import os
 from pathlib import Path
@@ -34,7 +34,7 @@ CONFIG = """return {
 SCREEN = (2560, 720)  # two outputs side by side; HEADLESS-2 is the one at the origin
 PANEL = (21, 30, 44)  # shell.panel_color
 
-with tempfile.TemporaryDirectory(prefix="shaode-notify-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-notify-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(CONFIG)
@@ -58,7 +58,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-notify-test-") as directory:
                QT_QPA_PLATFORM="wayland", QT_QUICK_BACKEND="software", QT_FORCE_STDERR_LOGGING="1",
                XDG_DATA_HOME=directory, XDG_DATA_DIRS=directory, XDG_STATE_HOME=directory,
                DBUS_SESSION_BUS_ADDRESS=address, WLR_HEADLESS_OUTPUTS="2",
-               SHAODE_SYSFS=str(root / "sys"))
+               SHAODESK_SYSFS=str(root / "sys"))
     env.pop("DISPLAY", None)
     env.pop("WAYLAND_DISPLAY", None)
 
@@ -106,7 +106,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-notify-test-") as directory:
                      "compositor startup")
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)",
                                                compositor_log.read_text())[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)",
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)",
                                              compositor_log.read_text())[1]
             desktop = subprocess.Popen([shell, "--config", str(config)], env=env,
                                        stdout=shell_out, stderr=shell_out)
@@ -114,7 +114,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-notify-test-") as directory:
             wait_for(lambda: "serving org.freedesktop.Notifications" in log(), "the daemon serving")
             info = subprocess.run([notify, "info"], env=env, capture_output=True, text=True,
                                   timeout=10)
-            assert info.stdout.strip() == "shaoDe 1.2", info
+            assert info.stdout.strip() == "shaodesk 1.2", info
 
             watcher = subprocess.Popen([notify, "watch"], env=env, stdout=subprocess.PIPE)
             processes.append(watcher)
@@ -163,7 +163,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-notify-test-") as directory:
             pointer("move", "300", "300")
             first = send("Hi", "--timeout", "0", "--action", "default=Open")
             wait_for(lambda: count("notifications shown on HEADLESS-2") == 1, "the card shown")
-            wait_for(lambda: "shaode-notifications" in layers(), "the card surface mapped")
+            wait_for(lambda: "shaodesk-notifications" in layers(), "the card surface mapped")
             time.sleep(0.5)  # the slide in
             close_to(PANEL, (1200, 60), "a card top right")
             close_to((35, 46, 64), (300, 200), "background elsewhere", tolerance=30)

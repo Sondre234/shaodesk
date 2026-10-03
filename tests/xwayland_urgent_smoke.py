@@ -23,15 +23,15 @@ def settings(activation):
 }}"""
 
 
-X11 = "shaode-x11-probe"
+X11 = "shaodesk-x11-probe"
 
-with tempfile.TemporaryDirectory(prefix="shaode-xurgent-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-xurgent-test-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(settings("urgent"))
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODE_SOCKET"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words):
@@ -65,7 +65,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-xurgent-test-") as directory:
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
             env["DISPLAY"] = re.search(r"XWayland listening on DISPLAY=(\S+)", text)[1]
-            env["SHAODE_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             x = subprocess.Popen([x11_probe, "commands"], env=env, stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE, text=True)
             processes.append(x)
@@ -75,13 +75,13 @@ with tempfile.TemporaryDirectory(prefix="shaode-xurgent-test-") as directory:
             w = subprocess.Popen([wayland_probe, "--commands"], env=env, stdin=subprocess.PIPE,
                                  stdout=subprocess.DEVNULL, text=True)
             processes.append(w)
-            wait_for(lambda: focused() == ["shaode-probe"], "the Wayland window takes focus")
+            wait_for(lambda: focused() == ["shaodesk-probe"], "the Wayland window takes focus")
             assert urgent() == []
 
             # The state message, then the flag in WM_HINTS, each set and cleared by the client.
             tell(x, "demand")
             wait_for(lambda: urgent() == [X11], "demands attention marks the X11 window")
-            assert focused() == ["shaode-probe"]
+            assert focused() == ["shaodesk-probe"]
             tell(x, "undemand")
             wait_for(lambda: urgent() == [], "the client withdraws the demand")
             tell(x, "hint")
@@ -98,20 +98,20 @@ with tempfile.TemporaryDirectory(prefix="shaode-xurgent-test-") as directory:
             time.sleep(.3)
             assert urgent() == []
             tell(x, "undemand")
-            subprocess.run([wayland_probe, "--activate", "shaode-probe"], env=env, check=True,
+            subprocess.run([wayland_probe, "--activate", "shaodesk-probe"], env=env, check=True,
                            timeout=5, stdout=subprocess.DEVNULL)
-            wait_for(lambda: focused() == ["shaode-probe"], "back to the Wayland window")
+            wait_for(lambda: focused() == ["shaodesk-probe"], "back to the Wayland window")
 
             # A window that asked before it mapped and opens without focus (a rule) is urgent from
             # the start.
             quiet = subprocess.Popen([x11_probe, "commands"], env=dict(
-                env, SHAODE_PROBE_URGENT_ON_MAP="1", SHAODE_PROBE_TITLE="Quiet X11"),
+                env, SHAODESK_PROBE_URGENT_ON_MAP="1", SHAODESK_PROBE_TITLE="Quiet X11"),
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
             processes.append(quiet)
             assert "X11 window mapped" in quiet.stdout.readline()
             wait_for(lambda: [r[9] for r in rows("urgent")] == ["Quiet X11"],
                      "the window that asked before it mapped is urgent")
-            assert focused() == ["shaode-probe"]
+            assert focused() == ["shaodesk-probe"]
             msg("focus_urgent")
             wait_for(lambda: [r[9] for r in rows("windows") if r[1] == "1"] == ["Quiet X11"] and
                      urgent() == [], "and focus_urgent takes it")
@@ -119,11 +119,11 @@ with tempfile.TemporaryDirectory(prefix="shaode-xurgent-test-") as directory:
             assert quiet.wait(timeout=10) == 0
             processes.remove(quiet)
             wait_for(lambda: len(rows("windows")) == 2, "the quiet window closed")
-            subprocess.run([wayland_probe, "--activate", "shaode-probe"], env=env, check=True,
+            subprocess.run([wayland_probe, "--activate", "shaodesk-probe"], env=env, check=True,
                            timeout=5, stdout=subprocess.DEVNULL)
-            wait_for(lambda: focused() == ["shaode-probe"], "back to the Wayland window")
+            wait_for(lambda: focused() == ["shaodesk-probe"], "back to the Wayland window")
             msg("focus_urgent")  # nothing urgent left
-            assert focused() == ["shaode-probe"]
+            assert focused() == ["shaodesk-probe"]
 
             # Under "focus" the request focuses it; under "ignore" nothing happens.
             config.write_text(settings("ignore"))
@@ -131,7 +131,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-xurgent-test-") as directory:
             wait_for(lambda: "Configuration reloaded" in log.read_text(), "reload")
             tell(x, "demand")
             time.sleep(.4)
-            assert urgent() == [] and focused() == ["shaode-probe"]
+            assert urgent() == [] and focused() == ["shaodesk-probe"]
             tell(x, "undemand")
             config.write_text(settings("focus"))
             msg("reload")
