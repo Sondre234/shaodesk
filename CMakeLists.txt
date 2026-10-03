@@ -1,0 +1,297 @@
+cmake_minimum_required(VERSION 3.25)
+project(shaoDe VERSION 0.1.0 LANGUAGES C CXX)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+find_package(PkgConfig REQUIRED)
+pkg_search_module(LUA REQUIRED IMPORTED_TARGET lua5.4 lua-5.4 lua54 lua)
+if(LUA_VERSION VERSION_LESS 5.4 OR NOT LUA_VERSION VERSION_LESS 5.5)
+    message(FATAL_ERROR "shaoDe requires Lua 5.4; found ${LUA_VERSION}")
+endif()
+pkg_check_modules(XKB REQUIRED IMPORTED_TARGET xkbcommon)
+include(GNUInstallDirs)
+option(SHAODE_INSTALL_SESSION "Install the experimental display-manager session entry" OFF)
+option(SHAODE_BUILD_SHELL "Build the Qt Quick desktop shell" ON)
+option(SHAODE_SHELL_PREVIEW_ONLY "Build only the shell UI preview without LayerShellQt" OFF)
+
+add_library(shaode_config src/config.cpp src/layout.cpp src/tiling.cpp
+    src/import/common.cpp src/import/hyprland.cpp src/import/waybar.cpp src/import/import.cpp)
+target_include_directories(shaode_config PUBLIC include)
+target_link_libraries(shaode_config PRIVATE PkgConfig::LUA PUBLIC PkgConfig::XKB)
+target_compile_options(shaode_config PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_definitions(shaode_config PRIVATE
+    SHAODE_DEFAULT_CONFIG="${CMAKE_INSTALL_FULL_DATADIR}/shaode/init.lua")
+
+include(CTest)
+if(BUILD_TESTING)
+    # Tests read a copy of the example so a theme.lua generated beside it by `shaode import`
+    # (git-ignored, personal) cannot change what they see.
+    set(EXAMPLE_CONFIG ${CMAKE_CURRENT_BINARY_DIR}/example-config/init.lua)
+    configure_file(config/init.lua ${EXAMPLE_CONFIG} COPYONLY)
+    add_executable(config_tests tests/config_tests.cpp)
+    target_link_libraries(config_tests PRIVATE shaode_config)
+    add_test(NAME config COMMAND config_tests ${EXAMPLE_CONFIG})
+    add_executable(layout_tests tests/layout_tests.cpp)
+    target_link_libraries(layout_tests PRIVATE shaode_config)
+    add_test(NAME layout COMMAND layout_tests)
+    add_executable(tiling_tests tests/tiling_tests.cpp)
+    target_link_libraries(tiling_tests PRIVATE shaode_config)
+    add_test(NAME tiling COMMAND tiling_tests)
+    add_executable(import_tests tests/import_tests.cpp)
+    target_link_libraries(import_tests PRIVATE shaode_config)
+    add_test(NAME import COMMAND import_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/import)
+endif()
+option(SHAODE_BUILD_COMPOSITOR "Build the wlroots compositor" ON)
+if(SHAODE_BUILD_COMPOSITOR)
+    # The wlroots API is unstable. Target one release series deliberately.
+    pkg_check_modules(WLROOTS REQUIRED IMPORTED_TARGET "wlroots-0.20>=0.20.0" "wlroots-0.20<0.21")
+    pkg_check_modules(WAYLAND REQUIRED IMPORTED_TARGET wayland-server)
+    pkg_check_modules(PROTOCOLS REQUIRED wayland-protocols)
+    pkg_get_variable(PROTOCOL_DIR wayland-protocols pkgdatadir)
+    find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
+    set(WLR_PROTOCOL_HEADERS)
+    set(WLR_CLIENT_PROTOCOL_SOURCES)
+    foreach(PROTOCOL wlr-layer-shell-unstable-v1 wlr-foreign-toplevel-management-unstable-v1)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-protocol.h
+            COMMAND ${WAYLAND_SCANNER} server-header
+            ${CMAKE_CURRENT_SOURCE_DIR}/protocols/${PROTOCOL}.xml
+            ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-protocol.h
+            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/protocols/${PROTOCOL}.xml)
+        list(APPEND WLR_PROTOCOL_HEADERS ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-protocol.h)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header
+            ${CMAKE_CURRENT_SOURCE_DIR}/protocols/${PROTOCOL}.xml
+            ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-client-protocol.h
+            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/protocols/${PROTOCOL}.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code
+            ${CMAKE_CURRENT_SOURCE_DIR}/protocols/${PROTOCOL}.xml
+            ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-protocol.c
+            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/protocols/${PROTOCOL}.xml)
+        list(APPEND WLR_CLIENT_PROTOCOL_SOURCES
+            ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-protocol.c)
+    endforeach()
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.h
+        COMMAND ${WAYLAND_SCANNER} server-header
+        ${PROTOCOL_DIR}/stable/xdg-shell/xdg-shell.xml
+        ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.h
+        DEPENDS ${PROTOCOL_DIR}/stable/xdg-shell/xdg-shell.xml)
+    add_executable(shaode src/main.cpp src/backend.c src/decoration.c src/animation.c src/sleep.c
+        ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.h ${WLR_PROTOCOL_HEADERS})
+    target_include_directories(shaode PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+    target_compile_definitions(shaode PRIVATE WLR_USE_UNSTABLE)
+    target_compile_definitions(shaode PRIVATE
+        SHAODE_VERSION="${PROJECT_VERSION}"
+        SHAODE_DEFAULT_CONFIG="${CMAKE_INSTALL_FULL_DATADIR}/shaode/init.lua")
+    target_compile_options(shaode PRIVATE -Wall -Wextra -Wno-unused-parameter)
+    target_link_libraries(shaode PRIVATE shaode_config PkgConfig::WLROOTS PkgConfig::WAYLAND m)
+    # A standalone session keeps the machine awake through logind while it is on screen.
+    pkg_search_module(SDBUS IMPORTED_TARGET libsystemd libelogind basu)
+    if(SDBUS_FOUND)
+        string(TOUPPER ${SDBUS_MODULE_NAME} SHAODE_SDBUS)
+        string(REPLACE "LIB" "" SHAODE_SDBUS ${SHAODE_SDBUS})
+        target_compile_definitions(shaode PRIVATE SHAODE_SDBUS_${SHAODE_SDBUS}=1)
+        target_link_libraries(shaode PRIVATE PkgConfig::SDBUS)
+    else()
+        message(STATUS "No sd-bus (libsystemd, libelogind, basu); other desktops may suspend "
+            "the machine while shaoDe is on screen")
+    endif()
+    # X11 support follows the wlroots build; the XWM waker needs xcb directly.
+    find_file(SHAODE_WLR_CONFIG_H wlr/config.h PATHS ${WLROOTS_INCLUDE_DIRS} NO_DEFAULT_PATH)
+    file(READ ${SHAODE_WLR_CONFIG_H} SHAODE_WLR_CONFIG)
+    if(SHAODE_WLR_CONFIG MATCHES "WLR_HAS_XWAYLAND 1")
+        # Unpatched wlroots strands X events; see packaging/patches/wlroots-xwm-drain.patch.
+        option(SHAODE_XWM_WAKER "Nudge wlroots' X11 window manager (off only for patched wlroots)" ON)
+        pkg_check_modules(XCB REQUIRED IMPORTED_TARGET xcb)
+        target_link_libraries(shaode PRIVATE PkgConfig::XCB)
+        if(SHAODE_XWM_WAKER)
+            pkg_check_modules(XCB_XFIXES REQUIRED IMPORTED_TARGET xcb-xfixes)
+            target_link_libraries(shaode PRIVATE PkgConfig::XCB_XFIXES)
+            target_compile_definitions(shaode PRIVATE SHAODE_XWM_WAKER=1)
+        endif()
+        set(SHAODE_HAS_XWAYLAND ON)
+    else()
+        message(STATUS "wlroots lacks XWayland support; X11 applications will not run")
+    endif()
+    # Pointer settings reach libinput devices directly (standalone sessions only).
+    if(SHAODE_WLR_CONFIG MATCHES "WLR_HAS_LIBINPUT_BACKEND 1")
+        pkg_check_modules(LIBINPUT REQUIRED IMPORTED_TARGET libinput)
+        target_link_libraries(shaode PRIVATE PkgConfig::LIBINPUT)
+    endif()
+    install(TARGETS shaode RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(FILES config/init.lua DESTINATION ${CMAKE_INSTALL_DATADIR}/shaode)
+    install(FILES README.md docs/gentoo.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+    install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/shaode)
+    install(FILES vendor/tinywl/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/shaode
+        RENAME TinyWL-LICENSE)
+    install(DIRECTORY protocols/ DESTINATION ${CMAKE_INSTALL_DATADIR}/shaode/protocols)
+    install(FILES packaging/shaode-portals.conf
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/xdg-desktop-portal)
+    if(SHAODE_INSTALL_SESSION)
+        configure_file(packaging/shaode.desktop.in shaode.desktop @ONLY)
+        install(FILES ${CMAKE_CURRENT_BINARY_DIR}/shaode.desktop
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/wayland-sessions)
+    endif()
+    if(SHAODE_BUILD_SHELL)
+        add_subdirectory(shell)
+        if(NOT SHAODE_SHELL_PREVIEW_ONLY)
+            target_compile_definitions(shaode PRIVATE SHAODE_HAS_SHELL=1)
+        endif()
+    endif()
+    if(BUILD_TESTING)
+        find_package(Python3 COMPONENTS Interpreter REQUIRED)
+        pkg_check_modules(WAYLAND_CLIENT REQUIRED IMPORTED_TARGET wayland-client)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header
+            ${PROTOCOL_DIR}/stable/xdg-shell/xdg-shell.xml
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client-protocol.h
+            DEPENDS ${PROTOCOL_DIR}/stable/xdg-shell/xdg-shell.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code
+            ${PROTOCOL_DIR}/stable/xdg-shell/xdg-shell.xml
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.c
+            DEPENDS ${PROTOCOL_DIR}/stable/xdg-shell/xdg-shell.xml)
+        add_executable(wayland_probe tests/wayland_probe.c
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.c ${WLR_CLIENT_PROTOCOL_SOURCES})
+        target_include_directories(wayland_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        target_link_libraries(wayland_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
+        target_compile_options(wayland_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        add_test(NAME compositor_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/compositor_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>
+            ${EXAMPLE_CONFIG})
+        set_tests_properties(compositor_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME workspaces COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/workspace_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>
+            ${EXAMPLE_CONFIG})
+        set_tests_properties(workspaces PROPERTIES TIMEOUT 60)
+        add_test(NAME sticky_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/sticky_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>
+            ${EXAMPLE_CONFIG})
+        set_tests_properties(sticky_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME workspace_back_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/workspace_back_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(workspace_back_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME tiling_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/tiling_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>
+            ${EXAMPLE_CONFIG})
+        set_tests_properties(tiling_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME tiling_open_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/tiling_open_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>
+            ${EXAMPLE_CONFIG})
+        set_tests_properties(tiling_open_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME screenshot_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/screenshot_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>
+            ${EXAMPLE_CONFIG})
+        set_tests_properties(screenshot_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME output_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(output_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME output_tiling_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_tiling_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(output_tiling_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME per_output_tiling_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/per_output_tiling_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(per_output_tiling_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME move_window_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/move_window_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(move_window_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME focus_output_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/focus_output_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(focus_output_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME switcher_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/switcher_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(switcher_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME scratchpad_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/scratchpad_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(scratchpad_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME tile_focus_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/tile_focus_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(tile_focus_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME keyboard_resize_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/keyboard_resize_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(keyboard_resize_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME window_style_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_style_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(window_style_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME window_rules_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_rules_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(window_rules_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME output_workspace_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_workspace_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(output_workspace_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME output_follow_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_follow_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(output_follow_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME animation_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/animation_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(animation_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME fullscreen_panel_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/fullscreen_panel_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(fullscreen_panel_smoke PROPERTIES TIMEOUT 60)
+        set(LOCK_XML ${PROTOCOL_DIR}/staging/ext-session-lock/ext-session-lock-v1.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/ext-session-lock-v1-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header ${LOCK_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/ext-session-lock-v1-client-protocol.h
+            DEPENDS ${LOCK_XML})
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/ext-session-lock-v1-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code ${LOCK_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/ext-session-lock-v1-protocol.c
+            DEPENDS ${LOCK_XML})
+        add_executable(lock_probe tests/lock_probe.c
+            ${CMAKE_CURRENT_BINARY_DIR}/ext-session-lock-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/ext-session-lock-v1-protocol.c
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.c)
+        target_include_directories(lock_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        target_link_libraries(lock_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
+        target_compile_options(lock_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        add_test(NAME session_lock COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/lock_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:lock_probe>
+            ${EXAMPLE_CONFIG})
+        set_tests_properties(session_lock PROPERTIES TIMEOUT 60)
+        # XWayland coverage needs wlroots built with X support and an Xwayland binary.
+        find_program(XWAYLAND_BINARY Xwayland)
+        if(SHAODE_HAS_XWAYLAND AND XWAYLAND_BINARY)
+            add_executable(x11_probe tests/x11_probe.c)
+            target_link_libraries(x11_probe PRIVATE PkgConfig::XCB)
+            target_compile_options(x11_probe PRIVATE -Wall -Wextra)
+            add_test(NAME xwayland_smoke COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/xwayland_smoke.py
+                $<TARGET_FILE:shaode> $<TARGET_FILE:x11_probe> $<TARGET_FILE:wayland_probe>
+                ${EXAMPLE_CONFIG})
+            set_tests_properties(xwayland_smoke PROPERTIES TIMEOUT 60)
+        else()
+            message(STATUS "XWayland test skipped: needs an Xwayland binary and wlroots X support")
+        endif()
+    endif()
+endif()

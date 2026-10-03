@@ -1,0 +1,79 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+import QtQuick
+
+// The window switcher: every window's icon and title in a grid, most recently focused first,
+// with the selected one's full title and place below. A click picks a window.
+Rectangle {
+    id: switcher
+    readonly property var windows: shell.switcherWindows
+    readonly property int cell: 132
+    readonly property int padding: 16
+    readonly property string uiFont: shell.fontFamily.length > 0 ? shell.fontFamily : Qt.application.font.family
+    // As many columns as fit in most of the output's width, and rows up to most of its height;
+    // the grid scrolls to the selection past that.
+    readonly property int columns: Math.max(1, Math.min(windows.length, Math.floor((screenSize.width * 0.9 - 2 * padding) / cell)))
+    readonly property int rows: Math.max(1, Math.min(Math.ceil(windows.length / columns), Math.floor((screenSize.height * 0.8 - 2 * padding - 48) / cell)))
+    readonly property var current: windows[shell.switcherSelected] || ({})
+    width: columns * cell + 2 * padding
+    height: rows * cell + 2 * padding + caption.height + 8
+    radius: 14
+    color: shell.panelColor
+    border.color: Qt.lighter(shell.panelColor, 1.6)
+
+    GridView {
+        id: grid
+        objectName: "switcherGrid"
+        x: switcher.padding; y: switcher.padding
+        width: switcher.columns * switcher.cell; height: switcher.rows * switcher.cell
+        cellWidth: switcher.cell; cellHeight: switcher.cell
+        interactive: false
+        clip: true
+        model: switcher.windows
+        currentIndex: shell.switcherSelected
+        highlightMoveDuration: 0
+        highlight: Rectangle {
+            radius: 10
+            color: Qt.rgba(shell.accent.r, shell.accent.g, shell.accent.b, 0.28)
+            border.color: shell.accent; border.width: 2
+        }
+        delegate: Item {
+            id: entry
+            required property var modelData
+            required property int index
+            width: switcher.cell; height: switcher.cell
+            opacity: modelData.minimized ? 0.6 : 1
+            Image {
+                id: icon
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: 18; width: 56; height: 56; sourceSize: Qt.size(56, 56)
+                source: "image://icons/" + shell.iconFor(entry.modelData.appId)
+            }
+            Text {
+                anchors.top: icon.bottom; anchors.topMargin: 8
+                anchors.left: parent.left; anchors.right: parent.right; anchors.margins: 8
+                text: entry.modelData.title.length > 0 ? entry.modelData.title : entry.modelData.appId
+                color: shell.textColor; font.family: switcher.uiFont; font.pixelSize: 12
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
+            }
+            MouseArea { anchors.fill: parent; onClicked: shell.switcherPick(entry.index) }
+        }
+    }
+    Column {
+        id: caption
+        anchors.top: grid.bottom; anchors.topMargin: 8
+        x: switcher.padding; width: switcher.width - 2 * switcher.padding
+        Text {
+            width: parent.width
+            text: switcher.current.title || switcher.current.appId || ""
+            color: shell.textColor; font.family: switcher.uiFont; font.pixelSize: 14; font.bold: true
+            horizontalAlignment: Text.AlignHCenter; elide: Text.ElideMiddle
+        }
+        Text {
+            width: parent.width
+            text: switcher.current.output ? "Workspace " + switcher.current.workspace + " on " + switcher.current.output + (switcher.current.minimized ? " · minimized" : "") : ""
+            color: shell.textColor; opacity: 0.65; font.family: switcher.uiFont; font.pixelSize: 12
+            horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight
+        }
+    }
+}

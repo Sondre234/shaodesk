@@ -1,0 +1,231 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#pragma once
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* No wlroots types cross this boundary. C++ owns configuration and policy. */
+enum sh_action {
+    SH_NONE,
+    SH_HANDLED,
+    SH_QUIT,
+    SH_CLOSE,
+    SH_CYCLE,
+    SH_SNAP_LEFT,
+    SH_SNAP_RIGHT,
+    SH_MAXIMIZE,
+    SH_RESTORE,
+    SH_TILE,
+    SH_RELOAD,
+    SH_FULLSCREEN,
+    SH_WORKSPACE,         /* argument: workspace number, from 1 */
+    SH_MOVE_TO_WORKSPACE, /* argument: workspace number, from 1 */
+    SH_WORKSPACE_NEXT,
+    SH_WORKSPACE_PREV,
+    SH_TOGGLE_TILING,
+    SH_TOGGLE_FLOATING,
+    SH_LAUNCHER, /* asks the shell to toggle its application menu */
+    SH_FOCUS_LEFT,
+    SH_FOCUS_RIGHT,
+    SH_FOCUS_UP,
+    SH_FOCUS_DOWN,
+    SH_SCREENSHOT, /* argument: enum sh_screenshot_mode */
+    /* Hyprland's movewindow: a tile trades places with its neighbour, a floating window moves
+     * to the edge of its output, and either one moves on to the next output from there. */
+    SH_MOVE_LEFT,
+    SH_MOVE_RIGHT,
+    SH_MOVE_UP,
+    SH_MOVE_DOWN,
+    SH_WORKSPACE_BACK, /* the output's previously shown workspace, as sway's back_and_forth */
+    /* Sway's scratchpad: hide the focused window there, or show (and cycle) the hidden ones. */
+    SH_MOVE_TO_SCRATCHPAD,
+    SH_SCRATCHPAD_SHOW,
+    /* As sway's sticky: the window floats and shows on every workspace of its output. */
+    SH_TOGGLE_STICKY,
+    /* Keyboard resizing, argument: pixels. A tile's split on that side moves that way (else the
+     * one on the opposite side); a floating window's right or bottom edge moves that way. */
+    SH_RESIZE_LEFT,
+    SH_RESIZE_RIGHT,
+    SH_RESIZE_UP,
+    SH_RESIZE_DOWN,
+    /* The window switcher (Alt+Tab) over every window on every output and workspace, most
+     * recently focused first: opens on the focused output, or selects the next or previous
+     * window while open. Bound to a key, it focuses the selected window once the binding's
+     * modifiers are released; opened from the control socket, it waits for switcher_confirm. */
+    SH_SWITCHER_NEXT,
+    SH_SWITCHER_PREV,
+    SH_SWITCHER_CONFIRM, /* argument: the window's place in the list from 1, or 0: the selected */
+    SH_SWITCHER_CANCEL,
+};
+
+enum sh_screenshot_mode {
+    SH_SCREENSHOT_REGION, /* the user selects it with slurp */
+    SH_SCREENSHOT_OUTPUT, /* the output under the pointer */
+    SH_SCREENSHOT_WINDOW, /* the focused window */
+};
+
+/* Modifier and edge bits intentionally match wlroots, without importing its headers. */
+enum sh_modifier { SH_SHIFT = 1, SH_CTRL = 4, SH_ALT = 8, SH_LOGO = 64 };
+enum sh_edge { SH_EDGE_TOP = 1, SH_EDGE_BOTTOM = 2, SH_EDGE_LEFT = 4, SH_EDGE_RIGHT = 8 };
+
+/* Settings for one output, matched by connector name, or by "desc:" and the start of its
+ * "make model serial". Zero fields keep the defaults. */
+struct sh_monitor {
+    char name[128];
+    bool enabled;
+    int width, height; /* 0: the preferred resolution */
+    int refresh;       /* mHz; 0: the fastest at that resolution */
+    float scale;       /* 0: 1 */
+    bool positioned;   /* x, y are layout coordinates before the primary output shift */
+    int x, y;
+    int transform; /* enum wl_output_transform, which Hyprland's numbering matches */
+    bool vrr;      /* adaptive sync, where the monitor supports it */
+    int tiling;    /* automatic tiling: -1 follows sh_settings.tiling, else 0 or 1 */
+};
+
+struct sh_settings {
+    float background[4];
+    uint32_t mouse_modifier;
+    int repeat_rate;
+    int repeat_delay;
+    int gap_inner; /* between neighbouring windows */
+    int gap_outer; /* between windows and the edges of the usable area */
+    char keyboard_layout[128];
+    char keyboard_options[128];
+    bool xwayland; /* read at startup; changing it needs a restart */
+    bool tiling;   /* automatic tiling on outputs without their own; toggled per output */
+    int workspaces;
+    /* Outputs named here sit left to right in this order; others follow as they appear.
+     * The primary output (or the leftmost, if unnamed) sits at the layout origin. */
+    char output_order[8][32];
+    int output_count;
+    char primary_output[32];
+    struct sh_monitor monitors[8];
+    int monitor_count;
+    /* Drawn outside each window's geometry; placed windows shrink to keep it in their slot. */
+    int border_width;
+    float border_active[4], border_inactive[4]; /* premultiplied RGBA */
+    /* Pointer devices (libinput only). A negative value keeps the device's own default. */
+    double pointer_speed; /* -1 to 1; used when pointer_speed_set */
+    bool pointer_speed_set;
+    int pointer_accel;        /* -1 default, 0 flat, 1 adaptive */
+    int mouse_natural_scroll; /* -1, 0, 1 */
+    int touchpad_natural_scroll, touchpad_tap, touchpad_dwt;
+    bool focus_follows_mouse; /* hovering a window focuses it, without raising it */
+    bool animations;          /* windows fade in and out, and tiles glide into place */
+    int animation_duration;   /* milliseconds */
+    /* features.workspace_back_and_forth: SH_WORKSPACE naming the workspace already shown
+     * switches back to the previous one, as sway's workspace_auto_back_and_forth. */
+    bool workspace_back_and_forth;
+    /* Lua `features`: optional behaviour that can be switched off. */
+    bool scratchpad; /* move_to_scratchpad and scratchpad_show */
+    /* features.sticky: toggle_sticky pins windows to every workspace of their output. Off
+     * unsticks every sticky window. */
+    bool sticky;
+    bool keyboard_resize; /* features.keyboard_resize: the resize_* actions */
+    /* features.window_rules: the actions of windows.rules (see sh_window_rule). Opacity rules
+     * apply either way. */
+    bool window_rules;
+};
+
+/* What a mouse button was pressed over. */
+enum sh_pointer_target {
+    SH_POINTER_WINDOW,
+    SH_POINTER_DESKTOP, /* no window, panel, or other surface but the wallpaper */
+    SH_POINTER_OTHER,   /* a panel, bar, or other layer surface */
+};
+
+/* What windows.rules decide for a window as it opens. */
+enum sh_rule_position { SH_RULE_POSITION_UNSET, SH_RULE_POSITION_CENTER, SH_RULE_POSITION_AT };
+struct sh_window_rule {
+    int floating;      /* -1 unset, 0 tile, 1 float */
+    int workspace;     /* from 1; 0 unset */
+    char output[128];  /* connector, or "desc:" and the start of "make model serial"; "" unset */
+    int width, height; /* 0 unset */
+    enum sh_rule_position position;
+    int x, y; /* with SH_RULE_POSITION_AT, from the top-left of the output's usable area */
+    bool fullscreen, maximize;
+    bool no_focus;
+    bool sticky; /* only with features.sticky */
+};
+
+struct sh_rect;
+struct sh_callbacks {
+    void *userdata;
+    const struct sh_settings *(*settings)(void *);
+    /* Returns the bound action; *argument receives its numeric argument, if any. */
+    enum sh_action (*key)(void *, uint32_t modifiers, uint32_t keysym, int *argument);
+    /* The same for a pressed mouse button (a Linux BTN_* code) over `target`; `app_id` is the
+     * window's, or "". SH_NONE leaves the click to the application. */
+    enum sh_action (*button)(void *, uint32_t modifiers, uint32_t button,
+                             enum sh_pointer_target target, const char *app_id, int *argument);
+    /* Parses a control-socket request into an action; SH_NONE with a message on error. */
+    enum sh_action (*command)(void *, const char *request, int *argument, char *error,
+                              size_t error_size);
+    bool (*reload)(void *);
+    void (*startup)(void *);
+    void (*child_exited)(void *, int pid);
+    /* Opacity for a window with this app ID and title (either may be ""), focused or not. */
+    float (*opacity)(void *, const char *app_id, const char *title, bool active);
+    /* Captures the screen in the background: `output` names the output for
+     * SH_SCREENSHOT_OUTPUT, `box` is the window in layout coordinates for SH_SCREENSHOT_WINDOW.
+     * Returns false with a message when it cannot start. */
+    bool (*screenshot)(void *, enum sh_screenshot_mode mode, const char *output,
+                       const struct sh_rect *box, char *error, size_t error_size);
+    /* The rules for a window opening with this app ID and title (either may be ""). Returns
+     * false, leaving `rule` unset, when none applies. */
+    bool (*window_rule)(void *, const char *app_id, const char *title,
+                        struct sh_window_rule *rule);
+};
+
+enum sh_backend_mode { SH_BACKEND_NESTED, SH_BACKEND_HEADLESS, SH_BACKEND_SESSION };
+int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode);
+
+struct sh_rect {
+    int x, y, width, height;
+};
+bool sh_placement(enum sh_action action, struct sh_rect area, int gap, int index, int count,
+                  struct sh_rect *result);
+
+/* Automatic tiling in the style of Hyprland's dwindle layout: one binary split tree per output
+ * name and workspace. Each split divides its box along the longer side; a new window splits an
+ * existing one. Windows are opaque pointers owned by the caller. */
+struct sh_tiling;
+struct sh_tiling *sh_tiling_create(void);
+void sh_tiling_destroy(struct sh_tiling *tiling);
+/* Splits `target` if it is tiled, else the window last arranged under the point (with
+ * has_point), else the newest window of that tree. With a point inside the split window, the new
+ * window takes the half nearer the point; otherwise the right or bottom half. */
+void sh_tiling_insert(struct sh_tiling *tiling, const char *output, int workspace, void *window,
+                      const void *target, bool has_point, double x, double y);
+void sh_tiling_remove(struct sh_tiling *tiling, const void *window);
+/* The output name of the window's tree, or NULL when it is not tiled. */
+const char *sh_tiling_output(const struct sh_tiling *tiling, const void *window);
+typedef void (*sh_tile_place)(void *userdata, void *window, struct sh_rect rect);
+void sh_tiling_arrange(struct sh_tiling *tiling, const char *output, int workspace,
+                       struct sh_rect area, int gap, sh_tile_place place, void *userdata);
+/* The tile `window` would get from sh_tiling_insert and sh_tiling_arrange with these arguments,
+ * leaving the tree as it was. False when the window is already tiled or the area is empty. */
+bool sh_tiling_preview(struct sh_tiling *tiling, const char *output, int workspace, void *window,
+                       const void *target, bool has_point, double x, double y, struct sh_rect area,
+                       int gap, struct sh_rect *result);
+/* Moves the splits beside the window's given edges (enum sh_edge bits) to those edges of
+ * `rect`, in the coordinates of the last arrangement. Returns whether anything changed. */
+bool sh_tiling_resize(struct sh_tiling *tiling, const void *window, uint32_t edges,
+                      struct sh_rect rect);
+/* Keyboard resizing: moves one split beside the window `amount` pixels toward `direction` (one
+ * enum sh_edge bit). The split on that side of the window moves outward, growing it; a window
+ * with no split on that side (at the edge of its output) moves the one on the opposite side
+ * instead, shrinking it. Splits keep the limits of sh_tiling_resize. Returns whether anything
+ * changed. */
+bool sh_tiling_resize_by(struct sh_tiling *tiling, const void *window, uint32_t direction,
+                         int amount);
+
+#ifdef __cplusplus
+}
+#endif

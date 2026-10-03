@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#pragma once
+#include <QPointer>
+#include <QSortFilterProxyModel>
+
+class ShellController;
+// The windows that belong in one taskbar slot: those of the pinned application `app`, or, when
+// `app` is empty, every window no pinned application takes in. `controller` is the shell.
+// `windowApp`, when set, keeps only the windows with that app id. `grouped` keeps one window per
+// application, the first of them: in a pinned slot the whole slot is one application; elsewhere
+// windows with the same app id are, and those without one stand alone.
+class TaskFilter : public QSortFilterProxyModel {
+    Q_OBJECT
+    Q_PROPERTY(QObject *controller READ controller WRITE setController NOTIFY controllerChanged)
+    Q_PROPERTY(QString app READ app WRITE setApp NOTIFY appChanged)
+    Q_PROPERTY(QString windowApp READ windowApp WRITE setWindowApp NOTIFY windowAppChanged)
+    Q_PROPERTY(bool grouped READ grouped WRITE setGrouped NOTIFY groupedChanged)
+    Q_PROPERTY(int count READ count NOTIFY countChanged)
+    // The focused window among these, or -1, and whether every one of them is minimized.
+    Q_PROPERTY(int activeTask READ activeTask NOTIFY summaryChanged)
+    Q_PROPERTY(bool minimized READ minimized NOTIFY summaryChanged)
+  public:
+    explicit TaskFilter(QObject *parent = nullptr);
+    QObject *controller() const;
+    void setController(QObject *controller);
+    QString app() const { return app_; }
+    void setApp(const QString &app);
+    QString windowApp() const { return windowApp_; }
+    void setWindowApp(const QString &windowApp);
+    bool grouped() const { return grouped_; }
+    void setGrouped(bool grouped);
+    int count() const { return rowCount(); }
+    void setSourceModel(QAbstractItemModel *source) override;
+    int activeTask() const;
+    bool minimized() const;
+    // The window after the focused one, wrapping around, or the first when none is focused.
+    Q_INVOKABLE int nextTask() const;
+    // Moves within the source model, so dragging reorders the whole task list. Grouped, a
+    // row's windows all move, landing past (or ahead of) every window of the row at `to`.
+    Q_INVOKABLE void move(int from, int to, int count = 1);
+  Q_SIGNALS:
+    void controllerChanged();
+    void appChanged();
+    void windowAppChanged();
+    void groupedChanged();
+    void countChanged();
+    void summaryChanged();
+
+  protected:
+    bool filterAcceptsRow(int row, const QModelIndex &parent) const override;
+
+  private:
+    QPointer<ShellController> shell_;
+    QString app_, windowApp_;
+    bool grouped_ = false;
+    QList<QMetaObject::Connection> sourceConnections_;
+    void refilter();
+    QVariant sourceValue(int row, const char *role) const;
+    bool belongs(int row) const;
+    // The application a source row groups under; empty when it stands alone.
+    QString groupOf(int row) const;
+    int value(int row, const char *role) const;
+};
