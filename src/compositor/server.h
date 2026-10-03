@@ -586,7 +586,6 @@ uint64_t now_ns(void);
 void add_listener(struct wl_signal *signal, struct wl_listener *listener,
                   wl_notify_func_t notify);
 const struct sh_settings *server_settings(struct sh_server *server);
-struct wlr_output *first_output(struct sh_server *server);
 int output_slot(struct sh_server *server, const char *name);
 int *output_workspace(struct sh_server *server, const char *name);
 bool toplevel_visible(struct sh_toplevel *toplevel);
@@ -611,7 +610,6 @@ void focus_top_on(struct sh_server *server, struct wlr_output *output);
 void focus_desktop(struct sh_server *server, struct wlr_output *output);
 void focus_layer(struct sh_layer *layer);
 void minimize_toplevel(struct sh_toplevel *toplevel);
-struct sh_rect usable_area(struct sh_server *server, struct wlr_output *output);
 struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *output);
 struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel);
 struct sh_toplevel *current_toplevel(struct sh_server *server);
@@ -753,6 +751,8 @@ void output_config_test(struct wl_listener *listener, void *data);
 void output_config_apply(struct wl_listener *listener, void *data);
 void server_new_output(struct wl_listener *listener, void *data);
 struct wlr_output *find_output(struct sh_server *server, const char *name);
+struct wlr_output *first_output(struct sh_server *server);
+struct sh_rect usable_area(struct sh_server *server, struct wlr_output *output);
 
 /* output_moves.c */
 void evacuate_output(struct sh_server *server, const char *name, struct wlr_box gone,

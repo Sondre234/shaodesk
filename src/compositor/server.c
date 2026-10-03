@@ -30,13 +30,6 @@ const struct sh_settings *server_settings(struct sh_server *server) {
     return server->callbacks->settings(server->callbacks->userdata);
 }
 
-struct wlr_output *first_output(struct sh_server *server) {
-    if (wl_list_empty(&server->outputs))
-        return NULL;
-    struct sh_output *first = wl_container_of(server->outputs.next, first, link);
-    return first->wlr_output;
-}
-
 /* The current workspace of the output named `name`, which need not be connected. */
 int output_slot(struct sh_server *server, const char *name) {
     int count = sizeof(server->output_workspaces) / sizeof(server->output_workspaces[0]);
@@ -461,17 +454,6 @@ void minimize_toplevel(struct sh_toplevel *toplevel) {
         wlr_foreign_toplevel_handle_v1_set_minimized(toplevel->foreign, true);
     if (toplevel->server->focused_toplevel == toplevel)
         focus_previous(toplevel->server);
-}
-
-struct sh_rect usable_area(struct sh_server *server, struct wlr_output *output) {
-    struct wlr_box box;
-    wlr_output_layout_get_box(server->output_layout, output, &box);
-    struct sh_output *candidate;
-    wl_list_for_each(candidate, &server->outputs, link) {
-        if (candidate->wlr_output == output)
-            box = candidate->usable;
-    }
-    return (struct sh_rect){box.x, box.y, box.width, box.height};
 }
 
 /* Fullscreen the client asked for covers the whole output; fullscreen from a binding or the

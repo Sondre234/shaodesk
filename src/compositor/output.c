@@ -584,3 +584,21 @@ struct wlr_output *find_output(struct sh_server *server, const char *name) {
     }
     return NULL;
 }
+
+struct wlr_output *first_output(struct sh_server *server) {
+    if (wl_list_empty(&server->outputs))
+        return NULL;
+    struct sh_output *first = wl_container_of(server->outputs.next, first, link);
+    return first->wlr_output;
+}
+
+struct sh_rect usable_area(struct sh_server *server, struct wlr_output *output) {
+    struct wlr_box box;
+    wlr_output_layout_get_box(server->output_layout, output, &box);
+    struct sh_output *candidate;
+    wl_list_for_each(candidate, &server->outputs, link) {
+        if (candidate->wlr_output == output)
+            box = candidate->usable;
+    }
+    return (struct sh_rect){box.x, box.y, box.width, box.height};
+}
