@@ -583,32 +583,50 @@ static const uint32_t ALL_EDGES = WLR_EDGE_TOP | WLR_EDGE_BOTTOM | WLR_EDGE_LEFT
 
 /* server.c */
 const struct sh_settings *server_settings(struct sh_server *server);
+bool toplevel_mapped(struct sh_toplevel *toplevel);
 struct wlr_box toplevel_geometry(struct sh_toplevel *toplevel);
+void toplevel_configure_box(struct sh_toplevel *toplevel, struct wlr_box box);
+struct wlr_box toplevel_box(struct sh_toplevel *toplevel);
+void toplevel_set_states(struct sh_toplevel *toplevel, bool maximized, uint32_t tiled);
 const char *toplevel_title(struct sh_toplevel *toplevel);
 const char *toplevel_app_id(struct sh_toplevel *toplevel);
 int *output_workspace(struct sh_server *server, const char *name);
 bool toplevel_visible(struct sh_toplevel *toplevel);
 struct wlr_output *focused_output(struct sh_server *server);
+void set_toplevel_output(struct sh_toplevel *toplevel, struct wlr_output *output);
+void focus_toplevel(struct sh_toplevel *toplevel);
+void minimize_toplevel(struct sh_toplevel *toplevel);
+struct sh_rect usable_area(struct sh_server *server, struct wlr_output *output);
+void switch_workspace(struct sh_server *server, struct wlr_output *output, int workspace);
+void set_sticky(struct sh_toplevel *toplevel, bool sticky, bool retile);
 size_t overview_describe(struct sh_server *server, char *text, size_t size);
 void overview_select(struct sh_server *server, int index);
 void overview_touch(struct sh_server *server, bool relayout);
 void overview_view(struct sh_server *server, int workspace);
 void overview_set_filter(struct sh_server *server, const char *text);
+void hide_in_scratchpad(struct sh_toplevel *toplevel);
 bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, char *error,
                      size_t error_size);
 void run_action(struct sh_server *server, enum sh_action action, int argument);
 int64_t now_ms(void);
 double zoom_level(struct sh_server *server, int64_t now);
 void output_description(const struct wlr_output *output, char *text, size_t size);
+struct wlr_box rebase_box(struct sh_server *server, struct wlr_box box,
+                          struct wlr_output *output);
+void place_by_hand(struct sh_toplevel *toplevel, enum sh_action action);
+void reflow_output(struct sh_server *server, struct wlr_output *output);
 struct wlr_output *find_output(struct sh_server *server, const char *name);
+bool output_default_tiling(struct sh_server *server, struct wlr_output *output);
 bool output_tiles(struct sh_server *server, struct wlr_output *output);
-bool session_save(struct sh_server *server, const char *name, int *windows, char *error,
-                  size_t error_size);
-bool session_restore(struct sh_server *server, const char *name, bool launch,
-                     int *restored, int *launched, int *missing, char *error,
-                     size_t error_size);
-int session_name_compare(const struct dirent **a, const struct dirent **b);
-int session_name_filter(const struct dirent *entry);
+struct wlr_output *home_output(struct sh_toplevel *toplevel);
+bool wants_tiling(struct sh_toplevel *toplevel, struct wlr_output *output);
+bool toplevel_is_dialog(struct sh_toplevel *toplevel);
+void tile_toplevel(struct sh_toplevel *toplevel, struct wlr_output *output,
+                   struct sh_toplevel *target, bool at_cursor);
+void untile_toplevel(struct sh_toplevel *toplevel, bool restore);
+void set_output_tiling(struct sh_server *server, struct wlr_output *output, bool enabled);
+void unarrange_in_place(struct sh_toplevel *toplevel);
+void set_fullscreen(struct sh_toplevel *toplevel, bool fullscreen);
 
 /* control.c */
 void notify_subscribers(struct sh_server *server);
@@ -619,5 +637,17 @@ void request_launcher(struct sh_server *server);
 void request_palette(struct sh_server *server);
 void open_control_socket(struct sh_server *server, const char *wayland_socket);
 void close_control_socket(struct sh_server *server);
+
+/* session.c */
+pid_t toplevel_pid(struct sh_toplevel *toplevel);
+bool session_save(struct sh_server *server, const char *name, int *windows, char *error,
+                  size_t error_size);
+bool session_restore(struct sh_server *server, const char *name, bool launch,
+                     int *restored, int *launched, int *missing, char *error,
+                     size_t error_size);
+int session_name_compare(const struct dirent **a, const struct dirent **b);
+int session_name_filter(const struct dirent *entry);
+bool session_claim(struct sh_server *server, struct sh_toplevel *toplevel,
+                   struct sh_window_rule *rule, bool ruled);
 
 /* END PROTOTYPES */
