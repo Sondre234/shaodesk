@@ -5,10 +5,6 @@
  * shaodesk/session.h); `session restore NAME [launch]` puts matching windows back, and with
  * `launch` starts the applications that are missing, placing their windows as they open. */
 
-/* BEGIN FORWARD */
-static int64_t monotonic_ms(void);
-/* END FORWARD */
-
 static void session_read_command(struct sh_toplevel *toplevel, struct sh_session_window *window) {
     pid_t pid = toplevel_pid(toplevel);
     window->command[0] = '\0';
@@ -330,7 +326,7 @@ bool session_restore(struct sh_server *server, const char *name, bool launch,
         }
         char **argv = launch ? sh_session_argv(saved->command) : NULL;
         size_t slot = 0, slots = sizeof(server->session_pending) / sizeof(*server->session_pending);
-        int64_t now = monotonic_ms();
+        int64_t now = now_ms();
         while (slot < slots && server->session_pending[slot].used &&
                server->session_pending[slot].deadline >= now)
             ++slot;
@@ -357,18 +353,12 @@ bool session_restore(struct sh_server *server, const char *name, bool launch,
     return true;
 }
 
-static int64_t monotonic_ms(void) {
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
-}
-
 /* A window a session restore launched takes over the saved window's place as its rule: the
  * output, workspace, floating place and state it had. Returns whether one matched. */
 bool session_claim(struct sh_server *server, struct sh_toplevel *toplevel,
                    struct sh_window_rule *rule, bool ruled) {
     const char *app_id = toplevel_app_id(toplevel);
-    int64_t now = monotonic_ms();
+    int64_t now = now_ms();
     for (size_t i = 0; i < sizeof(server->session_pending) / sizeof(*server->session_pending);
          ++i) {
         if (server->session_pending[i].used && server->session_pending[i].deadline < now)
