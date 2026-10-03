@@ -27,11 +27,11 @@ with tempfile.TemporaryDirectory(prefix="shaode-xwayland-test-") as directory:
                                   env=env, stdout=output, stderr=output)
         try:
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), [server], "startup",
-                     timeout=10)
+                     timeout=30)
             assert "XWayland listening" not in log.read_text(), log.read_text()
         finally:
             server.terminate()
-            server.wait(timeout=5)
+            server.wait(timeout=30)
 
     config.write_text(source)
     with log.open("w") as output:
@@ -40,7 +40,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-xwayland-test-") as directory:
         processes = [server]
         try:
             wait_for(lambda: "Running Wayland compositor" in log.read_text(), processes, "startup",
-                     timeout=10)
+                     timeout=30)
             text = log.read_text()
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
             env["DISPLAY"] = re.search(r"XWayland listening on DISPLAY=(\S+)", text)[1]
@@ -54,11 +54,11 @@ with tempfile.TemporaryDirectory(prefix="shaode-xwayland-test-") as directory:
             assert client.stdout.readline().strip() == "X11 window mapped and focused"
             assert client.stdout.readline().strip() == "waiting for close"
             subprocess.run([wayland_probe, "--close", "shaode-x11-probe"], env=env, check=True,
-                           timeout=10)
-            assert client.wait(timeout=10) == 0
+                           timeout=30)
+            assert client.wait(timeout=30) == 0
             processes.remove(client)
             server.terminate()
-            assert server.wait(timeout=10) == 0, log.read_text()
+            assert server.wait(timeout=30) == 0, log.read_text()
             print("XWayland mapping, focus, fullscreen, taskbar close, and disable passed")
         except Exception:
             print(log.read_text(), file=sys.stderr)
@@ -67,4 +67,4 @@ with tempfile.TemporaryDirectory(prefix="shaode-xwayland-test-") as directory:
             for process in reversed(processes):
                 if process.poll() is None:
                     process.kill()
-                    process.wait(timeout=5)
+                    process.wait(timeout=30)

@@ -24,6 +24,8 @@ Rectangle {
                 retry.start()
             } else if (status === Image.Ready) {
                 retry.interval = 1000
+                shown = source
+                if (previous.source.toString() !== "") fade.restart()
             }
         }
         Timer {
@@ -32,6 +34,16 @@ Rectangle {
             onTriggered: {
                 interval = Math.min(interval * 2, 60000)
                 wallpaper.load()
+            }
+        }
+        // A new wallpaper fades in over the one shown before (held by `previous`) once it has
+        // loaded, rather than the background showing while it decodes.
+        property url shown: ""
+        onSourceChanged: {
+            if (source.toString() !== "" && shown.toString() !== "" && source.toString() !== shown.toString()) {
+                fade.stop()
+                previous.source = shown
+                previous.opacity = 1
             }
         }
         Connections {
@@ -43,6 +55,17 @@ Rectangle {
             }
         }
     }
+    Image {
+        id: previous
+        anchors.fill: parent
+        fillMode: Image.PreserveAspectCrop
+        visible: source.toString() !== ""
+        NumberAnimation {
+            id: fade
+            target: previous; property: "opacity"; to: 0; duration: 450; easing.type: Easing.InOutQuad
+            onFinished: previous.source = ""
+        }
+    }
     Rectangle {
         anchors.fill: parent
         visible: shell.wallpaper.toString().length === 0 || wallpaper.status === Image.Error
@@ -50,12 +73,6 @@ Rectangle {
             GradientStop { position: 0; color: Qt.lighter(shell.background, 1.45) }
             GradientStop { position: 1; color: shell.background }
         }
-    }
-    Text {
-        anchors.right: parent.right; anchors.rightMargin: 40
-        anchors.bottom: parent.bottom; anchors.bottomMargin: (shell.panelTop ? 0 : shell.panelExtent) + 35
-        text: "shaoDe"; font.pixelSize: 32; font.weight: Font.Light
-        color: shell.textColor; opacity: 0.18
     }
     MouseArea {
         anchors.fill: parent
@@ -80,7 +97,7 @@ Rectangle {
                 contentItem: Column {
                     spacing: 6
                     Image { anchors.horizontalCenter: parent.horizontalCenter; width: 40; height: 40; sourceSize: Qt.size(40, 40); source: "image://icons/" + modelData.icon }
-                    Text { width: parent.width; text: modelData.name; color: shell.textColor; font.pixelSize: 12; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight }
+                    Text { width: parent.width; text: modelData.name; textFormat: Text.PlainText; color: shell.textColor; font.pixelSize: 12; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight }
                 }
             }
         }

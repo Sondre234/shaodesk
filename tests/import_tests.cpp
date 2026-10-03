@@ -41,6 +41,7 @@ void hyprlang(const fs::path &root) {
     require(config.shell.accent == "#ff8800", "accent does not follow the active border");
     require(near(config.opacity, 0.95F), "active_opacity not imported");
     require(!s.animations, "animations:enabled not imported");
+    require(s.activation == SH_ACTIVATION_FOCUS, "misc:focus_on_activate not imported");
     require(std::string(s.keyboard_layout) == "us" &&
                 std::string(s.keyboard_options) == "caps:escape" && s.repeat_rate == 30,
             "keyboard settings not imported");

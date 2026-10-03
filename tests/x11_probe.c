@@ -2,6 +2,7 @@
 /* X11 client exercising XWayland mapping, focus, fullscreen, and close. */
 #include <poll.h>
 #include <stdbool.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,7 +12,7 @@
 struct probe {
     xcb_connection_t *connection;
     xcb_window_t root, window;
-    xcb_atom_t protocols, delete_window, state, fullscreen;
+    xcb_atom_t protocols, delete_window, state, fullscreen, attention, hints;
     int width, height;
     bool mapped, closed;
 };
@@ -105,26 +106,42 @@ int main(int argc, char **argv) {
     probe.delete_window = atom(probe.connection, "WM_DELETE_WINDOW");
     probe.state = atom(probe.connection, "_NET_WM_STATE");
     probe.fullscreen = atom(probe.connection, "_NET_WM_STATE_FULLSCREEN");
+    probe.attention = atom(probe.connection, "_NET_WM_STATE_DEMANDS_ATTENTION");
+    probe.hints = atom(probe.connection, "WM_HINTS");
 
     probe.window = xcb_generate_id(probe.connection);
     uint32_t values[] = {screen->white_pixel, XCB_EVENT_MASK_STRUCTURE_NOTIFY};
     xcb_create_window(probe.connection, XCB_COPY_FROM_PARENT, probe.window, probe.root, 0, 0, 300,
                       200, 0, XCB_WINDOW_CLASS_INPUT_OUTPUT, screen->root_visual,
                       XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK, values);
-    const char title[] = "shaoDe X11 probe", class[] = "shaode-x11-probe\0shaode-x11-probe";
+    // Tests telling several windows apart, or matching a window rule, name them.
+    const char *env_title = getenv("SHAODE_PROBE_TITLE");
+    const char *title = env_title && *env_title ? env_title : "shaoDe X11 probe";
+    const char class[] = "shaode-x11-probe\0shaode-x11-probe";
     xcb_change_property(probe.connection, XCB_PROP_MODE_REPLACE, probe.window, XCB_ATOM_WM_NAME,
                         XCB_ATOM_STRING, 8, strlen(title), title);
     xcb_change_property(probe.connection, XCB_PROP_MODE_REPLACE, probe.window, XCB_ATOM_WM_CLASS,
                         XCB_ATOM_STRING, 8, sizeof(class), class);
     xcb_change_property(probe.connection, XCB_PROP_MODE_REPLACE, probe.window, probe.protocols,
                         XCB_ATOM_ATOM, 32, 1, &probe.delete_window);
+    // Real toolkits say which process owns a window; the compositor reads it for swallowing.
+    uint32_t pid = (uint32_t)getpid();
+    xcb_change_property(probe.connection, XCB_PROP_MODE_REPLACE, probe.window,
+                        atom(probe.connection, "_NET_WM_PID"), XCB_ATOM_CARDINAL, 32, 1, &pid);
+    if (getenv("SHAODE_PROBE_URGENT_ON_MAP")) {
+        // Asks for attention before mapping, as an application started in the background does.
+        uint32_t hints[9] = {256};
+        xcb_change_property(probe.connection, XCB_PROP_MODE_REPLACE, probe.window, probe.hints,
+                            probe.hints, 32, 9, hints);
+    }
     xcb_map_window(probe.connection, probe.window);
     xcb_flush(probe.connection);
     WAIT_FOR(&probe, probe.mapped, "window mapping");
 
-    // The compositor gives newly mapped windows keyboard focus.
+    // The compositor gives newly mapped windows keyboard focus, unless a rule says otherwise
+    // (the window that asked for attention before mapping is opened that way).
     double deadline = now() + 5;
-    for (;;) {
+    for (; !getenv("SHAODE_PROBE_URGENT_ON_MAP");) {
         xcb_get_input_focus_reply_t *focus = xcb_get_input_focus_reply(
             probe.connection, xcb_get_input_focus(probe.connection), NULL);
         bool focused = focus && focus->focus == probe.window;
@@ -136,13 +153,75 @@ int main(int argc, char **argv) {
         struct timespec pause = {0, 20 * 1000 * 1000};
         nanosleep(&pause, NULL);
     }
-    puts("X11 window mapped and focused");
+    puts(getenv("SHAODE_PROBE_URGENT_ON_MAP") ? "X11 window mapped and focused (not waited for)"
+                                              : "X11 window mapped and focused");
 
     if (!strcmp(command, "wait-close")) {
         // The harness closes this window through the compositor.
         puts("waiting for close");
         fflush(stdout);
         WAIT_FOR(&probe, probe.closed, "compositor close request");
+        puts("X11 close request received");
+        xcb_disconnect(probe.connection);
+        return 0;
+    }
+
+    if (!strcmp(command, "commands")) {
+        // Lines on standard input ask for attention the two ways X11 clients do: "demand" and
+        // "undemand" add and remove _NET_WM_STATE_DEMANDS_ATTENTION, "hint" and "unhint" set
+        // and clear the urgency flag of WM_HINTS. Closing the window ends it.
+        puts("waiting for commands");
+        fflush(stdout);
+        char pending[128];
+        size_t length = 0;
+        bool input = true;
+        while (!probe.closed) {
+            xcb_generic_event_t *event;
+            while ((event = xcb_poll_for_event(probe.connection))) {
+                handle(&probe, event);
+                free(event);
+            }
+            if (xcb_connection_has_error(probe.connection))
+                die("X connection failed");
+            struct pollfd fds[2] = {{xcb_get_file_descriptor(probe.connection), POLLIN, 0},
+                                    {input ? 0 : -1, POLLIN, 0}};
+            poll(fds, 2, 50);
+            if (!(fds[1].revents & (POLLIN | POLLHUP)))
+                continue;
+            ssize_t count = read(0, pending + length, sizeof(pending) - 1 - length);
+            if (count <= 0) {
+                input = false;
+                continue;
+            }
+            length += (size_t)count;
+            pending[length] = '\0';
+            char *newline;
+            while ((newline = strchr(pending, '\n'))) {
+                *newline = '\0';
+                if (!strcmp(pending, "demand") || !strcmp(pending, "undemand")) {
+                    xcb_client_message_event_t message = {
+                        .response_type = XCB_CLIENT_MESSAGE,
+                        .format = 32,
+                        .window = probe.window,
+                        .type = probe.state,
+                        .data.data32 = {pending[0] == 'd' ? 1 : 0, probe.attention, 0, 1, 0}};
+                    xcb_send_event(probe.connection, false, probe.root,
+                                   XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
+                                       XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT,
+                                   (const char *)&message);
+                } else if (!strcmp(pending, "hint") || !strcmp(pending, "unhint")) {
+                    // flags, input, initial state, icon pixmap, icon window, icon x, icon y,
+                    // icon mask, window group; bit 8 of the flags is urgency.
+                    uint32_t hints[9] = {pending[0] == 'h' ? 256 : 0};
+                    xcb_change_property(probe.connection, XCB_PROP_MODE_REPLACE, probe.window,
+                                        probe.hints, probe.hints, 32, 9, hints);
+                } else
+                    die("unknown command");
+                xcb_flush(probe.connection);
+                length -= (size_t)(newline + 1 - pending);
+                memmove(pending, newline + 1, length + 1);
+            }
+        }
         puts("X11 close request received");
         xcb_disconnect(probe.connection);
         return 0;

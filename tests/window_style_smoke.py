@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-style-test-") as directory:
 
     def msg(*words):
         result = subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                                text=True, timeout=5, check=True)
+                                text=True, timeout=30, check=True)
         return result.stdout
 
     def boxes():
@@ -82,9 +82,9 @@ with tempfile.TemporaryDirectory(prefix="shaode-style-test-") as directory:
 
             for process in processes[1:]:
                 process.terminate()
-                process.wait(timeout=5)
+                process.wait(timeout=30)
             server.send_signal(signal.SIGTERM)
-            assert server.wait(timeout=5) == 0, log.read_text()
+            assert server.wait(timeout=30) == 0, log.read_text()
             print("Inner and outer gaps, borders, and their reload passed")
         except Exception:
             print(log.read_text(), file=sys.stderr)

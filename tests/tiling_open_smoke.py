@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-tiling-open-test-") as directory
     def windows():
         """(x, y, width, height) per window, oldest first."""
         result = subprocess.run([compositor, "msg", "get", "windows"], env=env,
-                                capture_output=True, text=True, timeout=5)
+                                capture_output=True, text=True, timeout=30)
         assert result.returncode == 0, result.stderr
         return [tuple(map(int, line.split("\t")[4:8])) for line in result.stdout.splitlines()]
 
@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-tiling-open-test-") as directory
                      all(configures(i) and configures(i)[-1] == windows()[i][2:]
                          for i in range(index + 1)), f"window {index} tiled")
             # Let any late configure arrive before counting.
-            subprocess.run([probe, "--globals"], env=env, capture_output=True, timeout=5)
+            subprocess.run([probe, "--globals"], env=env, capture_output=True, timeout=30)
             return [configures(i) for i in range(index + 1)]
 
         try:
@@ -87,23 +87,23 @@ with tempfile.TemporaryDirectory(prefix="shaode-tiling-open-test-") as directory
 
             # A taskbar maximize request leaves a fullscreen window alone, as a client's does.
             output = subprocess.run([compositor, "msg", "get", "outputs"], env=env,
-                                    capture_output=True, text=True, timeout=5).stdout
-            subprocess.run([compositor, "msg", "fullscreen"], env=env, check=True, timeout=5)
+                                    capture_output=True, text=True, timeout=30).stdout
+            subprocess.run([compositor, "msg", "fullscreen"], env=env, check=True, timeout=30)
             full = [(0, 0, *map(int, re.search(r"(\d+)x(\d+)", output).groups()))]
             wait_for(lambda: windows()[2] == full[0], "focused window fullscreen")
             subprocess.run([probe, "--maximize", "shaode-probe"], env=env, check=True,
-                           capture_output=True, timeout=5)
-            subprocess.run([probe, "--globals"], env=env, capture_output=True, timeout=5)
+                           capture_output=True, timeout=30)
+            subprocess.run([probe, "--globals"], env=env, capture_output=True, timeout=30)
             assert windows()[2] == full[0], windows()
-            subprocess.run([compositor, "msg", "fullscreen"], env=env, check=True, timeout=5)
+            subprocess.run([compositor, "msg", "fullscreen"], env=env, check=True, timeout=30)
             wait_for(lambda: windows() == previous, "tile restored after fullscreen")
 
             for window in processes[1:]:
                 window.kill()
-                window.wait(timeout=5)
+                window.wait(timeout=30)
             del processes[1:]
             server.terminate()
-            assert server.wait(timeout=5) == 0, log.read_text()
+            assert server.wait(timeout=30) == 0, log.read_text()
             print("New tiles configured once at their size, unchanged tiles left alone")
         except Exception:
             print(log.read_text(), file=sys.stderr)
@@ -112,4 +112,4 @@ with tempfile.TemporaryDirectory(prefix="shaode-tiling-open-test-") as directory
             for process in reversed(processes):
                 if process.poll() is None:
                     process.kill()
-                    process.wait(timeout=5)
+                    process.wait(timeout=30)

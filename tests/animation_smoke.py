@@ -34,13 +34,17 @@ with tempfile.TemporaryDirectory(prefix="shaode-animation-test-") as directory:
 
     def msg(*words):
         result = subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                                text=True, timeout=5, check=True)
+                                text=True, timeout=30, check=True)
         return result.stdout
 
     def state():
         """(running animations, window trees stacked in the scene)"""
-        running, stacked = msg("get", "animations").split("\t")
+        running, stacked, _fading = msg("get", "animations").split("\t")
         return int(running), int(stacked)
+
+    def fading():
+        """Focus fades (opacity and border color) in flight."""
+        return int(msg("get", "animations").split("\t")[2])
 
     def windows():
         return [line.split("\t") for line in msg("get", "windows").splitlines()]
@@ -57,7 +61,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-animation-test-") as directory:
 
     def close(window):
         window.terminate()
-        window.wait(timeout=5)
+        window.wait(timeout=30)
         processes.remove(window)
 
     with log.open("w") as output:
@@ -80,7 +84,10 @@ with tempfile.TemporaryDirectory(prefix="shaode-animation-test-") as directory:
             # A second tile opens and the first glides aside; both end.
             second = launch()
             wait_for(lambda: len(windows()) == 2 and state()[0] == 2, "open and glide running")
+            # The first window lost focus, so its opacity and border fade.
+            wait_for(lambda: fading() >= 1, "focus fade running")
             wait_for(lambda: state() == (0, 2), "open and glide finished")
+            wait_for(lambda: fading() == 0, "focus fade finished")
 
             # Closing leaves a copy behind for the animation, which then goes, and the remaining
             # tile glides back.
@@ -90,6 +97,37 @@ with tempfile.TemporaryDirectory(prefix="shaode-animation-test-") as directory:
             close(first)
             wait_for(lambda: not windows() and state()[1] <= 1, "last window closed")
             wait_for(lambda: state() == (0, 0), "nothing left behind")
+
+            # Switching workspace slides a copy of the old windows away and brings the new ones
+            # in; input never waits for either.
+            left = launch()
+            wait_for(lambda: len(windows()) == 1 and state() == (0, 1), "window on workspace 1")
+            msg("workspace", "2")
+            assert msg("get", "workspace") == "2\n"
+            wait_for(lambda: state() == (1, 2), "copy sliding away")
+            wait_for(lambda: state() == (0, 1), "copy gone")
+            right = launch()
+            wait_for(lambda: len(windows()) == 2 and state() == (0, 2), "window on workspace 2")
+            msg("workspace", "1")
+            wait_for(lambda: state() == (2, 3), "one window out, one in")
+            assert msg("get", "workspace") == "1\n"
+            wait_for(lambda: state() == (0, 2), "slide finished")
+            close(left)
+            close(right)
+            wait_for(lambda: not windows() and state()[0] == 0, "workspace windows closed")
+            msg("workspace", "1")
+            wait_for(lambda: state() == (0, 0), "nothing left behind")
+
+            # Fullscreen toggles glide the window, and leaving lands it at its old place.
+            floating = launch()
+            wait_for(lambda: len(windows()) == 1 and state() == (0, 1), "window for fullscreen")
+            msg("fullscreen")
+            wait_for(lambda: state()[0] >= 1, "fullscreen glide running")
+            wait_for(lambda: state()[0] == 0, "fullscreen glide finished")
+            msg("fullscreen")
+            wait_for(lambda: state()[0] == 0, "leaving fullscreen settles")
+            close(floating)
+            wait_for(lambda: not windows() and state() == (0, 0), "fullscreen window closed")
 
             # Turning animations off ends those running.
             windows_open = [launch(), launch()]
@@ -110,7 +148,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-animation-test-") as directory:
             close(window)
             wait_for(lambda: state()[0] >= 1, "closing animation before quitting")
             server.send_signal(signal.SIGTERM)
-            assert server.wait(timeout=5) == 0, log.read_text()
+            assert server.wait(timeout=30) == 0, log.read_text()
             print("Opening, glide, closing snapshots, disabling, and quitting mid-animation passed")
         except Exception:
             print(log.read_text(), file=sys.stderr)

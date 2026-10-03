@@ -2,17 +2,25 @@
 #define _GNU_SOURCE
 #include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
+#include "xdg-activation-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <poll.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <signal.h>
 #include <unistd.h>
 #include <wayland-client.h>
 
 /* A real xdg-shell client: map pixels, wait for a frame, maximize, restore. */
+#ifdef __SANITIZE_ADDRESS__
+/* A short-lived test client exits without tearing its protocol objects down. */
+const char *__asan_default_options(void) { return "detect_leaks=0"; }
+#endif
+
 struct buffer {
     struct wl_buffer *object;
     void *pixels;
@@ -41,9 +49,13 @@ struct probe {
     int width, height, stage;
     bool maximized, fullscreen, handle_fullscreen, done, external_control, external_panel;
     const char *close_app_id;
+    bool move_on_press; // SHAODE_PROBE_MOVE: a button press on the window starts an interactive move
+    int resize_edges;   // SHAODE_PROBE_RESIZE=EDGE: ... or a resize (xdg_toplevel_resize_edge, or 0)
     bool activate; // --activate: activate the matching window instead of closing it
     bool maximize; // --maximize: ask to maximize the matching window instead of closing it
     struct zwlr_foreign_toplevel_handle_v1 *close_target;
+    struct xdg_activation_v1 *activation;
+    bool commands; // --commands: an external-control window that obeys lines on standard input
 };
 static void die(const char *message) {
     fprintf(stderr, "wayland probe: %s\n", message);
@@ -148,13 +160,96 @@ static void global(void *data, struct wl_registry *registry, uint32_t name, cons
     else if (!strcmp(interface, "wl_output") && !probe->output) {
         probe->output = wl_registry_bind(registry, name, &wl_output_interface, 2);
         wl_output_add_listener(probe->output, &output_listener, probe);
+    } else if (!strcmp(interface, "xdg_activation_v1")) {
+        probe->activation = wl_registry_bind(registry, name, &xdg_activation_v1_interface, 1);
     } else if (!strcmp(interface, "xdg_wm_base")) {
         probe->shell = wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
         xdg_wm_base_add_listener(probe->shell, &shell_listener, probe);
     }
 }
+/* Asks to be focused, the way an application does for a message it wants read: a token from
+ * xdg-activation, made without an input serial, and then activate with it. */
+static void token_done(void *data, struct xdg_activation_token_v1 *token, const char *string) {
+    struct probe *probe = data;
+    xdg_activation_v1_activate(probe->activation, string, probe->surface);
+    xdg_activation_token_v1_destroy(token);
+}
+static const struct xdg_activation_token_v1_listener token_listener = {.done = token_done};
+static void request_activation(struct probe *probe) {
+    if (!probe->activation)
+        die("xdg_activation_v1 is not advertised");
+    struct xdg_activation_token_v1 *token = xdg_activation_v1_get_activation_token(probe->activation);
+    xdg_activation_token_v1_add_listener(token, &token_listener, probe);
+    xdg_activation_token_v1_set_surface(token, probe->surface);
+    xdg_activation_token_v1_commit(token);
+}
+/* One line of standard input: "activate", "title TEXT", or "app_id TEXT". */
+static void run_command(struct probe *probe, char *line) {
+    line[strcspn(line, "\n")] = '\0';
+    if (!strcmp(line, "activate"))
+        request_activation(probe);
+    else if (!strncmp(line, "title ", 6))
+        xdg_toplevel_set_title(probe->toplevel, line + 6);
+    else if (!strncmp(line, "app_id ", 7))
+        xdg_toplevel_set_app_id(probe->toplevel, line + 7);
+    else
+        die("unknown command");
+}
+/* Dispatches Wayland events and standard input together until the window is closed. */
+static void run_commands(struct wl_display *display, struct probe *probe) {
+    char pending[256];
+    size_t length = 0;
+    bool input = true;
+    while (!probe->done) {
+        while (wl_display_prepare_read(display) != 0)
+            wl_display_dispatch_pending(display);
+        wl_display_flush(display);
+        struct pollfd fds[2] = {{wl_display_get_fd(display), POLLIN, 0}, {input ? 0 : -1, POLLIN, 0}};
+        int ready = poll(fds, 2, -1);
+        if (ready < 0 || !(fds[0].revents & POLLIN))
+            wl_display_cancel_read(display);
+        else if (wl_display_read_events(display) < 0)
+            die("dispatch failed");
+        if (wl_display_dispatch_pending(display) < 0)
+            die("dispatch failed");
+        if (ready > 0 && (fds[1].revents & (POLLIN | POLLHUP))) {
+            ssize_t count = read(0, pending + length, sizeof(pending) - 1 - length);
+            if (count <= 0)
+                input = false;
+            else
+                length += (size_t)count;
+            char *newline;
+            pending[length] = '\0';
+            while ((newline = strchr(pending, '\n'))) {
+                *newline = '\0';
+                run_command(probe, pending);
+                length -= (size_t)(newline + 1 - pending);
+                memmove(pending, newline + 1, length + 1);
+            }
+        }
+    }
+}
 static void global_remove(void *data, struct wl_registry *registry, uint32_t name) {}
 static const struct wl_registry_listener registry_listener = {global, global_remove};
+static void pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial,
+                          struct wl_surface *surface, wl_fixed_t x, wl_fixed_t y) {}
+static void pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial,
+                          struct wl_surface *surface) {}
+static void pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t x,
+                           wl_fixed_t y) {}
+static void pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint32_t time,
+                           uint32_t button, uint32_t state) {
+    struct probe *probe = data;
+    if (probe->resize_edges && state == WL_POINTER_BUTTON_STATE_PRESSED)
+        xdg_toplevel_resize(probe->toplevel, probe->seat, serial, probe->resize_edges);
+    else if (probe->move_on_press && state == WL_POINTER_BUTTON_STATE_PRESSED)
+        xdg_toplevel_move(probe->toplevel, probe->seat, serial);
+}
+static void pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis,
+                         wl_fixed_t value) {}
+static const struct wl_pointer_listener pointer_listener = {
+    .enter = pointer_enter, .leave = pointer_leave, .motion = pointer_motion,
+    .button = pointer_button, .axis = pointer_axis};
 static void frame_done(void *data, struct wl_callback *callback, uint32_t time) {
     struct probe *probe = data;
     wl_callback_destroy(callback);
@@ -188,6 +283,7 @@ static void frame_done(void *data, struct wl_callback *callback, uint32_t time) 
         xdg_toplevel_set_fullscreen(probe->toplevel, NULL);
         wl_surface_commit(probe->surface);
     } else if (probe->stage == 6 && probe->fullscreen) {
+        // Fullscreen the client asks for itself covers the panel too.
         if (probe->width != probe->output_width || probe->height != probe->output_height)
             die("fullscreen did not cover the whole output");
         if (!probe->handle_fullscreen)
@@ -284,12 +380,64 @@ static void toplevel_close(void *data, struct xdg_toplevel *toplevel) {
 }
 static const struct xdg_toplevel_listener toplevel_listener = {.configure = toplevel_configure,
                                                                .close = toplevel_close};
+/* SHAODE_PROBE_SPAWN_APP_ID (or SHAODE_PROBE_SPAWN_PROGRAM, a program that takes "wait-close"): on SIGUSR1 start another probe window with that app_id as a child
+ * of this process (through a shell that stays in between when SHAODE_PROBE_SPAWN_SHELL is set),
+ * like an application started from a terminal. */
+extern char **environ;
+static char *spawn_argv[8], **spawn_envp;
+static const char *spawn_program;
+static void spawn_child(int sig) {
+    pid_t pid = fork();
+    if (pid == 0) {
+        execve(spawn_program, spawn_argv, spawn_envp);
+        _exit(127);
+    }
+}
+static void prepare_spawn(const char *self, const char *app_id) {
+    size_t count = 0;
+    while (environ[count])
+        ++count;
+    spawn_envp = calloc(count + 3, sizeof(char *));
+    size_t used = 0;
+    for (size_t i = 0; i < count; ++i)
+        if (strncmp(environ[i], "SHAODE_PROBE_APP_ID=", 20) &&
+            strncmp(environ[i], "SHAODE_PROBE_SPAWN_", 19))
+            spawn_envp[used++] = environ[i];
+    char *entry = malloc(strlen(app_id) + 32);
+    sprintf(entry, "SHAODE_PROBE_APP_ID=%s", app_id);
+    spawn_envp[used++] = entry;
+    if (getenv("SHAODE_PROBE_SPAWN_TITLE")) {
+        entry = malloc(strlen(getenv("SHAODE_PROBE_SPAWN_TITLE")) + 32);
+        sprintf(entry, "SHAODE_PROBE_TITLE=%s", getenv("SHAODE_PROBE_SPAWN_TITLE"));
+        spawn_envp[used++] = entry;
+    }
+    if (getenv("SHAODE_PROBE_SPAWN_PROGRAM")) { // another kind of client, e.g. the X11 probe
+        spawn_program = getenv("SHAODE_PROBE_SPAWN_PROGRAM");
+        spawn_argv[0] = (char *)spawn_program;
+        spawn_argv[1] = "wait-close";
+    } else if (getenv("SHAODE_PROBE_SPAWN_SHELL")) {
+        spawn_program = "/bin/sh";
+        spawn_argv[0] = "sh";
+        spawn_argv[1] = "-c";
+        spawn_argv[2] = "\"$0\" --window-only; status=$?; exit $status";
+        spawn_argv[3] = (char *)self;
+    } else {
+        spawn_program = self;
+        spawn_argv[0] = (char *)self;
+        spawn_argv[1] = "--window-only";
+    }
+    struct sigaction action = {.sa_handler = spawn_child, .sa_flags = SA_RESTART};
+    sigaction(SIGUSR1, &action, NULL);
+    signal(SIGCHLD, SIG_IGN);
+}
 int main(int argc, char **argv) {
     struct probe probe = {.width = 320, .height = 240, .panel_height = 48};
     if (argc == 2 && !strcmp(argv[1], "--external-control"))
         probe.external_control = true;
     else if (argc == 2 && !strcmp(argv[1], "--window-only")) // external control, no panel
         probe.external_control = probe.external_panel = true;
+    else if (argc == 2 && !strcmp(argv[1], "--commands")) // window only, told what to do on stdin
+        probe.external_control = probe.external_panel = probe.commands = true;
     else if (argc == 2 && !strcmp(argv[1], "--globals"))
         probe.list_globals = true;
     else if (argc == 3 && !strcmp(argv[1], "--external-panel")) {
@@ -306,10 +454,19 @@ int main(int argc, char **argv) {
         probe.maximize = !strcmp(argv[1], "--maximize");
     } else if (argc != 1)
         die("usage: wayland_probe [--globals | --external-control | --window-only | "
-            "--external-panel HEIGHT | --close APP_ID | --activate APP_ID | --maximize APP_ID]");
+            "--commands | --external-panel HEIGHT | --close APP_ID | --activate APP_ID | --maximize APP_ID]");
     struct wl_display *display = wl_display_connect(NULL);
     if (!display)
         die("cannot connect to compositor");
+    if (getenv("SHAODE_PROBE_SPAWN_APP_ID") || getenv("SHAODE_PROBE_SPAWN_PROGRAM")) {
+        static char self[4096];
+        ssize_t length = readlink("/proc/self/exe", self, sizeof(self) - 1);
+        if (length <= 0)
+            die("cannot find the probe's own path");
+        self[length] = '\0';
+        prepare_spawn(self, getenv("SHAODE_PROBE_SPAWN_APP_ID") ? getenv("SHAODE_PROBE_SPAWN_APP_ID")
+                                                               : "");
+    }
     struct wl_registry *registry = wl_display_get_registry(display);
     wl_registry_add_listener(registry, &registry_listener, &probe);
     if (wl_display_roundtrip(display) < 0)
@@ -362,12 +519,25 @@ int main(int argc, char **argv) {
     xdg_surface_add_listener(probe.xdg_surface, &surface_listener, &probe);
     probe.toplevel = xdg_surface_get_toplevel(probe.xdg_surface);
     xdg_toplevel_add_listener(probe.toplevel, &toplevel_listener, &probe);
+    if (getenv("SHAODE_PROBE_MOVE") || getenv("SHAODE_PROBE_RESIZE")) {
+        const char *edge = getenv("SHAODE_PROBE_RESIZE");
+        if (edge) { // top, bottom, left, right, or two of them joined by "_"
+            probe.resize_edges = (strstr(edge, "top") ? XDG_TOPLEVEL_RESIZE_EDGE_TOP : 0) |
+                                 (strstr(edge, "bottom") ? XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM : 0) |
+                                 (strstr(edge, "left") ? XDG_TOPLEVEL_RESIZE_EDGE_LEFT : 0) |
+                                 (strstr(edge, "right") ? XDG_TOPLEVEL_RESIZE_EDGE_RIGHT : 0);
+        }
+        probe.move_on_press = true;
+        wl_pointer_add_listener(wl_seat_get_pointer(probe.seat), &pointer_listener, &probe);
+    }
     // Tests telling several probes apart name them through SHAODE_PROBE_TITLE, and window
     // rule tests through SHAODE_PROBE_APP_ID.
     const char *title = getenv("SHAODE_PROBE_TITLE"), *app_id = getenv("SHAODE_PROBE_APP_ID");
     xdg_toplevel_set_title(probe.toplevel, title && *title ? title : "shaoDe protocol probe");
     xdg_toplevel_set_app_id(probe.toplevel, app_id && *app_id ? app_id : "shaode-probe");
     wl_surface_commit(probe.surface);
+    if (probe.commands)
+        run_commands(display, &probe);
     while (!probe.done)
         if (wl_display_dispatch(display) < 0)
             die("dispatch failed");
@@ -388,6 +558,8 @@ int main(int argc, char **argv) {
     }
     if (!probe.handle_closed)
         die("taskbar window handle survived unmapping");
+    if (probe.activation)
+        xdg_activation_v1_destroy(probe.activation);
     if (probe.panel) {
         zwlr_layer_surface_v1_destroy(probe.panel);
         wl_surface_destroy(probe.panel_surface);

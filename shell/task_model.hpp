@@ -10,7 +10,7 @@
 class TaskModel : public QAbstractListModel {
     Q_OBJECT
   public:
-    enum Role { TaskId = Qt::UserRole + 1, Title, AppId, Active, Minimized, Maximized };
+    enum Role { TaskId = Qt::UserRole + 1, Title, AppId, Active, Minimized, Maximized, Urgent };
     explicit TaskModel(QObject *parent = nullptr);
     ~TaskModel() override;
     bool connectDisplay();
@@ -22,6 +22,10 @@ class TaskModel : public QAbstractListModel {
     Q_INVOKABLE void maximize(int id);
     Q_INVOKABLE void close(int id);
     Q_INVOKABLE void showDesktop();
+    // The windows the compositor says are asking for attention, as {appId, title} pairs: the
+    // foreign-toplevel protocol has no such state, so a task is urgent when a pair matches its
+    // app id and title (each pair marks one task, the first not marked already).
+    void setUrgent(const QList<QPair<QString, QString>> &windows);
     // Same signature as ListModel.move, so the panel can reorder either.
     Q_INVOKABLE void move(int from, int to, int count = 1);
   Q_SIGNALS:
@@ -33,7 +37,10 @@ class TaskModel : public QAbstractListModel {
         zwlr_foreign_toplevel_handle_v1 *handle;
         int id;
         QString title, appId;
-        bool active = false, minimized = false, maximized = false;
+        bool active = false, minimized = false, maximized = false, urgent = false;
+        // What the model last announced; a `done` that changes none of it announces nothing.
+        QString shownTitle, shownAppId;
+        bool shownActive = false, shownMinimized = false, shownMaximized = false, shownUrgent = false;
     };
     std::vector<std::unique_ptr<Task>> tasks_;
     wl_display *display_ = nullptr;
@@ -41,9 +48,12 @@ class TaskModel : public QAbstractListModel {
     wl_seat *seat_ = nullptr;
     zwlr_foreign_toplevel_manager_v1 *manager_ = nullptr;
     std::unique_ptr<QSocketNotifier> read_, write_;
+    QList<QPair<QString, QString>> urgent_;
     int nextId_ = 1;
     Task *find(int id);
     void flush();
+    // Works out which tasks are urgent; those but `except` that change announce it.
+    void matchUrgent(const Task *except = nullptr);
     void changed(Task *task);
     void removed(Task *task);
     static void global(void *, wl_registry *, uint32_t, const char *, uint32_t);

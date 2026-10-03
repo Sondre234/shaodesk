@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "view.hpp"
 #include "task_filter.hpp"
-#include <QIcon>
-#include <QPainter>
-#include <QQmlContext>
-#include <QQmlEngine>
-#include <QQuickImageProvider>
 #include <QQuickItem>
 #include <QScreen>
 #include <iostream>
@@ -13,41 +8,8 @@
 #include <LayerShellQt/Window>
 #endif
 
-namespace {
-class Icons : public QQuickImageProvider {
-  public:
-    Icons() : QQuickImageProvider(QQuickImageProvider::Image) {}
-    QImage requestImage(const QString &id, QSize *size, const QSize &requested) override {
-        QSize dimensions = requested.isEmpty() ? QSize(48, 48) : requested;
-        QIcon icon = id.startsWith('/') ? QIcon(id) : QIcon::fromTheme(id);
-        if (icon.isNull())
-            icon = QIcon::fromTheme("application-x-executable");
-        QImage image;
-        if (!icon.isNull())
-            image = icon.pixmap(dimensions).toImage();
-        if (image.isNull()) {
-            image = QImage(dimensions, QImage::Format_ARGB32_Premultiplied);
-            image.fill(Qt::transparent);
-            QPainter painter(&image);
-            painter.setRenderHint(QPainter::Antialiasing);
-            painter.setPen(Qt::NoPen);
-            painter.setBrush(QColor("#8aaff4"));
-            painter.drawRoundedRect(image.rect().adjusted(4, 4, -4, -4), 8, 8);
-            painter.setPen(QColor("#172237"));
-            QFont font = painter.font();
-            font.setPixelSize(dimensions.height() / 2);
-            font.setBold(true);
-            painter.setFont(font);
-            painter.drawText(image.rect(), Qt::AlignCenter, "+");
-        }
-        if (size)
-            *size = image.size();
-        return image;
-    }
-};
-} // namespace
 ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop, bool preview)
-    : controller_(controller), desktop_(desktop), preview_(preview), outputScreen_(screen) {
+    : QQuickView(controller.engine(), nullptr), controller_(controller), desktop_(desktop), preview_(preview), outputScreen_(screen) {
     setScreen(screen);
     setTitle(desktop ? "shaoDe desktop" : "shaoDe taskbar");
     setColor(Qt::transparent);
@@ -55,12 +17,10 @@ ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop,
     setFlags(Qt::FramelessWindowHint);
     static const int registered = qmlRegisterType<TaskFilter>("ShaoDe", 1, 0, "TaskFilter");
     Q_UNUSED(registered);
-    engine()->addImageProvider("icons", new Icons);
-    rootContext()->setContextProperty("shell", &controller);
-    rootContext()->setContextProperty("shellView", this);
-    rootContext()->setContextProperty("desktopView", desktop);
-    // Matches the compositor's output name, which the workspace state is keyed by.
-    rootContext()->setContextProperty("outputName", screen->name());
+    // The engine is shared by every view; what differs per view goes in as initial properties.
+    // outputName matches the compositor's output name, which the workspace state is keyed by.
+    if (!desktop)
+        setInitialProperties({{"shellView", QVariant::fromValue(this)}, {"outputName", screen->name()}});
 #if SHAODE_LAYER_SHELL
     if (!preview) {
         using W = LayerShellQt::Window;
@@ -74,7 +34,7 @@ ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop,
     }
 #endif
     resizeForContent();
-    setSource(QUrl(desktop ? "qrc:/shell/Desktop.qml" : "qrc:/shell/Panel.qml"));
+    setSource(QUrl(desktop ? "qrc:/shell/ShaoDeShell/Desktop.qml" : "qrc:/shell/ShaoDeShell/Panel.qml"));
     connect(&controller, &ShellController::configChanged, this, [this] {
         placeLayer();
         resizeForContent();
@@ -136,17 +96,51 @@ void ShellView::setExpanded(bool expanded, bool keyboard) {
     if (keyboard)
         requestActivate();
 }
+OverviewView::OverviewView(ShellController &controller, QScreen *screen)
+    : QQuickView(controller.engine(), nullptr), controller_(controller), outputScreen_(screen) {
+    setScreen(screen);
+    setTitle("shaoDe overview");
+    setColor(Qt::transparent);
+    setFlags(Qt::FramelessWindowHint);
+    resize(screen->geometry().size());
+    setInitialProperties({{"screenSize", screen->geometry().size()}});
+#if SHAODE_LAYER_SHELL
+    using W = LayerShellQt::Window;
+    layer_ = W::get(this);
+    layer_->setScreen(screen);
+    layer_->setScope("shaode-overview");
+    layer_->setLayer(W::LayerOverlay);
+    layer_->setAnchors(W::Anchors(W::AnchorTop | W::AnchorBottom | W::AnchorLeft | W::AnchorRight));
+    layer_->setExclusiveZone(-1);
+    layer_->setKeyboardInteractivity(W::KeyboardInteractivityNone);
+    layer_->setActivateOnShow(false);
+#endif
+    setSource(QUrl("qrc:/shell/ShaoDeShell/Overview.qml"));
+    connect(screen, &QScreen::geometryChanged, this, [this] {
+        resize(outputScreen_->geometry().size());
+        if (rootObject())
+            rootObject()->setProperty("screenSize", outputScreen_->geometry().size());
+    });
+    connect(&controller, &ShellController::overviewChanged, this, &OverviewView::update);
+}
+void OverviewView::update() {
+    const bool here = controller_.overviewOutput() == outputScreen_->name();
+    if (here && !isVisible()) {
+        show();
+        std::cerr << "shaoDe overview shown on " << outputScreen_->name().toStdString() << '\n';
+    } else if (!here && isVisible()) {
+        hide();
+        std::cerr << "shaoDe overview hidden on " << outputScreen_->name().toStdString() << '\n';
+    }
+}
 SwitcherView::SwitcherView(ShellController &controller, QScreen *screen)
-    : controller_(controller), outputScreen_(screen), delay_(new QTimer(this)) {
+    : QQuickView(controller.engine(), nullptr), controller_(controller), outputScreen_(screen), delay_(new QTimer(this)) {
     setScreen(screen);
     setTitle("shaoDe switcher");
     setColor(Qt::transparent);
     setResizeMode(QQuickView::SizeViewToRootObject);
     setFlags(Qt::FramelessWindowHint);
-    engine()->addImageProvider("icons", new Icons);
-    rootContext()->setContextProperty("shell", &controller);
-    rootContext()->setContextProperty("outputName", screen->name());
-    rootContext()->setContextProperty("screenSize", screen->geometry().size());
+    setInitialProperties({{"screenSize", screen->geometry().size()}});
 #if SHAODE_LAYER_SHELL
     using W = LayerShellQt::Window;
     layer_ = W::get(this);
@@ -161,9 +155,10 @@ SwitcherView::SwitcherView(ShellController &controller, QScreen *screen)
     connect(this, &QWindow::widthChanged, this, fit);
     connect(this, &QWindow::heightChanged, this, fit);
 #endif
-    setSource(QUrl("qrc:/shell/Switcher.qml"));
+    setSource(QUrl("qrc:/shell/ShaoDeShell/Switcher.qml"));
     connect(screen, &QScreen::geometryChanged, this, [this] {
-        rootContext()->setContextProperty("screenSize", outputScreen_->geometry().size());
+        if (rootObject())
+            rootObject()->setProperty("screenSize", outputScreen_->geometry().size());
     });
     // A quick Alt+Tab switches without the overlay flashing up.
     delay_->setSingleShot(true);
@@ -186,5 +181,229 @@ void SwitcherView::update() {
         }
     } else if (!isVisible() && !delay_->isActive()) {
         delay_->start();
+    }
+}
+PaletteView::PaletteView(ShellController &controller, QScreen *screen)
+    : QQuickView(controller.engine(), nullptr), controller_(controller), outputScreen_(screen) {
+    setScreen(screen);
+    setTitle("shaoDe palette");
+    setColor(Qt::transparent);
+    setResizeMode(QQuickView::SizeViewToRootObject);
+    setFlags(Qt::FramelessWindowHint);
+    setInitialProperties({{"screenSize", screen->geometry().size()}});
+#if SHAODE_LAYER_SHELL
+    using W = LayerShellQt::Window;
+    layer_ = W::get(this);
+    layer_->setScreen(screen);
+    layer_->setScope("shaode-palette");
+    layer_->setLayer(W::LayerOverlay);
+    layer_->setAnchors(W::AnchorTop);
+    layer_->setMargins(QMargins(0, screen->geometry().height() / 6, 0, 0));
+    layer_->setExclusiveZone(0);
+    layer_->setKeyboardInteractivity(W::KeyboardInteractivityExclusive);
+    layer_->setActivateOnShow(true);
+#endif
+    setSource(QUrl("qrc:/shell/ShaoDeShell/Palette.qml"));
+    // The surface is as big as the palette wants, whatever size the compositor last configured
+    // (a palette that opened small would otherwise stay small).
+    if (auto *root = rootObject()) {
+        auto fit = [this, root] {
+            const QSize wanted(qRound(root->width()), qRound(root->height()));
+            if (size() != wanted)
+                resize(wanted);
+#if SHAODE_LAYER_SHELL
+            layer_->setDesiredSize(wanted);
+#endif
+        };
+        connect(root, &QQuickItem::widthChanged, this, fit);
+        connect(root, &QQuickItem::heightChanged, this, fit);
+        connect(this, &QWindow::heightChanged, this, fit);
+        fit();
+    }
+    connect(screen, &QScreen::geometryChanged, this, [this] {
+        if (rootObject())
+            rootObject()->setProperty("screenSize", outputScreen_->geometry().size());
+#if SHAODE_LAYER_SHELL
+        if (layer_)
+            layer_->setMargins(QMargins(0, outputScreen_->geometry().height() / 6, 0, 0));
+#endif
+    });
+    // Clicking elsewhere takes the keyboard away, which closes the palette.
+    connect(this, &QWindow::activeChanged, this, [this] {
+        if (isActive())
+            wasActive_ = true;
+        else if (wasActive_ && isVisible())
+            controller_.palette()->close();
+    });
+    connect(controller.palette(), &Palette::openChanged, this, &PaletteView::update);
+}
+void PaletteView::update() {
+    const bool mine = controller_.palette()->output() == outputScreen_->name();
+    if (mine && !isVisible()) {
+        wasActive_ = false;
+        if (rootObject())
+            QMetaObject::invokeMethod(rootObject(), "reset");
+        show();
+        requestActivate();
+        std::cerr << "shaoDe palette shown on " << outputScreen_->name().toStdString() << '\n';
+    } else if (!mine && isVisible()) {
+        hide();
+        std::cerr << "shaoDe palette hidden on " << outputScreen_->name().toStdString() << '\n';
+    }
+}
+
+namespace {
+// Makes the surface as big as the item it shows, whatever size the compositor last configured
+// (a surface that opened small would otherwise stay small).
+void followRoot(QQuickView *view, LayerShellQt::Window *layer, QQuickItem *root) {
+    auto fit = [view, layer, root] {
+        const QSize wanted(qRound(root->width()), qRound(root->height()));
+        if (view->size() != wanted)
+            view->resize(wanted);
+#if SHAODE_LAYER_SHELL
+        if (layer)
+            layer->setDesiredSize(wanted);
+#else
+        Q_UNUSED(layer);
+#endif
+    };
+    QObject::connect(root, &QQuickItem::widthChanged, view, fit);
+    QObject::connect(root, &QQuickItem::heightChanged, view, fit);
+    QObject::connect(view, &QWindow::heightChanged, view, fit);
+    QObject::connect(view, &QWindow::widthChanged, view, fit);
+    fit();
+}
+} // namespace
+CardsView::CardsView(ShellController &controller, QScreen *screen)
+    : QQuickView(controller.engine(), nullptr), controller_(controller), outputScreen_(screen) {
+    setScreen(screen);
+    setTitle("shaoDe notifications");
+    setColor(Qt::transparent);
+    setResizeMode(QQuickView::SizeViewToRootObject);
+    setFlags(Qt::FramelessWindowHint);
+    setInitialProperties({{"outputName", screen->name()}});
+#if SHAODE_LAYER_SHELL
+    using W = LayerShellQt::Window;
+    layer_ = W::get(this);
+    layer_->setScreen(screen);
+    layer_->setScope("shaode-notifications");
+    layer_->setLayer(W::LayerOverlay);
+    layer_->setExclusiveZone(0);
+    layer_->setKeyboardInteractivity(W::KeyboardInteractivityNone);
+    layer_->setActivateOnShow(false);
+    placeLayer();
+#endif
+    setSource(QUrl("qrc:/shell/ShaoDeShell/NotificationCards.qml"));
+    if (auto *root = rootObject()) {
+        connect(root, SIGNAL(activeChanged()), this, SLOT(update()));
+        followRoot(this, layer_, root);
+    }
+    connect(&controller, &ShellController::configChanged, this, [this] { placeLayer(); });
+    update();
+}
+void CardsView::placeLayer() {
+#if SHAODE_LAYER_SHELL
+    using W = LayerShellQt::Window;
+    W::Anchors anchors;
+    anchors |= controller_.notifications()->bottom() ? W::AnchorBottom : W::AnchorTop;
+    anchors |= controller_.notifications()->left() ? W::AnchorLeft : W::AnchorRight;
+    layer_->setAnchors(anchors);
+#endif
+}
+void CardsView::update() {
+    const bool want = rootObject() && rootObject()->property("active").toBool();
+    if (want && !isVisible()) {
+        show();
+        std::cerr << "shaoDe notifications shown on " << outputScreen_->name().toStdString() << '\n';
+    } else if (!want && isVisible()) {
+        hide();
+        std::cerr << "shaoDe notifications hidden on " << outputScreen_->name().toStdString() << '\n';
+    }
+}
+OsdView::OsdView(ShellController &controller, QScreen *screen)
+    : QQuickView(controller.engine(), nullptr), controller_(controller), outputScreen_(screen) {
+    setScreen(screen);
+    setTitle("shaoDe osd");
+    setColor(Qt::transparent);
+    setResizeMode(QQuickView::SizeViewToRootObject);
+    setFlags(Qt::FramelessWindowHint | Qt::WindowTransparentForInput);
+    setInitialProperties({{"outputName", screen->name()}});
+#if SHAODE_LAYER_SHELL
+    using W = LayerShellQt::Window;
+    layer_ = W::get(this);
+    layer_->setScreen(screen);
+    layer_->setScope("shaode-osd");
+    layer_->setLayer(W::LayerOverlay);
+    layer_->setExclusiveZone(-1);
+    layer_->setKeyboardInteractivity(W::KeyboardInteractivityNone);
+    layer_->setActivateOnShow(false);
+    placeLayer();
+#endif
+    setSource(QUrl("qrc:/shell/ShaoDeShell/Osd.qml"));
+    if (auto *root = rootObject()) {
+        connect(root, SIGNAL(visibleNowChanged()), this, SLOT(update()));
+        followRoot(this, layer_, root);
+    }
+    connect(&controller, &ShellController::configChanged, this, [this] { placeLayer(); });
+}
+void OsdView::placeLayer() {
+#if SHAODE_LAYER_SHELL
+    using W = LayerShellQt::Window;
+    layer_->setAnchors(controller_.osd()->top() ? W::AnchorTop : W::AnchorBottom);
+    layer_->setMargins(QMargins(0, 48, 0, 48));
+#endif
+}
+void OsdView::update() {
+    const bool want = rootObject() && rootObject()->property("visibleNow").toBool();
+    if (want && !isVisible()) {
+        show();
+        std::cerr << "shaoDe osd shown on " << outputScreen_->name().toStdString() << '\n';
+    } else if (!want && isVisible()) {
+        hide();
+        std::cerr << "shaoDe osd hidden on " << outputScreen_->name().toStdString() << '\n';
+    }
+}
+ConfigErrorView::ConfigErrorView(ShellController &controller, QScreen *screen)
+    : QQuickView(controller.engine(), nullptr), outputScreen_(screen) {
+    setScreen(screen);
+    setTitle("shaoDe configuration error");
+    setColor(Qt::transparent);
+    setResizeMode(QQuickView::SizeRootObjectToView);
+    setFlags(Qt::FramelessWindowHint | Qt::WindowTransparentForInput);
+#if SHAODE_LAYER_SHELL
+    using W = LayerShellQt::Window;
+    layer_ = W::get(this);
+    layer_->setScreen(screen);
+    layer_->setScope("shaode-config-error");
+    layer_->setLayer(W::LayerOverlay);
+    layer_->setAnchors(W::Anchors(W::AnchorTop) | W::AnchorLeft | W::AnchorRight);
+    layer_->setExclusiveZone(-1);
+    layer_->setKeyboardInteractivity(W::KeyboardInteractivityNone);
+    layer_->setActivateOnShow(false);
+#endif
+    setSource(QUrl("qrc:/shell/ShaoDeShell/ConfigError.qml"));
+    if (auto *root = rootObject()) {
+        connect(root, SIGNAL(visibleNowChanged()), this, SLOT(update()));
+        connect(root, SIGNAL(implicitHeightChanged()), this, SLOT(update()));
+    }
+    update();
+}
+void ConfigErrorView::update() {
+    auto *root = rootObject();
+    const bool want = root && root->property("visibleNow").toBool();
+    if (root) {
+        // The compositor stretches it across the output; only its height is asked for.
+        const int height = qMax(1, qRound(root->implicitHeight()));
+        resize(outputScreen_->geometry().width(), height);
+#if SHAODE_LAYER_SHELL
+        layer_->setDesiredSize(QSize(0, height));
+#endif
+    }
+    if (want && !isVisible()) {
+        show();
+        std::cerr << "shaoDe configuration error shown on " << outputScreen_->name().toStdString()
+                  << '\n';
+    } else if (!want && isVisible()) {
+        hide();
     }
 }

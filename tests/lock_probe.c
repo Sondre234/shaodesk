@@ -13,6 +13,11 @@
 #include <unistd.h>
 #include <wayland-client.h>
 
+#ifdef __SANITIZE_ADDRESS__
+/* A short-lived test client exits without tearing its protocol objects down. */
+const char *__asan_default_options(void) { return "detect_leaks=0"; }
+#endif
+
 struct probe {
     struct wl_display *display;
     struct wl_compositor *compositor;

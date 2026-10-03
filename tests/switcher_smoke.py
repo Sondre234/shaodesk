@@ -42,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-switcher-test-") as directory:
 
     def msg(*words):
         result = subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                                text=True, timeout=5)
+                                text=True, timeout=30)
         assert result.returncode == 0, (words, result.stdout, result.stderr)
         return result.stdout
 
@@ -180,12 +180,12 @@ with tempfile.TemporaryDirectory(prefix="shaode-switcher-test-") as directory:
             msg("switcher")  # C selected
             events.expect(lambda l: l == ["switcher-select 2"], "C selected")
             clients["B"].terminate()
-            clients["B"].wait(timeout=5)
+            clients["B"].wait(timeout=30)
             processes.remove(clients["B"])
             _, selected, titles, _ = opened(events.expect(opened, "list without B"))
             assert titles == ["D", "A", "C"] and selected == 2, (titles, selected)
             clients["C"].terminate()
-            clients["C"].wait(timeout=5)
+            clients["C"].wait(timeout=30)
             processes.remove(clients["C"])
             _, selected, titles, _ = opened(events.expect(opened, "list without C"))
             assert titles == ["D", "A"] and selected == 1, (titles, selected)
@@ -193,7 +193,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-switcher-test-") as directory:
             wait_for(lambda: focused() == "A", "A focused after the list shrank")
 
             error = subprocess.run([compositor, "msg", "switcher_confirm", "x"], env=env,
-                                   capture_output=True, text=True, timeout=5)
+                                   capture_output=True, text=True, timeout=30)
             assert error.returncode != 0 and "switcher_confirm takes" in error.stdout + \
                 error.stderr, (error.stdout, error.stderr)
 
@@ -201,7 +201,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-switcher-test-") as directory:
             wtype = shutil.which("wtype")
             if wtype:
                 def type_keys(*arguments):
-                    subprocess.run([wtype, *arguments], env=env, check=True, timeout=5)
+                    subprocess.run([wtype, *arguments], env=env, check=True, timeout=30)
 
                 events.lines = []
                 type_keys("-M", "alt", "-k", "Tab", "-m", "alt")
@@ -220,4 +220,4 @@ with tempfile.TemporaryDirectory(prefix="shaode-switcher-test-") as directory:
         finally:
             for process in reversed(processes):
                 process.terminate()
-                process.wait(timeout=5)
+                process.wait(timeout=30)

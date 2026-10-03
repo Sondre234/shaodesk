@@ -1,4 +1,10 @@
-# Verification: first nested compositor checkpoint
+# Verification: checkpoint log
+
+Dated records of what was checked, automatically and by hand, and what was not. New
+checkpoints are appended; the automated part is the `ctest` suite, which CI also runs
+headless in an Arch Linux container (see `.github/workflows/ci.yml`).
+
+## First nested compositor checkpoint
 
 Verified on 2026-09-23 with wlroots 0.20.2, GCC 16.2.1, Lua 5.4.8, and Wayland
 1.26.0 on Arch Linux. Nested graphics ran inside Hyprland on an NVIDIA RTX 4090
@@ -23,6 +29,11 @@ configuration, and the existing desktop remained running.
 Run all automated checks with `ctest --test-dir build --output-on-failure`.
 
 ## Nested runtime checks
+
+This section records the checkpoint as it was run. Its keys were the then-default Alt
+bindings (Alt + drag, Alt + F4, Alt + Shift + Escape); the default modifier is now Super
+(see [config/init.lua](../config/init.lua)), and there are no default bindings for the
+last two: close is Super + C and quit is Super + M.
 
 Real Kitty clients were opened inside temporary nested compositor instances.
 Input was sent to those windows through Hyprland's documented dispatch API;
@@ -218,3 +229,131 @@ right-clicking empty bar space showed the bar menu, whose tiling and Application
 items worked. `shell_ui` right-clicks a stand-in task (holding the button for a
 second) and empty bar space, and checks each menu lies inside the grown surface.
 Not yet checked with a physical mouse or touchpad.
+
+## Scrolling layout
+
+Added 2026-09-28. `tiling_tests` checks the column geometry (widths, gaps, stacks, the
+three view-follow modes, presets, consuming and expelling, moving columns) and runs 4000
+random operations checking that every window is placed once and none overlap, also under
+AddressSanitizer and UBSan. `scroll_smoke` drives a headless compositor with three
+clients through scroll, width, center, consume and expel actions. Not checked: how the
+gliding view looks at real refresh rates, focus following the mouse while columns
+move under a still pointer, dragging a column's edge with a physical mouse, Xwayland
+windows in columns, or several monitors with different layouts on a real display.
+
+## Output layouts and hotplug
+
+Added 2026-09-28. `tiling_tests` checks that an output's layout defaults sit between the
+global defaults and a workspace's own choice. `output_layout_smoke` reloads the configuration
+under two headless outputs and checks that `layout.outputs` reaches windows already open
+without overriding a layout chosen by an action. `output_hotplug_smoke` unplugs and re-plugs
+a headless output (`shaode msg headless_output`) holding tiled windows on two workspaces and
+floating windows: they move to the other output, keep their workspaces and tiling, and come
+back, or stay with `outputs.return_windows = false`. Not checked on real hardware: a monitor
+that goes away and comes back through DRM (sleep, cable pull, DisplayPort link retraining),
+hotplug events arriving while a client is mid-commit, or fractional scales that differ
+between the monitors.
+
+`scroll_follow_smoke` checks the three `layout.scroll.follow` modes (`center`, `edge`, `never`)
+against a headless compositor. `output_workspace_move_smoke` moves and swaps workspaces between two headless outputs
+(windows, layout state, what each output shows, and an output that does not tile), and checks
+that the windows glide. `session_scroll_smoke` saves and restores scroll columns. Not checked:
+the look of the glide across two real monitors with different scales or refresh rates.
+
+## Window swallowing, magnetic edges and placement
+
+Added 2026-09-28. `swallow_smoke` runs a headless compositor whose probe client starts
+another probe window on a signal, directly or through a shell that stays in between, as an
+application started from a terminal is: the window takes the terminal's tile or floating
+rectangle, the terminal is hidden and off the taskbar, closing the window brings it back
+(also from another workspace, and from fullscreen), `exceptions`, the case-blind terminal
+list, a terminal that dies first, `enabled = false` and `swallow_toggle` (both ways) behave as
+documented. `swallow_x11_smoke` does the same with an XWayland window, whose process comes from
+`_NET_WM_PID`. `magnet_smoke` drags and resizes a floating window through a virtual pointer
+and keyboard (`pointer_probe`, with the client asking for the move as a client-decorated window
+does): edges land on the output, the area a panel leaves free and another window's edges, hold
+until the pointer is the distance away, honour the bypass modifier and the settings, keep
+drag-to-top maximizing, and the guide lines' geometry and pixels (grim) are checked.
+`window_placement_tests` covers cascade, center and smart placement including 500 random
+layouts, and `placement_smoke` the three modes with a panel, a rule's `position`, other
+workspaces and tiling. The compositor tests also ran under AddressSanitizer and UBSan.
+
+Not checked: swallowing with real terminals and real applications (foot, kitty, wezterm
+or a terminal that keeps one process for several windows), an application that hands its
+window to a running instance, how the magnetism feels with a physical mouse or touchpad at
+real refresh rates and whether 12 px suits high-density outputs, magnetism across monitors
+with different scales, and smart placement when a client changes its size right after
+opening.
+
+## Urgent windows
+
+Added 2026-09-28. `urgent_smoke` drives two to five headless probe windows that ask for
+attention through xdg-activation (a token without an input serial, the way a browser handed a
+link does): the default policy marks them and leaves focus alone; repeated requests and requests
+from the focused window change nothing; `get urgent` and the subscription report them in order;
+`focus_urgent` takes them oldest first, switches workspace, brings a scratchpad window back, and
+does nothing when none is urgent; focusing by the taskbar protocol, closing, and the policies
+`focus` (also from another workspace) and `ignore`, changed by reload, behave as documented.
+`urgent_border_smoke` checks with grim that the border pulses, holds `urgent_color`, sits inside
+the window without a `border_width` and gives way to the focus color, and that animations off
+hold the color at once. `xwayland_urgent_smoke` does the same for
+`_NET_WM_STATE_DEMANDS_ATTENTION` and the `WM_HINTS` urgency flag set and cleared by an X11
+client, and for a window that asked before mapping (`focus = false` rule). `urgent_shell_smoke` runs the shell on the headless compositor: the taskbar's marker
+and the overview's frame appear as pixels and go with focus. `shell_ui`, `shell_tasks`,
+`shell_task_filter` and `palette` cover the panel's workspace and task markers, the task
+model's urgent role and the palette's ordering. The tests ran repeatedly without a failure, and
+the suite passed under AddressSanitizer and UBSan (`shell_preview` timed out once in that
+parallel run and passed alone, as it did before this work). The pulse redraws borders every 40 ms
+for four seconds: ten windows pulsing at once cost the compositor about 40 ms of CPU in those
+four seconds (headless, pixman, 20 windows open), and nothing runs once it ends or while idle.
+
+Not checked: real applications asking for attention (a chat client's notification, Firefox or
+Chromium opening a link, a terminal's bell through Xwayland, Steam), whether the pulse looks
+right on a real display at its refresh rate, how the taskbar's dot reads next to a real icon
+theme. An X11 window that asks for attention before it maps is marked only when it opens
+without focus (a `focus = false` rule or another workspace); one that opens with focus has it. A token created by a different client than the window it
+activates is treated the same as one from the window itself.
+
+## Notifications and on-screen display
+
+Added 2026-09-29. Everything runs headless on a dbus-daemon the tests start (and kill by process)
+on a private address; the shell is started with that address, or with none in the older shell
+tests, and never sees the real session bus. `notifications_test` (QtTest) covers the model, the
+timers (expiry, hover pause keeping the remaining time, replacement while held), replacement by id
+and by stack tag, the limits, do-not-disturb with critical notifications passing, dismissal and
+default and named actions, `resident` and `transient`, closing by the application, the history
+cap and unread count, and 23 cases of body markup (unknown tags dropped, links limited to web and
+mail addresses, entities, unbalanced tags, `>` inside a quoted attribute).
+`notifications_dbus_test` calls the interface over the private bus: server information,
+capabilities, `Notify` with every hint the parser reads (urgency, value, image data, image path,
+desktop entry, resident, transient, stack tag), `CloseNotification`, the `NotificationClosed` and
+`ActionInvoked` signals, refusal of a second daemon, taking the name when the owner leaves, and
+1500 random calls with mistyped hints, odd action lists and short image data, which must neither
+crash nor break the card and history limits. `notifications_smoke` runs the compositor and the
+shell headless on two monitors: the card appears top right (pixels checked with grim), a click
+runs the default action, `CloseNotification` and timeouts remove the card, hovering with a
+virtual pointer holds the timer past its timeout, replacement keeps the id, do-not-disturb
+silences cards but not critical ones, the display and the cards go to the monitor with the focus
+and cards stay on one monitor while they last, the display's pill and the history popover are
+found as pixels, a change of a fake backlight (`SHAODE_SYSFS`, polled) shows the display, turning `notifications.enabled` off and on by reload releases and retakes the
+name, and a real `notify-send -w -A` gets its action back. `shell_ui` drives the bell, the
+badge, the cards' buttons, close button and default click, and the history's switch and Clear
+button through Qt Quick offscreen; `shell_osd` the display's timing, the volume hook (baseline
+quiet, changes shown, mute, output switches quiet) and a fake sysfs backlight. The new tests ran
+repeatedly without a failure, under AddressSanitizer and UBSan without a report, and with
+`-DSHAODE_NOTIFICATIONS=OFF` the shell builds and its tests pass. A search for a bug found one:
+the do-not-disturb switch called a property setter QML could not reach, which `shell_ui` caught.
+
+The display's surface has an empty input region (seen in the Wayland trace), so clicks go through it.
+
+Not checked: a physical backlight and its keys (the reading and the display are tested against a
+fake sysfs; the uevent socket that prompts a read on real hardware only has its message filter
+tested, and the kernel is expected to send one per change), the volume
+keys on a real PipeWire or PulseAudio session (the hook is driven by a stand-in sound server), real
+applications' notifications (Firefox, Chromium, Discord, Telegram, Thunderbird; only `notify-send`
+and a probe client were used), icons from a real icon theme (the tests have none, so cards show
+the stand-in), cards over a fullscreen window and over the lock screen on a real display, the look
+at high scales and with other fonts, a card pointer-hovered on real hardware, and whether the
+timings feel right. Another notification daemon started before the shell keeps the bus name; the
+shell then logs it and hides its bell, which is only checked with a second in-process daemon.
+

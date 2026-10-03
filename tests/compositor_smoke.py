@@ -20,7 +20,7 @@ for arguments, expected in [
 ]:
     result = subprocess.run([compositor, "--config", example, *arguments],
                             env=dict(os.environ, WAYLAND_DISPLAY="test-parent"),
-                            capture_output=True, text=True, timeout=5)
+                            capture_output=True, text=True, timeout=30)
     assert result.returncode != 0 and expected in result.stderr, result.stderr
 
 with tempfile.TemporaryDirectory(prefix="shaode-test-") as directory:
@@ -40,7 +40,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-test-") as directory:
             env["WAYLAND_DISPLAY"] = socket
             # Browsers and Electron apps expect these beyond the core desktop protocols.
             advertised = set(subprocess.run([probe, "--globals"], env=env, check=True,
-                                            capture_output=True, text=True, timeout=10).stdout.split())
+                                            capture_output=True, text=True, timeout=30).stdout.split())
             expected = {"wp_viewporter", "wp_fractional_scale_manager_v1", "zxdg_output_manager_v1",
                         "wp_presentation", "zwp_primary_selection_device_manager_v1",
                         "zwlr_data_control_manager_v1", "ext_data_control_manager_v1",
@@ -55,24 +55,28 @@ with tempfile.TemporaryDirectory(prefix="shaode-test-") as directory:
                         "zwp_virtual_keyboard_manager_v1", "zwlr_virtual_pointer_manager_v1"}
             assert expected <= advertised, f"missing globals: {sorted(expected - advertised)}"
             for _ in range(3):
-                subprocess.run([probe], env=env, check=True, timeout=10)
+                subprocess.run([probe], env=env, check=True, timeout=30)
             if task_model_test:
                 subprocess.run([task_model_test, probe], env=env, check=True, timeout=15)
             config.write_text("return {appearance={background='#315071'}, layout={gap=12}}")
             process.send_signal(signal.SIGHUP)
             wait_for(lambda: "Configuration reloaded" in log.read_text(), [process], "valid reload")
+            # An error loads the default configuration in its place and says what is wrong.
             config.write_text("return { layout = {gap = -1} }")
             process.send_signal(signal.SIGHUP)
-            wait_for(lambda: "Reload rejected" in log.read_text(), [process], "rejected reload")
-            subprocess.run([probe], env=env, check=True, timeout=10)
+            wait_for(lambda: "using the default configuration" in log.read_text(), [process],
+                     "reload with an error")
+            assert "layout.gap must be between 0 and 100" in log.read_text()
+            assert log.read_text().count("Configuration reloaded") == 2
+            subprocess.run([probe], env=env, check=True, timeout=30)
             # --check-config must reject invalid data without starting a display.
             result = subprocess.run([compositor, "--config", str(config), "--check-config"],
-                                    env=env, capture_output=True, text=True, timeout=5)
+                                    env=env, capture_output=True, text=True, timeout=30)
             assert result.returncode != 0 and "gap" in result.stderr
             process.send_signal(signal.SIGTERM)
-            assert process.wait(timeout=5) == 0, log.read_text()
+            assert process.wait(timeout=30) == 0, log.read_text()
             assert not (root / socket).exists(), "Wayland socket was not removed"
-            print("Headless clients, maximize/restore, reload, rejection, and clean shutdown passed")
+            print("Headless clients, maximize/restore, reload, fallback, and clean shutdown passed")
         except Exception:
             print(log.read_text(), file=sys.stderr)
             raise

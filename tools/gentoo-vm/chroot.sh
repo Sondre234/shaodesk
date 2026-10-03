@@ -75,7 +75,7 @@ eselect locale set en_US.utf8
 echo 'hostname="shaode-gentoo"' >/etc/conf.d/hostname
 
 # Boot: EFI system partition, GRUB (removable path, no NVRAM), dracut
-blkid -p "$ESP_DEV" | grep -q vfat || mkfs.vfat -F 32 -n ESP "$ESP_DEV"
+blkid -p "$ESP_DEV" | grep vfat >/dev/null || mkfs.vfat -F 32 -n ESP "$ESP_DEV"
 mkdir -p /efi
 mountpoint -q /efi || mount "$ESP_DEV" /efi
 cat >/etc/fstab <<EOF

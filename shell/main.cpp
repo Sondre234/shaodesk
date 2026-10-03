@@ -5,6 +5,9 @@
 #include <QGuiApplication>
 #include <QQmlEngine>
 #include <QQuickItem>
+#include <QQuickWindow>
+#include <QSGRendererInterface>
+#include <string_view>
 #include <QScreen>
 #include <QSocketNotifier>
 #include <QTimer>
@@ -27,6 +30,16 @@ void onSignal(int number) {
 }
 } // namespace
 int main(int argc, char **argv) {
+    // The compositor sets this so libGLX skips loading the GPU driver, which software rendering
+    // does not need. Applications launched from here get the original value back.
+    if (const char *vendor = std::getenv("__GLX_VENDOR_LIBRARY_NAME");
+        vendor && std::string_view(vendor) == "shaode-none") {
+        if (const char *saved = std::getenv("SHAODE_GLX_VENDOR"))
+            setenv("__GLX_VENDOR_LIBRARY_NAME", saved, 1);
+        else
+            unsetenv("__GLX_VENDOR_LIBRARY_NAME");
+        unsetenv("SHAODE_GLX_VENDOR");
+    }
     QGuiApplication app(argc, argv);
     // Views come and go with outputs (all of them during a VT switch); the shell's lifetime
     // follows the compositor connection instead.
@@ -60,6 +73,11 @@ int main(int argc, char **argv) {
         ShellController controller(parser.value("config").toStdString());
         if (!controller.enabled())
             return 0;
+        // A panel and a wallpaper gain nothing from the GPU, and Qt's GL/Vulkan set-up costs
+        // startup time, memory and threads. The environment's choice, if any, wins.
+        if (controller.softwareRenderer() && !qEnvironmentVariableIsSet("QT_QUICK_BACKEND") &&
+            !qEnvironmentVariableIsSet("QSG_RHI_BACKEND"))
+            QQuickWindow::setGraphicsApi(QSGRendererInterface::Software);
         QObject::connect(&controller, &ShellController::disabled, &app, &QCoreApplication::quit);
         QObject::connect(controller.tasks(), &TaskModel::disconnected, &app,
                          &QCoreApplication::quit);
@@ -70,6 +88,11 @@ int main(int argc, char **argv) {
         qmlRegisterUncreatableType<TaskModel>("ShaoDe", 1, 0, "TaskModel", "Provided by the shell");
         std::vector<std::unique_ptr<ShellView>> views;
         std::vector<std::unique_ptr<SwitcherView>> switchers;
+        std::vector<std::unique_ptr<PaletteView>> palettes;
+        std::vector<std::unique_ptr<OverviewView>> overviews;
+        std::vector<std::unique_ptr<CardsView>> cardViews;
+        std::vector<std::unique_ptr<OsdView>> osdViews;
+        std::vector<std::unique_ptr<ConfigErrorView>> errorViews;
         auto addScreen = [&](QScreen *screen) {
             // Qt's stand-in while the compositor has no outputs has no wl_output to attach to.
             if (!preview && screen->name().isEmpty())
@@ -109,6 +132,41 @@ int main(int argc, char **argv) {
                     throw std::runtime_error("could not load shell QML");
                 }
                 switchers.push_back(std::move(switcher));
+                auto palette = std::make_unique<PaletteView>(controller, screen);
+                if (palette->status() == QQuickView::Error) {
+                    for (const auto &error : palette->errors())
+                        std::cerr << error.toString().toStdString() << '\n';
+                    throw std::runtime_error("could not load shell QML");
+                }
+                palettes.push_back(std::move(palette));
+                auto overview = std::make_unique<OverviewView>(controller, screen);
+                if (overview->status() == QQuickView::Error) {
+                    for (const auto &error : overview->errors())
+                        std::cerr << error.toString().toStdString() << '\n';
+                    throw std::runtime_error("could not load shell QML");
+                }
+                overviews.push_back(std::move(overview));
+                auto cardView = std::make_unique<CardsView>(controller, screen);
+                if (cardView->status() == QQuickView::Error) {
+                    for (const auto &error : cardView->errors())
+                        std::cerr << error.toString().toStdString() << '\n';
+                    throw std::runtime_error("could not load shell QML");
+                }
+                cardViews.push_back(std::move(cardView));
+                auto osdView = std::make_unique<OsdView>(controller, screen);
+                if (osdView->status() == QQuickView::Error) {
+                    for (const auto &error : osdView->errors())
+                        std::cerr << error.toString().toStdString() << '\n';
+                    throw std::runtime_error("could not load shell QML");
+                }
+                osdViews.push_back(std::move(osdView));
+                auto errorView = std::make_unique<ConfigErrorView>(controller, screen);
+                if (errorView->status() == QQuickView::Error) {
+                    for (const auto &error : errorView->errors())
+                        std::cerr << error.toString().toStdString() << '\n';
+                    throw std::runtime_error("could not load shell QML");
+                }
+                errorViews.push_back(std::move(errorView));
             }
         };
         for (auto *screen : QGuiApplication::screens()) {
@@ -118,6 +176,10 @@ int main(int argc, char **argv) {
         }
         if (views.empty())
             throw std::runtime_error("no output available");
+        // The daemon answers once the surfaces to show its cards exist. A preview stays off the
+        // session bus unless asked to.
+        if (!preview || qEnvironmentVariableIsSet("SHAODE_PREVIEW_DBUS"))
+            controller.startNotifications();
         QObject::connect(&app, &QGuiApplication::screenAdded, &app, [&](QScreen *screen) {
             if (preview)
                 return;
@@ -133,6 +195,15 @@ int main(int argc, char **argv) {
             std::erase_if(switchers, [screen](const auto &switcher) {
                 return switcher->outputScreen() == screen;
             });
+            std::erase_if(palettes, [screen](const auto &palette) {
+                return palette->outputScreen() == screen;
+            });
+            std::erase_if(overviews, [screen](const auto &overview) {
+                return overview->outputScreen() == screen;
+            });
+            std::erase_if(cardViews, [screen](const auto &view) { return view->outputScreen() == screen; });
+            std::erase_if(osdViews, [screen](const auto &view) { return view->outputScreen() == screen; });
+            std::erase_if(errorViews, [screen](const auto &view) { return view->outputScreen() == screen; });
         });
         int pipeFds[2];
         if (pipe2(pipeFds, O_NONBLOCK | O_CLOEXEC) < 0)

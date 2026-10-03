@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "shaode/config.hpp"
+#include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
@@ -21,7 +22,7 @@ int main(int argc, char **argv) {
     try {
         require(argc == 2, "example config path required");
         auto config = shaode::load_config(argv[1]);
-        require(config.bindings.size() == 40, "example shortcuts missing");
+        require(config.bindings.size() == 63, "example shortcuts missing");
         require(config.binding(SH_ALT, XKB_KEY_Tab)->action == SH_SWITCHER_NEXT &&
                     config.binding(SH_ALT | SH_SHIFT, XKB_KEY_Tab)->action == SH_SWITCHER_PREV,
                 "example window switcher bindings missing");
@@ -67,6 +68,23 @@ int main(int argc, char **argv) {
         rejects("return {features={no_such_feature=true}}");
         rejects("return {features={true}}");
         rejects("return {features=true}");
+        {
+            auto moves = shaode::parse_config(
+                "return {bindings={{mods={'Super'},key='comma',action='move_workspace_to_output',"
+                "output='left'},{mods={'Super'},key='x',action='swap_workspaces'},"
+                "{mods={'Super'},key='y',action='swap_workspaces',output='desc:Dell U27'}}}");
+            require(moves.bindings.size() == 3 && moves.bindings[0].action == SH_MOVE_WORKSPACE_TO_OUTPUT &&
+                        moves.bindings[0].output == "left" &&
+                        moves.bindings[1].action == SH_SWAP_WORKSPACES &&
+                        moves.bindings[1].output == "next" &&
+                        moves.bindings[2].output == "desc:Dell U27",
+                    "workspace-to-output bindings not parsed");
+            rejects("return {bindings={{key='l',action='move_workspace_to_output'}}}");
+            rejects("return {bindings={{key='l',action='move_workspace_to_output',output=''}}}");
+            rejects("return {bindings={{key='l',action='move_workspace_to_output',output=3}}}");
+            rejects("return {bindings={{key='l',action='swap_workspaces',output='desc:'}}}");
+            rejects("return {bindings={{key='l',action='close',output='left'}}}");
+        }
         rejects("return {bindings={{key='l',action='close',amount=10}}}");
         rejects("return {bindings={{key='l',action='resize_up',amount=0}}}");
         rejects("return {bindings={{key='l',action='resize_up',amount=1.5}}}");
@@ -75,6 +93,77 @@ int main(int argc, char **argv) {
         require(shaode::parse_action("toggle_floating") == SH_TOGGLE_FLOATING,
                 "toggle_floating action missing");
         rejects("return {layout={tiling='yes'}}");
+        {
+            auto defaults = shaode::parse_config("return {}").settings;
+            require(defaults.tile_layout == SH_LAYOUT_DWINDLE && defaults.master_count == 1 &&
+                        defaults.master_ratio > 0.5F && defaults.master_ratio < 0.6F,
+                    "layout defaults wrong");
+            auto layouts = shaode::parse_config(
+                "return {layout={tile_layout='spiral',master_ratio=0.6,master_count=2}}");
+            require(layouts.settings.tile_layout == SH_LAYOUT_SPIRAL &&
+                        layouts.settings.master_ratio == 0.6F &&
+                        layouts.settings.master_count == 2,
+                    "layout settings not parsed");
+            rejects("return {layout={tile_layout='grid'}}");
+            rejects("return {layout={master_ratio=1}}");
+            rejects("return {layout={master_count=0}}");
+            require(defaults.scroll_follow == SH_SCROLL_FOLLOW_CENTER &&
+                        defaults.scroll_width == 0.5F && defaults.scroll_preset_count == 4,
+                    "scroll defaults wrong");
+            auto scroll = shaode::parse_config(
+                "return {layout={tile_layout='scroll',scroll={follow='never',width=0.4,step=0.05,"
+                "presets={0.25,0.5}}}}");
+            require(scroll.settings.tile_layout == SH_LAYOUT_SCROLL &&
+                        scroll.settings.scroll_follow == SH_SCROLL_FOLLOW_NEVER &&
+                        scroll.settings.scroll_width == 0.4F &&
+                        scroll.settings.scroll_step == 0.05F &&
+                        scroll.settings.scroll_preset_count == 2 &&
+                        scroll.settings.scroll_presets[1] == 0.5F,
+                    "scroll settings not parsed");
+            auto per_output = shaode::parse_config(
+                "return {layout={outputs={['DP-1']={tile_layout='scroll',master_ratio=0.6},"
+                "['desc:Dell']={master_count=3}}}}");
+            require(per_output.settings.output_layout_count == 2, "layout.outputs not parsed");
+            for (int i = 0; i < 2; ++i) {
+                const auto &entry = per_output.settings.output_layouts[i];
+                if (std::string(entry.name) == "DP-1")
+                    require(entry.tile_layout == SH_LAYOUT_SCROLL && entry.master_ratio == 0.6F &&
+                                entry.master_count == 0,
+                            "layout.outputs entry wrong");
+                else
+                    require(std::string(entry.name) == "desc:Dell" && entry.tile_layout < 0 &&
+                                entry.master_ratio == 0 && entry.master_count == 3,
+                            "layout.outputs description entry wrong");
+            }
+            require(defaults.output_layout_count == 0, "layout.outputs has a default");
+            require(defaults.return_windows &&
+                        !shaode::parse_config("return {outputs={return_windows=false}}")
+                             .settings.return_windows,
+                    "outputs.return_windows not parsed");
+            rejects("return {outputs={return_windows='yes'}}");
+            rejects("return {layout={outputs={['DP-1']={tile_layout='grid'}}}}");
+            rejects("return {layout={outputs={['DP-1']={master_ratio=2}}}}");
+            rejects("return {layout={outputs={['DP-1']={master_count=0}}}}");
+            rejects("return {layout={outputs={['DP-1']={tilelayout='scroll'}}}}");
+            rejects("return {layout={outputs={'DP-1'}}}");
+            rejects("return {layout={outputs={['']={tile_layout='scroll'}}}}");
+            rejects("return {layout={scroll={follow='sometimes'}}}");
+            rejects("return {layout={scroll={width=0}}}");
+            rejects("return {layout={scroll={step=1}}}");
+            rejects("return {layout={scroll={presets={}}}}");
+            rejects("return {layout={scroll={presets={2}}}}");
+            rejects("return {layout={scroll={presets={'half'}}}}");
+            rejects("return {layout={scroll={presets={0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5}}}}");
+            rejects("return {layout={scroll={colour='red'}}}");
+            for (auto name : {"layout_next", "layout_prev", "layout_dwindle", "layout_master",
+                              "layout_scroll", "scroll_left", "scroll_right", "column_widen",
+                              "column_narrow", "column_cycle_width", "consume_left",
+                              "consume_right", "expel", "center_column",
+                              "layout_spiral", "layout_monocle", "promote", "focus_next",
+                              "focus_prev", "swap_next", "swap_prev", "master_grow",
+                              "master_shrink", "master_more", "master_less"})
+                require(shaode::parse_action(name) != SH_NONE, "layout action missing");
+        }
         auto *back = config.binding(SH_LOGO, XKB_KEY_Tab);
         require(back && back->action == SH_WORKSPACE_BACK && back->workspace == 0,
                 "workspace_back binding missing");
@@ -93,8 +182,10 @@ int main(int argc, char **argv) {
         require(!shaode::parse_config("return {features={sticky=false}}").settings.sticky,
                 "features.sticky not parsed");
         rejects("return {features={sticky='no'}}");
-        auto *sticky = config.binding(SH_LOGO, XKB_KEY_p);
+        auto *sticky = config.binding(SH_LOGO | SH_SHIFT, XKB_KEY_p);
         require(sticky && sticky->action == SH_TOGGLE_STICKY, "sticky binding missing");
+        auto *palette = config.binding(SH_LOGO, XKB_KEY_p);
+        require(palette && palette->action == SH_PALETTE, "palette binding missing");
         rejects("return {features={bogus=true}}");
         rejects("return {features={true}}");
         rejects("return {features=true}");
@@ -232,6 +323,11 @@ int main(int argc, char **argv) {
         require(opaque.window_opacity("x", false) == 1 && opaque.settings.border_width == 0,
                 "window defaults changed");
         rejects("return {windows={border_width=21}}");
+        require(opaque.settings.corner_radius == 10, "tiled windows should default to rounded");
+        require(shaode::parse_config("return {windows={corner_radius=0}}").settings.corner_radius ==
+                    0,
+                "windows.corner_radius not parsed");
+        rejects("return {windows={corner_radius=41}}");
         require(opaque.settings.scratchpad && config.settings.scratchpad,
                 "the scratchpad should default to on");
         require(!shaode::parse_config("return {features={scratchpad=false}}").settings.scratchpad,
@@ -268,9 +364,85 @@ int main(int argc, char **argv) {
                 "a duration alone should keep animations on");
         rejects("return {animations={enabled='no'}}");
         rejects("return {animations={duration=0}}");
+        // The overview.
+        const auto &overview_defaults = shaode::parse_config("return {}").settings;
+        require(overview_defaults.overview && overview_defaults.overview_gap == 24 &&
+                    overview_defaults.overview_animation &&
+                    overview_defaults.overview_duration == 180 && overview_defaults.overview_strip &&
+                    overview_defaults.overview_hot_corner == 0 &&
+                    std::abs(overview_defaults.overview_dim - 0.86F) < 0.001F,
+                "overview defaults");
+        auto custom_overview = shaode::parse_config(
+            "return {overview={enabled=false,gap=0,animation=false,duration=40,strip=false,"
+            "hot_corner='bottom-right',dim=0.5}}");
+        require(!custom_overview.settings.overview && custom_overview.settings.overview_gap == 0 &&
+                    !custom_overview.settings.overview_animation &&
+                    custom_overview.settings.overview_duration == 40 &&
+                    !custom_overview.settings.overview_strip &&
+                    custom_overview.settings.overview_hot_corner == 4 &&
+                    std::abs(custom_overview.settings.overview_dim - 0.5F) < 0.001F,
+                "overview settings not parsed");
+        require(shaode::parse_config("return {overview={hot_corner='top-left'}}")
+                        .settings.overview_hot_corner == 1 &&
+                    shaode::parse_config("return {overview={hot_corner='top-right'}}")
+                            .settings.overview_hot_corner == 2 &&
+                    shaode::parse_config("return {overview={hot_corner='bottom-left'}}")
+                            .settings.overview_hot_corner == 3 &&
+                    shaode::parse_config("return {overview={gap=40}}").settings.overview,
+                "overview corners");
+        rejects("return {overview={hot_corner='middle'}}");
+        rejects("return {overview={hot_corner=1}}");
+        rejects("return {overview={gap=-1}}");
+        rejects("return {overview={gap=201}}");
+        rejects("return {overview={duration=5}}");
+        rejects("return {overview={dim=1.5}}");
+        rejects("return {overview={enabled='yes'}}");
+        rejects("return {overview={colour='red'}}");
+        for (auto [name, action] : {std::pair{"toggle_overview", SH_OVERVIEW_TOGGLE},
+                                    {"overview_confirm", SH_OVERVIEW_CONFIRM},
+                                    {"overview_cancel", SH_OVERVIEW_CANCEL}})
+            require(shaode::parse_action(name) == action, "overview action name");
         rejects("return {animations={duration=1.5}}");
         rejects("return {animations={duration=5000}}");
-        rejects("return {animations={curve='linear'}}");
+        rejects("return {animations={curve='fast'}}");
+        rejects("return {animations={curve='bezier(2,0,0,1)'}}");
+        rejects("return {animations={curve=3}}");
+        rejects("return {animations={speed=0}}");
+        rejects("return {animations={speed=50}}");
+        rejects("return {animations={late_frame_ms=-1}}");
+        rejects("return {animations={open=true}}");
+        rejects("return {animations={open={duration=2000}}}");
+        rejects("return {animations={open={duration=1.5}}}");
+        rejects("return {animations={open={curve='sluggish'}}}");
+        rejects("return {animations={open={speed=2}}}");
+        rejects("return {animations={fade={duration=100}}}");
+        {
+            const auto &s = defaults;
+            require(s.animation_speed == 1 && s.animation_late_ms == 80, "animation defaults");
+            require(s.animation_styles[SH_ANIM_MOVE].curve.kind == SH_CURVE_SPRING &&
+                        s.animation_styles[SH_ANIM_OPEN].curve.kind == SH_CURVE_EASE_OUT,
+                    "default curves are chosen per kind");
+            auto tuned = shaode::parse_config(
+                "return {animations={duration=200, speed=2, late_frame_ms=0, curve='linear',"
+                " move={duration=300, curve='bezier(0.2, 0.9, 0.1, 1)'}, open={curve='overshoot'},"
+                " close={duration=0}, focus={duration=50}}}").settings;
+            const auto &st = tuned.animation_styles;
+            require(tuned.animation_speed == 2 && tuned.animation_late_ms == 0, "speed, late");
+            require(st[SH_ANIM_WORKSPACE].duration == 200 &&
+                        st[SH_ANIM_WORKSPACE].curve.kind == SH_CURVE_LINEAR,
+                    "the base duration and curve reach every kind");
+            require(st[SH_ANIM_MOVE].duration == 300 && st[SH_ANIM_MOVE].curve.kind == SH_CURVE_BEZIER &&
+                        st[SH_ANIM_MOVE].curve.p[1] == 0.9F,
+                    "a kind's own duration and curve win");
+            require(st[SH_ANIM_OPEN].duration == 200 && st[SH_ANIM_OPEN].curve.kind == SH_CURVE_OVERSHOOT,
+                    "a kind may override only the curve");
+            require(st[SH_ANIM_CLOSE].duration == 0, "duration 0 turns one kind off");
+            require(st[SH_ANIM_FOCUS].duration == 50, "focus duration");
+            auto unset = shaode::parse_config("return {animations={duration=90}}").settings;
+            require(unset.animation_styles[SH_ANIM_MOVE].curve.kind == SH_CURVE_SPRING &&
+                        unset.animation_styles[SH_ANIM_MOVE].duration == 90,
+                    "kinds keep their default curve when only the duration is set");
+        }
         rejects("return {animations=true}");
         rejects("return {mouse={speed=2}}");
         rejects("return {mouse={acceleration='fast'}}");
@@ -356,6 +528,7 @@ int main(int argc, char **argv) {
         rejects("return {windows={rules={{app_id='x',position={1.5,2}}}}}");
         rejects("return {windows={rules={{app_id='x',position=true}}}}");
         rejects("return {keyboard={repeat_rate='25'}}");
+        rejects("return {keyboard={layout='us',variant='nosuchvariant'}}");
         rejects("return {appearance={background='#oops00'}}");
         rejects("return {layuot={gap=2}}");
         rejects("return {version=2}");
@@ -376,6 +549,13 @@ int main(int argc, char **argv) {
         require(even.shell.panel_margin[0] == 8 && even.shell.panel_margin[3] == 8 &&
                     !even.shell.panel_top && even.shell.icons_only && even.shell.group_windows,
                 "single panel margin not parsed");
+        require(even.shell.software_renderer, "the shell does not draw in software by default");
+        require(!shaode::parse_config("return {shell={renderer='gpu'}}").shell.software_renderer &&
+                    shaode::parse_config("return {shell={renderer='software'}}")
+                        .shell.software_renderer,
+                "renderer not parsed");
+        rejects("return {shell={renderer='vulkan'}}");
+        rejects("return {shell={renderer=true}}");
         rejects("return {shell={panel_position='left'}}");
         rejects("return {shell={panel_margin=-1}}");
         rejects("return {shell={panel_margin={middle=1}}}");
@@ -383,6 +563,20 @@ int main(int argc, char **argv) {
         rejects("return {shell={font_size=2}}");
         rejects("return {shell={icons_only='yes'}}");
         rejects("return {shell={group_windows=1}}");
+        auto widgets = shaode::parse_config(
+            "return {shell={widgets={battery=false,calendar=false,workspaces=false}}}");
+        require(!widgets.shell.widgets.battery && !widgets.shell.widgets.calendar &&
+                    !widgets.shell.widgets.workspaces && widgets.shell.widgets.network &&
+                    widgets.shell.widgets.volume && widgets.shell.widgets.clock &&
+                    widgets.shell.widgets.tiling && widgets.shell.widgets.profiles &&
+                    !shaode::parse_config("return {shell={widgets={profiles=false}}}")
+                         .shell.widgets.profiles,
+                "shell widgets not parsed");
+        require(shaode::parse_config("return {shell={}}").shell.widgets.battery,
+                "widgets not on by default");
+        rejects("return {shell={widgets={battery='no'}}}");
+        rejects("return {shell={widgets={bluetooth=false}}}");
+        rejects("return {shell={widgets=true}}");
         rejects("return {shell={accent='#12345'}}");
         rejects("return {appearance={background='#11223344'}}");
         rejects("return {shell={accent='red'}}");
@@ -401,7 +595,7 @@ int main(int argc, char **argv) {
         // A configuration extending the defaults holds only its changes.
         setenv("SHAODE_DEFAULT_CONFIG", argv[1], 1);
         auto bare = shaode::parse_config("return {extends='default'}");
-        require(bare.bindings.size() == 40 && bare.shell.launchers.empty() &&
+        require(bare.bindings.size() == 63 && bare.shell.launchers.empty() &&
                     bare.settings.workspaces == 4,
                 "extends did not supply the defaults");
         auto layered = shaode::parse_config(
@@ -411,7 +605,7 @@ int main(int argc, char **argv) {
             "{mods={'Super'}, key='e', action='spawn', command={'dolphin'}}}}");
         require(layered.settings.gap_inner == 3 && layered.settings.workspaces == 4,
                 "extending configuration settings not layered over the defaults");
-        require(layered.bindings.size() == 40 && !layered.binding(SH_LOGO, XKB_KEY_v),
+        require(layered.bindings.size() == 63 && !layered.binding(SH_LOGO, XKB_KEY_v),
                 "action none did not remove a default binding");
         require(layered.binding(SH_LOGO, XKB_KEY_q)->command == shaode::Command{"foot"} &&
                     layered.binding(SH_LOGO, XKB_KEY_e)->command == shaode::Command{"dolphin"},
@@ -468,7 +662,7 @@ int main(int argc, char **argv) {
             config = shaode::parse_config("return {layout={gap=999}}");
         } catch (const std::exception &) {
         }
-        require(config.settings.gap_inner == 8 && config.bindings.size() == 40,
+        require(config.settings.gap_inner == 8 && config.bindings.size() == 63,
                 "failed reload changed active configuration");
         std::cout << "Configuration validation, bindings, and transactional loading passed\n";
     } catch (const std::exception &error) {

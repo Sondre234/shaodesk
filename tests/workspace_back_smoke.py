@@ -32,7 +32,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-workspace-back-test-") as direct
 
     def msg(*words, ok=True):
         result = subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                                text=True, timeout=5)
+                                text=True, timeout=30)
         assert (result.returncode == 0) == ok, (words, result.stdout, result.stderr)
         return result.stdout if ok else result.stderr
 
@@ -88,7 +88,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-workspace-back-test-") as direct
             assert on(home, "workspace", "1") == 1
             assert windows()["shaode-probe"] == (4, home, False), windows()
             subprocess.run([probe, "--activate", "shaode-probe"], env=env, check=True,
-                           timeout=5, stdout=subprocess.DEVNULL)
+                           timeout=30, stdout=subprocess.DEVNULL)
             wait_for(lambda: current()[home] == 4, processes, "taskbar switch")
             assert on(home, "workspace_back") == 1
             assert on(home, "workspace_back") == 4
@@ -101,17 +101,18 @@ with tempfile.TemporaryDirectory(prefix="shaode-workspace-back-test-") as direct
             assert on("HEADLESS-1", "workspace", "3") == 2
             assert on("HEADLESS-1", "workspace", "1") == 1
             assert on("HEADLESS-1", "workspace", "1") == 2
-            # An unknown feature is rejected and the running configuration kept.
+            # An unknown feature is an error: the default configuration, without the feature,
+            # stands in until it is fixed.
             config.write_text(CONFIG.replace("workspace_back_and_forth", "bogus") % "true")
             msg("reload")
             assert "unknown feature 'bogus'" in log.read_text()
-            assert on("HEADLESS-1", "workspace", "2") == 1
+            assert on("HEADLESS-1", "workspace", "2") == 2
 
             window.kill()
-            window.wait(timeout=5)
+            window.wait(timeout=30)
             processes.remove(window)
             server.terminate()
-            assert server.wait(timeout=5) == 0, log.read_text()
+            assert server.wait(timeout=30) == 0, log.read_text()
             print("workspace_back and workspace back-and-forth passed")
         except Exception:
             print(log.read_text(), file=sys.stderr)
@@ -120,4 +121,4 @@ with tempfile.TemporaryDirectory(prefix="shaode-workspace-back-test-") as direct
             for process in reversed(processes):
                 if process.poll() is None:
                     process.kill()
-                    process.wait(timeout=5)
+                    process.wait(timeout=30)

@@ -5,6 +5,7 @@ import QtQuick
 // with the selected one's full title and place below. A click picks a window.
 Rectangle {
     id: switcher
+    required property size screenSize
     readonly property var windows: shell.switcherWindows
     readonly property int cell: 132
     readonly property int padding: 16
@@ -52,9 +53,18 @@ Rectangle {
                 anchors.top: icon.bottom; anchors.topMargin: 8
                 anchors.left: parent.left; anchors.right: parent.right; anchors.margins: 8
                 text: entry.modelData.title.length > 0 ? entry.modelData.title : entry.modelData.appId
+                textFormat: Text.PlainText
                 color: shell.textColor; font.family: switcher.uiFont; font.pixelSize: 12
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
+            }
+            // A window asking for attention has a dot in the urgent colour over its icon.
+            Rectangle {
+                objectName: "switcherUrgent"
+                visible: entry.modelData.urgent === true
+                anchors.right: icon.right; anchors.top: icon.top
+                width: 12; height: 12; radius: 6
+                color: shell.urgentColor; border.width: 2; border.color: shell.panelColor
             }
             MouseArea { anchors.fill: parent; onClicked: shell.switcherPick(entry.index) }
         }
@@ -66,12 +76,13 @@ Rectangle {
         Text {
             width: parent.width
             text: switcher.current.title || switcher.current.appId || ""
+            textFormat: Text.PlainText
             color: shell.textColor; font.family: switcher.uiFont; font.pixelSize: 14; font.bold: true
             horizontalAlignment: Text.AlignHCenter; elide: Text.ElideMiddle
         }
         Text {
             width: parent.width
-            text: switcher.current.output ? "Workspace " + switcher.current.workspace + " on " + switcher.current.output + (switcher.current.minimized ? " · minimized" : "") : ""
+            text: switcher.current.output ? "Workspace " + switcher.current.workspace + " on " + switcher.current.output + (switcher.current.minimized ? " · minimized" : "") + (switcher.current.urgent ? " · needs attention" : "") : ""
             color: shell.textColor; opacity: 0.65; font.family: switcher.uiFont; font.pixelSize: 12
             horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight
         }

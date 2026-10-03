@@ -150,3 +150,15 @@ enum sh_deco_part sh_decoration_part_at(double x, double y) {
         return SH_DECO_NONE;
     return button_at(x);
 }
+
+struct wlr_buffer *sh_pixel_buffer(uint32_t *pixels, int width, int height) {
+    struct pixel_buffer *buffer = calloc(1, sizeof(*buffer));
+    if (!buffer) {
+        free(pixels);
+        return NULL;
+    }
+    buffer->data = pixels;
+    buffer->stride = (size_t)width * sizeof(*pixels);
+    wlr_buffer_init(&buffer->base, &pixel_buffer_impl, width, height);
+    return &buffer->base;
+}

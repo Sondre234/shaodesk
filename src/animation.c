@@ -13,9 +13,12 @@ static const float SMALL = 0.94F;
 enum { SLACK_MS = 50 };
 
 struct sh_animator {
-    bool enabled;
-    int duration;           // milliseconds
+    struct sh_animator_config config;
+    int64_t (*clock)(void *);
+    void *clock_data;
+    int64_t last_tick;      // when a frame last advanced the animations; 0 while none run
     struct wl_list running; // struct sh_anim
+    struct wl_list tweens;  // struct sh_tween
     struct wl_event_source *timer;
 };
 
@@ -28,17 +31,26 @@ struct sh_anim_record {
     float paint[4], set_paint[4]; // opacity in [0], or a rectangle's color
 };
 
-static int64_t now_ms(void) {
+static int64_t real_clock(void *data) {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
     return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
 }
+static int64_t now_ms(const struct sh_animator *animator) {
+    return animator->clock(animator->clock_data);
+}
 
-/* Ease-out cubic: fast at first, settling gently. */
-static double eased(int64_t elapsed, int duration) {
-    double t = duration > 0 ? (double)elapsed / duration : 1;
-    t = t < 0 ? 0 : t > 1 ? 1 : t;
-    return 1 - (1 - t) * (1 - t) * (1 - t);
+/* A kind's duration after the speed multiplier; 0 means it does not animate. */
+static int duration_of(const struct sh_animator *animator, enum sh_anim_kind kind) {
+    const struct sh_anim_style *style = &animator->config.styles[kind];
+    if (style->duration <= 0)
+        return 0;
+    double speed = animator->config.speed > 0 ? animator->config.speed : 1;
+    return (int)fmax(1, lround(style->duration / speed));
+}
+
+static double eased(const struct sh_curve *curve, int64_t elapsed, int duration) {
+    return sh_curve_eval(curve, duration > 0 ? (double)elapsed / duration : 1);
 }
 
 static struct sh_anim_record *record(struct sh_anim *anim, struct wlr_scene_node *node) {
@@ -176,24 +188,48 @@ static void stop(struct sh_anim *anim) {
     anim->count = anim->capacity = 0;
 }
 
+/* The glide's offset along one axis at `elapsed` milliseconds, and its velocity. The eased
+ * decay carries the offset to 0; a term that is 0 at both ends carries the starting velocity, so
+ * a retargeted glide does not jerk. */
+static void glide_axis(const struct sh_anim *anim, double offset, double velocity, int64_t elapsed,
+                       double *position, double *speed) {
+    double d = anim->glide_duration, t = (double)elapsed / d;
+    if (t >= 1) {
+        *position = *speed = 0;
+        return;
+    }
+    if (t < 0)
+        t = 0;
+    const double h = 1e-4;
+    double slope = (sh_curve_eval(&anim->glide_curve, t + h) -
+                    sh_curve_eval(&anim->glide_curve, t > h ? t - h : 0)) /
+                   (t > h ? 2 * h : t + h);
+    double carry = (1 - t) * (1 - t);
+    *position = offset * (1 - sh_curve_eval(&anim->glide_curve, t)) + velocity * d * t * carry;
+    *speed = -offset * slope / d + velocity * (carry - 2 * t * (1 - t));
+}
+
 /* Returns whether the animation is still running. */
 static bool step(struct sh_anim *anim, int64_t now) {
-    int duration = anim->animator->duration;
     if (anim->glide) {
-        double e = eased(now - anim->glide_start, duration);
-        wlr_scene_node_set_position(&anim->tree->node, (int)lround(anim->glide_x * (1 - e)),
-                                    (int)lround(anim->glide_y * (1 - e)));
-        anim->glide = e < 1;
+        int64_t elapsed = now - anim->glide_start;
+        double x, y, vx, vy;
+        glide_axis(anim, anim->glide_x, anim->glide_vx, elapsed, &x, &vx);
+        glide_axis(anim, anim->glide_y, anim->glide_vy, elapsed, &y, &vy);
+        wlr_scene_node_set_position(&anim->tree->node, anim->base_x + (int)lround(x),
+                                    anim->base_y + (int)lround(y));
+        anim->glide = elapsed < anim->glide_duration;
     }
     if (anim->fx) {
-        double e = eased(now - anim->fx_start, duration);
-        if (e < 1)
+        int64_t elapsed = now - anim->fx_start;
+        double e = eased(&anim->fx_curve, elapsed, anim->fx_duration);
+        anim->fx = elapsed < anim->fx_duration;
+        if (anim->fx)
             walk(anim, anim->tree, 0, 0, false,
                  (float)(anim->scale_from + (anim->scale_to - anim->scale_from) * e),
                  (float)(anim->alpha_from + (anim->alpha_to - anim->alpha_from) * e));
         else if (!anim->owned)
             walk(anim, anim->tree, 0, 0, true, 1, 1);
-        anim->fx = e < 1;
     }
     return anim->fx || anim->glide;
 }
@@ -202,30 +238,195 @@ void sh_anim_finish(struct sh_anim *anim) {
     if (!anim->animator)
         return;
     if (anim->glide)
-        wlr_scene_node_set_position(&anim->tree->node, 0, 0);
+        wlr_scene_node_set_position(&anim->tree->node, anim->base_x, anim->base_y);
     if (anim->fx && !anim->owned)
         walk(anim, anim->tree, 0, 0, true, 1, 1);
     stop(anim);
 }
 
+static void tween_value(const struct sh_tween *tween, double e, float out[SH_TWEEN_VALUES]) {
+    for (int i = 0; i < SH_TWEEN_VALUES; ++i)
+        out[i] = (float)(tween->from[i] + (tween->to[i] - tween->from[i]) * e);
+}
+
+void sh_tween_stop(struct sh_tween *tween) {
+    if (tween->animator)
+        wl_list_remove(&tween->link);
+    tween->animator = NULL;
+    tween->valid = false;
+}
+
+void sh_tween_track(struct sh_animator *animator, struct sh_tween *tween, enum sh_anim_kind kind,
+                    bool animate, const float target[SH_TWEEN_VALUES],
+                    float current[SH_TWEEN_VALUES], void (*update)(void *), void *data) {
+    int duration = animate && animator->config.enabled ? duration_of(animator, kind) : 0;
+    bool changed = !tween->valid || memcmp(tween->to, target, sizeof(tween->to));
+    if (changed) {
+        if (!duration || !tween->valid) {
+            sh_tween_stop(tween);
+            tween->valid = true;
+            memcpy(tween->to, target, sizeof(tween->to));
+            memcpy(tween->value, target, sizeof(tween->value));
+        } else {
+            // From where it is drawn now: a fade reversed halfway goes back from there.
+            memcpy(tween->from, tween->value, sizeof(tween->from));
+            memcpy(tween->to, target, sizeof(tween->to));
+            tween->start = now_ms(animator);
+            tween->duration = duration;
+            tween->curve = animator->config.styles[kind].curve;
+            tween->update = update, tween->data = data;
+            if (!tween->animator) {
+                tween->animator = animator;
+                wl_list_insert(animator->tweens.prev, &tween->link);
+            }
+            if (!animator->last_tick)
+                animator->last_tick = tween->start;
+            wl_event_source_timer_update(animator->timer, duration + SLACK_MS);
+        }
+    }
+    memcpy(current, tween->value, sizeof(tween->value));
+}
+
+/* Moves every tween to `now`; a finished one lands and is dropped. */
+static void step_tweens(struct sh_animator *animator, int64_t now, bool finish) {
+    struct sh_tween *tween, *next;
+    wl_list_for_each_safe(tween, next, &animator->tweens, link) {
+        int64_t elapsed = now - tween->start;
+        if (finish || elapsed >= tween->duration) {
+            memcpy(tween->value, tween->to, sizeof(tween->value));
+            wl_list_remove(&tween->link);
+            tween->animator = NULL;
+        } else {
+            tween_value(tween, eased(&tween->curve, elapsed, tween->duration), tween->value);
+        }
+        if (tween->update)
+            tween->update(tween->data);
+    }
+}
+
+size_t sh_animator_tweens(const struct sh_animator *animator) {
+    return (size_t)wl_list_length(&animator->tweens);
+}
+
+static void rest_anim(struct sh_anim *anim) {
+    anim->rested = true;
+    if (anim->owned)
+        wlr_scene_node_set_enabled(&anim->tree->node, false);
+    if (anim->glide)
+        wlr_scene_node_set_position(&anim->tree->node, anim->base_x, anim->base_y);
+    if (anim->fx && !anim->owned)
+        walk(anim, anim->tree, 0, 0, true, 1, 1);
+}
+
+void sh_animator_rest(struct sh_animator *animator) {
+    struct sh_anim *anim;
+    wl_list_for_each(anim, &animator->running, link) rest_anim(anim);
+}
+
+/* Whether a buffer or rectangle below `tree`, whose parent is at (ox, oy), has a box that
+ * contains the point. A buffer of unknown size might. */
+static bool tree_covers(const struct wlr_scene_tree *tree, double ox, double oy, double px,
+                        double py) {
+    struct wlr_scene_node *node;
+    wl_list_for_each(node, &tree->children, link) {
+        if (!node->enabled)
+            continue;
+        double x = ox + node->x, y = oy + node->y;
+        if (node->type == WLR_SCENE_NODE_TREE) {
+            if (tree_covers(wlr_scene_tree_from_node(node), x, y, px, py))
+                return true;
+            continue;
+        }
+        int width, height;
+        if (node->type == WLR_SCENE_NODE_RECT) {
+            width = wlr_scene_rect_from_node(node)->width;
+            height = wlr_scene_rect_from_node(node)->height;
+        } else {
+            struct wlr_scene_buffer *buffer = wlr_scene_buffer_from_node(node);
+            width = buffer->dst_width;
+            height = buffer->dst_height;
+            if ((width <= 0 || height <= 0) && buffer->buffer) {
+                width = buffer->buffer->width;
+                height = buffer->buffer->height;
+            }
+            if (width <= 0 || height <= 0)
+                return true;
+        }
+        if (px >= x && px < x + width && py >= y && py < y + height)
+            return true;
+    }
+    return false;
+}
+
+void sh_animator_rest_at(struct sh_animator *animator, double px, double py) {
+    struct sh_anim *anim;
+    wl_list_for_each(anim, &animator->running, link) {
+        int cx, cy;
+        bool matters = true;
+        // A fade that only changes opacity and a glide keep their boxes' sizes; growing ones
+        // and their scale-about-a-center are put at rest without asking.
+        bool sizes_change = anim->fx && anim->scale_from != anim->scale_to;
+        if (!sizes_change && wlr_scene_node_coords(&anim->tree->node, &cx, &cy)) {
+            double parent_x = cx - anim->tree->node.x, parent_y = cy - anim->tree->node.y;
+            matters = tree_covers(anim->tree, cx, cy, px, py) ||
+                      (!anim->owned &&
+                       tree_covers(anim->tree, parent_x + anim->base_x, parent_y + anim->base_y, px,
+                                   py));
+        }
+        if (matters)
+            rest_anim(anim);
+    }
+}
+
+void sh_animator_resume(struct sh_animator *animator) {
+    int64_t now = now_ms(animator);
+    struct sh_anim *anim;
+    wl_list_for_each(anim, &animator->running, link) {
+        if (!anim->rested)
+            continue;
+        anim->rested = false;
+        if (anim->owned)
+            wlr_scene_node_set_enabled(&anim->tree->node, true);
+        step(anim, now);
+    }
+}
+
+void sh_animator_finish_all(struct sh_animator *animator) {
+    struct sh_anim *anim, *next;
+    wl_list_for_each_safe(anim, next, &animator->running, link) sh_anim_finish(anim);
+    step_tweens(animator, 0, true);
+    animator->last_tick = 0;
+}
+
 void sh_animator_tick(struct sh_animator *animator) {
-    int64_t now = now_ms();
+    int64_t now = now_ms(animator);
+    if (animator->config.late_ms > 0 && animator->last_tick &&
+        now - animator->last_tick > animator->config.late_ms) {
+        // The compositor fell behind: land now rather than jump through the middle.
+        sh_animator_finish_all(animator);
+        return;
+    }
+    animator->last_tick = now;
     struct sh_anim *anim, *next;
     wl_list_for_each_safe(anim, next, &animator->running, link) {
         if (!step(anim, now))
             stop(anim);
     }
+    step_tweens(animator, now, false);
+    if (wl_list_empty(&animator->running) && wl_list_empty(&animator->tweens))
+        animator->last_tick = 0;
 }
 
 static int timer_fired(void *data) {
     struct sh_animator *animator = data;
     sh_animator_tick(animator);
-    if (!wl_list_empty(&animator->running))
+    if (!wl_list_empty(&animator->running) || !wl_list_empty(&animator->tweens))
         wl_event_source_timer_update(animator->timer, SLACK_MS);
     return 0;
 }
 
-static void start(struct sh_animator *animator, struct sh_anim *anim, struct wlr_scene_tree *tree) {
+static void start(struct sh_animator *animator, struct sh_anim *anim, struct wlr_scene_tree *tree,
+                  int duration) {
     if (anim->animator && anim->tree != tree)
         sh_anim_finish(anim);
     anim->tree = tree;
@@ -233,33 +434,93 @@ static void start(struct sh_animator *animator, struct sh_anim *anim, struct wlr
         anim->animator = animator;
         wl_list_insert(animator->running.prev, &anim->link);
     }
-    wl_event_source_timer_update(animator->timer, animator->duration + SLACK_MS);
+    if (!animator->last_tick)
+        animator->last_tick = now_ms(animator);
+    wl_event_source_timer_update(animator->timer, duration + SLACK_MS);
 }
 
-void sh_anim_open(struct sh_animator *animator, struct sh_anim *anim, struct wlr_scene_tree *tree,
-                  double cx, double cy) {
-    if (!animator->enabled)
+/* The velocity a restarted glide adds to its curve's own so the speed stays the same, kept
+ * within what could plausibly matter for a move of `offset` pixels. */
+static double carried(double velocity, double curve_velocity, double offset, int duration) {
+    double extra = velocity - curve_velocity, limit = 2 * fabs(offset) / duration;
+    return extra > limit ? limit : extra < -limit ? -limit : extra;
+}
+
+static void glide_begin(struct sh_animator *animator, struct sh_anim *anim,
+                        struct wlr_scene_tree *tree, int dx, int dy, enum sh_anim_kind kind,
+                        int duration) {
+    start(animator, anim, tree, duration);
+    int64_t now = now_ms(animator);
+    // A glide under way continues from where the window is drawn now, at the speed it has.
+    double vx = 0, vy = 0;
+    bool moving = anim->glide;
+    if (moving) {
+        double x, y;
+        glide_axis(anim, anim->glide_x, anim->glide_vx, now - anim->glide_start, &x, &vx);
+        glide_axis(anim, anim->glide_y, anim->glide_vy, now - anim->glide_start, &y, &vy);
+    }
+    anim->glide_x = tree->node.x - anim->base_x + dx;
+    anim->glide_y = tree->node.y - anim->base_y + dy;
+    anim->glide_duration = duration;
+    anim->glide_curve = animator->config.styles[kind].curve;
+    // The new curve has a speed of its own to start with; carry only what it lacks.
+    const double h = 1e-4;
+    double start_slope = (sh_curve_eval(&anim->glide_curve, h) - 0) / h / duration;
+    anim->glide_vx = moving ? carried(vx, -anim->glide_x * start_slope, anim->glide_x, duration) : 0;
+    anim->glide_vy = moving ? carried(vy, -anim->glide_y * start_slope, anim->glide_y, duration) : 0;
+    anim->glide = true;
+    anim->glide_start = now;
+    step(anim, anim->glide_start);
+}
+
+void sh_anim_glide_kind(struct sh_animator *animator, struct sh_anim *anim,
+                        struct wlr_scene_tree *tree, int dx, int dy, enum sh_anim_kind kind) {
+    int duration = animator->config.enabled ? duration_of(animator, kind) : 0;
+    if (!duration || (dx == 0 && dy == 0))
         return;
-    start(animator, anim, tree);
-    anim->fx = true;
-    anim->fx_start = now_ms();
-    anim->scale_from = SMALL, anim->scale_to = 1;
-    anim->alpha_from = 0, anim->alpha_to = 1;
-    anim->cx = cx, anim->cy = cy;
-    step(anim, anim->fx_start);
+    glide_begin(animator, anim, tree, dx, dy, kind, duration);
 }
 
 void sh_anim_glide(struct sh_animator *animator, struct sh_anim *anim, struct wlr_scene_tree *tree,
                    int dx, int dy) {
-    if (!animator->enabled || (dx == 0 && dy == 0))
+    sh_anim_glide_kind(animator, anim, tree, dx, dy, SH_ANIM_MOVE);
+}
+
+/* Starts (or restarts) the fade-and-scale of a live window from the resting values. */
+static void fx_begin(struct sh_animator *animator, struct sh_anim *anim, enum sh_anim_kind kind,
+                     int duration, float scale_from, float scale_to, float alpha_from,
+                     float alpha_to, double cx, double cy) {
+    if (anim->fx && !anim->owned)
+        walk(anim, anim->tree, 0, 0, true, 1, 1); // what it shows now is not its resting look
+    anim->fx = true;
+    anim->fx_start = now_ms(animator);
+    anim->fx_duration = duration;
+    anim->fx_curve = animator->config.styles[kind].curve;
+    anim->scale_from = scale_from, anim->scale_to = scale_to;
+    anim->alpha_from = alpha_from, anim->alpha_to = alpha_to;
+    anim->cx = cx, anim->cy = cy;
+}
+
+void sh_anim_open(struct sh_animator *animator, struct sh_anim *anim, struct wlr_scene_tree *tree,
+                  double cx, double cy) {
+    int duration = animator->config.enabled ? duration_of(animator, SH_ANIM_OPEN) : 0;
+    if (!duration)
         return;
-    start(animator, anim, tree);
-    // A glide under way continues from where the window is drawn now.
-    anim->glide_x = tree->node.x + dx;
-    anim->glide_y = tree->node.y + dy;
-    anim->glide = true;
-    anim->glide_start = now_ms();
-    step(anim, anim->glide_start);
+    start(animator, anim, tree, duration);
+    fx_begin(animator, anim, SH_ANIM_OPEN, duration, SMALL, 1, 0, 1, cx, cy);
+    step(anim, anim->fx_start);
+}
+
+void sh_anim_slide(struct sh_animator *animator, struct sh_anim *anim, struct wlr_scene_tree *tree,
+                   int dx, int dy) {
+    int duration = animator->config.enabled ? duration_of(animator, SH_ANIM_WORKSPACE) : 0;
+    if (!duration)
+        return;
+    start(animator, anim, tree, duration);
+    if (dx || dy)
+        glide_begin(animator, anim, tree, dx, dy, SH_ANIM_WORKSPACE, duration);
+    fx_begin(animator, anim, SH_ANIM_WORKSPACE, duration, 1, 1, 0, 1, 0, 0);
+    step(anim, anim->fx_start);
 }
 
 /* Copies what is visible below `tree` into `target`, flattened. */
@@ -306,32 +567,55 @@ static void copy(struct wlr_scene_tree *target, struct wlr_scene_tree *tree, int
     }
 }
 
-void sh_anim_close(struct sh_animator *animator, struct wlr_scene_node *window,
-                   struct wlr_scene_tree *content, double cx, double cy) {
-    if (!animator->enabled || !window->enabled || !window->parent)
-        return;
+/* A tree just above `window` holding a copy of what is visible under `content`, owned by a new
+ * animation that has not started; NULL if there is nothing to copy. */
+static struct sh_anim *snapshot(struct sh_animator *animator, struct wlr_scene_node *window,
+                                struct wlr_scene_tree *content, int duration) {
     struct sh_anim *anim = calloc(1, sizeof(*anim));
     struct wlr_scene_tree *tree = anim ? wlr_scene_tree_create(window->parent) : NULL;
     if (!tree) {
         free(anim);
-        return;
+        return NULL;
     }
     copy(tree, content, 0, 0);
     if (wl_list_empty(&tree->children)) {
         wlr_scene_node_destroy(&tree->node);
         free(anim);
-        return;
+        return NULL;
     }
     wlr_scene_node_place_above(&tree->node, window);
     wlr_scene_node_set_position(&tree->node, window->x + content->node.x,
                                 window->y + content->node.y);
     anim->owned = true;
-    start(animator, anim, tree);
-    anim->fx = true;
-    anim->fx_start = now_ms();
-    anim->scale_from = 1, anim->scale_to = SMALL;
-    anim->alpha_from = 1, anim->alpha_to = 0;
-    anim->cx = cx, anim->cy = cy;
+    start(animator, anim, tree, duration);
+    return anim;
+}
+
+void sh_anim_close(struct sh_animator *animator, struct wlr_scene_node *window,
+                   struct wlr_scene_tree *content, double cx, double cy) {
+    int duration = animator->config.enabled ? duration_of(animator, SH_ANIM_CLOSE) : 0;
+    if (!duration || !window->enabled || !window->parent)
+        return;
+    struct sh_anim *anim = snapshot(animator, window, content, duration);
+    if (!anim)
+        return;
+    fx_begin(animator, anim, SH_ANIM_CLOSE, duration, 1, SMALL, 1, 0, cx, cy);
+    step(anim, anim->fx_start);
+}
+
+void sh_anim_slide_out(struct sh_animator *animator, struct wlr_scene_node *window,
+                       struct wlr_scene_tree *content, int dx, int dy) {
+    int duration = animator->config.enabled ? duration_of(animator, SH_ANIM_WORKSPACE) : 0;
+    if (!duration || !window->enabled || !window->parent)
+        return;
+    struct sh_anim *anim = snapshot(animator, window, content, duration);
+    if (!anim)
+        return;
+    // It rests where it slides to, and starts at the offset back from there.
+    anim->base_x = anim->tree->node.x + dx;
+    anim->base_y = anim->tree->node.y + dy;
+    glide_begin(animator, anim, anim->tree, 0, 0, SH_ANIM_WORKSPACE, duration);
+    fx_begin(animator, anim, SH_ANIM_WORKSPACE, duration, 1, 1, 1, 0, 0, 0);
     step(anim, anim->fx_start);
 }
 
@@ -340,6 +624,9 @@ struct sh_animator *sh_animator_create(struct wl_event_loop *loop) {
     if (!animator)
         return NULL;
     wl_list_init(&animator->running);
+    wl_list_init(&animator->tweens);
+    animator->clock = real_clock;
+    animator->config.speed = 1;
     animator->timer = wl_event_loop_add_timer(loop, timer_fired, animator);
     if (!animator->timer) {
         free(animator);
@@ -348,13 +635,17 @@ struct sh_animator *sh_animator_create(struct wl_event_loop *loop) {
     return animator;
 }
 
-void sh_animator_configure(struct sh_animator *animator, bool enabled, int duration_ms) {
-    animator->enabled = enabled && duration_ms > 0;
-    animator->duration = duration_ms;
-    if (!animator->enabled) {
-        struct sh_anim *anim, *next;
-        wl_list_for_each_safe(anim, next, &animator->running, link) sh_anim_finish(anim);
-    }
+void sh_animator_configure(struct sh_animator *animator, const struct sh_animator_config *config) {
+    animator->config = *config;
+    if (!(animator->config.speed > 0))
+        animator->config.speed = 1;
+    if (!animator->config.enabled)
+        sh_animator_finish_all(animator);
+}
+
+void sh_animator_set_clock(struct sh_animator *animator, int64_t (*now)(void *), void *data) {
+    animator->clock = now ? now : real_clock;
+    animator->clock_data = data;
 }
 
 size_t sh_animator_running(const struct sh_animator *animator) {
@@ -364,7 +655,7 @@ size_t sh_animator_running(const struct sh_animator *animator) {
 void sh_animator_destroy(struct sh_animator *animator) {
     if (!animator)
         return;
-    sh_animator_configure(animator, false, 0);
+    sh_animator_finish_all(animator);
     wl_event_source_remove(animator->timer);
     free(animator);
 }

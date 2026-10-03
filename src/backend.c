@@ -2,8 +2,15 @@
 /* Derived from wlroots TinyWL 0.20.2; see vendor/tinywl/LICENSE. */
 #define _GNU_SOURCE // accept4
 #include "shaode/backend.h"
+#include "shaode/effects.h"
+#include "shaode/effects_scene.h"
 #include "shaode/animation.h"
+#include "shaode/curve.h"
 #include "shaode/decoration.h"
+#include "shaode/session.h"
+#include "shaode/overview.h"
+#include "shaode/overview_scene.h"
+#include "shaode/tabs.h"
 #include "shaode/sleep.h"
 #include <assert.h>
 #include <errno.h>
@@ -11,18 +18,24 @@
 #include <limits.h>
 #include <linux/input-event-codes.h>
 #include <math.h>
+#include <dirent.h>
 #include <signal.h>
+#include <spawn.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
 #include <wlr/backend.h>
+#include <wlr/backend/headless.h>
+#include <wlr/backend/multi.h>
 #include <wlr/backend/wayland.h>
 #include <wlr/config.h>
 #if WLR_HAS_LIBINPUT_BACKEND
@@ -33,6 +46,7 @@
 #include <wlr/backend/session.h>
 #endif
 #include <wlr/render/allocator.h>
+#include <wlr/render/swapchain.h>
 #include <wlr/render/wlr_renderer.h>
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_cursor.h>
@@ -50,6 +64,7 @@
 #include <wlr/types/wlr_idle_inhibit_v1.h>
 #include <wlr/types/wlr_idle_notify_v1.h>
 #include <wlr/types/wlr_input_device.h>
+#include <wlr/types/wlr_output_management_v1.h>
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_linux_dmabuf_v1.h>
@@ -85,6 +100,7 @@
 #include <wlr/xcursor.h>
 #if WLR_HAS_XWAYLAND
 #include <wlr/xwayland.h>
+#include <xcb/xcb_icccm.h>
 #if SHAODE_XWM_WAKER
 #include <xcb/xfixes.h>
 #endif
@@ -114,6 +130,88 @@ struct sh_node {
     void *owner;
 };
 
+#define SH_FRAME_RING 4096
+
+/* Counters `get stats` reports, for the benchmark in tools/bench; cheap enough to keep on. */
+struct sh_stats {
+    uint64_t frames, frame_ns, frame_max_ns; /* output_frame calls and time spent in them */
+    uint64_t commits, commit_ns;             /* window commits handled (refresh_frame) */
+    uint64_t configures;                     /* windows placed by layouts (toplevel_configure) */
+    uint64_t opacity_rules;                  /* times the window rules were matched for opacity */
+    uint64_t motions, motion_ns;             /* pointer motion events handled and their time */
+    uint64_t reflows, reflow_ns;             /* reflow_output runs that placed windows, and their time */
+    /* The last SH_FRAME_RING frames: time spent in output_frame and time since the previous
+     * frame, in microseconds, for `get frame_times` (percentiles in the benchmark). */
+    uint32_t frame_us[SH_FRAME_RING], interval_us[SH_FRAME_RING];
+    uint64_t last_frame_ns;
+};
+
+static uint64_t now_ns(void) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (uint64_t)now.tv_sec * 1000000000u + (uint64_t)now.tv_nsec;
+}
+
+enum sh_night_mode { SH_NIGHT_AUTO, SH_NIGHT_OFF, SH_NIGHT_ON };
+#define NIGHT_LIGHT_TICK_MS 10000
+#define NIGHT_LIGHT_LUT 1024
+/* The overview (Expose). Thumbnails are scaled copies of the windows' scene nodes, kept live by
+ * copying again when a window's fingerprint changes; see overview_scene.h. */
+enum {
+    OVERVIEW_MAX = 96,
+    OVERVIEW_MINI_MAX = 128,
+    OVERVIEW_WORKSPACES = 10,
+    OVERVIEW_PAD = 6, /* the card around a thumbnail */
+    OVERVIEW_TOP = 48 /* room above the strip for the shell's search box */
+};
+struct sh_toplevel;
+struct sh_thumb {
+    struct sh_toplevel *toplevel;
+    struct wlr_scene_tree *tree;
+    uint64_t fingerprint;
+    double scale; /* the copy's scale; 0 before the first copy */
+};
+struct sh_overview {
+    bool open;    /* taking input */
+    bool visible; /* drawn: open, or gliding closed */
+    bool closing;
+    bool dirty; /* windows or workspaces changed: lay out again on the next step */
+    bool armed; /* a step is scheduled */
+    char output[64];
+    struct wlr_box screen; /* the output, in layout coordinates */
+    struct sh_rect area;   /* what the thumbnails use: the output less panels */
+    struct wlr_scene_tree *tree, *strip, *cards_tree, *grid, *frames;
+    struct wlr_scene_rect *backdrop, *frame[4];
+    struct wl_event_source *timer;
+    int viewed, current; /* the workspace the grid shows, and the one the output shows */
+    int workspaces;
+    char filter[128]; /* typed text; while set the grid lists matching windows everywhere */
+    int count, selected;
+    struct sh_toplevel *windows[OVERVIEW_MAX];
+    struct sh_rect sizes[OVERVIEW_MAX];   /* the windows' sizes */
+    struct sh_rect cells[OVERVIEW_MAX];   /* where the thumbnails rest */
+    struct sh_rect origins[OVERVIEW_MAX]; /* where the windows are, or the cell without one */
+    bool placed[OVERVIEW_MAX];            /* origins is a real place */
+    struct wlr_scene_rect *cards[OVERVIEW_MAX];
+    struct sh_thumb thumbs[OVERVIEW_MAX];
+    int strip_count;
+    struct sh_rect strip_cells[OVERVIEW_WORKSPACES];
+    struct wlr_scene_rect *strip_back[OVERVIEW_WORKSPACES], *strip_mark[OVERVIEW_WORKSPACES][4];
+    struct sh_thumb minis[OVERVIEW_MINI_MAX];
+    int mini_count;
+    int64_t started; /* milliseconds, CLOCK_MONOTONIC */
+    int span;        /* milliseconds the current glide takes */
+    double from, to, progress; /* 0: windows where they are, 1: thumbnails in the grid */
+    int press;                 /* thumbnail under a pressed left button, else -1 */
+    double press_x, press_y;
+    bool dragging;
+    struct sh_toplevel *dragged;
+    int drop;         /* workspace cell under a dragged thumbnail, else -1 */
+    uint32_t pressed; /* buttons the overview took; their releases are its too */
+    double scroll;    /* wheel motion not yet enough to change the workspace */
+    bool in_corner;   /* the pointer is in the hot corner: it opens the overview on entering */
+};
+
 struct sh_server {
     const struct sh_callbacks *callbacks;
     bool running;
@@ -122,8 +220,17 @@ struct sh_server {
     struct wlr_scene_tree *backgrounds;
     struct wlr_scene_tree *windows;
     struct wlr_scene_tree *fullscreen;
+    struct wlr_scene_tree *fullscreen_cover; // above the panels
     struct wlr_scene_tree *unmanaged;
     struct sh_animator *animator;
+    struct sh_stats stats;
+    unsigned config_generation; /* counts configurations loaded, starting at 1 */
+    struct {                    /* one hit test shared by the steps of a motion event */
+        bool caching, valid;
+        double x, y, sx, sy;
+        struct wlr_scene_node *node;
+    } hit;
+    int reflow_held;            /* while positive, reflow_output waits for the holder's own call */
 #if WLR_HAS_XWAYLAND
     struct wlr_xwayland *xwayland;
     struct wl_listener xwayland_ready, new_xwayland_surface;
@@ -164,10 +271,33 @@ struct sh_server {
         int count, selected;
         char output[64];
     } switcher;
+    struct sh_overview overview;
+    struct wlr_scene_tree *overview_layer;
+    /* Magnetic edges: guide lines over the windows while a dragged one is held by an edge. */
+    struct wlr_scene_tree *guide_layer;
+    struct wlr_scene_rect *guides[2]; /* a vertical and a horizontal line */
+
+    /* Windows a session restore launched and has yet to place: the first new window with the
+     * app ID takes the saved place, workspace and state, until the deadline (milliseconds on
+     * the monotonic clock). */
+    struct {
+        struct sh_session_window window;
+        int64_t deadline;
+        bool used;
+    } session_pending[32];
+
+    /* Urgent windows (see windows.activation): the last order number given, and the timer that
+     * redraws their pulsing borders while they pulse. */
+    unsigned urgent_serial;
+    struct wl_event_source *urgent_timer;
+    /* Configuration files changing: the watch, and a short wait so that a burst of writes
+     * (an editor saving through a temporary file) reloads once. */
+    struct wl_event_source *config_watch;
+    struct wl_event_source *config_timer;
 
     int control_fd;
     struct wl_list subscribers; // control clients receiving state changes
-    char sent_state[2048];      // the state they last received
+    char sent_state[8192];      // the state they last received
     char control_path[108];
     struct wl_event_source *control_source;
     struct wlr_scene_tree *layer_trees[4];
@@ -185,10 +315,13 @@ struct sh_server {
     struct wlr_scene_tree *lock_tree, *lock_blanks;
     struct wl_listener new_lock;
     struct wlr_idle_notifier_v1 *idle_notifier;
+    struct wlr_output_manager_v1 *output_manager;
+    struct wl_listener output_apply, output_test;
     struct wl_listener new_inhibitor;
     int inhibitors;
     struct wl_display *wl_display;
     struct wlr_backend *backend;
+    char pending_output_name[64]; // the name the next headless output takes, for tests
 #if WLR_HAS_SESSION
     struct wlr_session *session;
     struct wl_listener session_active;
@@ -238,9 +371,31 @@ struct sh_server {
     /* Window controls: shared buffers, the window whose controls are hovered (and which
      * button) or revealed, and a button pressed but not yet released. */
     struct wlr_buffer *deco_buffers[SH_DECO_FULLSCREEN + 1]; // by hovered part
+    /* Peek: 0 to 1, how far windows have faded toward the desktop. It is held by the key with
+     * evdev code `peek_keycode` on `peek_keyboard`, or toggled without one. */
+    struct sh_fade peek_fade;
+    bool peeking;
+    double peek_applied; // what the windows were last given
+    uint32_t peek_keycode;
+    struct sh_keyboard *peek_keyboard;
+    /* Night light: the schedule or an override picks a temperature; `night_transform` is the
+     * matrix for it (NULL at neutral), handed to every output commit. */
+    struct wl_event_source *night_timer;
+    struct sh_fade zoom_fade; // the magnification, 1 for none
+    double zoom_target, zoom_scroll;
+    struct sh_corner_dwell corner_dwell; // hot corners
+    struct wl_event_source *corner_timer;
+    int night_mode; // enum sh_night_mode
+    int night_kelvin;
+    double night_clock; // minutes after midnight when fixed for testing, else -1
+    struct wlr_color_transform *night_transform;
+    struct wlr_buffer *black;   // stretched over windows to dim them; made on first use
     struct sh_toplevel *deco_hovered, *deco_revealed, *deco_pressed;
     enum sh_deco_part deco_hovered_part;
     enum sh_deco_part deco_pressed_part;
+    unsigned group_serial;              // counts group members and groups, to name and order them
+    struct sh_toplevel *tabs_hovered;   // the window whose tab strip the pointer is on
+    int tabs_hovered_index;
 
     struct wlr_output_layout *output_layout;
     struct wl_list outputs;          /* enabled, in the layout */
@@ -253,8 +408,18 @@ struct sh_output {
     int x, y;                /* arrangement before the shift to the layout origin */
     struct wlr_box previous; /* where arrange_outputs found it; empty when newly added */
     bool disabled;           /* listed in disabled_outputs */
+    /* Settings a wlr-output-management client (wlr-randr, kanshi) applied at runtime. They
+     * replace the configured monitor until the configuration is reloaded. */
+    bool has_override;
+    struct sh_monitor override;
     struct wlr_scene_rect *background, *lock_blank;
     bool lock_presented;
+    /* Magnifier: the scene is drawn into `zoom_swapchain` and the output shows a part of the
+     * newest of those buffers (`zoom_source`, locked) enlarged. */
+    struct wlr_swapchain *zoom_swapchain;
+    struct wlr_buffer *zoom_source;
+    bool zoomed; // the last frame was magnified
+    bool zoom_failed; // it could not be magnified this time; it shows 1x until the zoom is reset
     struct wl_list link;
     struct sh_server *server;
     struct wlr_output *wlr_output;
@@ -263,12 +428,24 @@ struct sh_output {
     struct wl_listener destroy;
 };
 
+struct sh_opacity_rule {
+    unsigned generation; // server->config_generation it was computed under; 0 for never
+    bool active;
+    char *app_id, *title;
+    float value;
+};
+
 struct sh_toplevel {
     struct sh_node node;
     enum sh_action arrangement;
     bool minimized;
     int workspace;   // one of the workspaces of `output`
     char output[64]; // the output the window was placed on, by name; empty before that
+    /* Set while the window is away from an output that was unplugged: the output and workspace
+     * it came from, and whether it was tiled there. It goes back when that output returns. */
+    char home_output[64];
+    int home_workspace;
+    bool home_tiled;
     struct wlr_foreign_toplevel_handle_v1 *foreign;
     /* Window capture: a private scene holding only this window's surfaces, so sharing one
      * window never shows what overlaps it. */
@@ -279,6 +456,7 @@ struct sh_toplevel {
     struct wl_listener foreign_activate, foreign_close, foreign_maximize, foreign_minimize;
     struct wl_listener foreign_fullscreen;
     bool fullscreen;
+    bool fullscreen_cover; // the client asked for fullscreen itself, so it covers the panels too
     struct wlr_box fullscreen_restore;
     struct wl_listener request_minimize;
     /* xdg-decoration: the window leaves its title bar to us and gets the window controls instead. */
@@ -297,6 +475,23 @@ struct sh_toplevel {
     /* Shown on every workspace of its output, always floating; its workspace follows the
      * output's current one. `sticky_floating` is what `floating` was before, for unsticking. */
     bool sticky, sticky_floating;
+    /* Asked for attention while it had no focus; cleared when it is focused or unmapped.
+     * urgent_order says which asked first, urgent_since (milliseconds) when it began pulsing. */
+    bool urgent;
+    unsigned urgent_order;
+    int64_t urgent_since;
+    /* A window group: members share one slot and show one at a time (the others are
+     * group_hidden, out of the tiling and off the screen). 0: not in a group. group_order
+     * is the tab order. */
+    unsigned group, group_order;
+    bool group_hidden;
+    /* Window swallowing: a terminal that lets a window it started take its place is
+     * `swallowed` (hidden, and off the taskbar) and its `swallow_peer` is that window, whose
+     * own peer is the terminal. */
+    bool swallowed;
+    struct sh_toplevel *swallow_peer;
+    struct wlr_scene_buffer *tabs; // the strip of tabs over the shown member's top edge
+    int tabs_width, tabs_count, tabs_active, tabs_hover, tabs_scale; // what `tabs` shows
     struct wl_list link;
     struct sh_server *server;
     struct wlr_xdg_toplevel *xdg_toplevel; // NULL for X11 windows
@@ -304,16 +499,24 @@ struct sh_toplevel {
     struct wlr_xwayland_surface *xsurface; // NULL for xdg-shell windows
     bool unmanaged, associated;            // unmanaged: override-redirect menus and tooltips
     struct wl_listener x_associate, x_dissociate, x_configure, x_activate, x_geometry;
-    struct wl_listener x_decorations;
+    struct wl_listener x_decorations, x_attention, x_hints;
+    bool x_hint_urgent; // the client's WM_HINTS ask for attention
 #endif
     /* scene_tree sits at the window's place; content holds everything drawn for it, so an
      * animation can move, scale, and fade it without changing where the window is. */
     struct wlr_scene_tree *scene_tree, *content;
     struct sh_anim anim;
+    struct sh_tween fade; // opacity and border color following focus
     bool shown; // has opened (and started its opening animation) since it last mapped
     struct wlr_scene_buffer *deco;    // window controls; NULL when the client decorates itself
     struct wlr_scene_rect *border[4]; // top, bottom, left, right; NULL without a border
+    int frame_hole; // with rounded corners, the width of the frame border[0] draws; else 0
     float opacity;                    // last applied to the window's buffers
+    struct wlr_scene_buffer *dim;     // black over the window while it is dimmed, else NULL
+    struct sh_fade dim_fade;          // how opaque that black is, and where it is heading
+    /* The opacity the window rules gave for these inputs: matching regexes on every commit
+     * would cost more than the commit, so it is redone only when one of them changes. */
+    struct sh_opacity_rule opacity_rule;
     struct wl_listener map;
     struct wl_listener unmap;
     struct wl_listener commit;
@@ -397,20 +600,49 @@ static void follow_output(struct sh_toplevel *toplevel);
 static void lock_output_presented(struct sh_output *output);
 static void notify_subscribers(struct sh_server *server);
 static void request_launcher(struct sh_server *server);
+static void request_palette(struct sh_server *server);
+static void request_shell(struct sh_server *server, const char *what);
+static void send_shell_line(struct sh_server *server, const char *line);
 static void send_event(struct sh_server *server, const char *text, size_t length);
 static void switcher_close(struct sh_server *server, int index);
+static void set_default_cursor(struct sh_server *server);
+static int64_t now_ms(void);
+static void run_action(struct sh_server *server, enum sh_action action, int argument);
+static void move_workspace_to_output(struct sh_server *server, const char *target);
+static void swap_output_workspaces(struct sh_server *server, const char *target);
+static void overview_touch(struct sh_server *server, bool relayout);
+static void overview_forget(struct sh_toplevel *toplevel);
+static void overview_dismiss(struct sh_server *server);
 static void process_cursor_motion(struct sh_server *server, uint32_t time);
+static void process_pointer_target(struct sh_server *server, uint32_t time);
 static void refit_fullscreen(struct sh_server *server);
+static void fit_fullscreen(struct sh_toplevel *toplevel);
 static void rehome_tiles(struct sh_server *server);
 static void reconfigure_tiling(struct sh_server *server);
+static void configure_layouts(struct sh_server *server);
+static void apply_output_layout(struct sh_server *server, const struct wlr_output *output);
+static void schedule_evacuation(struct sh_server *server, struct sh_output *output);
+static void evacuate_output(struct sh_server *server, const char *name, struct wlr_box gone,
+                            bool keep_workspaces);
+static void return_home_windows(struct sh_server *server);
+static void pointer_follow(struct sh_toplevel *toplevel);
+static enum sh_tile_layout toplevel_layout(struct sh_toplevel *toplevel);
 static void reflow_output(struct sh_server *server, struct wlr_output *output);
 static void refresh_frame(struct sh_toplevel *toplevel);
+static void set_peek(struct sh_server *server, bool on);
+static void night_light_update(struct sh_server *server);
+static int night_light_tick(void *data);
+static void hot_corner_check(struct sh_server *server);
+static void zoom_by(struct sh_server *server, int steps);
+static void zoom_moved(struct sh_server *server);
 static struct sh_rect floating_area(struct sh_server *server, struct wlr_output *output);
 static void center_scratchpad(struct sh_toplevel *toplevel, struct wlr_output *output);
 static void restore_toplevel(struct sh_toplevel *toplevel);
 static void reload_config(struct sh_server *server);
 static void reset_cursor_mode(struct sh_server *server);
 static void set_fullscreen(struct sh_toplevel *toplevel, bool fullscreen);
+static void set_client_fullscreen(struct sh_toplevel *toplevel, bool fullscreen);
+static struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel);
 static void set_fullscreen_focus(struct sh_toplevel *toplevel, bool fullscreen, bool focus);
 static bool output_tiles(struct sh_server *server, struct wlr_output *output);
 static bool frameless(struct sh_toplevel *toplevel, struct wlr_output *output);
@@ -422,6 +654,18 @@ static struct wlr_output *tiled_output(struct sh_toplevel *toplevel);
 static struct wlr_output *toplevel_output(struct sh_toplevel *toplevel);
 static void untile_toplevel(struct sh_toplevel *toplevel, bool restore);
 static bool wants_tiling(struct sh_toplevel *toplevel, struct wlr_output *output);
+static void tile_toplevel_at(struct sh_toplevel *toplevel, struct wlr_output *output,
+                             struct sh_toplevel *target, bool has_point, double x, double y);
+static bool toplevel_is_dialog(struct sh_toplevel *toplevel);
+static pid_t toplevel_pid(struct sh_toplevel *toplevel);
+static void switcher_forget(struct sh_toplevel *toplevel);
+static void publish_toplevel(struct sh_toplevel *toplevel);
+static void unpublish_toplevel(struct sh_toplevel *toplevel);
+static void swallow_release(struct sh_toplevel *toplevel);
+static void group_follow(struct sh_toplevel *toplevel);
+static void group_show(struct sh_toplevel *toplevel);
+static void group_detach(struct sh_toplevel *toplevel);
+static void refresh_tabs(struct sh_toplevel *toplevel);
 
 static const uint32_t ALL_EDGES = WLR_EDGE_TOP | WLR_EDGE_BOTTOM | WLR_EDGE_LEFT | WLR_EDGE_RIGHT;
 
@@ -474,6 +718,7 @@ static void toplevel_set_activated(struct sh_toplevel *toplevel, bool activated)
 }
 /* Positions the window in layout coordinates; X11 clients also learn the position. */
 static void toplevel_configure(struct sh_toplevel *toplevel, int x, int y, int width, int height) {
+    ++toplevel->server->stats.configures;
     wlr_scene_node_set_position(&toplevel->scene_tree->node, x, y);
 #if WLR_HAS_XWAYLAND
     if (toplevel->xsurface) {
@@ -618,7 +863,7 @@ static int *output_workspace(struct sh_server *server, const char *name) {
 /* A window shows when its output shows its workspace. The output may be gone: its windows
  * keep their state until they are placed on another output. */
 static bool toplevel_visible(struct sh_toplevel *toplevel) {
-    return !toplevel->minimized &&
+    return !toplevel->minimized && !toplevel->group_hidden && !toplevel->swallowed &&
            (toplevel->sticky || !toplevel->output[0] ||
             toplevel->workspace == *output_workspace(toplevel->server, toplevel->output));
 }
@@ -678,6 +923,8 @@ static void set_toplevel_output(struct sh_toplevel *toplevel, struct wlr_output 
         return;
     snprintf(toplevel->output, sizeof(toplevel->output), "%s", output->name);
     toplevel->workspace = *output_workspace(toplevel->server, output->name);
+    toplevel->home_output[0] = '\0'; // placed on another output by hand: it stays
+    group_follow(toplevel);
     if (toplevel->server->focused_toplevel == toplevel)
         set_active_output(toplevel->server, output->name);
     if (toplevel_mapped(toplevel)) {
@@ -731,6 +978,10 @@ static void focus_toplevel_raise(struct sh_toplevel *toplevel, bool raise) {
         return;
     struct sh_server *server = toplevel->server;
     struct wlr_seat *seat = server->seat;
+    if (toplevel->swallowed && toplevel->swallow_peer)
+        swallow_release(toplevel->swallow_peer); // asked for by hand: it comes back
+    if (toplevel->group_hidden)
+        group_show(toplevel); // another tab of its group: it takes the group's slot
     // A hidden scratchpad window activated from the taskbar comes to the focused output, as
     // scratchpad_show brings it.
     if (toplevel->scratchpad && toplevel->minimized)
@@ -744,6 +995,8 @@ static void focus_toplevel_raise(struct sh_toplevel *toplevel, bool raise) {
     deactivate_toplevel(server);
     server->focused_layer = NULL;
     server->focused_toplevel = toplevel;
+    bool was_urgent = toplevel->urgent;
+    toplevel->urgent = false; // it has the user's attention now
     bool was_minimized = toplevel->minimized;
     toplevel->minimized = false;
     if (was_minimized && wants_tiling(toplevel, NULL))
@@ -752,7 +1005,7 @@ static void focus_toplevel_raise(struct sh_toplevel *toplevel, bool raise) {
     // Panels stay reachable once a fullscreen window loses focus.
     if (raise || toplevel->fullscreen) {
         wlr_scene_node_reparent(&toplevel->scene_tree->node,
-                                toplevel->fullscreen ? server->fullscreen : server->windows);
+                                toplevel->fullscreen ? fullscreen_tree(toplevel) : server->windows);
         wlr_scene_node_raise_to_top(&toplevel->scene_tree->node);
     }
     wl_list_remove(&toplevel->link);
@@ -766,9 +1019,123 @@ static void focus_toplevel_raise(struct sh_toplevel *toplevel, bool raise) {
     if (toplevel_accepts_keyboard(toplevel))
         keyboard_enter(seat, toplevel_surface(toplevel));
     set_active_output(server, toplevel->output);
+    // The scrolling view follows focus.
+    if (toplevel->tiled && sh_tiling_set_focus(server->tiling, toplevel)) {
+        struct wlr_output *output = tiled_output(toplevel);
+        if (output)
+            reflow_output(server, output);
+    }
+    if (was_urgent) {
+        wlr_log(WLR_INFO, "Urgent window focused");
+        notify_subscribers(server);
+    }
 }
 
 static void focus_toplevel(struct sh_toplevel *toplevel) { focus_toplevel_raise(toplevel, true); }
+
+/* Urgent windows. An unfocused window that asks for attention (xdg-activation, an X11 urgency
+ * hint) is marked urgent under windows.activation = "urgent": its border pulses for a few
+ * seconds and stays in the urgent color, the taskbar and workspace indicator show it, and
+ * focus_urgent goes to the one that asked first. Focusing it, or unmapping it, ends it. */
+enum { URGENT_PULSE_MS = 4000, URGENT_PULSE_PERIOD_MS = 1200, URGENT_TICK_MS = 40 };
+
+/* How bright an urgent window's border is now: it starts at full strength and pulses down and
+ * up for URGENT_PULSE_MS, then holds. Without animations it holds at once. */
+static float urgent_pulse(struct sh_toplevel *toplevel, int64_t now) {
+    if (!toplevel->urgent || !server_settings(toplevel->server)->animations)
+        return 1;
+    int64_t elapsed = now - toplevel->urgent_since;
+    if (elapsed < 0 || elapsed >= URGENT_PULSE_MS)
+        return 1;
+    return 0.65F + 0.35F * cosf((float)(2 * M_PI * (double)elapsed / URGENT_PULSE_PERIOD_MS));
+}
+
+static bool urgent_pulsing(struct sh_toplevel *toplevel, int64_t now) {
+    return toplevel->urgent && now - toplevel->urgent_since < URGENT_PULSE_MS + URGENT_TICK_MS;
+}
+
+/* Redraws the borders of the windows that pulse while any does; the tick after the last one
+ * finishes draws it at rest. */
+static int urgent_tick(void *data) {
+    struct sh_server *server = data;
+    int64_t now = now_ms();
+    bool more = false;
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (!urgent_pulsing(toplevel, now))
+            continue;
+        refresh_frame(toplevel);
+        more = true;
+    }
+    if (more && server->urgent_timer)
+        wl_event_source_timer_update(server->urgent_timer, URGENT_TICK_MS);
+    return 0;
+}
+
+static bool toplevel_can_be_urgent(struct sh_toplevel *toplevel) {
+#if WLR_HAS_XWAYLAND
+    if (toplevel->unmanaged)
+        return false;
+#endif
+    return toplevel_mapped(toplevel);
+}
+
+/* Marks or unmarks `toplevel` as urgent. The focused window never is: it has the attention. */
+static void set_urgent(struct sh_toplevel *toplevel, bool urgent) {
+    struct sh_server *server = toplevel->server;
+    if (toplevel->urgent == urgent)
+        return;
+    if (urgent && (!toplevel_can_be_urgent(toplevel) || server->focused_toplevel == toplevel))
+        return;
+    toplevel->urgent = urgent;
+    if (urgent) {
+        toplevel->urgent_order = ++server->urgent_serial;
+        toplevel->urgent_since = now_ms();
+        wlr_log(WLR_INFO, "Window %s is urgent", toplevel_app_id(toplevel) ? toplevel_app_id(toplevel) : "");
+        if (server->urgent_timer)
+            wl_event_source_timer_update(server->urgent_timer, URGENT_TICK_MS);
+    }
+    refresh_frame(toplevel);
+    notify_subscribers(server);
+}
+
+/* A client asks to be focused (xdg-activation, _NET_ACTIVE_WINDOW): what it gets follows
+ * windows.activation. */
+static void activation_requested(struct sh_toplevel *toplevel) {
+    if (!toplevel_can_be_urgent(toplevel))
+        return;
+    switch (server_settings(toplevel->server)->activation) {
+    case SH_ACTIVATION_FOCUS:
+        focus_toplevel(toplevel);
+        break;
+    case SH_ACTIVATION_URGENT:
+        set_urgent(toplevel, true);
+        break;
+    default:
+        break;
+    }
+}
+
+/* The window that has been urgent the longest, or NULL. */
+static struct sh_toplevel *oldest_urgent(struct sh_server *server) {
+    struct sh_toplevel *toplevel, *oldest = NULL;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (toplevel->urgent && toplevel_can_be_urgent(toplevel) &&
+            (!oldest || toplevel->urgent_order < oldest->urgent_order))
+            oldest = toplevel;
+    }
+    return oldest;
+}
+
+static void focus_urgent(struct sh_server *server) {
+    if (server->locked)
+        return;
+    struct sh_toplevel *toplevel = oldest_urgent(server);
+    if (!toplevel)
+        return;
+    focus_toplevel(toplevel);
+    pointer_follow(toplevel);
+}
 
 /* Whether hovering `toplevel` may focus it: not during a drag, a popup or menu grab, or while
  * a panel or launcher holds the keyboard. */
@@ -800,6 +1167,26 @@ static void focus_previous(struct sh_server *server) {
     }
     deactivate_toplevel(server);
     wlr_seat_keyboard_clear_focus(server->seat);
+}
+
+/* Focuses the window focused before the current one, wherever it is (its output switches to
+ * its workspace). Windows hidden in the scratchpad or minimized are not in the history. */
+static void focus_last(struct sh_server *server) {
+    if (server->locked)
+        return;
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+#if WLR_HAS_XWAYLAND
+        if (toplevel->unmanaged)
+            continue;
+#endif
+        if (toplevel == server->focused_toplevel || toplevel->minimized || toplevel->swallowed ||
+            !toplevel_mapped(toplevel))
+            continue;
+        focus_toplevel(toplevel);
+        pointer_follow(toplevel);
+        return;
+    }
 }
 
 /* Focuses the topmost visible window on `output`, else nothing. */
@@ -844,6 +1231,7 @@ static void focus_layer(struct sh_layer *layer) {
 }
 
 static void minimize_toplevel(struct sh_toplevel *toplevel) {
+    group_detach(toplevel); // a minimized window keeps no slot to share
     toplevel->minimized = true;
     untile_toplevel(toplevel, false);
     wlr_scene_node_set_enabled(&toplevel->scene_tree->node, false);
@@ -862,6 +1250,23 @@ static struct sh_rect usable_area(struct sh_server *server, struct wlr_output *o
             box = candidate->usable;
     }
     return (struct sh_rect){box.x, box.y, box.width, box.height};
+}
+
+/* Fullscreen the client asked for covers the whole output; fullscreen from a binding or the
+ * title bar leaves the panels' exclusive zones shown. */
+static struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *output) {
+    struct wlr_box box;
+    if (toplevel->fullscreen_cover) {
+        wlr_output_layout_get_box(toplevel->server->output_layout, output, &box);
+        return box;
+    }
+    struct sh_rect area = usable_area(toplevel->server, output);
+    return (struct wlr_box){area.x, area.y, area.width, area.height};
+}
+
+static struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel) {
+    return toplevel->fullscreen_cover ? toplevel->server->fullscreen_cover
+                                      : toplevel->server->fullscreen;
 }
 
 static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) {
@@ -895,9 +1300,47 @@ static void set_toplevel_workspace(struct sh_toplevel *toplevel, int workspace) 
     struct wlr_output *output = tiled_output(toplevel);
     untile_toplevel(toplevel, false);
     toplevel->workspace = workspace;
+    group_follow(toplevel);
     if (retile)
         tile_toplevel(toplevel, output, NULL, false);
     notify_subscribers(toplevel->server);
+}
+
+/* The distance windows slide when `output`'s workspace changes. */
+static int slide_distance(struct sh_server *server, struct wlr_output *output) {
+    struct wlr_box box;
+    wlr_output_layout_get_box(server->output_layout, output, &box);
+    return (int)(box.width * server_settings(server)->animation_slide);
+}
+
+/* Windows that come and go with a workspace, not sticky ones, which stay. */
+static bool slides(struct sh_server *server, struct sh_toplevel *toplevel,
+                   struct wlr_output *output) {
+    return toplevel->shown && toplevel_mapped(toplevel) && !toplevel->sticky &&
+           !strcmp(toplevel->output, output->name) && server->running;
+}
+
+/* Before the switch: copies of the visible windows slide away in `direction` (-1 is left). */
+static void slide_out_workspace(struct sh_server *server, struct wlr_output *output, int direction) {
+    int distance = slide_distance(server, output);
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (!slides(server, toplevel, output) || !toplevel_visible(toplevel))
+            continue;
+        sh_anim_slide_out(server->animator, &toplevel->scene_tree->node, toplevel->content,
+                          direction * distance, 0);
+    }
+}
+
+/* After the switch: the windows now shown arrive from the side the old ones left toward. */
+static void slide_in_workspace(struct sh_server *server, struct wlr_output *output, int direction) {
+    int distance = slide_distance(server, output);
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (slides(server, toplevel, output) && toplevel_visible(toplevel))
+            sh_anim_slide(server->animator, &toplevel->anim, toplevel->content,
+                          direction * distance, 0);
+    }
 }
 
 /* Switches only `output`. Focus moves along when it was on that output (or nowhere), so paging
@@ -913,7 +1356,10 @@ static void switch_workspace(struct sh_server *server, struct wlr_output *output
     bool refocus = !focused || find_output(server, focused->output) == output;
     if (refocus)
         deactivate_toplevel(server);
+    int from = *output_workspace(server, output->name);
+    slide_out_workspace(server, output, workspace > from ? -1 : 1);
     show_workspace(server, output->name, workspace);
+    slide_in_workspace(server, output, workspace > from ? 1 : -1);
     if (refocus) {
         focus_top_on(server, output);
         set_active_output(server, output->name);
@@ -946,8 +1392,8 @@ static void set_sticky(struct sh_toplevel *toplevel, bool sticky, bool retile) {
 }
 
 /* A sticky window moved to a workspace stops being sticky and stays there. */
-static void move_to_workspace(struct sh_server *server, int workspace) {
-    struct sh_toplevel *toplevel = current_toplevel(server);
+static void move_toplevel_to_workspace(struct sh_server *server, struct sh_toplevel *toplevel,
+                                       int workspace) {
     int count = server_settings(server)->workspaces;
     if (!toplevel || workspace < 0 || workspace >= count)
         return;
@@ -967,6 +1413,10 @@ static void move_to_workspace(struct sh_server *server, int workspace) {
         deactivate_toplevel(server);
         focus_top_on(server, find_output(server, toplevel->output));
     }
+}
+
+static void move_to_workspace(struct sh_server *server, int workspace) {
+    move_toplevel_to_workspace(server, current_toplevel(server), workspace);
 }
 
 /* The nearest visible window from `from` in a direction (`sign` -1 is left or up): first those
@@ -1048,7 +1498,22 @@ static void focus_direction(struct sh_server *server, enum sh_action action) {
     }
     bool horizontal = action == SH_FOCUS_LEFT || action == SH_FOCUS_RIGHT;
     int sign = action == SH_FOCUS_LEFT || action == SH_FOCUS_UP ? -1 : 1;
-    struct sh_toplevel *best = current ? toplevel_toward(current, horizontal, sign, false) : NULL;
+    struct sh_toplevel *best;
+    if (current && current->tiled && toplevel_layout(current) == SH_LAYOUT_SCROLL)
+        // Columns off the output count too: step through the strip.
+        best = sh_tiling_scroll_step(server->tiling, current, horizontal ? sign : 0,
+                                     horizontal ? 0 : sign);
+    else
+        best = current ? toplevel_toward(current, horizontal, sign, false) : NULL;
+    if (current && current->tiled && toplevel_layout(current) == SH_LAYOUT_MONOCLE) {
+        // Every tile covers the same area, so the arrows step through them.
+        best = sh_tiling_neighbour(server->tiling, current, sign);
+        if (best) {
+            focus_toplevel(best);
+            pointer_follow(best);
+        }
+        return;
+    }
     if (best) {
         focus_toplevel(best);
         pointer_follow(best);
@@ -1082,8 +1547,487 @@ static void focus_direction(struct sh_server *server, enum sh_action action) {
     process_cursor_motion(server, now.tv_sec * 1000 + now.tv_nsec / 1000000);
 }
 
+/* Window groups. The member showing holds the group's slot (its tile, or its floating place);
+ * the others are group_hidden, in no tiling and on no screen, until a tab brings one forward. */
+static bool groups_enabled(struct sh_server *server) {
+    return server_settings(server)->groups;
+}
+
+static int group_size(struct sh_server *server, unsigned group) {
+    int count = 0;
+    struct sh_toplevel *member;
+    if (group)
+        wl_list_for_each(member, &server->toplevels, link) count += member->group == group;
+    return count;
+}
+
+/* The member of `group` that is showing. */
+static struct sh_toplevel *group_shown(struct sh_server *server, unsigned group) {
+    struct sh_toplevel *member;
+    if (group)
+        wl_list_for_each(member, &server->toplevels, link) {
+            if (member->group == group && !member->group_hidden)
+                return member;
+        }
+    return NULL;
+}
+
+/* The tab `from` is, counting from 0. */
+static int group_index(struct sh_toplevel *from) {
+    int index = 0;
+    struct sh_toplevel *member;
+    wl_list_for_each(member, &from->server->toplevels, link) {
+        index += member->group == from->group && member->group_order < from->group_order;
+    }
+    return index;
+}
+
+/* The member `step` (1 or -1) tabs away from `from`, wrapping; NULL when it is alone. */
+static struct sh_toplevel *group_step(struct sh_toplevel *from, int step) {
+    struct sh_toplevel *member, *best = NULL, *wrap = NULL;
+    wl_list_for_each(member, &from->server->toplevels, link) {
+        if (member->group != from->group || member == from)
+            continue;
+        bool beyond = step > 0 ? member->group_order > from->group_order
+                               : member->group_order < from->group_order;
+        if (beyond && (!best || (step > 0 ? member->group_order < best->group_order
+                                          : member->group_order > best->group_order)))
+            best = member;
+        if (!wrap || (step > 0 ? member->group_order < wrap->group_order
+                               : member->group_order > wrap->group_order))
+            wrap = member;
+    }
+    return best ? best : wrap;
+}
+
+/* Hidden members follow the shown one to another workspace or output. */
+static void group_follow(struct sh_toplevel *toplevel) {
+    if (!toplevel->group || toplevel->group_hidden)
+        return;
+    struct sh_toplevel *member;
+    wl_list_for_each(member, &toplevel->server->toplevels, link) {
+        if (member->group != toplevel->group || member == toplevel)
+            continue;
+        member->workspace = toplevel->workspace;
+        snprintf(member->output, sizeof(member->output), "%s", toplevel->output);
+    }
+}
+
+/* `to` takes the slot of `from` (its tile, or its floating place and state). The caller has set
+ * which of the two is hidden. */
+static void hand_over_slot(struct sh_toplevel *from, struct sh_toplevel *to) {
+    struct sh_server *server = from->server;
+    struct wlr_output *output = from->tiled ? tiled_output(from) : NULL;
+    to->workspace = from->workspace;
+    snprintf(to->output, sizeof(to->output), "%s", from->output);
+    to->floating = from->floating;
+    to->placed = from->placed;
+    to->restore_box = from->restore_box;
+    to->tile_sized = false;
+    wlr_scene_node_set_position(&to->scene_tree->node, from->scene_tree->node.x,
+                                from->scene_tree->node.y);
+    if (from->tiled) {
+        sh_tiling_replace(server->tiling, from, to);
+        from->tiled = false;
+        from->arranged = false;
+        from->arrangement = SH_NONE;
+        to->tiled = true;
+        to->arranged = false;
+        to->arrangement = SH_NONE;
+        if (to->foreign)
+            wlr_foreign_toplevel_handle_v1_set_maximized(to->foreign, false);
+    } else {
+        struct wlr_box box = toplevel_box(from);
+        to->arranged = from->arranged;
+        to->arrangement = from->arrangement;
+        toplevel_set_states(to, from->arrangement == SH_MAXIMIZE, 0);
+        toplevel_configure_box(to, box);
+    }
+    wlr_scene_node_set_enabled(&from->scene_tree->node, toplevel_visible(from));
+    wlr_scene_node_set_enabled(&to->scene_tree->node, toplevel_visible(to));
+    if (output)
+        reflow_output(server, output);
+    refresh_frame(from);
+    refresh_frame(to);
+}
+
+/* `to` (a hidden member) takes the slot of `from` (the member showing), which hides. */
+static void group_take_slot(struct sh_toplevel *from, struct sh_toplevel *to) {
+    from->group_hidden = true;
+    to->group_hidden = false;
+    hand_over_slot(from, to);
+    group_follow(to);
+    notify_subscribers(from->server);
+}
+
+/* Brings a hidden member forward; the caller focuses it. */
+static void group_show(struct sh_toplevel *toplevel) {
+    struct sh_toplevel *shown = group_shown(toplevel->server, toplevel->group);
+    if (!toplevel->group_hidden || !shown || shown == toplevel)
+        return;
+    if (shown->fullscreen)
+        set_fullscreen(shown, false); // it could not hide, and would return fullscreen
+    group_take_slot(shown, toplevel);
+    // The tabs of the others follow the new count and highlight.
+    struct sh_toplevel *member;
+    wl_list_for_each(member, &toplevel->server->toplevels, link) {
+        if (member->group == toplevel->group)
+            refresh_tabs(member);
+    }
+}
+
+/* Takes a window out of its group. A member showing hands its slot to the next tab; a group
+ * left with one window dissolves. The window keeps no slot of its own (it is on its way out,
+ * or the caller places it). */
+static void group_detach(struct sh_toplevel *toplevel) {
+    struct sh_server *server = toplevel->server;
+    unsigned group = toplevel->group;
+    if (!group)
+        return;
+    struct sh_toplevel *heir = toplevel->group_hidden ? NULL : group_step(toplevel, 1);
+    bool had_focus = server->focused_toplevel == toplevel;
+    if (heir)
+        group_take_slot(toplevel, heir);
+    toplevel->group = 0;
+    toplevel->group_hidden = false;
+    if (toplevel->tabs) {
+        wlr_scene_node_destroy(&toplevel->tabs->node);
+        toplevel->tabs = NULL;
+    }
+    if (server->tabs_hovered == toplevel)
+        server->tabs_hovered = NULL;
+    struct sh_toplevel *member, *last = NULL;
+    int left = 0;
+    wl_list_for_each(member, &server->toplevels, link) {
+        if (member->group == group)
+            ++left, last = member;
+    }
+    if (heir && had_focus)
+        focus_toplevel(heir);
+    if (left == 1 && last) {
+        last->group = 0;
+        refresh_tabs(last);
+    } else if (left > 1) {
+        wl_list_for_each(member, &server->toplevels, link) {
+            if (member->group == group)
+                refresh_tabs(member);
+        }
+    }
+    notify_subscribers(server);
+}
+
+/* Whether a window can be part of a group: an ordinary window on a workspace. */
+static bool groupable(struct sh_toplevel *toplevel) {
+    return toplevel && toplevel_mapped(toplevel) && !toplevel->sticky && !toplevel->scratchpad &&
+           !toplevel->fullscreen && !toplevel->minimized && !toplevel->group_hidden
+#if WLR_HAS_XWAYLAND
+           && !toplevel->unmanaged
+#endif
+        ;
+}
+
+/* Makes `toplevel` a member of `group`, last in tab order. */
+static void group_join(struct sh_toplevel *toplevel, unsigned group) {
+    toplevel->group = group;
+    toplevel->group_order = ++toplevel->server->group_serial;
+}
+
+/* The focused window becomes a group of one, so windows opening next join it, or, in a group,
+ * the whole group dissolves: hidden members return to tiles beside the shown one. */
+static void group_toggle(struct sh_server *server, struct sh_toplevel *current) {
+    if (!current)
+        return;
+    if (!current->group) {
+        if (!groupable(current))
+            return;
+        group_join(current, ++server->group_serial);
+        refresh_frame(current);
+        notify_subscribers(server);
+        return;
+    }
+    unsigned group = current->group;
+    struct sh_toplevel *member, *tmp;
+    struct sh_toplevel *shown = group_shown(server, group);
+    wl_list_for_each_safe(member, tmp, &server->toplevels, link) {
+        if (member->group != group)
+            continue;
+        bool hidden = member->group_hidden;
+        member->group = 0;
+        member->group_hidden = false;
+        if (hidden && shown) {
+            // It comes back beside the shown window: a tile splitting its slot, or floating there.
+            wlr_scene_node_set_enabled(&member->scene_tree->node, toplevel_visible(member));
+            if (wants_tiling(member, NULL) && shown->tiled)
+                tile_toplevel_at(member, tiled_output(shown), shown, false, 0, 0);
+            else if (!member->tiled) {
+                struct wlr_box box = toplevel_box(shown);
+                box.x += 32, box.y += 32;
+                toplevel_configure_box(member, box);
+            }
+        }
+        refresh_frame(member);
+    }
+    notify_subscribers(server);
+}
+
+static void group_cycle(struct sh_server *server, struct sh_toplevel *current, int step) {
+    if (!current || !current->group)
+        return;
+    struct sh_toplevel *next = group_step(current, step);
+    if (!next)
+        return;
+    focus_toplevel(next); // a hidden member takes the slot as it gets focus
+}
+
+/* Takes the focused window out of its group into a slot of its own beside it. */
+static void ungroup(struct sh_server *server, struct sh_toplevel *current) {
+    if (!current || !current->group)
+        return;
+    struct sh_toplevel *heir = current->group_hidden ? NULL : group_step(current, 1);
+    struct wlr_output *output = current->tiled ? tiled_output(current) : NULL;
+    struct wlr_box box = toplevel_box(current);
+    bool floating = !current->tiled;
+    group_detach(current);
+    if (!heir || current->group_hidden)
+        return;
+    // The heir holds the slot now; the window gets a place beside it.
+    wlr_scene_node_set_enabled(&current->scene_tree->node, toplevel_visible(current));
+    if (output && wants_tiling(current, output)) {
+        tile_toplevel_at(current, output, heir, false, 0, 0);
+    } else if (floating) {
+        box.x += 32, box.y += 32;
+        toplevel_configure_box(current, box);
+    }
+    refresh_frame(current);
+    focus_toplevel(current);
+}
+
+/* Moves the focused window into the group of the window beside it, that way: it becomes the
+ * shown tab in that window's slot. */
+static void group_merge(struct sh_server *server, enum sh_action action) {
+    struct sh_toplevel *current = server->focused_toplevel;
+    if (server->locked || !groupable(current))
+        return;
+    int index = action - SH_GROUP_MERGE_LEFT;
+    bool horizontal = index < 2;
+    int sign = index % 2 ? 1 : -1;
+    struct sh_toplevel *target = toplevel_toward(current, horizontal, sign, false);
+    if (!target || target == current || !groupable(target) || (target->group && target->group == current->group))
+        return;
+    if (!target->group)
+        group_join(target, ++server->group_serial);
+    unsigned group = target->group;
+    // Leave the old group (or slot), then take the target's slot as its shown tab.
+    group_detach(current);
+    if (current->tiled)
+        untile_toplevel(current, false);
+    group_join(current, group);
+    current->group_hidden = true; // hidden until it takes the slot, so the swap is uniform
+    wlr_scene_node_set_enabled(&current->scene_tree->node, false);
+    struct sh_toplevel *member;
+    group_show(current);
+    focus_toplevel(current);
+    wl_list_for_each(member, &server->toplevels, link) {
+        if (member->group == group)
+            refresh_tabs(member);
+    }
+}
+
+/* With features.groups off every group dissolves. */
+static void dissolve_groups(struct sh_server *server) {
+    struct sh_toplevel *toplevel, *tmp;
+    wl_list_for_each_safe(toplevel, tmp, &server->toplevels, link) {
+        if (toplevel->group && !toplevel->group_hidden)
+            group_toggle(server, toplevel);
+    }
+    wl_list_for_each_safe(toplevel, tmp, &server->toplevels, link) {
+        if (toplevel->group)
+            group_toggle(server, toplevel);
+    }
+}
+
+/* Window swallowing (windows.swallow). A window started from a terminal, which the process
+ * ancestry shows, takes the terminal's slot and hides it; when the window closes, the terminal
+ * takes the slot back. */
+static bool swallow_listed(const char (*names)[64], int count, const char *name) {
+    for (int i = 0; name && i < count; ++i) {
+        if (!strcasecmp(names[i], name))
+            return true;
+    }
+    return false;
+}
+
+static bool swallow_terminal(struct sh_toplevel *toplevel) {
+    const struct sh_settings *settings = server_settings(toplevel->server);
+    return swallow_listed(settings->swallow_terminals, settings->swallow_terminal_count,
+                          toplevel_app_id(toplevel));
+}
+
+/* The parent of a process, or 0 when it cannot be read. */
+static pid_t process_parent(pid_t pid) {
+    char path[64], text[512];
+    snprintf(path, sizeof(path), "/proc/%d/stat", (int)pid);
+    FILE *file = fopen(path, "r");
+    if (!file)
+        return 0;
+    size_t length = fread(text, 1, sizeof(text) - 1, file);
+    fclose(file);
+    text[length] = '\0';
+    // "pid (name) state ppid ...": the name may hold spaces and parentheses.
+    char *end = strrchr(text, ')');
+    char state;
+    int parent = 0;
+    if (!end || sscanf(end + 1, " %c %d", &state, &parent) != 2)
+        return 0;
+    return parent;
+}
+
+/* A window that can lend its slot to another. */
+static bool swallow_hostable(struct sh_toplevel *host) {
+    return toplevel_mapped(host) && !host->swallowed && !host->swallow_peer && !host->group &&
+           !host->minimized && !host->scratchpad && !host->sticky
+#if WLR_HAS_XWAYLAND
+           && !host->unmanaged
+#endif
+        ;
+}
+
+/* The window `child` was started from: that of its nearest ancestor process which has one
+ * (the focused or else the most recently focused, when a process has several). With
+ * `terminals_only` it has to be one of the configured terminals. */
+static struct sh_toplevel *swallow_host(struct sh_toplevel *child, bool terminals_only) {
+    struct sh_server *server = child->server;
+    pid_t pid = toplevel_pid(child), self = getpid();
+    if (pid <= 1)
+        return NULL;
+    pid = process_parent(pid);
+    for (int depth = 0; pid > 1 && pid != self && depth < 64; ++depth, pid = process_parent(pid)) {
+        struct sh_toplevel *best = NULL, *host;
+        wl_list_for_each(host, &server->toplevels, link) {
+            if (host == child || !swallow_hostable(host) || toplevel_pid(host) != pid ||
+                (terminals_only && !swallow_terminal(host)))
+                continue;
+            if (!best || host == server->focused_toplevel)
+                best = host;
+        }
+        if (best)
+            return best;
+    }
+    return NULL;
+}
+
+/* Whether a window opening now may swallow its terminal by itself. */
+static bool swallow_wanted(struct sh_toplevel *child) {
+    const struct sh_settings *settings = server_settings(child->server);
+    return settings->swallow && !swallow_terminal(child) && !toplevel_is_dialog(child) &&
+           !swallow_listed(settings->swallow_exceptions, settings->swallow_exception_count,
+                           toplevel_app_id(child));
+}
+
+/* `child` takes the place of `host`, which hides and leaves the taskbar. */
+static void swallow_attach(struct sh_toplevel *host, struct sh_toplevel *child) {
+    struct sh_server *server = host->server;
+    if (host->fullscreen)
+        set_fullscreen(host, false); // it could not hide, and would return fullscreen
+    if (child->tiled)
+        untile_toplevel(child, false);
+    host->swallowed = true;
+    host->swallow_peer = child;
+    child->swallow_peer = host;
+    hand_over_slot(host, child);
+    unpublish_toplevel(host);
+    if (server->switcher.open)
+        switcher_forget(host);
+    overview_forget(host);
+    notify_subscribers(server);
+}
+
+/* The window `child` is going away: the terminal it swallowed takes its place again. */
+static void swallow_restore(struct sh_toplevel *child) {
+    struct sh_toplevel *host = child->swallow_peer;
+    child->swallow_peer = NULL;
+    if (!host)
+        return;
+    struct sh_server *server = child->server;
+    host->swallow_peer = NULL;
+    host->swallowed = false;
+    if (child->fullscreen)
+        set_fullscreen(child, false);
+    bool had_focus = server->focused_toplevel == child;
+    hand_over_slot(child, host);
+    publish_toplevel(host);
+    if (had_focus)
+        focus_toplevel(host);
+    notify_subscribers(server);
+}
+
+/* The window `child` stays; the terminal it swallowed comes back beside it. */
+static void swallow_release(struct sh_toplevel *child) {
+    struct sh_toplevel *host = child->swallow_peer;
+    child->swallow_peer = NULL;
+    if (!host)
+        return;
+    struct sh_server *server = child->server;
+    host->swallow_peer = NULL;
+    host->swallowed = false;
+    publish_toplevel(host);
+    wlr_scene_node_set_enabled(&host->scene_tree->node, toplevel_visible(host));
+    struct wlr_output *output = child->tiled ? tiled_output(child) : NULL;
+    if (output && wants_tiling(host, output)) {
+        tile_toplevel_at(host, output, child, false, 0, 0);
+    } else if (!host->tiled) {
+        struct wlr_box box = toplevel_box(child);
+        box.x += 32, box.y += 32;
+        toplevel_configure_box(host, box);
+    }
+    refresh_frame(host);
+    notify_subscribers(server);
+}
+
+/* A window that swallowed or was swallowed is unmapping. */
+static void swallow_end(struct sh_toplevel *toplevel) {
+    struct sh_toplevel *peer = toplevel->swallow_peer;
+    if (!peer)
+        return;
+    if (toplevel->swallowed) {
+        // The terminal closed: the window that took its place stays where it is.
+        peer->swallow_peer = NULL;
+        toplevel->swallow_peer = NULL;
+        toplevel->swallowed = false;
+    } else {
+        swallow_restore(toplevel);
+    }
+}
+
+/* swallow_toggle: the focused window gives its terminal a place again, or, when it has none
+ * swallowed, takes the place of the terminal it was started from (else of the terminal that
+ * was focused last on its workspace). */
+static void swallow_toggle(struct sh_server *server, struct sh_toplevel *current) {
+    if (!current || server->locked || !toplevel_mapped(current) || !toplevel_visible(current))
+        return;
+    if (current->swallow_peer) {
+        swallow_release(current);
+        return;
+    }
+    struct sh_toplevel *host = swallow_host(current, false), *other;
+    if (!host) {
+        wl_list_for_each(other, &server->toplevels, link) {
+            if (other != current && swallow_hostable(other) && swallow_terminal(other) &&
+                toplevel_visible(other) && other->workspace == current->workspace &&
+                !strcmp(other->output, current->output)) {
+                host = other;
+                break;
+            }
+        }
+    }
+    if (!host)
+        return;
+    swallow_attach(host, current);
+    focus_toplevel(current);
+}
+
 /* The window switcher. Subscribers get "switcher OUTPUT SELECTED COUNT" followed by COUNT
- * lines "switcher-window APP_ID\tTITLE\tOUTPUT\tWORKSPACE\tMINIMIZED" as it opens or its list
+ * lines "switcher-window APP_ID\tTITLE\tOUTPUT\tWORKSPACE\tMINIMIZED\tURGENT" as it opens or its list
  * changes, "switcher-select N" as the selection moves (both counting from 0), and
  * "switcher-close" when it closes. */
 static void switcher_announce(struct sh_server *server) {
@@ -1104,8 +2048,9 @@ static void switcher_announce(struct sh_server *server) {
         for (char *c = title; *c; ++c)
             *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
         length +=
-            snprintf(text + length, size - length, "switcher-window %s\t%s\t%s\t%d\t%d\n", app_id,
-                     title, toplevel->output, toplevel->workspace + 1, toplevel->minimized);
+            snprintf(text + length, size - length, "switcher-window %s\t%s\t%s\t%d\t%d\t%d\n",
+                     app_id, title, toplevel->output, toplevel->workspace + 1, toplevel->minimized,
+                     toplevel->urgent);
     }
     send_event(server, text, length);
     free(text);
@@ -1156,6 +2101,8 @@ static void switcher_open(struct sh_server *server, bool backward, uint32_t modi
         if (toplevel->unmanaged)
             continue;
 #endif
+        if (toplevel->swallowed)
+            continue;
         if (count < (int)(sizeof(server->switcher.windows) / sizeof(*server->switcher.windows)))
             server->switcher.windows[count++] = toplevel;
     }
@@ -1217,6 +2164,912 @@ static void switcher_key(struct sh_server *server, uint32_t modifiers, xkb_keysy
     if (sym == XKB_KEY_Tab || xkb_keysym_to_lower(sym) == server->switcher.key)
         switcher_select(server,
                         server->switcher.selected + (modifiers & WLR_MODIFIER_SHIFT ? -1 : 1));
+}
+
+/* The overview (Expose). Opening it lays every window of the focused output's workspace out as
+ * a live thumbnail in a grid, with a strip of the output's workspaces above. It is drawn by the
+ * compositor from scaled copies of the windows' scene nodes (overview_scene.h), so the
+ * thumbnails move with the windows' contents at no cost while nothing changes. The shell
+ * draws the text (titles, the filter) over it from the events sent by overview_announce. The
+ * overview takes the keyboard and the pointer while open and changes nothing until a window
+ * is picked, a workspace chosen, or a thumbnail dropped on the strip. */
+static void overview_colour(float out[4], float r, float g, float b, float a) {
+    out[0] = r * a; // scene rectangles take premultiplied colours
+    out[1] = g * a;
+    out[2] = b * a;
+    out[3] = a;
+}
+
+static void overview_thumb_clear(struct sh_thumb *thumb) {
+    if (thumb->tree)
+        wlr_scene_node_destroy(&thumb->tree->node);
+    memset(thumb, 0, sizeof(*thumb));
+}
+
+/* Places `toplevel`'s thumbnail with its top-left corner at (x, y), copying the window again
+ * only when it changed or the scale did. */
+static void overview_thumb_place(struct sh_thumb *thumb, struct wlr_scene_tree *parent,
+                                 struct sh_toplevel *toplevel, int x, int y, double scale) {
+    if (thumb->tree && thumb->toplevel != toplevel) {
+        sh_thumb_clear(thumb->tree);
+        thumb->fingerprint = 0;
+        thumb->scale = 0;
+    }
+    thumb->toplevel = toplevel;
+    if (!thumb->tree) {
+        thumb->tree = wlr_scene_tree_create(parent);
+        if (!thumb->tree)
+            return;
+    }
+    uint64_t print = sh_thumb_fingerprint(toplevel->scene_tree);
+    if (print != thumb->fingerprint || fabs(scale - thumb->scale) > 1e-4) {
+        sh_thumb_clear(thumb->tree);
+        sh_thumb_clone(thumb->tree, toplevel->scene_tree, scale, 1.0f);
+        thumb->fingerprint = print;
+        thumb->scale = scale;
+    }
+    wlr_scene_node_set_position(&thumb->tree->node, x, y);
+    wlr_scene_node_set_enabled(&thumb->tree->node, true);
+}
+
+static void overview_rect_set(struct wlr_scene_rect **rect, struct wlr_scene_tree *parent,
+                              struct sh_rect box, const float colour[4]) {
+    if (!*rect)
+        *rect = wlr_scene_rect_create(parent, box.width, box.height, colour);
+    if (!*rect)
+        return;
+    wlr_scene_rect_set_size(*rect, box.width < 1 ? 1 : box.width, box.height < 1 ? 1 : box.height);
+    wlr_scene_rect_set_color(*rect, colour);
+    wlr_scene_node_set_position(&(*rect)->node, box.x, box.y);
+    wlr_scene_node_set_enabled(&(*rect)->node, true);
+}
+
+/* Four bars of `thickness` around `box`, outside it. */
+static void overview_frame_set(struct wlr_scene_rect *bars[4], struct wlr_scene_tree *parent,
+                               struct sh_rect box, int thickness, const float colour[4]) {
+    struct sh_rect sides[4] = {
+        {box.x - thickness, box.y - thickness, box.width + 2 * thickness, thickness},
+        {box.x - thickness, box.y + box.height, box.width + 2 * thickness, thickness},
+        {box.x - thickness, box.y, thickness, box.height},
+        {box.x + box.width, box.y, thickness, box.height},
+    };
+    for (int i = 0; i < 4; ++i)
+        overview_rect_set(&bars[i], parent, sides[i], colour);
+}
+
+static void overview_frame_hide(struct wlr_scene_rect *bars[4]) {
+    for (int i = 0; i < 4; ++i) {
+        if (bars[i])
+            wlr_scene_node_set_enabled(&bars[i]->node, false);
+    }
+}
+
+static bool overview_listable(struct sh_toplevel *toplevel) {
+#if WLR_HAS_XWAYLAND
+    if (toplevel->unmanaged)
+        return false;
+#endif
+    return toplevel_mapped(toplevel) && !toplevel->swallowed;
+}
+
+/* Whether a window is on `workspace` of the overview's output, for the grid and the strip. */
+static bool overview_on(struct sh_overview *overview, struct sh_toplevel *toplevel,
+                        int workspace) {
+    return overview_listable(toplevel) && !toplevel->minimized &&
+           !strcmp(toplevel->output, overview->output) &&
+           (toplevel->sticky || toplevel->workspace == workspace);
+}
+
+/* Lists the windows the grid shows, keeping the selection on its window when it is still
+ * there. Without a filter that is the viewed workspace's windows, most recently used first; a
+ * filter lists every window that matches, minimized ones and other workspaces' included. */
+static void overview_collect(struct sh_server *server) {
+    struct sh_overview *overview = &server->overview;
+    struct sh_toplevel *kept = overview->selected >= 0 && overview->selected < overview->count
+                                   ? overview->windows[overview->selected]
+                                   : NULL;
+    struct sh_toplevel *old[OVERVIEW_MAX];
+    struct sh_thumb old_thumbs[OVERVIEW_MAX];
+    int old_count = overview->count;
+    memcpy(old, overview->windows, sizeof(old));
+    memcpy(old_thumbs, overview->thumbs, sizeof(old_thumbs));
+    memset(overview->thumbs, 0, sizeof(overview->thumbs));
+    overview->count = 0;
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (overview->count >= OVERVIEW_MAX || !overview_listable(toplevel))
+            continue;
+        bool listed;
+        if (overview->filter[0]) {
+            const char *app_id = toplevel_app_id(toplevel), *title = toplevel_title(toplevel);
+            char text[512];
+            snprintf(text, sizeof(text), "%s %s", app_id ? app_id : "", title ? title : "");
+            listed = sh_overview_matches(text, overview->filter);
+        } else {
+            listed = overview_on(overview, toplevel, overview->viewed);
+        }
+        if (listed)
+            overview->windows[overview->count++] = toplevel;
+    }
+    // A window that stays keeps its thumbnail, so it is not copied again.
+    for (int i = 0; i < overview->count; ++i) {
+        for (int j = 0; j < old_count; ++j) {
+            if (old[j] == overview->windows[i] && old_thumbs[j].tree) {
+                overview->thumbs[i] = old_thumbs[j];
+                memset(&old_thumbs[j], 0, sizeof(old_thumbs[j]));
+                break;
+            }
+        }
+    }
+    for (int j = 0; j < old_count; ++j)
+        overview_thumb_clear(&old_thumbs[j]);
+    overview->selected = -1;
+    for (int i = 0; i < overview->count; ++i) {
+        if (overview->windows[i] == kept)
+            overview->selected = i;
+    }
+    if (overview->selected < 0 && overview->count)
+        overview->selected = 0;
+}
+
+/* Where each window's thumbnail rests, and the workspace strip. Only the geometry: nothing is
+ * drawn here. */
+static void overview_layout(struct sh_server *server) {
+    struct sh_overview *overview = &server->overview;
+    const struct sh_settings *settings = server_settings(server);
+    int gap = settings->overview_gap;
+    struct sh_rect area = {overview->area.x, overview->area.y, overview->area.width,
+                           overview->area.height};
+    int top = area.y + OVERVIEW_TOP;
+    overview->strip_count = 0;
+    if (settings->overview_strip && overview->workspaces > 1) {
+        struct sh_rect band = {area.x + gap, top, area.width - 2 * gap,
+                               area.height / 7 > 40 ? area.height / 7 : 40};
+        double aspect = (double)overview->screen.width / (overview->screen.height ? overview->screen.height : 1);
+        int strip_gap = gap / 2 < 8 ? 8 : gap / 2;
+        if (sh_overview_strip(overview->workspaces, band, strip_gap, aspect, band.height,
+                              overview->strip_cells)) {
+            overview->strip_count = overview->workspaces;
+            top = overview->strip_cells[0].y + overview->strip_cells[0].height + gap;
+        }
+    }
+    struct sh_rect grid = {area.x + gap, top, area.width - 2 * gap, area.y + area.height - gap - top};
+    for (int i = 0; i < overview->count; ++i) {
+        struct wlr_box box = toplevel_box(overview->windows[i]);
+        overview->sizes[i] = (struct sh_rect){0, 0, box.width > 0 ? box.width : 1,
+                                              box.height > 0 ? box.height : 1};
+        bool shown = toplevel_visible(overview->windows[i]) &&
+                     !strcmp(overview->windows[i]->output, overview->output);
+        overview->placed[i] = shown;
+        overview->origins[i] = (struct sh_rect){box.x, box.y, overview->sizes[i].width,
+                                                overview->sizes[i].height};
+    }
+    if (!overview->count || !sh_overview_grid(overview->sizes, overview->count, grid, gap, 1.0,
+                                              overview->cells)) {
+        for (int i = 0; i < overview->count; ++i)
+            overview->cells[i] = (struct sh_rect){grid.x, grid.y, 1, 1};
+    }
+    for (int i = 0; i < overview->count; ++i) {
+        if (!overview->placed[i])
+            overview->origins[i] = overview->cells[i];
+    }
+}
+
+static struct sh_rect overview_rect_between(struct sh_rect from, struct sh_rect to, double t) {
+    return (struct sh_rect){(int)lround(from.x + (to.x - from.x) * t),
+                            (int)lround(from.y + (to.y - from.y) * t),
+                            (int)lround(from.width + (to.width - from.width) * t),
+                            (int)lround(from.height + (to.height - from.height) * t)};
+}
+
+/* Draws the overview at the current progress: the backdrop, the strip with a copy of each
+ * workspace's windows, the cards and thumbnails, and the selection. */
+static void overview_render(struct sh_server *server) {
+    struct sh_overview *overview = &server->overview;
+    const struct sh_settings *settings = server_settings(server);
+    if (!overview->tree)
+        return;
+    double t = overview->progress;
+    bool settled = t >= 1;
+    float colour[4];
+    overview_colour(colour, 0.04f, 0.05f, 0.08f, (float)(settings->overview_dim * t));
+    overview_rect_set(&overview->backdrop, overview->tree,
+                      (struct sh_rect){overview->screen.x, overview->screen.y,
+                                       overview->screen.width, overview->screen.height},
+                      colour);
+    // The strip fades in with the backdrop by staying hidden until the grid has settled.
+    for (int w = 0; w < OVERVIEW_WORKSPACES; ++w) {
+        bool listed = settled && w < overview->strip_count;
+        if (overview->strip_back[w])
+            wlr_scene_node_set_enabled(&overview->strip_back[w]->node, listed);
+        if (!listed) {
+            overview_frame_hide(overview->strip_mark[w]);
+            continue;
+        }
+        struct sh_rect cell = overview->strip_cells[w];
+        bool viewed = w == overview->viewed, target = w == overview->drop;
+        overview_colour(colour, viewed ? 0.22f : 0.12f, viewed ? 0.25f : 0.13f,
+                        viewed ? 0.31f : 0.16f, 0.95f);
+        overview_rect_set(&overview->strip_back[w], overview->strip, cell, colour);
+        if (target || viewed || w == overview->current) {
+            if (target)
+                overview_colour(colour, 0.35f, 0.85f, 0.5f, 1);
+            else if (viewed)
+                overview_colour(colour, 0.36f, 0.6f, 1.0f, 1);
+            else
+                overview_colour(colour, 0.8f, 0.8f, 0.85f, 0.5f);
+            overview_frame_set(overview->strip_mark[w], overview->strip, cell, target ? 3 : 2,
+                               colour);
+        } else {
+            overview_frame_hide(overview->strip_mark[w]);
+        }
+    }
+    // Copies of each workspace's windows in its strip cell, at the output's proportions.
+    int minis = 0;
+    if (settled) {
+        for (int w = 0; w < overview->strip_count; ++w) {
+            struct sh_rect cell = overview->strip_cells[w];
+            double scale = (double)cell.width / (overview->screen.width ? overview->screen.width : 1);
+            struct sh_toplevel *toplevel;
+            wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
+                if (minis >= OVERVIEW_MINI_MAX)
+                    break;
+                if (!overview_on(overview, toplevel, w) || toplevel == overview->dragged)
+                    continue;
+                struct wlr_box box = toplevel_box(toplevel);
+                overview_thumb_place(&overview->minis[minis++], overview->strip, toplevel,
+                                     cell.x + (int)lround((box.x - overview->screen.x) * scale),
+                                     cell.y + (int)lround((box.y - overview->screen.y) * scale),
+                                     scale);
+            }
+        }
+    }
+    for (int i = minis; i < OVERVIEW_MINI_MAX; ++i)
+        overview_thumb_clear(&overview->minis[i]);
+    overview->mini_count = minis;
+
+    for (int i = 0; i < OVERVIEW_MAX; ++i) {
+        if (i >= overview->count || !overview->windows[i]) {
+            if (overview->cards[i])
+                wlr_scene_node_set_enabled(&overview->cards[i]->node, false);
+            continue;
+        }
+        struct sh_rect rect = overview_rect_between(overview->origins[i], overview->cells[i], t);
+        double scale = (double)rect.width / overview->sizes[i].width;
+        bool dragged = overview->dragging && overview->press == i;
+        if (dragged) {
+            rect.x += (int)lround(server->cursor->x - overview->press_x);
+            rect.y += (int)lround(server->cursor->y - overview->press_y);
+        }
+        struct sh_rect card = {rect.x - OVERVIEW_PAD, rect.y - OVERVIEW_PAD,
+                               rect.width + 2 * OVERVIEW_PAD, rect.height + 2 * OVERVIEW_PAD};
+        overview_colour(colour, 0.1f, 0.11f, 0.14f, 0.85f);
+        if (settled && !dragged)
+            overview_rect_set(&overview->cards[i], overview->cards_tree, card, colour);
+        else if (overview->cards[i])
+            wlr_scene_node_set_enabled(&overview->cards[i]->node, false);
+        overview_thumb_place(&overview->thumbs[i], overview->grid, overview->windows[i], rect.x,
+                             rect.y, scale);
+        if (dragged && overview->thumbs[i].tree)
+            wlr_scene_node_raise_to_top(&overview->thumbs[i].tree->node);
+    }
+    if (settled && overview->selected >= 0 && overview->selected < overview->count &&
+        !overview->dragging) {
+        struct sh_rect cell = overview->cells[overview->selected];
+        overview_colour(colour, 0.36f, 0.6f, 1.0f, 1);
+        overview_frame_set(overview->frame, overview->frames,
+                           (struct sh_rect){cell.x - OVERVIEW_PAD, cell.y - OVERVIEW_PAD,
+                                            cell.width + 2 * OVERVIEW_PAD,
+                                            cell.height + 2 * OVERVIEW_PAD},
+                           3, colour);
+    } else {
+        overview_frame_hide(overview->frame);
+    }
+}
+
+/* Tells the shell what to draw its text over: the output, the filter, the selection, then a
+ * line per thumbnail and per strip cell, in coordinates of the output.
+ *   overview OUTPUT COUNT SELECTED VIEWED STRIP AREA_X AREA_Y AREA_WIDTH AREA_HEIGHT FILTER
+ *     (AREA is what the panels leave, FILTER is "-" when empty)
+ *   overview-window X Y WIDTH HEIGHT APP_ID\tTITLE\tWORKSPACE\tURGENT (URGENT is 0 or 1)
+ *   overview-strip X Y WIDTH HEIGHT WORKSPACE\tWINDOWS
+ * and "overview-select N" as the selection moves, "overview-close" when it closes. */
+static size_t overview_describe(struct sh_server *server, char *text, size_t size) {
+    struct sh_overview *overview = &server->overview;
+    size_t length = 0;
+    length += snprintf(text + length, size - length, "overview %s %d %d %d %d %d %d %d %d %s\n",
+                       overview->output, overview->count, overview->selected,
+                       overview->viewed + 1, overview->strip_count,
+                       overview->area.x - overview->screen.x,
+                       overview->area.y - overview->screen.y, overview->area.width,
+                       overview->area.height, overview->filter[0] ? overview->filter : "-");
+    for (int i = 0; i < overview->count && length < size; ++i) {
+        struct sh_toplevel *toplevel = overview->windows[i];
+        if (!toplevel)
+            continue;
+        const char *app_id = toplevel_app_id(toplevel), *title = toplevel_title(toplevel);
+        char clean_title[160], clean_app_id[128];
+        snprintf(clean_title, sizeof(clean_title), "%s", title ? title : "");
+        snprintf(clean_app_id, sizeof(clean_app_id), "%s", app_id ? app_id : "");
+        // Neither can end the line or the column: a client sets both as it likes.
+        for (char *c = clean_title; *c; ++c) {
+            if (*c == '\t' || *c == '\n' || *c == '\r')
+                *c = ' ';
+        }
+        for (char *c = clean_app_id; *c; ++c) {
+            if (*c == '\t' || *c == '\n' || *c == '\r')
+                *c = ' ';
+        }
+        struct sh_rect cell = overview->cells[i];
+        length += snprintf(text + length, size - length, "overview-window %d %d %d %d %s\t%s\t%d\t%d\n",
+                           cell.x - overview->screen.x, cell.y - overview->screen.y, cell.width,
+                           cell.height, clean_app_id, clean_title, toplevel->workspace + 1,
+                           toplevel->urgent);
+    }
+    for (int w = 0; w < overview->strip_count && length < size; ++w) {
+        struct sh_rect cell = overview->strip_cells[w];
+        int windows = 0;
+        struct sh_toplevel *toplevel;
+        wl_list_for_each(toplevel, &server->toplevels, link) windows += overview_on(overview, toplevel, w);
+        length += snprintf(text + length, size - length, "overview-strip %d %d %d %d %d\t%d\n",
+                           cell.x - overview->screen.x, cell.y - overview->screen.y, cell.width,
+                           cell.height, w + 1, windows);
+    }
+    return length < size ? length : size - 1;
+}
+
+static void overview_announce(struct sh_server *server) {
+    struct sh_overview *overview = &server->overview;
+    if (wl_list_empty(&server->subscribers))
+        return;
+    size_t size = 512 + (size_t)(overview->count + OVERVIEW_WORKSPACES) * 512;
+    char *text = malloc(size);
+    if (!text)
+        return;
+    size_t length = overview_describe(server, text, size);
+    send_event(server, text, length);
+    free(text);
+}
+
+static void overview_select(struct sh_server *server, int index) {
+    struct sh_overview *overview = &server->overview;
+    if (!overview->count || index < 0 || index >= overview->count || index == overview->selected)
+        return;
+    overview->selected = index;
+    char line[32];
+    int length = snprintf(line, sizeof(line), "overview-select %d\n", index);
+    send_event(server, line, (size_t)length);
+    overview_render(server);
+}
+
+/* Lays out again if the windows or workspaces changed, then draws; synchronous, so what a
+ * control request changed is in place when it is answered. */
+static void overview_refresh(struct sh_server *server) {
+    struct sh_overview *overview = &server->overview;
+    if (!overview->visible)
+        return;
+    if (overview->open && overview->dirty) {
+        overview->dirty = false;
+        overview_collect(server);
+        overview_layout(server);
+        overview_announce(server);
+    }
+    overview_render(server);
+}
+
+static void overview_hide(struct sh_server *server) {
+    struct sh_overview *overview = &server->overview;
+    overview->visible = false;
+    overview->open = false;
+    overview->closing = false;
+    overview->dragging = false;
+    overview->press = -1;
+    overview->dragged = NULL;
+    for (int i = 0; i < OVERVIEW_MAX; ++i)
+        overview_thumb_clear(&overview->thumbs[i]);
+    for (int i = 0; i < OVERVIEW_MINI_MAX; ++i)
+        overview_thumb_clear(&overview->minis[i]);
+    overview->count = overview->mini_count = 0;
+    if (overview->tree)
+        wlr_scene_node_set_enabled(&overview->tree->node, false);
+}
+
+static int overview_step(void *data) {
+    struct sh_server *server = data;
+    struct sh_overview *overview = &server->overview;
+    overview->armed = false;
+    if (!overview->visible)
+        return 0;
+    if (overview->progress != overview->to) {
+        int64_t elapsed = now_ms() - overview->started;
+        if (overview->span <= 0 || elapsed >= overview->span) {
+            overview->progress = overview->to;
+        } else {
+            struct sh_curve ease = {SH_CURVE_EASE_OUT, {0, 0, 0, 0}};
+            overview->progress = overview->from + (overview->to - overview->from) *
+                                                      sh_curve_eval(&ease, (double)elapsed /
+                                                                               overview->span);
+        }
+    }
+    overview_refresh(server);
+    if (overview->progress != overview->to) {
+        overview->armed = true;
+        wl_event_source_timer_update(overview->timer, 16);
+    } else if (overview->closing) {
+        overview_hide(server);
+    }
+    return 0;
+}
+
+/* Asks for a redraw soon; many changes in a row make one. */
+static void overview_touch(struct sh_server *server, bool relayout) {
+    struct sh_overview *overview = &server->overview;
+    if (!overview->visible)
+        return;
+    if (relayout)
+        overview->dirty = true;
+    if (!overview->armed && overview->timer) {
+        overview->armed = true;
+        wl_event_source_timer_update(overview->timer, 8);
+    }
+}
+
+/* A window that goes away leaves the overview at once; the next layout drops its place. */
+static void overview_forget(struct sh_toplevel *toplevel) {
+    struct sh_server *server = toplevel->server;
+    struct sh_overview *overview = &server->overview;
+    if (!overview->visible)
+        return;
+    for (int i = 0; i < OVERVIEW_MAX; ++i) {
+        if (overview->thumbs[i].toplevel == toplevel)
+            overview_thumb_clear(&overview->thumbs[i]);
+        if (i < overview->count && overview->windows[i] == toplevel)
+            overview->windows[i] = NULL;
+    }
+    for (int i = 0; i < OVERVIEW_MINI_MAX; ++i) {
+        if (overview->minis[i].toplevel == toplevel)
+            overview_thumb_clear(&overview->minis[i]);
+    }
+    if (overview->dragged == toplevel) {
+        overview->dragged = NULL;
+        overview->dragging = false;
+        overview->press = -1;
+    }
+    overview_touch(server, true);
+}
+
+/* Fullscreen windows sit above the other windows; while the overview is open the
+ * focused one goes down among the others, as it does when it loses focus. */
+static void overview_lower_fullscreen(struct sh_server *server, bool lower) {
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (!toplevel->fullscreen || !toplevel->scene_tree)
+            continue;
+        wlr_scene_node_reparent(&toplevel->scene_tree->node,
+                                lower ? server->windows : fullscreen_tree(toplevel));
+    }
+}
+
+static void overview_open(struct sh_server *server) {
+    struct sh_overview *overview = &server->overview;
+    const struct sh_settings *settings = server_settings(server);
+    if (!settings->overview) {
+        wlr_log(WLR_INFO, "Overview actions ignored: overview.enabled is false");
+        return;
+    }
+    if (overview->open || server->locked || !server->overview_layer)
+        return;
+    struct wlr_output *output = focused_output(server);
+    if (!output)
+        return;
+    if (overview->visible) // still gliding closed
+        overview_hide(server);
+    switcher_close(server, -1);
+    snprintf(overview->output, sizeof(overview->output), "%s", output->name);
+    wlr_output_layout_get_box(server->output_layout, output, &overview->screen);
+    struct sh_rect usable = usable_area(server, output);
+    overview->area = (struct sh_rect){usable.x, usable.y, usable.width, usable.height};
+    overview->workspaces = settings->workspaces < OVERVIEW_WORKSPACES ? settings->workspaces
+                                                                      : OVERVIEW_WORKSPACES;
+    overview->current = overview->viewed = *output_workspace(server, output->name);
+    overview->filter[0] = '\0';
+    overview->count = 0;
+    overview->selected = -1;
+    overview->press = overview->drop = -1;
+    overview->dragging = false;
+    overview->dragged = NULL;
+    overview->scroll = 0;
+    if (!overview->tree) {
+        overview->tree = wlr_scene_tree_create(server->overview_layer);
+        if (!overview->tree)
+            return;
+        float clear[4] = {0, 0, 0, 0};
+        overview->backdrop = wlr_scene_rect_create(overview->tree, 1, 1, clear);
+        overview->strip = wlr_scene_tree_create(overview->tree);
+        overview->cards_tree = wlr_scene_tree_create(overview->tree);
+        overview->grid = wlr_scene_tree_create(overview->tree);
+        overview->frames = wlr_scene_tree_create(overview->tree);
+        overview->timer = wl_event_loop_add_timer(wl_display_get_event_loop(server->wl_display),
+                                                  overview_step, server);
+    }
+    wlr_scene_node_set_enabled(&overview->tree->node, true);
+    overview_lower_fullscreen(server, true);
+    overview_collect(server);
+    overview->selected = -1;
+    for (int i = 0; i < overview->count; ++i) {
+        if (overview->windows[i] == server->focused_toplevel)
+            overview->selected = i;
+    }
+    if (overview->selected < 0 && overview->count)
+        overview->selected = 0;
+    overview_layout(server);
+    overview->open = overview->visible = true;
+    overview->closing = false;
+    overview->dirty = false;
+    overview->from = overview->progress = 0;
+    overview->to = 1;
+    overview->span = settings->overview_animation && settings->animations
+                         ? (int)(settings->overview_duration / (settings->animation_speed > 0 ? settings->animation_speed : 1))
+                         : 0;
+    overview->started = now_ms();
+    if (overview->span <= 0)
+        overview->progress = 1;
+    // The pointer belongs to the overview, not to the window under it.
+    wlr_seat_pointer_clear_focus(server->seat);
+    set_default_cursor(server);
+    overview_render(server);
+    if (overview->progress != overview->to)
+        overview_touch(server, false);
+    overview_announce(server);
+    wlr_log(WLR_INFO, "Overview opened on %s", output->name);
+}
+
+/* Closes the overview, focusing `chosen` if any; else, with `workspace` not below 0, showing
+ * that workspace on the overview's output. The thumbnails glide back to the windows. */
+static void overview_close(struct sh_server *server, struct sh_toplevel *chosen, int workspace) {
+    struct sh_overview *overview = &server->overview;
+    if (!overview->open)
+        return;
+    overview->open = false;
+    overview->dragging = false;
+    overview->press = overview->drop = -1;
+    overview->dragged = NULL;
+    overview_lower_fullscreen(server, false);
+    if (chosen && !server->locked) {
+        focus_toplevel(chosen);
+        struct wlr_box box = toplevel_box(chosen);
+        if (!wlr_box_contains_point(&box, server->cursor->x, server->cursor->y))
+            pointer_follow(chosen);
+    } else if (workspace >= 0) {
+        struct wlr_output *output = find_output(server, overview->output);
+        if (output) {
+            switch_workspace(server, output, workspace);
+            focus_top_on(server, output);
+        }
+    }
+    // Where the windows are now: the thumbnails glide there.
+    for (int i = 0; i < overview->count; ++i) {
+        if (!overview->windows[i])
+            continue;
+        bool shown = toplevel_visible(overview->windows[i]) && overview_listable(overview->windows[i]);
+        struct wlr_box box = toplevel_box(overview->windows[i]);
+        overview->origins[i] = shown ? (struct sh_rect){box.x, box.y, overview->sizes[i].width,
+                                                         overview->sizes[i].height}
+                                     : overview->cells[i];
+    }
+    const struct sh_settings *settings = server_settings(server);
+    overview->closing = true;
+    overview->from = overview->progress;
+    overview->to = 0;
+    overview->started = now_ms();
+    overview->span = settings->overview_animation && settings->animations
+                         ? (int)(settings->overview_duration * overview->progress / (settings->animation_speed > 0 ? settings->animation_speed : 1))
+                         : 0;
+    send_event(server, "overview-close\n", strlen("overview-close\n"));
+    if (overview->span <= 0) {
+        overview_hide(server);
+    } else {
+        overview_render(server);
+        overview_touch(server, false);
+    }
+    wlr_log(WLR_INFO, "Overview closed");
+}
+
+/* Closes at once, without the glide: the session locks, or the output goes. */
+static void overview_dismiss(struct sh_server *server) {
+    struct sh_overview *overview = &server->overview;
+    if (overview->open)
+        overview_close(server, NULL, -1);
+    if (overview->visible)
+        overview_hide(server);
+}
+
+static void overview_confirm(struct sh_server *server, int index) {
+    struct sh_overview *overview = &server->overview;
+    if (!overview->open)
+        return;
+    if (index >= 0 && index < overview->count && overview->windows[index])
+        overview_close(server, overview->windows[index], -1);
+    else if (!overview->count)
+        overview_close(server, NULL, overview->viewed); // an empty workspace: go there
+}
+
+/* Shows another workspace of the output in the grid, without switching to it. */
+static void overview_view(struct sh_server *server, int workspace) {
+    struct sh_overview *overview = &server->overview;
+    if (!overview->open || workspace < 0 || workspace >= overview->workspaces ||
+        (workspace == overview->viewed && !overview->filter[0]))
+        return;
+    overview->viewed = workspace;
+    overview->filter[0] = '\0';
+    overview->selected = -1;
+    overview->dirty = true;
+    overview_refresh(server);
+}
+
+static void overview_set_filter(struct sh_server *server, const char *text) {
+    struct sh_overview *overview = &server->overview;
+    if (!overview->open || !strcmp(overview->filter, text))
+        return;
+    snprintf(overview->filter, sizeof(overview->filter), "%s", text);
+    overview->selected = -1; // the first match
+    overview->dirty = true;
+    overview_refresh(server);
+}
+
+static void overview_close_selected(struct sh_server *server) {
+    struct sh_overview *overview = &server->overview;
+    if (overview->selected >= 0 && overview->selected < overview->count &&
+        overview->windows[overview->selected])
+        toplevel_close(overview->windows[overview->selected]);
+}
+
+/* Index of the thumbnail (its card) under a point, else -1. */
+static int overview_thumb_at(struct sh_overview *overview, double x, double y) {
+    for (int i = overview->count - 1; i >= 0; --i) {
+        struct sh_rect cell = overview->cells[i];
+        if (x >= cell.x - OVERVIEW_PAD && x < cell.x + cell.width + OVERVIEW_PAD &&
+            y >= cell.y - OVERVIEW_PAD && y < cell.y + cell.height + OVERVIEW_PAD)
+            return i;
+    }
+    return -1;
+}
+
+static int overview_strip_at(struct sh_overview *overview, double x, double y) {
+    for (int w = 0; w < overview->strip_count; ++w) {
+        struct sh_rect cell = overview->strip_cells[w];
+        if (x >= cell.x && x < cell.x + cell.width && y >= cell.y && y < cell.y + cell.height)
+            return w;
+    }
+    return -1;
+}
+
+/* Keys while the overview is open. Text goes to the filter; the rest is navigation. Every key
+ * is kept from the windows. */
+static void overview_key(struct sh_server *server, uint32_t modifiers, xkb_keysym_t sym) {
+    struct sh_overview *overview = &server->overview;
+    bool control = modifiers & WLR_MODIFIER_CTRL;
+    int selected = overview->selected;
+    switch (sym) {
+    case XKB_KEY_Escape:
+        if (overview->filter[0])
+            overview_set_filter(server, "");
+        else
+            overview_close(server, NULL, -1);
+        return;
+    case XKB_KEY_Return:
+    case XKB_KEY_KP_Enter:
+        overview_confirm(server, selected);
+        return;
+    case XKB_KEY_Left:
+    case XKB_KEY_Right:
+        if (control) {
+            overview_view(server, overview->viewed + (sym == XKB_KEY_Left ? -1 : 1));
+            return;
+        }
+        // fall through
+    case XKB_KEY_Up:
+    case XKB_KEY_Down: {
+        if (selected < 0 || !overview->count)
+            return;
+        enum sh_overview_direction direction = sym == XKB_KEY_Left    ? SH_OVERVIEW_LEFT
+                                               : sym == XKB_KEY_Right ? SH_OVERVIEW_RIGHT
+                                               : sym == XKB_KEY_Up    ? SH_OVERVIEW_UP
+                                                                      : SH_OVERVIEW_DOWN;
+        overview_select(server, sh_overview_neighbour(overview->cells, overview->count, selected,
+                                                      direction));
+        return;
+    }
+    case XKB_KEY_Tab:
+    case XKB_KEY_ISO_Left_Tab: {
+        if (!overview->count)
+            return;
+        bool back = sym == XKB_KEY_ISO_Left_Tab || (modifiers & WLR_MODIFIER_SHIFT);
+        int next = (selected + (back ? -1 : 1) + overview->count) % overview->count;
+        overview_select(server, next);
+        return;
+    }
+    case XKB_KEY_Home:
+        overview_select(server, 0);
+        return;
+    case XKB_KEY_End:
+        overview_select(server, overview->count - 1);
+        return;
+    case XKB_KEY_Page_Up:
+        overview_view(server, overview->viewed - 1);
+        return;
+    case XKB_KEY_Page_Down:
+        overview_view(server, overview->viewed + 1);
+        return;
+    case XKB_KEY_Delete:
+        overview_close_selected(server);
+        return;
+    case XKB_KEY_BackSpace: {
+        size_t length = strlen(overview->filter);
+        if (!length)
+            return;
+        char text[sizeof(overview->filter)];
+        memcpy(text, overview->filter, length);
+        while (length > 0 && (text[length - 1] & 0xC0) == 0x80)
+            --length; // step back over a multibyte character's tail
+        if (length > 0)
+            --length;
+        text[length] = '\0';
+        overview_set_filter(server, text);
+        return;
+    }
+    }
+    if (modifiers & (WLR_MODIFIER_CTRL | WLR_MODIFIER_ALT | WLR_MODIFIER_LOGO))
+        return;
+    char utf8[8];
+    int bytes = xkb_keysym_to_utf8(sym, utf8, sizeof(utf8));
+    if (bytes <= 1 || (unsigned char)utf8[0] < 0x20 || utf8[0] == 0x7f)
+        return; // bytes counts the terminator: 1 means no character
+    char text[sizeof(overview->filter)];
+    size_t length = strlen(overview->filter);
+    if (length + (size_t)bytes >= sizeof(text))
+        return;
+    memcpy(text, overview->filter, length);
+    memcpy(text + length, utf8, (size_t)bytes);
+    overview_set_filter(server, text);
+}
+
+static bool overview_button(struct sh_server *server, const struct wlr_pointer_button_event *event) {
+    struct sh_overview *overview = &server->overview;
+    double x = server->cursor->x, y = server->cursor->y;
+    uint32_t bit = event->button >= BTN_MOUSE && event->button < BTN_MOUSE + 32
+                       ? 1u << (event->button - BTN_MOUSE)
+                       : 0;
+    if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
+        if (!(overview->pressed & bit))
+            return false;
+        overview->pressed &= ~bit;
+        if (event->button != BTN_LEFT || overview->press < 0)
+            return true;
+        int press = overview->press;
+        bool dragging = overview->dragging;
+        int drop = overview->drop;
+        struct sh_toplevel *toplevel = press < overview->count ? overview->windows[press] : NULL;
+        overview->press = overview->drop = -1;
+        overview->dragging = false;
+        overview->dragged = NULL;
+        if (!overview->open)
+            return true;
+        if (dragging) {
+            if (toplevel && drop >= 0 && drop != toplevel->workspace &&
+                !strcmp(toplevel->output, overview->output)) {
+                move_toplevel_to_workspace(server, toplevel, drop);
+                overview->dirty = true;
+            }
+            overview_refresh(server);
+        } else if (overview_thumb_at(overview, x, y) == press) {
+            overview_confirm(server, press);
+        }
+        return true;
+    }
+    if (!overview->open)
+        return false;
+    // A click on a panel, or on another monitor, closes the overview and goes on to what is
+    // there: the taskbar's buttons still work.
+    struct wlr_box area = {overview->area.x, overview->area.y, overview->area.width,
+                           overview->area.height};
+    if (!wlr_box_contains_point(&area, x, y)) {
+        overview_close(server, NULL, -1);
+        process_cursor_motion(server, event->time_msec);
+        return false;
+    }
+    overview->pressed |= bit;
+    if (event->button == BTN_LEFT) {
+        int thumb = overview_thumb_at(overview, x, y), cell = overview_strip_at(overview, x, y);
+        if (thumb >= 0) {
+            overview_select(server, thumb);
+            overview->press = thumb;
+            overview->press_x = x;
+            overview->press_y = y;
+        } else if (cell >= 0) {
+            if (cell == overview->viewed && !overview->filter[0])
+                overview_close(server, NULL, cell); // a second click goes there
+            else
+                overview_view(server, cell);
+        } else {
+            overview_close(server, NULL, -1);
+        }
+    } else if (event->button == BTN_MIDDLE) {
+        int thumb = overview_thumb_at(overview, x, y);
+        if (thumb >= 0 && overview->windows[thumb])
+            toplevel_close(overview->windows[thumb]);
+    }
+    return true;
+}
+
+static bool overview_motion(struct sh_server *server) {
+    struct sh_overview *overview = &server->overview;
+    if (!overview->open)
+        return false;
+    double x = server->cursor->x, y = server->cursor->y;
+    if (overview->press >= 0 && !overview->dragging &&
+        fabs(x - overview->press_x) + fabs(y - overview->press_y) > 8 &&
+        overview->press < overview->count) {
+        overview->dragging = true;
+        overview->dragged = overview->windows[overview->press];
+    }
+    if (overview->dragging) {
+        overview->drop = overview_strip_at(overview, x, y);
+        overview_render(server);
+    } else if (overview->press < 0) {
+        int thumb = overview_thumb_at(overview, x, y);
+        if (thumb >= 0)
+            overview_select(server, thumb);
+    }
+    set_default_cursor(server);
+    wlr_seat_pointer_clear_focus(server->seat);
+    return true;
+}
+
+/* The hot corner: entering the configured corner of an output opens the overview there. */
+static void overview_hot_corner(struct sh_server *server) {
+    struct sh_overview *overview = &server->overview;
+    const struct sh_settings *settings = server_settings(server);
+    int corner = settings->overview_hot_corner;
+    bool inside = false;
+    struct wlr_output *output = NULL;
+    if (settings->overview && corner > 0 && !server->locked &&
+        server->cursor_mode == SH_CURSOR_PASSTHROUGH) {
+        output = wlr_output_layout_output_at(server->output_layout, server->cursor->x,
+                                             server->cursor->y);
+        if (output) {
+            struct wlr_box box;
+            wlr_output_layout_get_box(server->output_layout, output, &box);
+            double x = corner == 2 || corner == 4 ? box.x + box.width - 1 : box.x;
+            double y = corner == 3 || corner == 4 ? box.y + box.height - 1 : box.y;
+            inside = fabs(server->cursor->x - x) < 2 && fabs(server->cursor->y - y) < 2;
+        }
+    }
+    if (inside && !overview->in_corner && !overview->open && !server->switcher.open) {
+        server->target_output = output;
+        overview_open(server);
+        server->target_output = NULL;
+    }
+    overview->in_corner = inside;
+}
+
+/* The wheel pages through the workspaces. */
+static bool overview_axis(struct sh_server *server, const struct wlr_pointer_axis_event *event) {
+    struct sh_overview *overview = &server->overview;
+    if (!overview->open)
+        return false;
+    if (event->orientation != WL_POINTER_AXIS_VERTICAL_SCROLL)
+        return true;
+    overview->scroll += event->delta;
+    while (overview->scroll >= 10) {
+        overview->scroll -= 10;
+        overview_view(server, overview->viewed + 1);
+    }
+    while (overview->scroll <= -10) {
+        overview->scroll += 10;
+        overview_view(server, overview->viewed - 1);
+    }
+    return true;
 }
 
 /* Sway's scratchpad. A window put there floats and hides, listed in the taskbar as minimized.
@@ -1346,6 +3199,107 @@ static bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mo
                                          error, error_size);
 }
 
+/* The tiling layout actions, on the focused output's current workspace. */
+static void layout_action(struct sh_server *server, enum sh_action action) {
+    struct wlr_output *output = focused_output(server);
+    if (!output || server->locked)
+        return;
+    const char *name = output->name;
+    int workspace = *output_workspace(server, name);
+    struct sh_toplevel *current = current_toplevel(server);
+    if (current && (!current->tiled || tiled_output(current) != output ||
+                    current->workspace != workspace))
+        current = NULL;
+    bool changed = true;
+    // The master keys resize the focused column in the scrolling layout.
+    if (sh_tiling_layout(server->tiling, name, workspace) == SH_LAYOUT_SCROLL) {
+        if (action == SH_MASTER_GROW)
+            action = SH_COLUMN_WIDEN;
+        else if (action == SH_MASTER_SHRINK)
+            action = SH_COLUMN_NARROW;
+    }
+    switch (action) {
+    case SH_LAYOUT_NEXT:
+    case SH_LAYOUT_PREV:
+        sh_tiling_cycle_layout(server->tiling, name, workspace, action == SH_LAYOUT_NEXT ? 1 : -1);
+        break;
+    case SH_SET_LAYOUT_DWINDLE:
+    case SH_SET_LAYOUT_MASTER:
+    case SH_SET_LAYOUT_SPIRAL:
+    case SH_SET_LAYOUT_MONOCLE:
+    case SH_SET_LAYOUT_SCROLL:
+        sh_tiling_set_layout(server->tiling, name, workspace,
+                             (enum sh_tile_layout)(action - SH_SET_LAYOUT_DWINDLE));
+        break;
+    case SH_PROMOTE: {
+        void *master = sh_tiling_master(server->tiling, name, workspace);
+        if (current && master == current)
+            master = sh_tiling_neighbour(server->tiling, current, 1);
+        changed = current && master && sh_tiling_swap(server->tiling, current, master);
+        break;
+    }
+    case SH_SWAP_NEXT:
+    case SH_SWAP_PREV: {
+        void *other = current ? sh_tiling_neighbour(server->tiling, current,
+                                                     action == SH_SWAP_NEXT ? 1 : -1)
+                              : NULL;
+        changed = other && sh_tiling_swap(server->tiling, current, other);
+        break;
+    }
+    case SH_FOCUS_NEXT:
+    case SH_FOCUS_PREV: {
+        struct sh_toplevel *other = current ? sh_tiling_neighbour(server->tiling, current,
+                                                                  action == SH_FOCUS_NEXT ? 1 : -1)
+                                            : NULL;
+        if (other) {
+            focus_toplevel(other);
+            pointer_follow(other);
+        }
+        return;
+    }
+    case SH_MASTER_GROW:
+    case SH_MASTER_SHRINK:
+        changed = sh_tiling_adjust(server->tiling, name, workspace,
+                                   action == SH_MASTER_GROW ? 0.05 : -0.05, 0);
+        break;
+    case SH_MASTER_MORE:
+    case SH_MASTER_LESS:
+        changed = sh_tiling_adjust(server->tiling, name, workspace, 0,
+                                   action == SH_MASTER_MORE ? 1 : -1);
+        break;
+    case SH_SCROLL_LEFT:
+    case SH_SCROLL_RIGHT: {
+        struct sh_toplevel *other = current ? sh_tiling_scroll_step(server->tiling, current,
+                                                                    action == SH_SCROLL_RIGHT ? 1 : -1, 0)
+                                            : NULL;
+        if (other) {
+            focus_toplevel(other);
+            pointer_follow(other);
+        }
+        return;
+    }
+    case SH_COLUMN_WIDEN:
+    case SH_COLUMN_NARROW:
+    case SH_COLUMN_CYCLE_WIDTH:
+    case SH_CONSUME_LEFT:
+    case SH_CONSUME_RIGHT:
+    case SH_EXPEL:
+    case SH_CENTER_COLUMN:
+        changed = current && sh_tiling_scroll_action(server->tiling, current, action);
+        break;
+    default:
+        return;
+    }
+    if (!changed)
+        return;
+    if (current)
+        sh_tiling_set_focus(server->tiling, current); // a new layout finds the view to move
+    reflow_output(server, output);
+    // Monocle stacks the tiles: keep the focused one on top.
+    if (current)
+        focus_toplevel(current);
+}
+
 /* Shared by key bindings and the control socket. */
 static void run_action(struct sh_server *server, enum sh_action action, int argument) {
     int count = server_settings(server)->workspaces;
@@ -1371,6 +3325,32 @@ static void run_action(struct sh_server *server, enum sh_action action, int argu
         }
         break;
     }
+    case SH_FOCUS_LAST:
+        focus_last(server);
+        break;
+    case SH_FOCUS_URGENT:
+        focus_urgent(server);
+        break;
+    case SH_GROUP_TOGGLE:
+        if (groups_enabled(server))
+            group_toggle(server, current);
+        break;
+    case SH_GROUP_NEXT:
+    case SH_GROUP_PREV:
+        if (groups_enabled(server))
+            group_cycle(server, current, action == SH_GROUP_NEXT ? 1 : -1);
+        break;
+    case SH_UNGROUP:
+        if (groups_enabled(server))
+            ungroup(server, current);
+        break;
+    case SH_GROUP_MERGE_LEFT:
+    case SH_GROUP_MERGE_RIGHT:
+    case SH_GROUP_MERGE_UP:
+    case SH_GROUP_MERGE_DOWN:
+        if (groups_enabled(server))
+            group_merge(server, action);
+        break;
     case SH_FULLSCREEN:
         if (current)
             set_fullscreen(current, !current->fullscreen);
@@ -1413,8 +3393,38 @@ static void run_action(struct sh_server *server, enum sh_action action, int argu
         set_tiling(server, output, !output_tiles(server, output));
         break;
     }
+    case SH_LAYOUT_NEXT:
+    case SH_LAYOUT_PREV:
+    case SH_SET_LAYOUT_DWINDLE:
+    case SH_SET_LAYOUT_MASTER:
+    case SH_SET_LAYOUT_SPIRAL:
+    case SH_SET_LAYOUT_MONOCLE:
+    case SH_SET_LAYOUT_SCROLL:
+    case SH_SCROLL_LEFT:
+    case SH_SCROLL_RIGHT:
+    case SH_COLUMN_WIDEN:
+    case SH_COLUMN_NARROW:
+    case SH_COLUMN_CYCLE_WIDTH:
+    case SH_CONSUME_LEFT:
+    case SH_CONSUME_RIGHT:
+    case SH_EXPEL:
+    case SH_CENTER_COLUMN:
+    case SH_PROMOTE:
+    case SH_FOCUS_NEXT:
+    case SH_FOCUS_PREV:
+    case SH_SWAP_NEXT:
+    case SH_SWAP_PREV:
+    case SH_MASTER_GROW:
+    case SH_MASTER_SHRINK:
+    case SH_MASTER_MORE:
+    case SH_MASTER_LESS:
+        layout_action(server, action);
+        break;
     case SH_LAUNCHER:
         request_launcher(server);
+        break;
+    case SH_PALETTE:
+        request_palette(server);
         break;
     case SH_FOCUS_LEFT:
     case SH_FOCUS_RIGHT:
@@ -1457,6 +3467,73 @@ static void run_action(struct sh_server *server, enum sh_action action, int argu
         break;
     case SH_SWITCHER_CANCEL:
         switcher_close(server, -1);
+        break;
+    case SH_OVERVIEW_TOGGLE:
+        if (server->overview.open)
+            overview_close(server, NULL, -1);
+        else
+            overview_open(server);
+        break;
+    case SH_OVERVIEW_CONFIRM:
+        overview_confirm(server, argument > 0 ? argument - 1 : server->overview.selected);
+        break;
+    case SH_OVERVIEW_CANCEL:
+        overview_close(server, NULL, -1);
+        break;
+    case SH_PEEK:
+    case SH_PEEK_TOGGLE:
+        set_peek(server, !server->peeking);
+        break;
+    case SH_NIGHT_LIGHT_TOGGLE:
+        server->night_mode = server->night_kelvin < SH_KELVIN_NEUTRAL ? SH_NIGHT_OFF : SH_NIGHT_ON;
+        night_light_update(server);
+        break;
+    case SH_NIGHT_LIGHT_ON:
+        server->night_mode = SH_NIGHT_ON;
+        night_light_update(server);
+        break;
+    case SH_NIGHT_LIGHT_OFF:
+        server->night_mode = SH_NIGHT_OFF;
+        night_light_update(server);
+        break;
+    case SH_NIGHT_LIGHT_AUTO:
+        server->night_mode = SH_NIGHT_AUTO;
+        night_light_update(server);
+        break;
+    case SH_ZOOM_IN:
+        zoom_by(server, 1);
+        break;
+    case SH_ZOOM_OUT:
+        zoom_by(server, -1);
+        break;
+    case SH_ZOOM_RESET:
+        zoom_by(server, 0);
+        break;
+    case SH_SWALLOW_TOGGLE:
+        swallow_toggle(server, current);
+        break;
+    case SH_MOVE_WORKSPACE_TO_OUTPUT:
+    case SH_SWAP_WORKSPACES: {
+        const char *target = server->callbacks->action_target
+                                 ? server->callbacks->action_target(server->callbacks->userdata)
+                                 : "";
+        if (action == SH_MOVE_WORKSPACE_TO_OUTPUT)
+            move_workspace_to_output(server, target);
+        else
+            swap_output_workspaces(server, target);
+        break;
+    }
+    case SH_DND_TOGGLE:
+        send_shell_line(server, "dnd toggle\n");
+        break;
+    case SH_DND_ON:
+        send_shell_line(server, "dnd on\n");
+        break;
+    case SH_DND_OFF:
+        send_shell_line(server, "dnd off\n");
+        break;
+    case SH_NOTIFICATION_HISTORY:
+        request_shell(server, "notifications");
         break;
     case SH_TOGGLE_STICKY:
         if (current && server_settings(server)->sticky)
@@ -1512,11 +3589,34 @@ static bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, ui
         switcher_key(server, modifiers, sym);
         return true;
     }
+    if (server->overview.open) {
+        // The overview's own bindings (toggling it again) work as bound; other keys are its.
+        int bound_argument = 0;
+        enum sh_action bound =
+            modifiers & (WLR_MODIFIER_CTRL | WLR_MODIFIER_ALT | WLR_MODIFIER_LOGO)
+                ? server->callbacks->key(server->callbacks->userdata, modifiers, sym,
+                                         &bound_argument)
+                : SH_NONE;
+        if (bound == SH_OVERVIEW_TOGGLE || bound == SH_OVERVIEW_CONFIRM ||
+            bound == SH_OVERVIEW_CANCEL)
+            run_action(server, bound, bound_argument);
+        else
+            overview_key(server, modifiers, sym);
+        return true;
+    }
     int argument = 0;
     enum sh_action action =
         server->callbacks->key(server->callbacks->userdata, modifiers, sym, &argument);
     if (action == SH_NONE)
         return false;
+    if (action == SH_PEEK) {
+        // Held: the desktop shows until the key comes back up.
+        server->peek_keycode = keycode;
+        server->peek_keyboard = keyboard;
+        set_peek(server, true);
+        server->peek_keycode = keycode; // set_peek only forgets it when peeking ends
+        return true;
+    }
     if (action == SH_SWITCHER_NEXT || action == SH_SWITCHER_PREV) {
         // Held, the binding's modifiers keep it open. Shift may come and go to step backward.
         uint32_t held =
@@ -1584,6 +3684,8 @@ static void keyboard_handle_key(struct wl_listener *listener, void *data) {
     } else if (event->keycode <= KEY_MAX) {
         handled = keyboard->consumed[event->keycode];
         keyboard->consumed[event->keycode] = false;
+        if (server->peeking && server->peek_keycode == event->keycode && handled)
+            set_peek(server, false);
     }
 
     if (!handled) {
@@ -1599,6 +3701,8 @@ static void keyboard_handle_destroy(struct wl_listener *listener, void *data) {
     if (server->switcher.open && server->switcher.modifiers &&
         (wlr_keyboard_get_modifiers(keyboard->wlr_keyboard) & server->switcher.modifiers))
         switcher_close(server, server->switcher.selected);
+    if (server->peek_keyboard == keyboard)
+        set_peek(server, false);
     if (keyboard->repeat_timer)
         wl_event_source_remove(keyboard->repeat_timer);
     wl_list_remove(&keyboard->modifiers.link);
@@ -1614,6 +3718,8 @@ static bool configure_keyboard(struct sh_server *server, struct wlr_keyboard *ke
     if (!context)
         return false;
     struct xkb_rule_names names = {.layout = settings->keyboard_layout,
+                                   .variant = settings->keyboard_variant,
+                                   .model = settings->keyboard_model,
                                    .options = settings->keyboard_options};
     struct xkb_keymap *keymap =
         xkb_keymap_new_from_names(context, &names, XKB_KEYMAP_COMPILE_NO_FLAGS);
@@ -1814,13 +3920,14 @@ static struct sh_toplevel *toplevel_for_surface(struct sh_server *server,
 
 /* xdg-activation: an application asks to be raised, e.g. a browser opening a link from chat.
  * wlroots expires and validates tokens. Tokens made without an input serial are honoured too:
- * a browser handed a link by another process often has nothing better. */
+ * a browser handed a link by another process often has nothing better. What the window then
+ * gets depends on windows.activation. */
 static void request_activate(struct wl_listener *listener, void *data) {
     struct sh_server *server = wl_container_of(listener, server, request_activate);
     struct wlr_xdg_activation_v1_request_activate_event *event = data;
     struct sh_toplevel *toplevel = toplevel_for_surface(server, event->surface);
-    if (toplevel && toplevel_mapped(toplevel))
-        focus_toplevel(toplevel);
+    if (toplevel)
+        activation_requested(toplevel);
 }
 
 /* Pointer constraints (games, remote desktops, pointer lock in browsers) apply to the
@@ -1866,9 +3973,69 @@ static void seat_keyboard_focus_change(struct wl_listener *listener, void *data)
                                       : NULL);
 }
 
+/* Whether `node` is a window's rounded frame and the layout position is inside its hole. */
+static bool in_frame_hole(struct wlr_scene_node *node, double lx, double ly) {
+    if (!node || node->type != WLR_SCENE_NODE_RECT)
+        return false;
+    struct wlr_scene_tree *tree = node->parent;
+    while (tree && !tree->node.data)
+        tree = tree->node.parent;
+    struct sh_node *owner = tree ? tree->node.data : NULL;
+    if (!owner || owner->kind != SH_NODE_TOPLEVEL)
+        return false;
+    struct sh_toplevel *toplevel = owner->owner;
+    int hole = toplevel->frame_hole;
+    if (hole <= 0 || !toplevel->border[0] || node != &toplevel->border[0]->node)
+        return false;
+    struct wlr_scene_rect *rect = toplevel->border[0];
+    int x, y;
+    wlr_scene_node_coords(node, &x, &y);
+    return lx >= x + hole && lx < x + rect->width - hole && ly >= y + hole &&
+           ly < y + rect->height - hole;
+}
+
+/* The topmost node at a layout position, where windows will be once their animations end:
+ * input never waits for an animation, nor lands in the middle of one. */
+static struct wlr_scene_node *scene_node_at(struct sh_server *server, double lx, double ly,
+                                            double *sx, double *sy) {
+    // A motion event asks the same question several times (window, controls, tabs, resize
+    // band) with nothing moved in between; it answers once.
+    if (server->hit.caching && server->hit.valid && server->hit.x == lx && server->hit.y == ly) {
+        *sx = server->hit.sx;
+        *sy = server->hit.sy;
+        return server->hit.node;
+    }
+    bool animating = sh_animator_running(server->animator) > 0;
+    if (animating)
+        sh_animator_rest_at(server->animator, lx, ly);
+    struct wlr_scene_node *node = wlr_scene_node_at(&server->scene->tree.node, lx, ly, sx, sy);
+    // A rounded border is one hollow rect over the whole window, which hit testing takes as
+    // solid: pointing through its hole reaches what is below, the window itself first.
+    struct wlr_scene_node *hidden[8];
+    int hidden_count = 0;
+    while (hidden_count < 8 && in_frame_hole(node, lx, ly)) {
+        node->enabled = false; // only for the next lookup: no damage, nothing redrawn
+        hidden[hidden_count++] = node;
+        node = wlr_scene_node_at(&server->scene->tree.node, lx, ly, sx, sy);
+    }
+    while (hidden_count > 0)
+        hidden[--hidden_count]->enabled = true;
+    if (animating)
+        sh_animator_resume(server->animator);
+    if (server->hit.caching) {
+        server->hit.valid = true;
+        server->hit.x = lx;
+        server->hit.y = ly;
+        server->hit.sx = *sx;
+        server->hit.sy = *sy;
+        server->hit.node = node;
+    }
+    return node;
+}
+
 static struct sh_node *desktop_node_at(struct sh_server *server, double lx, double ly,
                                        struct wlr_surface **surface, double *sx, double *sy) {
-    struct wlr_scene_node *node = wlr_scene_node_at(&server->scene->tree.node, lx, ly, sx, sy);
+    struct wlr_scene_node *node = scene_node_at(server, lx, ly, sx, sy);
     if (node == NULL || node->type != WLR_SCENE_NODE_BUFFER) {
         return NULL;
     }
@@ -1892,6 +4059,19 @@ static struct sh_toplevel *desktop_toplevel_at(struct sh_server *server, double 
                                                double *sy) {
     struct sh_node *node = desktop_node_at(server, x, y, surface, sx, sy);
     return node && node->kind == SH_NODE_TOPLEVEL ? node->owner : NULL;
+}
+
+/* Whether a panel (a layer surface above the windows) is under the point. It is no bare
+ * desktop: pointing at it or clicking it leaves the focused window focused, so a taskbar on
+ * another monitor still sees that window as the active one and a click on it minimizes it. */
+static bool panel_at(struct sh_server *server, double x, double y) {
+    struct wlr_surface *surface;
+    double sx, sy;
+    struct sh_node *node = desktop_node_at(server, x, y, &surface, &sx, &sy);
+    if (!node || node->kind != SH_NODE_LAYER)
+        return false;
+    struct sh_layer *layer = node->owner;
+    return layer->surface->current.layer >= ZWLR_LAYER_SHELL_V1_LAYER_TOP;
 }
 
 /* Clients report exact corners only in a few pixels; a single-edge grab near the end of that
@@ -1963,7 +4143,18 @@ static void cursor_request_set_shape(struct wl_listener *listener, void *data) {
     }
 }
 
+static void magnet_hide_guides(struct sh_server *server) {
+    for (int i = 0; i < 2; ++i) {
+        if (server->guides[i])
+            wlr_scene_node_set_enabled(&server->guides[i]->node, false);
+    }
+}
+
 static void reset_cursor_mode(struct sh_server *server) {
+    magnet_hide_guides(server);
+    // A window dropped on another output takes up that output's corners.
+    if (server->grabbed_toplevel)
+        refresh_frame(server->grabbed_toplevel);
     server->cursor_mode = SH_CURSOR_PASSTHROUGH;
     server->grabbed_toplevel = NULL;
     server->grab_retile = false;
@@ -2009,6 +4200,212 @@ static void finish_grab(struct sh_server *server) {
 /* Pointer travel that turns a press on a fullscreen window into a drag out of fullscreen. */
 #define SH_DRAG_THRESHOLD 8
 
+/* Magnetic edges (windows.magnet). While a floating window is dragged or resized, an edge of it
+ * that comes within `distance` of an edge of the output, of the area panels leave free, or of
+ * another window (one whose extent beside it overlaps the dragged window's) lands on it. The
+ * position always follows from where the pointer is, not from where the window was, so the
+ * window stays held until the pointer has moved `distance` away and then follows it again. */
+#define MAGNET_LINES 80
+
+/* An edge a window can stick to: a vertical line at x = `at` (or a horizontal one at y = `at`)
+ * spanning [from, to] along the other axis, or, with `outer`, the whole of it. */
+struct magnet_line {
+    int at, from, to;
+    bool outer;
+};
+struct magnet_lines {
+    struct magnet_line line[MAGNET_LINES];
+    int count;
+};
+
+/* The edge of the window that landed, and where. */
+struct magnet_hit {
+    bool found;
+    int delta;
+    struct magnet_line line;
+};
+
+static void magnet_add(struct magnet_lines *lines, int at, int from, int to, bool outer) {
+    if (lines->count < MAGNET_LINES)
+        lines->line[lines->count++] = (struct magnet_line){at, from, to, outer};
+}
+
+/* The lines to consider for a window occupying `frame` (the frame the eye sees, border
+ * included): vertical ones in `x`, horizontal ones in `y`. */
+static void magnet_collect(struct sh_server *server, struct sh_toplevel *toplevel,
+                           struct wlr_output *output, struct wlr_box frame,
+                           struct magnet_lines *x, struct magnet_lines *y) {
+    int distance = server_settings(server)->magnet_distance;
+    int border = server_settings(server)->border_width;
+    struct wlr_box full;
+    wlr_output_layout_get_box(server->output_layout, output, &full);
+    struct sh_rect free_area = usable_area(server, output);
+    int xs[] = {full.x, full.x + full.width, free_area.x, free_area.x + free_area.width};
+    int ys[] = {full.y, full.y + full.height, free_area.y, free_area.y + free_area.height};
+    for (size_t i = 0; i < sizeof(xs) / sizeof(*xs); ++i) {
+        magnet_add(x, xs[i], 0, 0, true);
+        magnet_add(y, ys[i], 0, 0, true);
+    }
+    int left = frame.x, right = frame.x + frame.width, top = frame.y,
+        bottom = frame.y + frame.height;
+    struct sh_toplevel *other;
+    wl_list_for_each(other, &server->toplevels, link) {
+        if (other == toplevel || !toplevel_mapped(other) || !toplevel_visible(other) ||
+            other->fullscreen || other->minimized || toplevel_output(other) != output)
+            continue;
+        struct wlr_box b = toplevel_box(other);
+        int o_left = b.x - border, o_right = b.x + b.width + border, o_top = b.y - border,
+            o_bottom = b.y + b.height + border;
+        if (top - distance <= o_bottom && bottom + distance >= o_top) {
+            magnet_add(x, o_left, o_top, o_bottom, false);
+            magnet_add(x, o_right, o_top, o_bottom, false);
+        }
+        if (left - distance <= o_right && right + distance >= o_left) {
+            magnet_add(y, o_top, o_left, o_right, false);
+            magnet_add(y, o_bottom, o_left, o_right, false);
+        }
+    }
+}
+
+/* Moves the edges `low` and `high` (each when allowed) onto the nearest line within reach. */
+static struct magnet_hit magnet_best(const struct magnet_lines *lines, int low, int high,
+                                     bool use_low, bool use_high, int distance) {
+    struct magnet_hit hit = {0};
+    for (int i = 0; i < lines->count; ++i) {
+        for (int side = 0; side < 2; ++side) {
+            if (!(side ? use_high : use_low))
+                continue;
+            int delta = lines->line[i].at - (side ? high : low);
+            if (abs(delta) > distance || (hit.found && abs(delta) >= abs(hit.delta)))
+                continue;
+            hit.found = true;
+            hit.delta = delta;
+            hit.line = lines->line[i];
+        }
+    }
+    return hit;
+}
+
+static void magnet_draw(struct sh_server *server, int index, bool show, struct wlr_box box) {
+    if (!show) {
+        if (server->guides[index])
+            wlr_scene_node_set_enabled(&server->guides[index]->node, false);
+        return;
+    }
+    const struct sh_settings *settings = server_settings(server);
+    if (!server->guides[index])
+        server->guides[index] = wlr_scene_rect_create(server->guide_layer, box.width, box.height,
+                                                      settings->magnet_guide_color);
+    struct wlr_scene_rect *rect = server->guides[index];
+    wlr_scene_rect_set_size(rect, box.width, box.height);
+    wlr_scene_rect_set_color(rect, settings->magnet_guide_color);
+    wlr_scene_node_set_position(&rect->node, box.x, box.y);
+    wlr_scene_node_set_enabled(&rect->node, true);
+}
+
+/* Draws the guide lines for edges that landed: `frame` is the window's frame now. */
+static void magnet_show(struct sh_server *server, struct wlr_box frame, struct magnet_hit x,
+                        struct magnet_hit y) {
+    const int thickness = 3; // an edge of the output still shows two of them
+    bool guides = server_settings(server)->magnet_guides;
+    int left = frame.x, right = frame.x + frame.width, top = frame.y,
+        bottom = frame.y + frame.height;
+    // A line covers the extent of the windows it joins.
+    int from = x.found && !x.line.outer && x.line.from < top ? x.line.from : top;
+    int to = x.found && !x.line.outer && x.line.to > bottom ? x.line.to : bottom;
+    magnet_draw(server, 0, guides && x.found,
+                (struct wlr_box){x.line.at - thickness / 2, from, thickness, to - from});
+    from = y.found && !y.line.outer && y.line.from < left ? y.line.from : left;
+    to = y.found && !y.line.outer && y.line.to > right ? y.line.to : right;
+    magnet_draw(server, 1, guides && y.found,
+                (struct wlr_box){from, y.line.at - thickness / 2, to - from, thickness});
+}
+
+/* The modifiers held on any keyboard, virtual ones (wtype, tests) included. */
+static uint32_t held_modifiers(struct sh_server *server) {
+    uint32_t mods = 0;
+    struct sh_keyboard *keyboard;
+    wl_list_for_each(keyboard, &server->keyboards, link) {
+        mods |= wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
+    }
+    return mods;
+}
+
+/* The output the magnetism works on, or NULL when it is off for this drag. */
+static struct wlr_output *magnet_output(struct sh_server *server, struct sh_toplevel *toplevel) {
+    const struct sh_settings *settings = server_settings(server);
+    uint32_t mods = held_modifiers(server);
+    struct wlr_output *output =
+        wlr_output_layout_output_at(server->output_layout, server->cursor->x, server->cursor->y);
+    if (!settings->magnet || settings->magnet_distance <= 0 || !output || toplevel->tiled ||
+        server->grab_retile || server->grab_fullscreen ||
+        (settings->magnet_bypass && (mods & settings->magnet_bypass) == settings->magnet_bypass)) {
+        magnet_hide_guides(server);
+        return NULL;
+    }
+    return output;
+}
+
+/* Adjusts the position (x, y) a drag asks for. */
+static void magnet_snap(struct sh_server *server, struct sh_toplevel *toplevel, int *x, int *y) {
+    struct wlr_output *output = magnet_output(server, toplevel);
+    if (!output)
+        return;
+    int distance = server_settings(server)->magnet_distance;
+    int border = server_settings(server)->border_width;
+    struct wlr_box box = toplevel_box(toplevel);
+    // The frame the eye sees: the border is drawn outside the window's geometry.
+    struct wlr_box frame = {*x - border, *y - border, box.width + 2 * border,
+                            box.height + 2 * border};
+    struct magnet_lines vertical = {0}, horizontal = {0};
+    magnet_collect(server, toplevel, output, frame, &vertical, &horizontal);
+    struct magnet_hit hx = magnet_best(&vertical, frame.x, frame.x + frame.width, true, true,
+                                       distance);
+    struct magnet_hit hy = magnet_best(&horizontal, frame.y, frame.y + frame.height, true, true,
+                                       distance);
+    if (hx.found)
+        *x += hx.delta, frame.x += hx.delta;
+    if (hy.found)
+        *y += hy.delta, frame.y += hy.delta;
+    magnet_show(server, frame, hx, hy);
+}
+
+/* Adjusts the edges a resize asks for (the sides in `edges` are the ones being moved). */
+static void magnet_snap_resize(struct sh_server *server, struct sh_toplevel *toplevel,
+                               uint32_t edges, int *left, int *top, int *right, int *bottom) {
+    struct wlr_output *output = magnet_output(server, toplevel);
+    if (!output)
+        return;
+    int distance = server_settings(server)->magnet_distance;
+    int border = server_settings(server)->border_width;
+    struct wlr_box frame = {*left - border, *top - border, *right - *left + 2 * border,
+                            *bottom - *top + 2 * border};
+    struct magnet_lines vertical = {0}, horizontal = {0};
+    magnet_collect(server, toplevel, output, frame, &vertical, &horizontal);
+    struct magnet_hit hx = magnet_best(&vertical, frame.x, frame.x + frame.width,
+                                       edges & WLR_EDGE_LEFT, edges & WLR_EDGE_RIGHT, distance);
+    struct magnet_hit hy = magnet_best(&horizontal, frame.y, frame.y + frame.height,
+                                       edges & WLR_EDGE_TOP, edges & WLR_EDGE_BOTTOM, distance);
+    // A window keeps a pixel of width and height however the edge is pulled.
+    if (hx.found) {
+        if (edges & WLR_EDGE_LEFT && *left + hx.delta < *right)
+            *left += hx.delta, frame.x += hx.delta, frame.width -= hx.delta;
+        else if (edges & WLR_EDGE_RIGHT && *right + hx.delta > *left)
+            *right += hx.delta, frame.width += hx.delta;
+        else
+            hx.found = false;
+    }
+    if (hy.found) {
+        if (edges & WLR_EDGE_TOP && *top + hy.delta < *bottom)
+            *top += hy.delta, frame.y += hy.delta, frame.height -= hy.delta;
+        else if (edges & WLR_EDGE_BOTTOM && *bottom + hy.delta > *top)
+            *bottom += hy.delta, frame.height += hy.delta;
+        else
+            hy.found = false;
+    }
+    magnet_show(server, frame, hx, hy);
+}
+
 static void process_cursor_move(struct sh_server *server) {
     struct sh_toplevel *toplevel = server->grabbed_toplevel;
     if (server->grab_fullscreen) {
@@ -2024,8 +4421,9 @@ static void process_cursor_move(struct sh_server *server) {
         }
         begin_interactive(toplevel, SH_CURSOR_MOVE, 0);
     }
-    toplevel_set_position(toplevel, server->cursor->x - server->grab_x,
-                          server->cursor->y - server->grab_y);
+    int x = (int)(server->cursor->x - server->grab_x), y = (int)(server->cursor->y - server->grab_y);
+    magnet_snap(server, toplevel, &x, &y);
+    toplevel_set_position(toplevel, x, y);
 }
 
 static void process_cursor_resize(struct sh_server *server) {
@@ -2060,6 +4458,9 @@ static void process_cursor_resize(struct sh_server *server) {
         }
     }
 
+    if (!toplevel->tiled)
+        magnet_snap_resize(server, toplevel, server->resize_edges, &new_left, &new_top,
+                           &new_right, &new_bottom);
     if (toplevel->tiled) {
         // Resizing a tile moves the splits beside the dragged edges instead.
         struct sh_rect rect = {new_left, new_top, new_right - new_left, new_bottom - new_top};
@@ -2127,6 +4528,21 @@ static bool in_deco_corner(struct sh_toplevel *toplevel, double x, double y) {
            y < top + 2 * SH_DECO_MARGIN + SH_DECO_HEIGHT;
 }
 
+/* Keeps the controls and the border above the window's surfaces. A new node starts on top and
+ * the surfaces sit in one subtree, so a frame node is out of place only when something else
+ * was stacked over all of them; raising one that is already fine would still make the scene
+ * recompute the window's whole tree on every commit. */
+static void raise_frame_node(struct sh_toplevel *toplevel, struct wlr_scene_node *node) {
+    struct wl_list *children = &toplevel->content->children;
+    struct wlr_scene_node *top = wl_container_of(children->prev, top, link);
+    if (top == node || (toplevel->deco && top == &toplevel->deco->node))
+        return;
+    for (int i = 0; i < 4; ++i)
+        if (toplevel->border[i] && top == &toplevel->border[i]->node)
+            return;
+    wlr_scene_node_raise_to_top(node);
+}
+
 /* Adds, removes, or updates a window's controls to match what it asks for and its state. */
 static void refresh_decoration(struct sh_toplevel *toplevel) {
     struct sh_server *server = toplevel->server;
@@ -2154,14 +4570,410 @@ static void refresh_decoration(struct sh_toplevel *toplevel) {
     int x, y;
     deco_position(toplevel, &x, &y);
     wlr_scene_node_set_position(&toplevel->deco->node, x, y);
-    wlr_scene_node_raise_to_top(&toplevel->deco->node);
+    raise_frame_node(toplevel, &toplevel->deco->node);
     wlr_scene_node_set_enabled(&toplevel->deco->node, server->deco_revealed == toplevel);
+}
+
+/* The tab strip of a group's shown window: one segment per member, the shown one lit. */
+static void refresh_tabs(struct sh_toplevel *toplevel) {
+    struct sh_server *server = toplevel->server;
+    if (!toplevel->scene_tree)
+        return;
+    if (!toplevel->group || toplevel->group_hidden || !toplevel_mapped(toplevel) ||
+        toplevel->fullscreen || !groups_enabled(server)) {
+        if (toplevel->tabs)
+            wlr_scene_node_destroy(&toplevel->tabs->node);
+        toplevel->tabs = NULL;
+        return;
+    }
+    struct wlr_box g = toplevel_geometry(toplevel);
+    int count = group_size(server, toplevel->group), active = group_index(toplevel);
+    int hover = server->tabs_hovered == toplevel ? server->tabs_hovered_index : -1;
+    float scale = 1;
+    struct sh_output *output;
+    wl_list_for_each(output, &server->outputs, link) {
+        if (output->wlr_output->scale > scale)
+            scale = output->wlr_output->scale;
+    }
+    int pixel_scale = (int)ceilf(scale);
+    if (g.width < 1)
+        return;
+    if (!toplevel->tabs || toplevel->tabs_width != g.width || toplevel->tabs_count != count ||
+        toplevel->tabs_active != active || toplevel->tabs_hover != hover ||
+        toplevel->tabs_scale != pixel_scale) {
+        size_t pixels = (size_t)g.width * pixel_scale * SH_TABS_HEIGHT * pixel_scale;
+        uint32_t *data = calloc(pixels, sizeof(*data));
+        if (!data)
+            return;
+        sh_tabs_paint(data, g.width, pixel_scale, count, active, hover);
+        struct wlr_buffer *buffer =
+            sh_pixel_buffer(data, g.width * pixel_scale, SH_TABS_HEIGHT * pixel_scale);
+        if (!buffer)
+            return; // it freed the pixels
+        if (!toplevel->tabs)
+            toplevel->tabs = wlr_scene_buffer_create(toplevel->content, buffer);
+        else
+            wlr_scene_buffer_set_buffer(toplevel->tabs, buffer);
+        wlr_buffer_drop(buffer); // the scene holds it now
+        if (!toplevel->tabs)
+            return;
+        toplevel->tabs_width = g.width;
+        toplevel->tabs_count = count;
+        toplevel->tabs_active = active;
+        toplevel->tabs_hover = hover;
+        toplevel->tabs_scale = pixel_scale;
+        wlr_scene_buffer_set_dest_size(toplevel->tabs, g.width, SH_TABS_HEIGHT);
+    }
+    wlr_scene_node_set_position(&toplevel->tabs->node, g.x, g.y);
+    wlr_scene_node_raise_to_top(&toplevel->tabs->node);
 }
 
 static void set_buffer_opacity(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
     struct sh_toplevel *toplevel = data;
-    if (buffer != toplevel->deco)
+    if (buffer != toplevel->deco && buffer != toplevel->dim && buffer != toplevel->tabs)
         wlr_scene_buffer_set_opacity(buffer, toplevel->opacity);
+}
+
+static void fade_update(void *data) {
+    refresh_frame(data);
+}
+
+static int64_t now_ms(void) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+}
+
+/* Asks every output for a frame, so that fades keep advancing while nothing else changes. */
+static void schedule_frames(struct sh_server *server) {
+    struct sh_output *output;
+    wl_list_for_each(output, &server->outputs, link) wlr_output_schedule_frame(output->wlr_output);
+}
+
+/* Puts the dimming black at its current opacity, or takes it away once it has faded out. */
+static void apply_dim(struct sh_toplevel *toplevel, int64_t now) {
+    double value = sh_fade_value(&toplevel->dim_fade, now);
+    bool wanted = value > 0.001 || sh_fade_active(&toplevel->dim_fade, now) ||
+                  toplevel->dim_fade.to > 0;
+    if (!wanted || !toplevel->scene_tree) {
+        if (toplevel->dim && toplevel->scene_tree)
+            wlr_scene_node_destroy(&toplevel->dim->node);
+        toplevel->dim = NULL;
+        return;
+    }
+    struct sh_server *server = toplevel->server;
+    if (!toplevel->dim) {
+        if (!server->black)
+            server->black = sh_black_buffer();
+        if (!server->black)
+            return;
+        toplevel->dim = sh_dim_create(toplevel->content, server->black);
+        if (!toplevel->dim)
+            return;
+    }
+    // The scene tree's origin is the top-left corner of the window geometry.
+    struct wlr_box g = toplevel_geometry(toplevel);
+    wlr_scene_node_set_position(&toplevel->dim->node, 0, 0);
+    wlr_scene_buffer_set_dest_size(toplevel->dim, g.width, g.height);
+    // Peeking clears the dimming with everything else.
+    value *= 1 - sh_fade_value(&server->peek_fade, now);
+    wlr_scene_buffer_set_opacity(toplevel->dim, (float)value);
+    wlr_scene_node_raise_to_top(&toplevel->dim->node);
+}
+
+/* windows.dim_inactive: a window without focus fades toward the configured darkness. */
+static void update_dim(struct sh_toplevel *toplevel) {
+    struct sh_server *server = toplevel->server;
+    const struct sh_settings *settings = server_settings(server);
+    bool dimmed = settings->dim_inactive > 0 && toplevel_mapped(toplevel) &&
+                  !toplevel->fullscreen && server->focused_toplevel != toplevel;
+    double target = dimmed ? settings->dim_inactive : 0;
+    int64_t now = now_ms();
+    if (target != toplevel->dim_fade.to) {
+        bool fades = settings->animations && toplevel_mapped(toplevel);
+        // A window that gains focus just as it maps has barely started to dim: no fade back.
+        if (target == 0 && sh_fade_value(&toplevel->dim_fade, now) < 0.01)
+            fades = false;
+        sh_fade_to(&toplevel->dim_fade, target, now, fades ? settings->dim_duration : 0);
+        schedule_frames(server);
+    }
+    apply_dim(toplevel, now);
+}
+
+/* Advances the fades; true while one is still running. */
+static bool tick_effects(struct sh_server *server) {
+    int64_t now = now_ms();
+    bool running = sh_fade_active(&server->peek_fade, now) || sh_fade_active(&server->zoom_fade, now);
+    struct sh_toplevel *toplevel;
+    double peek = sh_fade_value(&server->peek_fade, now);
+    if (peek != server->peek_applied) {
+        server->peek_applied = peek;
+        wl_list_for_each(toplevel, &server->toplevels, link) refresh_frame(toplevel);
+    }
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (!toplevel->dim)
+            continue;
+        running = running || sh_fade_active(&toplevel->dim_fade, now);
+        apply_dim(toplevel, now);
+    }
+    return running;
+}
+
+/* The temperature the schedule or an override asks for right now. */
+static int night_light_target(struct sh_server *server) {
+    const struct sh_effect_settings *fx = &server_settings(server)->effects;
+    if (server->night_mode == SH_NIGHT_OFF || (server->night_mode == SH_NIGHT_AUTO && !fx->night_light))
+        return SH_KELVIN_NEUTRAL;
+    if (server->night_mode == SH_NIGHT_ON)
+        return fx->night_kelvin;
+    time_t now = time(NULL);
+    struct tm local;
+    localtime_r(&now, &local);
+    double minute = server->night_clock >= 0
+                        ? server->night_clock
+                        : local.tm_hour * 60 + local.tm_min + local.tm_sec / 60.0;
+    struct sh_night_schedule schedule = {fx->day_kelvin, fx->night_kelvin, fx->sunrise, fx->sunset,
+                                         fx->transition};
+    if (fx->sunrise < 0) {
+        bool polar_day = false;
+        if (!sh_solar_times(fx->latitude, fx->longitude, local.tm_year + 1900, local.tm_mon + 1,
+                            local.tm_mday, local.tm_gmtoff / 3600.0, &schedule.sunrise,
+                            &schedule.sunset, &polar_day))
+            return polar_day ? fx->day_kelvin : fx->night_kelvin;
+    }
+    return sh_night_kelvin(&schedule, minute);
+}
+
+/* Applies the temperature for now to every output, and keeps the clock ticking while the
+ * schedule is in charge. */
+static void night_light_update(struct sh_server *server) {
+    const struct sh_effect_settings *fx = &server_settings(server)->effects;
+    int kelvin = night_light_target(server);
+    if (kelvin != server->night_kelvin) {
+        struct wlr_color_transform *transform = NULL;
+        if (kelvin != SH_KELVIN_NEUTRAL) {
+            // The same three-table form a wlr-gamma-control client would hand over, which
+            // outputs turn into their hardware gamma tables.
+            uint16_t ramp[3 * NIGHT_LIGHT_LUT];
+            sh_gamma_ramp(sh_kelvin_to_rgb(kelvin), NIGHT_LIGHT_LUT, ramp);
+            transform = wlr_color_transform_init_lut_3x1d(
+                NIGHT_LIGHT_LUT, ramp, ramp + NIGHT_LIGHT_LUT, ramp + 2 * NIGHT_LIGHT_LUT);
+        }
+        if (transform || kelvin == SH_KELVIN_NEUTRAL) {
+            if (server->night_transform)
+                wlr_color_transform_unref(server->night_transform);
+            server->night_transform = transform;
+            server->night_kelvin = kelvin;
+            struct sh_output *output;
+            wl_list_for_each(output, &server->outputs, link) {
+                wlr_output_schedule_frame(output->wlr_output);
+            }
+        }
+    }
+    if (server->night_timer)
+        wl_event_source_timer_update(
+            server->night_timer,
+            server->night_mode == SH_NIGHT_AUTO && fx->night_light && server->night_clock < 0
+                ? NIGHT_LIGHT_TICK_MS
+                : 0);
+}
+
+static int night_light_tick(void *data) {
+    night_light_update(data);
+    return 0;
+}
+
+/* Hot corners: runs what a corner is bound to once the pointer has rested in it. */
+static bool output_has_fullscreen(struct sh_server *server, struct wlr_output *output) {
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (toplevel->fullscreen && toplevel_mapped(toplevel) && toplevel_visible(toplevel) &&
+            toplevel_output(toplevel) == output)
+            return true;
+    }
+    return false;
+}
+
+static void hot_corner_check(struct sh_server *server) {
+    const struct sh_effect_settings *fx = &server_settings(server)->effects;
+    int corner = -1;
+    if (fx->corner_mask && !server->locked && server->cursor_mode == SH_CURSOR_PASSTHROUGH &&
+        !server->seat->drag) {
+        struct wlr_output *output =
+            wlr_output_layout_output_at(server->output_layout, server->cursor->x, server->cursor->y);
+        struct wlr_box box;
+        if (output && !output_has_fullscreen(server, output)) {
+            wlr_output_layout_get_box(server->output_layout, output, &box);
+            corner = sh_corner_at(server->cursor->x - box.x, server->cursor->y - box.y, box.width,
+                                  box.height, fx->corner_size);
+            if (corner >= 0 && !(fx->corner_mask & (1U << corner)))
+                corner = -1;
+        }
+    }
+    int64_t now = now_ms();
+    int fired = sh_corner_dwell_update(&server->corner_dwell, corner, now, fx->corner_delay);
+    if (fired >= 0) {
+        int argument = 0;
+        enum sh_action action = server->callbacks->hot_corner(server->callbacks->userdata, fired,
+                                                              &argument);
+        if (action != SH_NONE)
+            run_action(server, action, argument);
+    }
+    if (server->corner_timer) {
+        int wait = sh_corner_dwell_wait(&server->corner_dwell, now, fx->corner_delay);
+        wl_event_source_timer_update(server->corner_timer, wait > 0 ? wait : 0);
+    }
+}
+
+static int hot_corner_tick(void *data) {
+    hot_corner_check(data);
+    return 0;
+}
+
+/* Magnifier. `zoom_by` moves the target a step (or back to 1x for 0 steps) and the level
+ * eases there; outputs draw themselves through `output_commit_zoomed` while it is above 1. */
+static double zoom_level(struct sh_server *server, int64_t now) {
+    return sh_fade_value(&server->zoom_fade, now);
+}
+
+static void zoom_by(struct sh_server *server, int steps) {
+    const struct sh_settings *settings = server_settings(server);
+    double target = steps == 0 ? 1
+                               : sh_zoom_level(server->zoom_target, settings->effects.zoom_step,
+                                               steps, settings->effects.zoom_max);
+    if (target == server->zoom_target)
+        return;
+    server->zoom_target = target;
+    int64_t now = now_ms();
+    sh_fade_to(&server->zoom_fade, target, now,
+               settings->animations ? settings->effects.zoom_duration : 0);
+    tick_effects(server);
+    schedule_frames(server);
+}
+
+/* The view follows the pointer, so a frame is due whenever it moves while magnified. */
+static void zoom_moved(struct sh_server *server) {
+    if (server->zoom_target > 1 || server->zoom_fade.to > 1)
+        schedule_frames(server);
+}
+
+static void output_release_zoom(struct sh_output *output) {
+    if (output->zoom_source)
+        wlr_buffer_unlock(output->zoom_source);
+    output->zoom_source = NULL;
+    if (output->zoom_swapchain)
+        wlr_swapchain_destroy(output->zoom_swapchain);
+    output->zoom_swapchain = NULL;
+}
+
+/* Draws the scene into a private buffer and puts the part of it around the pointer on the
+ * output, enlarged; false (nothing committed) when that cannot be done. */
+static bool output_commit_zoomed(struct sh_output *output, struct wlr_scene_output *scene_output,
+                                 const struct wlr_scene_output_state_options *options,
+                                 double level) {
+    struct sh_server *server = output->server;
+    struct wlr_output *wlr_output = output->wlr_output;
+    struct wlr_box box;
+    wlr_output_layout_get_box(server->output_layout, wlr_output, &box);
+    if (!wlr_output->enabled || wlr_output->transform != WL_OUTPUT_TRANSFORM_NORMAL ||
+        box.width <= 0 || box.height <= 0)
+        return false;
+    if (output->zoom_swapchain && (output->zoom_swapchain->width != wlr_output->width ||
+                                   output->zoom_swapchain->height != wlr_output->height))
+        output_release_zoom(output);
+    if (!output->zoom_swapchain &&
+        !wlr_output_configure_primary_swapchain(wlr_output, NULL, &output->zoom_swapchain))
+        return false;
+    if (!output->zoomed)
+        wlr_damage_ring_add_whole(&scene_output->damage_ring);
+    struct wlr_scene_output_state_options scene_options = *options;
+    scene_options.swapchain = output->zoom_swapchain;
+    struct wlr_output_state state;
+    wlr_output_state_init(&state);
+    bool done = false;
+    struct wlr_texture *texture = NULL;
+    if (!wlr_scene_output_build_state(scene_output, &state, &scene_options))
+        goto out;
+    if (state.committed & WLR_OUTPUT_STATE_BUFFER) {
+        if (output->zoom_source)
+            wlr_buffer_unlock(output->zoom_source);
+        output->zoom_source = wlr_buffer_lock(state.buffer);
+    }
+    if (!output->zoom_source)
+        goto out;
+    texture = wlr_texture_from_buffer(server->renderer, output->zoom_source);
+    if (!texture)
+        goto out;
+    struct sh_view view = sh_zoom_view(level, box.width, box.height, server->cursor->x - box.x,
+                                       server->cursor->y - box.y);
+    double sx = (double)output->zoom_source->width / box.width;
+    double sy = (double)output->zoom_source->height / box.height;
+    struct wlr_render_pass *pass = wlr_output_begin_render_pass(wlr_output, &state, NULL);
+    if (!pass)
+        goto out;
+    wlr_render_pass_add_texture(
+        pass, &(struct wlr_render_texture_options){
+                  .texture = texture,
+                  .src_box = {view.x * sx, view.y * sy, view.width * sx, view.height * sy},
+                  .dst_box = {0, 0, wlr_output->width, wlr_output->height},
+                  .filter_mode = WLR_SCALE_FILTER_BILINEAR,
+                  .blend_mode = WLR_RENDER_BLEND_MODE_NONE,
+              });
+    if (!wlr_render_pass_submit(pass))
+        goto out;
+    // Everything changed as far as the output is concerned, not just what the scene redrew.
+    state.committed &= ~WLR_OUTPUT_STATE_DAMAGE;
+    done = wlr_output_commit_state(wlr_output, &state);
+out:
+    if (texture)
+        wlr_texture_destroy(texture);
+    wlr_output_state_finish(&state);
+    if (done)
+        output->zoomed = true;
+    return done;
+}
+
+/* Starts or ends peeking. Windows fade over peek.duration, or at once without animations. */
+static void set_peek(struct sh_server *server, bool on) {
+    if (server->peeking == on)
+        return;
+    const struct sh_settings *settings = server_settings(server);
+    server->peeking = on;
+    sh_fade_to(&server->peek_fade, on ? 1 : 0, now_ms(),
+               settings->animations ? settings->effects.peek_duration : 0);
+    if (!on) {
+        server->peek_keycode = 0;
+        server->peek_keyboard = NULL;
+    }
+    tick_effects(server);
+    schedule_frames(server);
+}
+
+static float rule_opacity(struct sh_toplevel *toplevel, const char *app_id, const char *title,
+                          bool active) {
+    struct sh_server *server = toplevel->server;
+    app_id = app_id ? app_id : "";
+    title = title ? title : "";
+    struct sh_opacity_rule *cache = &toplevel->opacity_rule;
+    if (cache->generation == server->config_generation && cache->active == active &&
+        cache->app_id && cache->title && !strcmp(cache->app_id, app_id) &&
+        !strcmp(cache->title, title))
+        return cache->value;
+    char *app_id_copy = strdup(app_id), *title_copy = strdup(title);
+    ++server->stats.opacity_rules;
+    cache->value = server->callbacks->opacity(server->callbacks->userdata, app_id, title, active);
+    if (!app_id_copy || !title_copy) { // out of memory: leave the cache unusable
+        free(app_id_copy);
+        free(title_copy);
+        app_id_copy = title_copy = NULL;
+    }
+    free(cache->app_id);
+    free(cache->title);
+    cache->app_id = app_id_copy;
+    cache->title = title_copy;
+    cache->active = active;
+    cache->generation = server->config_generation;
+    return cache->value;
 }
 
 /* The border around the window's geometry and its opacity, both following focus. Called on
@@ -2169,6 +4981,7 @@ static void set_buffer_opacity(struct wlr_scene_buffer *buffer, int sx, int sy, 
 static void refresh_frame(struct sh_toplevel *toplevel) {
     if (!toplevel->scene_tree)
         return;
+    overview_touch(toplevel->server, false); // a thumbnail of it may need copying again
 #if WLR_HAS_XWAYLAND
     if (toplevel->unmanaged)
         return;
@@ -2178,29 +4991,69 @@ static void refresh_frame(struct sh_toplevel *toplevel) {
     bool mapped = toplevel_mapped(toplevel);
     bool active = server->focused_toplevel == toplevel;
     const char *app_id = toplevel_app_id(toplevel), *title = toplevel_title(toplevel);
-    float opacity = toplevel->fullscreen || !mapped
-                        ? 1
-                        : server->callbacks->opacity(server->callbacks->userdata,
-                                                     app_id ? app_id : "", title ? title : "",
-                                                     active);
+    float opacity =
+        toplevel->fullscreen || !mapped ? 1 : rule_opacity(toplevel, app_id, title, active);
+    // Opacity and border color fade when focus changes; a window that is not yet shown, or
+    // was hidden, takes them at once.
+    int b = settings->border_width;
+    // An urgent window is framed in its color even without a border: inside its edges, so the
+    // layout does not move.
+    bool urgent = toplevel->urgent && !active;
+    bool inset = urgent && b == 0;
+    bool shown = (b > 0 || inset) && mapped && !frameless(toplevel, toplevel_output(toplevel));
+    const float *color = urgent ? settings->urgent_color
+                                : active ? settings->border_active : settings->border_inactive;
+    float target[SH_TWEEN_VALUES] = {opacity}, fading[SH_TWEEN_VALUES];
+    if (shown)
+        memcpy(target + 1, color, 4 * sizeof(float));
+    sh_tween_track(server->animator, &toplevel->fade, SH_ANIM_FOCUS,
+                   mapped && toplevel->shown && toplevel_visible(toplevel), target, fading,
+                   fade_update, toplevel);
+    // Peeking scales the opacity, fullscreen windows included.
+    opacity = fading[0] * (float)(1 - sh_fade_value(&server->peek_fade, now_ms()) *
+                                          (1 - settings->effects.peek_opacity));
+    color = fading + 1;
+    float pulsing[4];
+    if (urgent) {
+        // The border pulses over its fade to the urgent color; premultiplied, scaling all four
+        // channels dims it.
+        float pulse = urgent_pulse(toplevel, now_ms());
+        for (int i = 0; i < 4; ++i)
+            pulsing[i] = color[i] * pulse;
+        color = pulsing;
+    }
     // New subsurfaces start opaque, so a translucent window is revisited on every commit.
     if (opacity != toplevel->opacity || opacity < 1) {
         toplevel->opacity = opacity;
         wlr_scene_node_for_each_buffer(&toplevel->scene_tree->node, set_buffer_opacity, toplevel);
     }
+    update_dim(toplevel);
     refresh_decoration(toplevel); // the controls follow the window's width
+    refresh_tabs(toplevel);
+
+    // Windows on an output that tiles get rounded corners, floating ones too, clipping
+    // everything drawn for them but the border, which rounds itself to match.
+    struct wlr_box g = toplevel_geometry(toplevel);
+    struct wlr_output *output = toplevel_output(toplevel);
+    int radius = mapped && output_tiles(server, output) && !frameless(toplevel, output)
+                     ? settings->corner_radius
+                     : 0;
+#ifdef SHAODE_ROUNDED_CORNERS
+    wlr_scene_tree_set_rounded_clip(
+        toplevel->content, radius > 0 ? &(struct wlr_box){0, 0, g.width, g.height} : NULL, radius);
+#else
+    radius = 0;
+#endif
 
     // xdg-shell windows keep their scene tree while unmapped; the border must not.
-    int b = settings->border_width;
-    bool shown = b > 0 && mapped && !frameless(toplevel, toplevel_output(toplevel));
     for (int i = 0; i < 4; ++i) {
         if (!shown) {
             if (toplevel->border[i])
                 wlr_scene_node_destroy(&toplevel->border[i]->node);
             toplevel->border[i] = NULL;
+            toplevel->frame_hole = 0;
             continue;
         }
-        const float *color = active ? settings->border_active : settings->border_inactive;
         if (!toplevel->border[i])
             toplevel->border[i] = wlr_scene_rect_create(toplevel->content, 1, 1, color);
         if (!toplevel->border[i])
@@ -2210,15 +5063,34 @@ static void refresh_frame(struct sh_toplevel *toplevel) {
     if (!shown)
         return;
     // The scene tree's origin is the top-left corner of the window geometry.
-    struct wlr_box g = toplevel_geometry(toplevel);
-    const struct wlr_box sides[4] = {{-b, -b, g.width + 2 * b, b},
-                                     {-b, g.height, g.width + 2 * b, b},
-                                     {-b, 0, b, g.height},
-                                     {g.width, 0, b, g.height}};
+    if (inset)
+        b = g.width < 8 || g.height < 8 ? 1 : 2;
+    const struct wlr_box outside[4] = {{-b, -b, g.width + 2 * b, b},
+                                       {-b, g.height, g.width + 2 * b, b},
+                                       {-b, 0, b, g.height},
+                                       {g.width, 0, b, g.height}};
+    const struct wlr_box inside[4] = {{0, 0, g.width, b},
+                                      {0, g.height - b, g.width, b},
+                                      {0, b, b, g.height - 2 * b},
+                                      {g.width - b, b, b, g.height - 2 * b}};
+    const struct wlr_box *sides = inset ? inside : outside;
+    // Around rounded corners the first side is the whole frame, a hollow rounded rect whose
+    // inner edge follows the window's corners; the other three are not needed.
+    const struct wlr_box frame[4] = {
+        inset ? (struct wlr_box){0, 0, g.width, g.height}
+              : (struct wlr_box){-b, -b, g.width + 2 * b, g.height + 2 * b}};
+    if (radius > 0)
+        sides = frame;
+    toplevel->frame_hole = radius > 0 ? b : 0;
     for (int i = 0; i < 4; ++i) {
         wlr_scene_node_set_position(&toplevel->border[i]->node, sides[i].x, sides[i].y);
         wlr_scene_rect_set_size(toplevel->border[i], sides[i].width, sides[i].height);
-        wlr_scene_node_raise_to_top(&toplevel->border[i]->node);
+#ifdef SHAODE_ROUNDED_CORNERS
+        wlr_scene_rect_set_rounding(toplevel->border[i],
+                                    i == 0 && radius > 0 ? radius + (inset ? 0 : b) : 0,
+                                    i == 0 && radius > 0 ? b : 0);
+#endif
+        raise_frame_node(toplevel, &toplevel->border[i]->node);
     }
 }
 
@@ -2230,6 +5102,11 @@ static void forget_decoration(struct sh_toplevel *toplevel) {
         server->deco_revealed = NULL;
     if (server->deco_pressed == toplevel)
         server->deco_pressed = NULL;
+    if (server->tabs_hovered == toplevel)
+        server->tabs_hovered = NULL;
+    if (toplevel->xdg_toplevel && toplevel->tabs)
+        wlr_scene_node_destroy(&toplevel->tabs->node);
+    toplevel->tabs = NULL;
     // X11 windows lose it with their scene tree; xdg-shell ones keep theirs while unmapped.
     if (toplevel->xdg_toplevel && toplevel->deco)
         wlr_scene_node_destroy(&toplevel->deco->node);
@@ -2240,7 +5117,7 @@ static void forget_decoration(struct sh_toplevel *toplevel) {
 static struct sh_toplevel *deco_at(struct sh_server *server, double x, double y,
                                    enum sh_deco_part *part) {
     double sx, sy;
-    struct wlr_scene_node *node = wlr_scene_node_at(&server->scene->tree.node, x, y, &sx, &sy);
+    struct wlr_scene_node *node = scene_node_at(server, x, y, &sx, &sy);
     if (!node || node->type != WLR_SCENE_NODE_BUFFER || !node->parent)
         return NULL;
     struct sh_node *owner = node->parent->node.data;
@@ -2307,6 +5184,44 @@ static struct sh_toplevel *resize_band_at(struct sh_server *server, double x, do
     return NULL;
 }
 
+/* The window whose tab strip is at (x, y), and which tab, counting from 0. */
+static struct sh_toplevel *tabs_at(struct sh_server *server, double x, double y, int *index) {
+    double sx, sy;
+    struct wlr_scene_node *node = scene_node_at(server, x, y, &sx, &sy);
+    if (!node || node->type != WLR_SCENE_NODE_BUFFER || !node->parent)
+        return NULL;
+    struct sh_node *owner = node->parent->node.data;
+    if (!owner || owner->kind != SH_NODE_TOPLEVEL)
+        return NULL;
+    struct sh_toplevel *toplevel = owner->owner;
+    if (!toplevel->tabs || &toplevel->tabs->node != node)
+        return NULL;
+    *index = sh_tabs_index_at(toplevel->tabs_width, toplevel->tabs_count, sx);
+    return *index < 0 ? NULL : toplevel;
+}
+
+static void set_tabs_hovered(struct sh_server *server, struct sh_toplevel *toplevel, int index) {
+    struct sh_toplevel *old = server->tabs_hovered;
+    if (old == toplevel && server->tabs_hovered_index == index)
+        return;
+    server->tabs_hovered = toplevel;
+    server->tabs_hovered_index = index;
+    if (old && old != toplevel)
+        refresh_tabs(old);
+    if (toplevel)
+        refresh_tabs(toplevel);
+}
+
+/* The member of the group that is tab `index`. */
+static struct sh_toplevel *group_tab(struct sh_toplevel *from, int index) {
+    struct sh_toplevel *member;
+    wl_list_for_each(member, &from->server->toplevels, link) {
+        if (member->group == from->group && group_index(member) == index)
+            return member;
+    }
+    return NULL;
+}
+
 static void set_deco_hovered(struct sh_server *server, struct sh_toplevel *toplevel,
                              enum sh_deco_part part) {
     struct sh_toplevel *old = server->deco_hovered;
@@ -2337,9 +5252,14 @@ static void deco_activate(struct sh_toplevel *toplevel, enum sh_deco_part part) 
 }
 
 static void process_cursor_motion(struct sh_server *server, uint32_t time) {
+    hot_corner_check(server);
+    zoom_moved(server);
     if (server->seat->drag)
         wlr_scene_node_set_position(&server->drag_icons->node, server->cursor->x,
                                     server->cursor->y);
+    overview_hot_corner(server);
+    if (overview_motion(server))
+        return;
     if (server->cursor_mode == SH_CURSOR_MOVE) {
         process_cursor_move(server);
         return;
@@ -2349,12 +5269,21 @@ static void process_cursor_motion(struct sh_server *server, uint32_t time) {
         return;
     }
 
+    server->hit.caching = true;
+    server->hit.valid = false;
+    process_pointer_target(server, time);
+    server->hit.caching = false;
+}
+
+/* What the pointer is over after moving: window, controls, tabs, resize band, focus. */
+static void process_pointer_target(struct sh_server *server, uint32_t time) {
     double sx, sy;
     struct wlr_seat *seat = server->seat;
     struct sh_toplevel *revealed = server->deco_revealed;
     if (revealed && !in_deco_corner(revealed, server->cursor->x, server->cursor->y)) {
         server->deco_revealed = NULL;
         refresh_decoration(revealed);
+        server->hit.valid = false; // the controls came out of the scene
     }
     struct wlr_surface *surface = NULL;
     struct sh_toplevel *toplevel =
@@ -2363,11 +5292,20 @@ static void process_cursor_motion(struct sh_server *server, uint32_t time) {
         in_deco_corner(toplevel, server->cursor->x, server->cursor->y)) {
         server->deco_revealed = toplevel;
         refresh_decoration(toplevel);
+        server->hit.valid = false; // the controls went into the scene
     }
     enum sh_deco_part part;
     struct sh_toplevel *decorated = deco_at(server, server->cursor->x, server->cursor->y, &part);
     set_deco_hovered(server, decorated, decorated ? part : SH_DECO_NONE);
     if (decorated) {
+        set_default_cursor(server);
+        wlr_seat_pointer_clear_focus(seat);
+        return;
+    }
+    int tab;
+    struct sh_toplevel *tabbed = tabs_at(server, server->cursor->x, server->cursor->y, &tab);
+    set_tabs_hovered(server, tabbed, tabbed ? tab : -1);
+    if (tabbed) {
         set_default_cursor(server);
         wlr_seat_pointer_clear_focus(seat);
         return;
@@ -2387,7 +5325,8 @@ static void process_cursor_motion(struct sh_server *server, uint32_t time) {
         focus_toplevel_raise(toplevel, false);
     else if (!toplevel && server_settings(server)->focus_follows_mouse &&
              seat->pointer_state.button_count == 0 && !wlr_seat_pointer_has_grab(seat) &&
-             !wlr_seat_keyboard_has_grab(seat))
+             !wlr_seat_keyboard_has_grab(seat) &&
+             !panel_at(server, server->cursor->x, server->cursor->y))
         focus_desktop(server, wlr_output_layout_output_at(server->output_layout,
                                                           server->cursor->x, server->cursor->y));
     if (drag_strip_at(toplevel, surface, server->cursor->y)) {
@@ -2426,16 +5365,22 @@ static void server_cursor_motion(struct wl_listener *listener, void *data) {
             dy = confined_y - sy;
         }
     }
+    uint64_t started = now_ns();
     wlr_cursor_move(server->cursor, &event->pointer->base, dx, dy);
     process_cursor_motion(server, event->time_msec);
+    ++server->stats.motions;
+    server->stats.motion_ns += now_ns() - started;
 }
 
 static void server_cursor_motion_absolute(struct wl_listener *listener, void *data) {
     struct sh_server *server = wl_container_of(listener, server, cursor_motion_absolute);
     struct wlr_pointer_motion_absolute_event *event = data;
     wlr_idle_notifier_v1_notify_activity(server->idle_notifier, server->seat);
+    uint64_t started = now_ns();
     wlr_cursor_warp_absolute(server->cursor, &event->pointer->base, event->x, event->y);
     process_cursor_motion(server, event->time_msec);
+    ++server->stats.motions;
+    server->stats.motion_ns += now_ns() - started;
 }
 
 /* Actions that work on the focused window; over the bare desktop, a button binding skips them
@@ -2446,6 +5391,11 @@ static bool action_targets_window(enum sh_action action) {
     case SH_FULLSCREEN:
     case SH_TOGGLE_FLOATING:
     case SH_TOGGLE_STICKY:
+    case SH_SWALLOW_TOGGLE:
+    case SH_GROUP_TOGGLE:
+    case SH_GROUP_NEXT:
+    case SH_GROUP_PREV:
+    case SH_UNGROUP:
     case SH_MOVE_TO_WORKSPACE:
     case SH_SNAP_LEFT:
     case SH_SNAP_RIGHT:
@@ -2456,6 +5406,9 @@ static bool action_targets_window(enum sh_action action) {
     case SH_MOVE_UP:
     case SH_MOVE_DOWN:
     case SH_MOVE_TO_SCRATCHPAD:
+    case SH_PROMOTE:
+    case SH_SWAP_NEXT:
+    case SH_SWAP_PREV:
     case SH_RESIZE_LEFT:
     case SH_RESIZE_RIGHT:
     case SH_RESIZE_UP:
@@ -2517,6 +5470,8 @@ static void server_cursor_button(struct wl_listener *listener, void *data) {
     struct sh_server *server = wl_container_of(listener, server, cursor_button);
     struct wlr_pointer_button_event *event = data;
     wlr_idle_notifier_v1_notify_activity(server->idle_notifier, server->seat);
+    if ((server->overview.open || server->overview.pressed) && overview_button(server, event))
+        return;
     if (server->deco_pressed && event->button == BTN_LEFT &&
         event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
         // A dot acts on release, and only if the pointer is still on it.
@@ -2538,6 +5493,18 @@ static void server_cursor_button(struct wl_listener *listener, void *data) {
     }
     if (handle_button_binding(server, event))
         return;
+    if (!server->locked && !server->deco_pressed) {
+        int tab;
+        struct sh_toplevel *tabbed = tabs_at(server, server->cursor->x, server->cursor->y, &tab);
+        if (tabbed) {
+            // A press on a tab brings that window forward; the release is ignored.
+            if (event->state == WL_POINTER_BUTTON_STATE_PRESSED && event->button == BTN_LEFT) {
+                struct sh_toplevel *member = group_tab(tabbed, tab);
+                focus_toplevel(member ? member : tabbed);
+            }
+            return;
+        }
+    }
     enum sh_deco_part part;
     struct sh_toplevel *decorated =
         event->state == WL_POINTER_BUTTON_STATE_PRESSED && !server->locked && !server->deco_pressed
@@ -2588,7 +5555,7 @@ static void server_cursor_button(struct wl_listener *listener, void *data) {
             node = NULL; // Only lock surfaces, which have no desktop node, are reachable.
             toplevel = NULL;
         }
-        if (!toplevel && !server->locked)
+        if (!toplevel && !server->locked && !panel_at(server, server->cursor->x, server->cursor->y))
             focus_desktop(server, clicked);
         if (toplevel)
             focus_toplevel(toplevel);
@@ -2625,6 +5592,24 @@ static void server_cursor_axis(struct wl_listener *listener, void *data) {
     struct sh_server *server = wl_container_of(listener, server, cursor_axis);
     struct wlr_pointer_axis_event *event = data;
     wlr_idle_notifier_v1_notify_activity(server->idle_notifier, server->seat);
+    if (overview_axis(server, event))
+        return;
+    struct wlr_keyboard *held = wlr_seat_get_keyboard(server->seat);
+    unsigned zoom_mask = server_settings(server)->effects.zoom_scroll_modifier;
+    if (zoom_mask && held && event->orientation == WL_POINTER_AXIS_VERTICAL_SCROLL &&
+        (wlr_keyboard_get_modifiers(held) & zoom_mask) == zoom_mask) {
+        // A wheel notch is about 15 units; touchpads send small amounts that add up.
+        server->zoom_scroll += event->delta;
+        while (server->zoom_scroll <= -10) {
+            server->zoom_scroll += 10;
+            zoom_by(server, 1);
+        }
+        while (server->zoom_scroll >= 10) {
+            server->zoom_scroll -= 10;
+            zoom_by(server, -1);
+        }
+        return;
+    }
     wlr_seat_pointer_notify_axis(server->seat, event->time_msec, event->orientation, event->delta,
                                  event->delta_discrete, event->source, event->relative_direction);
 }
@@ -2635,43 +5620,51 @@ static void server_cursor_frame(struct wl_listener *listener, void *data) {
     wlr_seat_pointer_notify_frame(server->seat);
 }
 
-/* Bars (top-layer surfaces that reserve space) stay hidden while the output shows a
- * fullscreen window, focused or not. One taking the keyboard, like the panel with its
- * launcher or a menu open, is still shown. */
-static void hide_bars_over_fullscreen(struct sh_output *output) {
-    struct sh_server *server = output->server;
-    bool fullscreen = false;
-    struct sh_toplevel *toplevel;
-    wl_list_for_each(toplevel, &server->toplevels, link) {
-        if (toplevel->fullscreen && toplevel_mapped(toplevel) && toplevel_visible(toplevel) &&
-            toplevel_output(toplevel) == output->wlr_output) {
-            fullscreen = true;
-            break;
-        }
-    }
-    struct sh_layer *layer;
-    wl_list_for_each(layer, &server->layers, link) {
-        struct wlr_layer_surface_v1 *surface = layer->surface;
-        if (surface->output != output->wlr_output ||
-            surface->current.layer != ZWLR_LAYER_SHELL_V1_LAYER_TOP ||
-            surface->current.exclusive_zone <= 0)
-            continue;
-        bool keyboard = surface->current.keyboard_interactive !=
-                        ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE;
-        wlr_scene_node_set_enabled(&layer->scene->tree->node, !fullscreen || keyboard);
-    }
-}
-
 static void output_frame(struct wl_listener *listener, void *data) {
     struct sh_output *output = wl_container_of(listener, output, frame);
     struct wlr_scene *scene = output->server->scene;
 
     struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(scene, output->wlr_output);
+    struct sh_stats *stats = &output->server->stats;
+    uint64_t started = now_ns();
 
     sh_animator_tick(output->server->animator);
-    hide_bars_over_fullscreen(output);
-    wlr_scene_output_commit(scene_output, NULL);
+    overview_touch(output->server, false); // windows that move or fade move their thumbnails
+    if (tick_effects(output->server))
+        wlr_output_schedule_frame(output->wlr_output);
+    struct wlr_scene_output_state_options night = {.color_transform = output->server->night_transform};
+    double level = zoom_level(output->server, now_ms());
+    bool zoomed = false;
+    struct wlr_output *pointed = wlr_output_layout_output_at(
+        output->server->output_layout, output->server->cursor->x, output->server->cursor->y);
+    if (level > 1.0005 && pointed == output->wlr_output && !output->zoom_failed) {
+        zoomed = output_commit_zoomed(output, scene_output, &night, level);
+        if (!zoomed) {
+            wlr_log(WLR_ERROR, "Cannot magnify %s; showing it at 1x", output->wlr_output->name);
+            output->zoom_failed = true;
+        }
+    }
+    if (!zoomed) {
+        if (output->zoomed) {
+            wlr_damage_ring_add_whole(&scene_output->damage_ring);
+            output->zoomed = false;
+        }
+        if (!(level > 1.0005)) {
+            output_release_zoom(output);
+            output->zoom_failed = false; // the next zoom tries again
+        }
+        wlr_scene_output_commit(scene_output, &night);
+    }
     lock_output_presented(output);
+    uint64_t spent = now_ns() - started;
+    ++stats->frames;
+    stats->frame_ns += spent;
+    if (spent > stats->frame_max_ns)
+        stats->frame_max_ns = spent;
+    size_t slot = (stats->frames - 1) % SH_FRAME_RING;
+    stats->frame_us[slot] = (uint32_t)(spent / 1000);
+    stats->interval_us[slot] = stats->last_frame_ns ? (uint32_t)((started - stats->last_frame_ns) / 1000) : 0;
+    stats->last_frame_ns = started;
 
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
@@ -2804,6 +5797,7 @@ static void server_new_lock(struct wl_listener *listener, void *data) {
     lock->server = server;
     lock->lock = wlr_lock;
     switcher_close(server, -1);
+    overview_dismiss(server);
     add_listener(&wlr_lock->events.new_surface, &lock->new_surface, lock_new_surface);
     add_listener(&wlr_lock->events.unlock, &lock->unlock, lock_unlock);
     add_listener(&wlr_lock->events.destroy, &lock->destroy, lock_destroy);
@@ -2877,13 +5871,17 @@ static void output_description(const struct wlr_output *output, char *text, size
 }
 
 /* A "desc:" key matches the start of the output's description, as Hyprland's does. */
-static bool monitor_matches(const struct sh_monitor *monitor, const struct wlr_output *output) {
-    if (strncmp(monitor->name, "desc:", 5) != 0)
-        return strcmp(monitor->name, output->name) == 0;
+static bool output_key_matches(const char *key, const struct wlr_output *output) {
+    if (strncmp(key, "desc:", 5) != 0)
+        return strcmp(key, output->name) == 0;
     char description[256];
     output_description(output, description, sizeof(description));
-    const char *prefix = monitor->name + 5;
+    const char *prefix = key + 5;
     return *prefix && strncmp(description, prefix, strlen(prefix)) == 0;
+}
+
+static bool monitor_matches(const struct sh_monitor *monitor, const struct wlr_output *output) {
+    return output_key_matches(monitor->name, output);
 }
 
 /* Settings by connector name win over a description match. */
@@ -2899,6 +5897,39 @@ static const struct sh_monitor *monitor_settings(const struct sh_settings *setti
         described = described ? described : monitor;
     }
     return described;
+}
+
+/* The monitor settings in force for `output`: what an output-management client applied, else
+ * what the configuration says. */
+static const struct sh_monitor *output_monitor(const struct sh_settings *settings,
+                                               const struct sh_output *output) {
+    return output->has_override ? &output->override
+                                : monitor_settings(settings, output->wlr_output);
+}
+
+/* Tells output-management clients how the outputs are set up now. */
+static void publish_output_configuration(struct sh_server *server) {
+    if (!server->output_manager)
+        return;
+    struct wlr_output_configuration_v1 *config = wlr_output_configuration_v1_create();
+    if (!config)
+        return;
+    struct wl_list *lists[] = {&server->outputs, &server->disabled_outputs};
+    for (size_t i = 0; i < 2; ++i) {
+        struct sh_output *output;
+        wl_list_for_each(output, lists[i], link) {
+            struct wlr_output_configuration_head_v1 *head =
+                wlr_output_configuration_head_v1_create(config, output->wlr_output);
+            if (!head)
+                continue;
+            head->state.enabled = !output->disabled && output->wlr_output->enabled;
+            struct wlr_box box;
+            wlr_output_layout_get_box(server->output_layout, output->wlr_output, &box);
+            head->state.x = box.x;
+            head->state.y = box.y;
+        }
+    }
+    wlr_output_manager_v1_set_configuration(server->output_manager, config);
 }
 
 /* Adds the output to the layout at x, y, or moves it there. */
@@ -2957,7 +5988,7 @@ static void arrange_outputs(struct sh_server *server) {
     int x = 0;
     bool positioned = false;
     wl_list_for_each(output, &server->outputs, link) {
-        const struct sh_monitor *monitor = monitor_settings(settings, output->wlr_output);
+        const struct sh_monitor *monitor = output_monitor(settings, output);
         if (monitor == NULL || !monitor->positioned)
             continue;
         int width, height;
@@ -2969,7 +6000,7 @@ static void arrange_outputs(struct sh_server *server) {
     }
     for (int i = 0; i <= settings->output_count; ++i) {
         wl_list_for_each_reverse(output, &server->outputs, link) {
-            const struct sh_monitor *monitor = monitor_settings(settings, output->wlr_output);
+            const struct sh_monitor *monitor = output_monitor(settings, output);
             if ((monitor != NULL && monitor->positioned) ||
                 (i < settings->output_count ? !output_named(output, settings->output_order[i])
                                             : output_listed(settings, output)))
@@ -3011,6 +6042,7 @@ static void arrange_outputs(struct sh_server *server) {
     update_backgrounds(server);
     arrange_layers(server);
     refit_fullscreen(server);
+    publish_output_configuration(server);
     notify_subscribers(server); // the list of outputs and their workspaces
 }
 
@@ -3048,7 +6080,7 @@ static void destroy_output_layers(struct sh_server *server, struct wlr_output *w
  * needlessly. The last enabled output stays on. Callers arrange the outputs afterwards. */
 static void configure_output(struct sh_server *server, struct sh_output *output) {
     struct wlr_output *wlr_output = output->wlr_output;
-    const struct sh_monitor *monitor = monitor_settings(server_settings(server), wlr_output);
+    const struct sh_monitor *monitor = output_monitor(server_settings(server), output);
     bool enable = monitor == NULL || monitor->enabled;
     if (!enable) {
         bool others = false;
@@ -3109,6 +6141,14 @@ static void configure_output(struct sh_server *server, struct sh_output *output)
         wlr_output_commit_state(wlr_output, &state);
     wlr_output_state_finish(&state);
 
+    // The windows of an output that is turned off go to another, as if it were unplugged.
+    bool turned_off = !enable && !wl_list_empty(&output->link) && !output->disabled;
+    struct wlr_box gone = {0};
+    if (turned_off) {
+        gone = output->usable;
+        if (wlr_box_empty(&gone))
+            wlr_output_layout_get_box(server->output_layout, wlr_output, &gone);
+    }
     if (wl_list_empty(&output->link) || enable == output->disabled) {
         wl_list_remove(&output->link);
         wl_list_insert(enable ? &server->outputs : &server->disabled_outputs, &output->link);
@@ -3122,18 +6162,31 @@ static void configure_output(struct sh_server *server, struct sh_output *output)
         wlr_output_layout_remove(server->output_layout, wlr_output);
         wlr_scene_node_set_enabled(&output->background->node, false);
         wlr_scene_node_set_enabled(&output->lock_blank->node, false);
+        if (turned_off && server->running)
+            evacuate_output(server, wlr_output->name, gone, false);
     }
 }
 
 static void configure_animations(struct sh_server *server) {
     const struct sh_settings *settings = server_settings(server);
-    sh_animator_configure(server->animator, settings->animations, settings->animation_duration);
+    struct sh_animator_config config = {.enabled = settings->animations,
+                                        .speed = settings->animation_speed,
+                                        .late_ms = settings->animation_late_ms};
+    memcpy(config.styles, settings->animation_styles, sizeof(config.styles));
+    sh_animator_configure(server->animator, &config);
 }
 
 static void reload_config(struct sh_server *server) {
     if (!server->callbacks->reload(server->callbacks->userdata))
         return;
+    struct sh_output *overridden;
+    wl_list_for_each(overridden, &server->outputs, link) overridden->has_override = false;
+    wl_list_for_each(overridden, &server->disabled_outputs, link) overridden->has_override = false;
+    ++server->config_generation;
     configure_animations(server);
+    night_light_update(server);
+    if (!server_settings(server)->overview)
+        overview_dismiss(server);
     struct sh_keyboard *keyboard;
     wl_list_for_each(keyboard, &server->keyboards, link) {
         if (wlr_input_device_get_virtual_keyboard(&keyboard->wlr_keyboard->base))
@@ -3151,6 +6204,7 @@ static void reload_config(struct sh_server *server) {
         configure_output(server, output);
     arrange_outputs(server);
     reconfigure_tiling(server);
+    return_home_windows(server);
     struct sh_toplevel *toplevel;
     // With features.sticky off, sticky windows stay on their output's current workspace.
     if (!server_settings(server)->sticky) {
@@ -3172,6 +6226,8 @@ static void reload_config(struct sh_server *server) {
     }
     if (!server_settings(server)->scratchpad)
         empty_scratchpad(server);
+    if (!server_settings(server)->groups)
+        dissolve_groups(server);
     show_workspaces(server);
     if (server->focused_toplevel && !toplevel_visible(server->focused_toplevel)) {
         deactivate_toplevel(server);
@@ -3180,6 +6236,130 @@ static void reload_config(struct sh_server *server) {
     // Gaps, borders, and opacity may have changed.
     wl_list_for_each(toplevel, &server->toplevels, link) refresh_frame(toplevel);
     wl_list_for_each(output, &server->outputs, link) reflow_output(server, output->wlr_output);
+}
+
+static struct sh_output *sh_output_for(struct sh_server *server, struct wlr_output *wlr_output) {
+    struct wl_list *lists[] = {&server->outputs, &server->disabled_outputs};
+    for (size_t i = 0; i < 2; ++i) {
+        struct sh_output *output;
+        wl_list_for_each(output, lists[i], link) {
+            if (output->wlr_output == wlr_output)
+                return output;
+        }
+    }
+    return NULL;
+}
+
+/* Settings a wlr-output-management head asks for, as the monitor entry they amount to. */
+static void head_monitor(struct sh_server *server, const struct sh_output *output,
+                         const struct wlr_output_head_v1_state *head, struct sh_monitor *monitor) {
+    const struct sh_monitor *configured = monitor_settings(server_settings(server), output->wlr_output);
+    memset(monitor, 0, sizeof(*monitor));
+    monitor->tiling = configured ? configured->tiling : -1;
+    snprintf(monitor->name, sizeof(monitor->name), "%s", output->wlr_output->name);
+    monitor->enabled = head->enabled;
+    if (!head->enabled)
+        return;
+    if (head->mode) {
+        monitor->width = head->mode->width;
+        monitor->height = head->mode->height;
+        monitor->refresh = head->mode->refresh;
+    } else {
+        monitor->width = head->custom_mode.width;
+        monitor->height = head->custom_mode.height;
+        monitor->refresh = head->custom_mode.refresh;
+    }
+    monitor->scale = head->scale;
+    monitor->transform = head->transform;
+    monitor->vrr = head->adaptive_sync_enabled;
+    monitor->positioned = true;
+    monitor->x = head->x;
+    monitor->y = head->y;
+}
+
+static bool test_head(const struct wlr_output_head_v1_state *head) {
+    struct wlr_output_state state;
+    wlr_output_state_init(&state);
+    wlr_output_state_set_enabled(&state, head->enabled);
+    if (head->enabled) {
+        if (head->mode)
+            wlr_output_state_set_mode(&state, head->mode);
+        else if (head->custom_mode.width > 0 && head->custom_mode.height > 0)
+            wlr_output_state_set_custom_mode(&state, head->custom_mode.width,
+                                             head->custom_mode.height, head->custom_mode.refresh);
+        wlr_output_state_set_scale(&state, head->scale);
+        wlr_output_state_set_transform(&state, head->transform);
+    }
+    bool ok = head->scale >= 0 && wlr_output_test_state(head->output, &state);
+    wlr_output_state_finish(&state);
+    return ok;
+}
+
+/* A request is acceptable when every head is known and its settings pass the backend's test,
+ * and an output stays on. */
+static bool output_configuration_ok(struct sh_server *server,
+                                    struct wlr_output_configuration_v1 *config) {
+    bool any_on = false;
+    struct wlr_output_configuration_head_v1 *head;
+    wl_list_for_each(head, &config->heads, link) {
+        if (!sh_output_for(server, head->state.output) || !test_head(&head->state))
+            return false;
+        any_on |= head->state.enabled;
+    }
+    // Outputs the request leaves out keep their state.
+    struct sh_output *output;
+    wl_list_for_each(output, &server->outputs, link) {
+        bool listed = false;
+        wl_list_for_each(head, &config->heads, link) listed |= head->state.output == output->wlr_output;
+        any_on |= !listed;
+    }
+    return any_on;
+}
+
+static void output_config_test(struct wl_listener *listener, void *data) {
+    struct sh_server *server = wl_container_of(listener, server, output_test);
+    struct wlr_output_configuration_v1 *config = data;
+    if (output_configuration_ok(server, config))
+        wlr_output_configuration_v1_send_succeeded(config);
+    else
+        wlr_output_configuration_v1_send_failed(config);
+    wlr_output_configuration_v1_destroy(config);
+}
+
+static void output_config_apply(struct wl_listener *listener, void *data) {
+    struct sh_server *server = wl_container_of(listener, server, output_apply);
+    struct wlr_output_configuration_v1 *config = data;
+    if (!output_configuration_ok(server, config)) {
+        wlr_output_configuration_v1_send_failed(config);
+        wlr_output_configuration_v1_destroy(config);
+        return;
+    }
+    struct wlr_output_configuration_head_v1 *head;
+    wl_list_for_each(head, &config->heads, link) {
+        struct sh_output *output = sh_output_for(server, head->state.output);
+        head_monitor(server, output, &head->state, &output->override);
+        output->has_override = true;
+    }
+    // Enable outputs before disabling others, so a swap never leaves none on.
+    struct sh_output *output, *temporary;
+    wl_list_for_each_safe(output, temporary, &server->disabled_outputs, link)
+        configure_output(server, output);
+    wl_list_for_each_safe(output, temporary, &server->outputs, link)
+        configure_output(server, output);
+    arrange_outputs(server);
+    reconfigure_tiling(server);
+    return_home_windows(server);
+    rehome_tiles(server);
+    show_workspaces(server);
+    struct sh_toplevel *toplevel;
+    if (server->focused_toplevel && !toplevel_visible(server->focused_toplevel)) {
+        deactivate_toplevel(server);
+        focus_previous(server);
+    }
+    wl_list_for_each(toplevel, &server->toplevels, link) refresh_frame(toplevel);
+    wl_list_for_each(output, &server->outputs, link) reflow_output(server, output->wlr_output);
+    wlr_output_configuration_v1_send_succeeded(config);
+    wlr_output_configuration_v1_destroy(config);
 }
 
 static void output_request_state(struct wl_listener *listener, void *data) {
@@ -3196,10 +6376,15 @@ static void output_destroy(struct wl_listener *listener, void *data) {
     wl_list_remove(&output->request_state.link);
     wl_list_remove(&output->destroy.link);
     wl_list_remove(&output->link);
+    output_release_zoom(output);
     destroy_output_layers(output->server, output->wlr_output);
     wlr_scene_node_destroy(&output->background->node);
     wlr_scene_node_destroy(&output->lock_blank->node);
     struct sh_server *server = output->server;
+    if (!strcmp(server->overview.output, output->wlr_output->name))
+        overview_dismiss(server);
+    if (server->running)
+        schedule_evacuation(server, output);
     // Closing the host window ends a nested session. A standalone session loses every output
     // on VT switch (wlroots recreates them on return) or when the last monitor is unplugged.
     bool standalone = false;
@@ -3232,14 +6417,20 @@ static void server_new_output(struct wl_listener *listener, void *data) {
     add_listener(&wlr_output->events.request_state, &output->request_state, output_request_state);
     add_listener(&wlr_output->events.destroy, &output->destroy, output_destroy);
 
+    if (server->pending_output_name[0]) {
+        wlr_output_set_name(wlr_output, server->pending_output_name);
+        server->pending_output_name[0] = '\0';
+    }
     wl_list_init(&output->link);
     char description[256];
     output_description(wlr_output, description, sizeof(description));
     wlr_log(WLR_INFO, "Output %s: %s", wlr_output->name, description);
+    apply_output_layout(server, wlr_output);
     configure_output(server, output);
     if (wlr_output_is_wl(wlr_output))
         wlr_wl_output_set_title(wlr_output, "shaoDe — nested desktop");
     arrange_outputs(server);
+    return_home_windows(server);
 }
 
 /* Layouts put their gap at the edges as well as between windows. Laying out with gap_inner
@@ -3452,10 +6643,15 @@ static void place_tiled(void *data, void *window, struct sh_rect rect) {
 /* Snapped, maximized, or grid-arranged windows that follow changes to the usable area. */
 static bool reflows(struct sh_toplevel *toplevel, int workspace, struct wlr_output *output) {
     return toplevel->workspace == workspace && toplevel->arranged && !toplevel->minimized &&
+           !toplevel->group_hidden && !toplevel->swallowed &&
            !toplevel->fullscreen && toplevel_output(toplevel) == output;
 }
 
 static void reflow_output(struct sh_server *server, struct wlr_output *output) {
+    if (server->reflow_held)
+        return;
+    ++server->stats.reflows;
+    uint64_t started = now_ns();
     struct sh_rect area = usable_area(server, output), target;
     const struct sh_settings *settings = server_settings(server);
     for (int workspace = 0; workspace < settings->workspaces; ++workspace) {
@@ -3477,6 +6673,12 @@ static void reflow_output(struct sh_server *server, struct wlr_output *output) {
                           gap_area(settings, area, SH_TILE), settings->gap_inner, place_tiled,
                           NULL);
     }
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (toplevel->fullscreen && toplevel_output(toplevel) == output)
+            fit_fullscreen(toplevel); // it follows the panels' exclusive zones
+    }
+    server->stats.reflow_ns += now_ns() - started;
 }
 
 static struct wlr_output *find_output(struct sh_server *server, const char *name) {
@@ -3491,6 +6693,12 @@ static struct wlr_output *find_output(struct sh_server *server, const char *name
 static struct wlr_output *tiled_output(struct sh_toplevel *toplevel) {
     const char *name = sh_tiling_output(toplevel->server->tiling, toplevel);
     return name ? find_output(toplevel->server, name) : NULL;
+}
+
+static enum sh_tile_layout toplevel_layout(struct sh_toplevel *toplevel) {
+    const char *name = sh_tiling_output(toplevel->server->tiling, toplevel);
+    return name ? sh_tiling_layout(toplevel->server->tiling, name, toplevel->workspace)
+                : SH_LAYOUT_DWINDLE;
 }
 
 /* The tiling setting the config gives `output`: its own, else layout.tiling. */
@@ -3522,7 +6730,7 @@ static struct wlr_output *home_output(struct sh_toplevel *toplevel) {
 
 /* Whether the window should join the tiling of `output` (by default its home output). */
 static bool wants_tiling(struct sh_toplevel *toplevel, struct wlr_output *output) {
-    return !toplevel->tiled && !toplevel->floating && !toplevel->sticky && !toplevel->minimized &&
+    return !toplevel->tiled && !toplevel->group_hidden && !toplevel->swallowed && !toplevel->floating && !toplevel->sticky && !toplevel->minimized &&
            output_tiles(toplevel->server, output ? output : home_output(toplevel));
 }
 
@@ -3614,6 +6822,448 @@ static void untile_toplevel(struct sh_toplevel *toplevel, bool restore) {
         reflow_output(server, output);
 }
 
+/* `box` moved from where it was on the output covering `from` to the same place relative to
+ * `area`, kept inside it. Sizes stay unless they no longer fit. */
+static struct wlr_box translate_box(struct wlr_box box, struct wlr_box from, struct sh_rect area) {
+    if (box.width <= 0 || box.height <= 0 || from.width <= 0 || from.height <= 0)
+        return box;
+    double rx = (double)(box.x - from.x) / from.width, ry = (double)(box.y - from.y) / from.height;
+    box.width = fmin(box.width, area.width);
+    box.height = fmin(box.height, area.height);
+    box.x = area.x + (int)lround(rx * area.width);
+    box.y = area.y + (int)lround(ry * area.height);
+    box.x = fmax(area.x, fmin(box.x, area.x + area.width - box.width));
+    box.y = fmax(area.y, fmin(box.y, area.y + area.height - box.height));
+    return box;
+}
+
+/* The connected output nearest the box, or NULL when there is none. */
+static struct wlr_output *nearest_output(struct sh_server *server, struct wlr_box box) {
+    struct wlr_output *best = NULL;
+    double best_distance = 0;
+    struct sh_output *candidate;
+    wl_list_for_each(candidate, &server->outputs, link) {
+        struct wlr_box other;
+        wlr_output_layout_get_box(server->output_layout, candidate->wlr_output, &other);
+        double dx = (other.x + other.width / 2.0) - (box.x + box.width / 2.0);
+        double dy = (other.y + other.height / 2.0) - (box.y + box.height / 2.0);
+        double distance = dx * dx + dy * dy;
+        if (!best || distance < best_distance) {
+            best = candidate->wlr_output;
+            best_distance = distance;
+        }
+    }
+    return best;
+}
+
+/* Puts a floating window at `box`, or a fullscreen one over `output`, so that the
+ * output the window follows is the one it was sent to. */
+static void place_on_output(struct sh_toplevel *toplevel, struct wlr_output *output,
+                            struct wlr_box box) {
+    if (toplevel->fullscreen)
+        box = fullscreen_box(toplevel, output);
+    toplevel_configure_box(toplevel, box);
+}
+
+/* Moves a window from `from` (the box of the output it is on) onto `to`, keeping its workspace
+ * number and, on an output that tiles, its place in the tiling. */
+static void relocate_toplevel(struct sh_toplevel *toplevel, struct wlr_box from,
+                              struct wlr_output *to, bool tile, bool keep_workspace) {
+    struct sh_server *server = toplevel->server;
+    struct sh_rect area = usable_area(server, to);
+    int workspace = toplevel->workspace;
+    toplevel->restore_box = translate_box(toplevel->restore_box, from, area);
+    toplevel->fullscreen_restore = translate_box(toplevel->fullscreen_restore, from, area);
+    struct wlr_box box = translate_box(toplevel_box(toplevel), from, area);
+    bool was_tiled = toplevel->tiled;
+    if (was_tiled)
+        untile_toplevel(toplevel, false);
+    set_toplevel_output(toplevel, to); // joins the workspace `to` shows
+    if (keep_workspace)
+        toplevel->workspace = workspace;
+    group_follow(toplevel);
+    if (was_tiled && tile && wants_tiling(toplevel, to)) {
+        tile_toplevel_at(toplevel, to, NULL, false, 0, 0);
+    } else if (was_tiled) {
+        restore_toplevel(toplevel); // floats where it was
+    } else if (toplevel_mapped(toplevel)) {
+        place_on_output(toplevel, to, box);
+    }
+}
+
+/* An output is going away: its windows move to the nearest one that is left, keeping their
+ * workspace numbers, and remember where they came from so they can return with it. Without
+ * another output they stay as they are, as they do when a VT switch takes every output. */
+static void evacuate_output(struct sh_server *server, const char *name, struct wlr_box gone,
+                            bool keep_workspaces) {
+    if (wlr_box_empty(&gone) || find_output(server, name))
+        return;
+    struct wlr_output *target = nearest_output(server, gone);
+    if (!target)
+        return;
+    bool remember = server_settings(server)->return_windows;
+    size_t count = 0, capacity = 0;
+    struct sh_toplevel **moving = NULL, *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+#if WLR_HAS_XWAYLAND
+        if (toplevel->unmanaged)
+            continue;
+#endif
+        if (strcmp(toplevel->output, name) != 0)
+            continue;
+        if (count == capacity) {
+            struct sh_toplevel **grown = realloc(moving, (capacity = capacity ? 2 * capacity : 16) * sizeof(*moving));
+            if (!grown)
+                break;
+            moving = grown;
+        }
+        moving[count++] = toplevel;
+    }
+    if (count == 0) {
+        free(moving);
+        return;
+    }
+    ++server->reflow_held;
+    for (size_t i = 0; i < count; ++i) {
+        toplevel = moving[i];
+        if (remember && !toplevel->home_output[0]) {
+            snprintf(toplevel->home_output, sizeof(toplevel->home_output), "%s", name);
+            toplevel->home_workspace = toplevel->workspace;
+            toplevel->home_tiled = toplevel->tiled;
+        }
+    }
+    for (size_t i = 0; i < count; ++i) {
+        toplevel = moving[i];
+        // Hidden members of a group follow the one that shows.
+        if (toplevel->group_hidden) {
+            struct sh_rect area = usable_area(server, target);
+            toplevel->restore_box = translate_box(toplevel->restore_box, gone, area);
+            continue;
+        }
+        char home[64];
+        int home_workspace = toplevel->home_workspace;
+        bool home_tiled = toplevel->home_tiled;
+        snprintf(home, sizeof(home), "%s", toplevel->home_output);
+        relocate_toplevel(toplevel, gone, target, true, keep_workspaces);
+        // Relocating counts as placing by hand; put the note back.
+        snprintf(toplevel->home_output, sizeof(toplevel->home_output), "%s", home);
+        toplevel->home_workspace = home_workspace;
+        toplevel->home_tiled = home_tiled;
+    }
+    --server->reflow_held;
+    free(moving);
+    wlr_log(WLR_INFO, "Moved windows of %s to %s", name, target->name);
+    show_workspaces(server);
+    reflow_output(server, target);
+    refit_fullscreen(server);
+    if (server->focused_toplevel && !toplevel_visible(server->focused_toplevel)) {
+        deactivate_toplevel(server);
+        focus_previous(server);
+    }
+}
+
+struct sh_evacuation {
+    struct sh_server *server;
+    char name[64];
+    struct wlr_box box;
+};
+
+static void evacuation_run(void *data) {
+    struct sh_evacuation *job = data;
+    if (job->server->running)
+        evacuate_output(job->server, job->name, job->box, true);
+    free(job);
+}
+
+/* Called while the output is being destroyed, when the scene and the layout still hold it and
+ * moving windows would touch it again: the move waits until it is gone. */
+static void schedule_evacuation(struct sh_server *server, struct sh_output *output) {
+    struct sh_evacuation *job = calloc(1, sizeof(*job));
+    if (!job)
+        return;
+    job->server = server;
+    snprintf(job->name, sizeof(job->name), "%s", output->wlr_output->name);
+    job->box = output->usable; // windows keep their place relative to the area they could use
+    if (wlr_box_empty(&job->box))
+        wlr_output_layout_get_box(server->output_layout, output->wlr_output, &job->box);
+    if (wlr_box_empty(&job->box))
+        job->box = output->previous;
+    wl_event_loop_add_idle(wl_display_get_event_loop(server->wl_display), evacuation_run, job);
+}
+
+/* Windows that came from an output that is connected again go back to it, to their old
+ * workspace and, when they were tiled, into its tiling. */
+static void return_home_windows(struct sh_server *server) {
+    const struct sh_settings *settings = server_settings(server);
+    bool any = false;
+    ++server->reflow_held;
+    struct sh_toplevel *toplevel;
+    wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
+        if (!toplevel->home_output[0])
+            continue;
+        if (!settings->return_windows || toplevel->group_hidden) {
+            toplevel->home_output[0] = '\0';
+            continue;
+        }
+        struct wlr_output *home = find_output(server, toplevel->home_output);
+        if (!home)
+            continue; // still away
+        if (!strcmp(toplevel->output, toplevel->home_output)) {
+            toplevel->home_output[0] = '\0';
+            continue;
+        }
+        struct wlr_output *from = find_output(server, toplevel->output);
+        struct wlr_box from_box = {0};
+        if (from) {
+            struct sh_rect area = usable_area(server, from);
+            from_box = (struct wlr_box){area.x, area.y, area.width, area.height};
+        } else {
+            from_box = toplevel_box(toplevel);
+        }
+        int workspace = toplevel->home_workspace;
+        bool tile = toplevel->home_tiled;
+        toplevel->home_output[0] = '\0';
+        // relocate_toplevel keeps the workspace number the window has now.
+        toplevel->workspace = workspace;
+        relocate_toplevel(toplevel, from_box, home, tile, true);
+        any = true;
+    }
+    --server->reflow_held;
+    if (!any)
+        return;
+    show_workspaces(server);
+    // The outputs the windows left lose tiles too.
+    struct sh_output *output;
+    wl_list_for_each(output, &server->outputs, link) reflow_output(server, output->wlr_output);
+    refit_fullscreen(server);
+    wl_list_for_each(toplevel, &server->toplevels, link) refresh_frame(toplevel);
+}
+
+/* The output an output-target words name, seen from `from`: "left" or "right" is the next
+ * output that way, "next" or "prev" the one after or before it from left to right, wrapping;
+ * anything else a connector name or "desc:" description. NULL when there is none, or it is
+ * `from` itself. */
+static struct wlr_output *resolve_output_target(struct sh_server *server, struct wlr_output *from,
+                                                const char *target) {
+    struct wlr_output *found = NULL;
+    struct wlr_box box;
+    wlr_output_layout_get_box(server->output_layout, from, &box);
+    if (!strcmp(target, "left") || !strcmp(target, "right")) {
+        found = wlr_output_layout_adjacent_output(
+            server->output_layout, !strcmp(target, "left") ? WLR_DIRECTION_LEFT : WLR_DIRECTION_RIGHT,
+            from, box.x + box.width / 2.0, box.y + box.height / 2.0);
+    } else if (!strcmp(target, "next") || !strcmp(target, "prev")) {
+        // The output whose left edge follows (or precedes) ours, else the far end.
+        struct wlr_output *best = NULL, *edge = NULL;
+        struct wlr_box best_box = {0}, edge_box = {0};
+        bool forward = !strcmp(target, "next");
+        struct sh_output *candidate;
+        wl_list_for_each(candidate, &server->outputs, link) {
+            if (candidate->wlr_output == from)
+                continue;
+            struct wlr_box other;
+            wlr_output_layout_get_box(server->output_layout, candidate->wlr_output, &other);
+            bool after = other.x > box.x || (other.x == box.x && other.y > box.y);
+            bool nearer = !best || (forward ? (other.x < best_box.x ||
+                                              (other.x == best_box.x && other.y < best_box.y))
+                                            : (other.x > best_box.x ||
+                                               (other.x == best_box.x && other.y > best_box.y)));
+            if (after == forward && nearer) {
+                best = candidate->wlr_output;
+                best_box = other;
+            }
+            bool further = !edge || (forward ? (other.x < edge_box.x ||
+                                               (other.x == edge_box.x && other.y < edge_box.y))
+                                             : (other.x > edge_box.x ||
+                                                (other.x == edge_box.x && other.y > edge_box.y)));
+            if (further) {
+                edge = candidate->wlr_output;
+                edge_box = other;
+            }
+        }
+        found = best ? best : edge;
+    } else {
+        struct sh_output *candidate;
+        wl_list_for_each(candidate, &server->outputs, link) {
+            if (candidate->wlr_output != from && output_key_matches(target, candidate->wlr_output)) {
+                found = candidate->wlr_output;
+                break;
+            }
+        }
+    }
+    return found != from ? found : NULL;
+}
+
+/* The windows a workspace exchange moves, with where each was drawn, for the glide. */
+struct sh_exchange {
+    struct sh_toplevel **windows;
+    int *x, *y;
+    size_t count, capacity;
+};
+
+static void exchange_note(struct sh_exchange *exchange, struct sh_toplevel *toplevel) {
+    if (exchange->count == exchange->capacity) {
+        size_t capacity = exchange->capacity ? 2 * exchange->capacity : 32;
+        struct sh_toplevel **windows = realloc(exchange->windows, capacity * sizeof(*windows));
+        int *x = realloc(exchange->x, capacity * sizeof(*x));
+        int *y = realloc(exchange->y, capacity * sizeof(*y));
+        if (windows)
+            exchange->windows = windows;
+        if (x)
+            exchange->x = x;
+        if (y)
+            exchange->y = y;
+        if (!windows || !x || !y)
+            return;
+        exchange->capacity = capacity;
+    }
+    exchange->windows[exchange->count] = toplevel;
+    exchange->x[exchange->count] = toplevel->scene_tree->node.x;
+    exchange->y[exchange->count++] = toplevel->scene_tree->node.y;
+}
+
+/* Whether a window goes along with its workspace: sticky windows and the scratchpad's belong
+ * to their output. */
+static bool travels_with_workspace(struct sh_toplevel *toplevel) {
+#if WLR_HAS_XWAYLAND
+    if (toplevel->unmanaged)
+        return false;
+#endif
+    return toplevel->output[0] && !toplevel->sticky && !toplevel->scratchpad;
+}
+
+/* Trades what workspace `wa` of output `a` and workspace `wb` of `b` hold: their windows, moved
+ * to the other output (a floating window keeps its place relative to the usable area, a tile its
+ * place in the tiling, which comes along with its layout, ratio and columns), and their layout
+ * state. A tile that lands on an output that does not tile floats, and a floating window that
+ * lands on one that does joins the tiling. Nothing is shown or arranged here. */
+static void exchange_workspace_slots(struct sh_server *server, struct wlr_output *a, int wa,
+                                     struct wlr_output *b, int wb, struct sh_exchange *exchange) {
+    struct sh_rect area_a = usable_area(server, a), area_b = usable_area(server, b);
+    struct wlr_box box_a = {area_a.x, area_a.y, area_a.width, area_a.height};
+    struct wlr_box box_b = {area_b.x, area_b.y, area_b.width, area_b.height};
+    size_t first = exchange->count;
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (!travels_with_workspace(toplevel))
+            continue;
+        bool from_a = !strcmp(toplevel->output, a->name) && toplevel->workspace == wa;
+        bool from_b = !strcmp(toplevel->output, b->name) && toplevel->workspace == wb;
+        if (!from_a && !from_b)
+            continue;
+        exchange_note(exchange, toplevel);
+    }
+    size_t last = exchange->count;
+    sh_tiling_exchange(server->tiling, a->name, wa, b->name, wb);
+    for (size_t i = first; i < last; ++i) {
+        toplevel = exchange->windows[i];
+        bool from_a = !strcmp(toplevel->output, a->name);
+        struct wlr_output *to = from_a ? b : a;
+        struct wlr_box from_box = from_a ? box_a : box_b;
+        struct sh_rect area = from_a ? area_b : area_a;
+        toplevel->restore_box = translate_box(toplevel->restore_box, from_box, area);
+        toplevel->fullscreen_restore = translate_box(toplevel->fullscreen_restore, from_box, area);
+        struct wlr_box moved = translate_box(toplevel_box(toplevel), from_box, area);
+        snprintf(toplevel->output, sizeof(toplevel->output), "%s", to->name);
+        toplevel->workspace = from_a ? wb : wa;
+        toplevel->home_output[0] = '\0';
+        if (toplevel->group_hidden || toplevel->swallowed || !toplevel_mapped(toplevel))
+            continue;
+        if (toplevel->tiled) {
+            if (!output_tiles(server, to)) {
+                // A window that opened tiled floats where its tile is, which must be on `to`.
+                wlr_scene_node_set_position(&toplevel->scene_tree->node, moved.x, moved.y);
+                untile_toplevel(toplevel, true);
+            }
+            continue;
+        }
+        place_on_output(toplevel, to, moved);
+        if (wants_tiling(toplevel, to))
+            tile_toplevel_at(toplevel, to, NULL, false, 0, 0);
+    }
+}
+
+/* The last steps of an exchange: what is on screen, the arrangement of both outputs, and a glide
+ * from where each window was drawn. */
+static void finish_exchange(struct sh_server *server, struct wlr_output *a, struct wlr_output *b,
+                            struct sh_exchange *exchange) {
+    show_workspaces(server);
+    // Floating windows glide from where they were; tiles glide in reflow_output.
+    for (size_t i = 0; i < exchange->count; ++i) {
+        struct sh_toplevel *toplevel = exchange->windows[i];
+        if (toplevel->tiled || !toplevel->shown || !toplevel_visible(toplevel))
+            continue;
+        struct wlr_scene_node *node = &toplevel->scene_tree->node;
+        sh_anim_glide_kind(server->animator, &toplevel->anim, toplevel->content,
+                           exchange->x[i] - node->x, exchange->y[i] - node->y, SH_ANIM_MOVE);
+    }
+    reflow_output(server, a);
+    reflow_output(server, b);
+    refit_fullscreen(server);
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) refresh_frame(toplevel);
+    if (server->focused_toplevel) {
+        if (!toplevel_visible(server->focused_toplevel)) {
+            deactivate_toplevel(server);
+            focus_previous(server);
+        } else {
+            set_active_output(server, server->focused_toplevel->output);
+        }
+    }
+    notify_subscribers(server);
+}
+
+/* move_workspace_to_output: the focused output's workspace goes to another output, which shows
+ * it; the workspace with the same number there takes its place. */
+static void move_workspace_to_output(struct sh_server *server, const char *target) {
+    struct wlr_output *from = focused_output(server);
+    struct wlr_output *to = from ? resolve_output_target(server, from, target) : NULL;
+    if (!to) {
+        wlr_log(WLR_INFO, "move_workspace_to_output: no output %s from %s", target,
+                from ? from->name : "here");
+        return;
+    }
+    int workspace = *output_workspace(server, from->name);
+    struct sh_exchange exchange = {0};
+    ++server->reflow_held;
+    exchange_workspace_slots(server, from, workspace, to, workspace, &exchange);
+    --server->reflow_held;
+    show_workspace(server, to->name, workspace);
+    finish_exchange(server, from, to, &exchange);
+    wlr_log(WLR_INFO, "Workspace %d moved from %s to %s", workspace + 1, from->name, to->name);
+    free(exchange.windows);
+    free(exchange.x);
+    free(exchange.y);
+}
+
+/* swap_workspaces: the focused output and another trade all their workspaces, and with them
+ * what they show. */
+static void swap_output_workspaces(struct sh_server *server, const char *target) {
+    struct wlr_output *first = focused_output(server);
+    struct wlr_output *second = first ? resolve_output_target(server, first, target) : NULL;
+    if (!second) {
+        wlr_log(WLR_INFO, "swap_workspaces: no output %s from %s", target,
+                first ? first->name : "here");
+        return;
+    }
+    struct sh_exchange exchange = {0};
+    ++server->reflow_held;
+    for (int workspace = 0; workspace < server_settings(server)->workspaces; ++workspace)
+        exchange_workspace_slots(server, first, workspace, second, workspace, &exchange);
+    --server->reflow_held;
+    int a = output_slot(server, first->name), b = output_slot(server, second->name);
+    int current = server->output_workspaces[a].current, previous = server->output_workspaces[a].previous;
+    server->output_workspaces[a].current = server->output_workspaces[b].current;
+    server->output_workspaces[a].previous = server->output_workspaces[b].previous;
+    server->output_workspaces[b].current = current;
+    server->output_workspaces[b].previous = previous;
+    finish_exchange(server, first, second, &exchange);
+    wlr_log(WLR_INFO, "Workspaces of %s and %s swapped", first->name, second->name);
+    free(exchange.windows);
+    free(exchange.x);
+    free(exchange.y);
+}
+
 /* Tiles of an output disabled in the config join the tiling of the output they are nearest
  * now, or float there if it does not tile; windows that floated only because their output did
  * not tile join the tiling of one that does. Tiles of an unplugged output wait for it:
@@ -3648,6 +7298,9 @@ static void set_tiling(struct sh_server *server, struct wlr_output *output, bool
     server->output_workspaces[output_slot(server, output->name)].tiling = enabled;
     // Most recently focused first, so the focused window gets the largest tile. Tiles of an
     // unplugged output are left waiting for it.
+    // Placing every window after each one joins or leaves would take time quadratic in the
+    // number of windows; the reflow after the loop places them once.
+    ++server->reflow_held;
     struct sh_toplevel *toplevel;
     wl_list_for_each(toplevel, &server->toplevels, link) {
         if (toplevel->tiled ? tiled_output(toplevel) != output : home_output(toplevel) != output)
@@ -3659,7 +7312,10 @@ static void set_tiling(struct sh_server *server, struct wlr_output *output, bool
         else if (!enabled && toplevel->arranged && toplevel->arrangement == SH_NONE)
             restore_toplevel(toplevel); // left the tiling while minimized
     }
+    --server->reflow_held;
     reflow_output(server, output); // maximized windows gain or lose their border
+    // Floating windows, which no reflow touches, gain or lose their rounded corners.
+    wl_list_for_each(toplevel, &server->toplevels, link) refresh_frame(toplevel);
     wlr_log(WLR_INFO, "Tiling %s on %s", enabled ? "on" : "off", output->name);
     notify_subscribers(server);
 }
@@ -3787,7 +7443,29 @@ static void move_window(struct sh_server *server, enum sh_action action) {
     if (!output)
         return;
     if (toplevel->tiled) {
-        struct sh_toplevel *neighbour = toplevel_toward(toplevel, horizontal, sign, true);
+        bool strip = toplevel_layout(toplevel) == SH_LAYOUT_SCROLL;
+        if (strip && horizontal) {
+            // Moves the whole column along the strip; from its end, on to the next output.
+            if (sh_tiling_scroll_move(server->tiling, toplevel, sign)) {
+                sh_tiling_set_focus(server->tiling, toplevel);
+                reflow_output(server, output);
+                pointer_follow(toplevel);
+                return;
+            }
+        }
+        bool monocle = toplevel_layout(toplevel) == SH_LAYOUT_MONOCLE;
+        struct sh_toplevel *neighbour =
+            strip ? (horizontal ? NULL
+                                : sh_tiling_scroll_step(server->tiling, toplevel, 0, sign))
+                  : monocle ? sh_tiling_neighbour(server->tiling, toplevel, sign)
+                            : toplevel_toward(toplevel, horizontal, sign, true);
+        if (neighbour && toplevel_layout(toplevel) != SH_LAYOUT_DWINDLE) {
+            // Outside dwindle, tiles keep their places in the list: trade with the neighbour.
+            sh_tiling_swap(server->tiling, toplevel, neighbour);
+            reflow_output(server, output);
+            pointer_follow(toplevel);
+            return;
+        }
         if (neighbour) {
             move_tile(toplevel, neighbour, output, horizontal, sign);
             pointer_follow(toplevel);
@@ -3875,7 +7553,49 @@ static void resize_window(struct sh_server *server, enum sh_action action, int a
 
 /* A reload applies tiling settings that changed in the config; outputs toggled since keep
  * their state while the config for them stays the same. */
+static void configure_layouts(struct sh_server *server) {
+    const struct sh_settings *settings = server_settings(server);
+    sh_tiling_set_defaults(server->tiling, (enum sh_tile_layout)settings->tile_layout,
+                           settings->master_ratio, settings->master_count);
+    sh_tiling_set_scroll(server->tiling, (enum sh_scroll_follow)settings->scroll_follow,
+                         settings->scroll_width, settings->scroll_step, settings->scroll_presets,
+                         settings->scroll_preset_count);
+}
+
+/* layout.outputs for one output: the entry by connector name wins over one by description. */
+static void apply_output_layout(struct sh_server *server, const struct wlr_output *output) {
+    const struct sh_settings *settings = server_settings(server);
+    const struct sh_output_layout *found = NULL;
+    for (int i = 0; i < settings->output_layout_count; ++i) {
+        const struct sh_output_layout *entry = &settings->output_layouts[i];
+        if (!output_key_matches(entry->name, output))
+            continue;
+        if (strncmp(entry->name, "desc:", 5) != 0) {
+            found = entry;
+            break;
+        }
+        found = found ? found : entry;
+    }
+    if (found)
+        sh_tiling_set_output_defaults(server->tiling, output->name, found->tile_layout,
+                                      found->master_ratio, found->master_count);
+    else
+        sh_tiling_set_output_defaults(server->tiling, output->name, -1, 0, 0);
+}
+
+/* Gives every connected output its layout.outputs defaults; the caller reflows. */
+static void apply_output_layouts(struct sh_server *server) {
+    struct wl_list *lists[] = {&server->outputs, &server->disabled_outputs};
+    for (size_t i = 0; i < 2; ++i) {
+        struct sh_output *output;
+        wl_list_for_each(output, lists[i], link) apply_output_layout(server, output->wlr_output);
+    }
+}
+
 static void reconfigure_tiling(struct sh_server *server) {
+    configure_layouts(server);
+    sh_tiling_clear_output_defaults(server->tiling);
+    apply_output_layouts(server);
     struct sh_output *output;
     wl_list_for_each(output, &server->outputs, link) {
         int slot = output_slot(server, output->wlr_output->name);
@@ -3947,6 +7667,8 @@ static void toplevel_title_changed(struct wl_listener *listener, void *data) {
         wlr_foreign_toplevel_handle_v1_set_title(toplevel->foreign, title ? title : "Untitled");
     update_listed_state(toplevel);
     refresh_frame(toplevel); // opacity rules may match the title
+    if (toplevel->urgent)
+        notify_subscribers(toplevel->server); // the shell finds the window by its title
 }
 static void toplevel_app_id_changed(struct wl_listener *listener, void *data) {
     struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, app_id_changed);
@@ -3954,6 +7676,8 @@ static void toplevel_app_id_changed(struct wl_listener *listener, void *data) {
     if (toplevel->foreign)
         wlr_foreign_toplevel_handle_v1_set_app_id(toplevel->foreign, app_id ? app_id : "");
     update_listed_state(toplevel);
+    if (toplevel->urgent)
+        notify_subscribers(toplevel->server);
 }
 static void list_toplevel(struct sh_toplevel *toplevel) {
     struct sh_server *server = toplevel->server;
@@ -4234,6 +7958,57 @@ static void leave_fullscreen_for(struct sh_toplevel *toplevel, struct wlr_output
     }
 }
 
+static int64_t monotonic_ms(void) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+}
+
+/* A window a session restore launched takes over the saved window's place as its rule: the
+ * output, workspace, floating place and state it had. Returns whether one matched. */
+static bool session_claim(struct sh_server *server, struct sh_toplevel *toplevel,
+                          struct sh_window_rule *rule, bool ruled) {
+    const char *app_id = toplevel_app_id(toplevel);
+    int64_t now = monotonic_ms();
+    for (size_t i = 0; i < sizeof(server->session_pending) / sizeof(*server->session_pending);
+         ++i) {
+        if (server->session_pending[i].used && server->session_pending[i].deadline < now)
+            server->session_pending[i].used = false;
+    }
+    for (size_t i = 0; i < sizeof(server->session_pending) / sizeof(*server->session_pending);
+         ++i) {
+        if (!server->session_pending[i].used ||
+            strcmp(server->session_pending[i].window.app_id, app_id ? app_id : ""))
+            continue;
+        const struct sh_session_window *saved = &server->session_pending[i].window;
+        server->session_pending[i].used = false;
+        if (!ruled)
+            memset(rule, 0, sizeof(*rule)), rule->floating = -1;
+        snprintf(rule->output, sizeof(rule->output), "%s", saved->output);
+        rule->workspace = saved->workspace + 1;
+        rule->floating = saved->flags & SH_SESSION_TILED ? 0 : saved->flags & SH_SESSION_FLOATING ? 1 : -1;
+        rule->fullscreen = saved->flags & SH_SESSION_FULLSCREEN;
+        rule->maximize = saved->flags & SH_SESSION_MAXIMIZED;
+        rule->sticky = saved->flags & SH_SESSION_STICKY;
+        rule->no_focus = !(saved->flags & SH_SESSION_FOCUSED);
+        rule->width = rule->height = 0;
+        rule->position = SH_RULE_POSITION_UNSET;
+        struct wlr_output *output = find_output(server, saved->output);
+        if (output && saved->width > 0 && saved->height > 0) {
+            struct sh_rect area = usable_area(server, output);
+            rule->width = saved->width;
+            rule->height = saved->height;
+            rule->position = SH_RULE_POSITION_AT;
+            rule->x = saved->x - area.x;
+            rule->y = saved->y - area.y;
+        }
+        return true;
+    }
+    return ruled;
+}
+
+#define SH_PLACE_OTHERS 32
+
 static void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool maximized) {
     struct sh_server *server = toplevel->server;
     int offset = 40 + 32 * (wl_list_length(&toplevel->server->toplevels) % 8);
@@ -4243,6 +8018,7 @@ static void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool max
     int width = geometry.width, height = geometry.height;
     struct sh_window_rule rule;
     bool ruled = window_rule(toplevel, &rule);
+    ruled = session_claim(server, toplevel, &rule, ruled);
     struct wlr_output *output = new_window_output(toplevel);
     if (ruled && rule.output[0]) {
         struct wlr_output *named = rule_output(server, rule.output);
@@ -4278,6 +8054,27 @@ static void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool max
             height = rule.height < area.height ? rule.height : area.height;
             resize = true;
         }
+        // Where the windows already there leave room, unless a rule names the place.
+        if (!(ruled && rule.position != SH_RULE_POSITION_UNSET) && width > 0 && height > 0) {
+            struct sh_rect others[SH_PLACE_OTHERS], place;
+            int count = 0, cascade = 0;
+            struct sh_toplevel *other;
+            wl_list_for_each(other, &server->toplevels, link) {
+                ++cascade;
+                if (count < SH_PLACE_OTHERS && toplevel_mapped(other) && toplevel_visible(other) &&
+                    !other->fullscreen && toplevel_output(other) == output &&
+                    other->workspace == toplevel->workspace) {
+                    struct wlr_box box = toplevel_box(other);
+                    others[count++] = (struct sh_rect){box.x, box.y, box.width, box.height};
+                }
+            }
+            if (sh_place_window(server_settings(server)->placement, (struct sh_rect){area.x, area.y,
+                                area.width, area.height}, others, count, width, height, cascade,
+                                &place)) {
+                x = place.x;
+                y = place.y;
+            }
+        }
         if (ruled && rule.position == SH_RULE_POSITION_CENTER) {
             x = area.x + (area.width - width) / 2;
             y = area.y + (area.height - height) / 2;
@@ -4299,6 +8096,16 @@ static void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool max
     // Sticky floats it on the current workspace of its output, whatever `workspace` says.
     if (ruled && rule.sticky && server_settings(server)->sticky)
         set_sticky(toplevel, true, false);
+    // A window started from a terminal takes its place, unless a rule puts it elsewhere.
+    struct sh_toplevel *terminal = NULL;
+    if (swallow_wanted(toplevel) &&
+        !(ruled && (rule.floating == 1 || rule.workspace || rule.output[0] || rule.sticky))) {
+        terminal = swallow_host(toplevel, true);
+        if (terminal) {
+            set_toplevel_output(toplevel, find_output(server, terminal->output));
+            toplevel->workspace = terminal->workspace;
+        }
+    }
     // A window a rule sends to another workspace, or opens without focus, stays out of the way.
     bool visible = toplevel_visible(toplevel);
     bool focus = visible && !(ruled && rule.no_focus);
@@ -4309,7 +8116,21 @@ static void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool max
         leave_fullscreen_for(toplevel, output);
     struct sh_toplevel *target = NULL;
     struct wlr_output *tile_output = visible ? new_tile_split(toplevel, output, &target) : output;
-    if (wants_tiling(toplevel, tile_output)) {
+    // Opening while a group has focus adds a tab to it, taking the group's slot.
+    struct sh_toplevel *host = server->focused_toplevel;
+    bool joins = visible && !terminal && host && host != toplevel && host->group && groupable(host) &&
+                 groups_enabled(server) && server_settings(server)->group_join_new &&
+                 !fullscreen && !toplevel_is_dialog(toplevel) && !toplevel->sticky &&
+                 !(ruled && (rule.floating == 1 || rule.workspace || rule.output[0])) &&
+                 host->workspace == toplevel->workspace && !strcmp(host->output, toplevel->output);
+    if (terminal) {
+        swallow_attach(terminal, toplevel);
+    } else if (joins) {
+        toplevel->group_hidden = true;
+        group_join(toplevel, host->group);
+        toplevel->floating = host->floating;
+        group_show(toplevel);
+    } else if (wants_tiling(toplevel, tile_output)) {
         tile_toplevel(toplevel, tile_output, target, visible);
     } else if (toplevel->tile_sized) {
         toplevel->tile_sized = false; // It floats after all: let the client choose its size.
@@ -4326,6 +8147,16 @@ static void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool max
         place_by_hand(toplevel, SH_MAXIMIZE);
     else if (maximized)
         maximize_toplevel(toplevel, true);
+#if WLR_HAS_XWAYLAND
+    // An X11 client may have asked for attention before it mapped; if it opens without focus,
+    // that request stands (the policy is applied as if it had come after).
+    if (!focus && toplevel->xsurface) {
+        const xcb_icccm_wm_hints_t *hints = toplevel->xsurface->hints;
+        toplevel->x_hint_urgent = hints && (hints->flags & XCB_ICCCM_WM_HINT_X_URGENCY);
+        if (toplevel->x_hint_urgent || toplevel->xsurface->demands_attention)
+            activation_requested(toplevel);
+    }
+#endif
     // The first frame is already committed and shows at once, only faded and a little small.
     toplevel->shown = true;
     struct wlr_box box = toplevel_geometry(toplevel);
@@ -4336,6 +8167,7 @@ static void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool max
 
 static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
     struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, map);
+    toplevel->fullscreen_cover = toplevel->xdg_toplevel->requested.fullscreen;
     map_toplevel(toplevel, toplevel->xdg_toplevel->requested.fullscreen,
                  toplevel->xdg_toplevel->requested.maximized);
 }
@@ -4350,14 +8182,18 @@ static void unmap_toplevel(struct sh_toplevel *toplevel) {
     }
     sh_anim_finish(&toplevel->anim);
     toplevel->shown = false;
+    swallow_end(toplevel);
     if (toplevel == toplevel->server->grabbed_toplevel) {
         reset_cursor_mode(toplevel->server);
     }
     forget_decoration(toplevel);
+    group_detach(toplevel);
 
     switcher_forget(toplevel);
-    toplevel->fullscreen = false;
+    overview_forget(toplevel);
+    toplevel->fullscreen = toplevel->fullscreen_cover = false;
     toplevel->scratchpad = false;
+    toplevel->urgent = false;
     refresh_frame(toplevel);
     untile_toplevel(toplevel, false);
     bool was_focused = toplevel->server->focused_toplevel == toplevel;
@@ -4388,13 +8224,19 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
             wlr_xdg_toplevel_decoration_v1_set_mode(toplevel->decoration,
                                                     decoration_mode(toplevel->decoration));
     } else if (toplevel->xdg_toplevel->base->surface->mapped) {
+        uint64_t started = now_ns();
         refresh_frame(toplevel);
+        ++toplevel->server->stats.commits;
+        toplevel->server->stats.commit_ns += now_ns() - started;
     }
 }
 
 /* Frees a window after removing the listeners xdg-shell and X11 windows have in common. */
 static void free_toplevel(struct sh_toplevel *toplevel) {
     sh_anim_finish(&toplevel->anim);
+    sh_tween_stop(&toplevel->fade);
+    free(toplevel->opacity_rule.app_id);
+    free(toplevel->opacity_rule.title);
     wl_list_remove(&toplevel->destroy.link);
     wl_list_remove(&toplevel->request_move.link);
     wl_list_remove(&toplevel->request_resize.link);
@@ -4408,6 +8250,7 @@ static void free_toplevel(struct sh_toplevel *toplevel) {
 
 static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
     struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, destroy);
+    overview_forget(toplevel);
     // The decoration outlives this listener: it hears the same signal later.
     if (toplevel->decoration) {
         wl_list_remove(&toplevel->decoration_mode.link);
@@ -4525,14 +8368,11 @@ static void xdg_toplevel_request_maximize(struct wl_listener *listener, void *da
     wlr_xdg_surface_schedule_configure(toplevel->xdg_toplevel->base);
 }
 
-/* Fullscreen covers the whole output, including exclusive panel zones. */
 static void fit_fullscreen(struct sh_toplevel *toplevel) {
     struct wlr_output *output = toplevel_output(toplevel);
     if (!output)
         return;
-    struct wlr_box box;
-    wlr_output_layout_get_box(toplevel->server->output_layout, output, &box);
-    toplevel_configure_box(toplevel, box);
+    toplevel_configure_box(toplevel, fullscreen_box(toplevel, output));
 }
 
 static void refit_fullscreen(struct sh_server *server) {
@@ -4555,9 +8395,13 @@ static void set_fullscreen_focus(struct sh_toplevel *toplevel, bool fullscreen, 
     }
     if (server->grabbed_toplevel == toplevel)
         reset_cursor_mode(server);
+    struct wlr_scene_node *node = &toplevel->scene_tree->node;
+    int from_x = node->x, from_y = node->y;
     if (fullscreen)
         toplevel->fullscreen_restore = toplevel_box(toplevel);
     toplevel->fullscreen = fullscreen;
+    if (!fullscreen)
+        toplevel->fullscreen_cover = false;
     toplevel_set_fullscreen_state(toplevel, fullscreen);
     if (toplevel->foreign)
         wlr_foreign_toplevel_handle_v1_set_fullscreen(toplevel->foreign, fullscreen);
@@ -4574,15 +8418,26 @@ static void set_fullscreen_focus(struct sh_toplevel *toplevel, bool fullscreen, 
         if ((toplevel->arranged || toplevel->tiled) && output)
             reflow_output(server, output);
     }
+    // The window glides from where it was drawn; the size follows when the client draws it.
+    if (toplevel->shown && toplevel_visible(toplevel))
+        sh_anim_glide_kind(server->animator, &toplevel->anim, toplevel->content,
+                           from_x - node->x, from_y - node->y, SH_ANIM_FULLSCREEN);
     if (server->focused_toplevel == toplevel || (fullscreen && focus))
         focus_toplevel(toplevel);
     refresh_decoration(toplevel);
     refresh_frame(toplevel);
 }
 
+/* Fullscreen the client asks for itself, like a video player's: it covers the panels too. */
+static void set_client_fullscreen(struct sh_toplevel *toplevel, bool fullscreen) {
+    if (fullscreen && !toplevel->fullscreen)
+        toplevel->fullscreen_cover = true;
+    set_fullscreen(toplevel, fullscreen);
+}
+
 static void xdg_toplevel_request_fullscreen(struct wl_listener *listener, void *data) {
     struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, request_fullscreen);
-    set_fullscreen(toplevel, toplevel->xdg_toplevel->requested.fullscreen);
+    set_client_fullscreen(toplevel, toplevel->xdg_toplevel->requested.fullscreen);
 }
 
 static void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
@@ -4673,6 +8528,7 @@ static void xwayland_map(struct wl_listener *listener, void *data) {
         if (toplevel->scene_tree)
             wlr_scene_node_destroy(&toplevel->scene_tree->node);
         toplevel->scene_tree = toplevel->content = NULL;
+        toplevel->dim = NULL;
         return;
     }
     if (toplevel->unmanaged) {
@@ -4683,6 +8539,7 @@ static void xwayland_map(struct wl_listener *listener, void *data) {
     }
     toplevel->scene_tree->node.data = &toplevel->node;
     toplevel->content->node.data = &toplevel->node;
+    toplevel->fullscreen_cover = xsurface->fullscreen;
     map_toplevel(toplevel, xsurface->fullscreen,
                  xsurface->maximized_horz && xsurface->maximized_vert);
     refresh_decoration(toplevel);
@@ -4707,6 +8564,7 @@ static void xwayland_unmap(struct wl_listener *listener, void *data) {
     sh_anim_finish(&toplevel->anim);
     wlr_scene_node_destroy(&toplevel->scene_tree->node);
     toplevel->scene_tree = toplevel->content = NULL;
+    toplevel->dim = NULL;
 }
 
 static void xwayland_associate(struct wl_listener *listener, void *data) {
@@ -4741,6 +8599,8 @@ static void xwayland_destroy(struct wl_listener *listener, void *data) {
     wl_list_remove(&toplevel->x_activate.link);
     wl_list_remove(&toplevel->x_geometry.link);
     wl_list_remove(&toplevel->x_decorations.link);
+    wl_list_remove(&toplevel->x_attention.link);
+    wl_list_remove(&toplevel->x_hints.link);
     free_toplevel(toplevel);
 }
 
@@ -4785,7 +8645,33 @@ static void xwayland_set_geometry(struct wl_listener *listener, void *data) {
 static void xwayland_request_activate(struct wl_listener *listener, void *data) {
     struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, x_activate);
     if (xwayland_managed(toplevel))
-        focus_toplevel(toplevel);
+        activation_requested(toplevel);
+}
+
+/* _NET_WM_STATE_DEMANDS_ATTENTION and the urgency flag of WM_HINTS ask for attention the way
+ * xdg-activation does; a client clears them (or the window is focused) when it is done. */
+static void xwayland_attention(struct sh_toplevel *toplevel, bool wanted) {
+    if (!xwayland_managed(toplevel))
+        return;
+    if (!wanted)
+        set_urgent(toplevel, false);
+    else if (toplevel->server->focused_toplevel != toplevel)
+        activation_requested(toplevel);
+}
+
+static void xwayland_demands_attention(struct wl_listener *listener, void *data) {
+    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, x_attention);
+    xwayland_attention(toplevel, toplevel->xsurface->demands_attention);
+}
+
+static void xwayland_set_hints(struct wl_listener *listener, void *data) {
+    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, x_hints);
+    const xcb_icccm_wm_hints_t *hints = toplevel->xsurface->hints;
+    bool urgent = hints && (hints->flags & XCB_ICCCM_WM_HINT_X_URGENCY);
+    if (urgent == toplevel->x_hint_urgent)
+        return;
+    toplevel->x_hint_urgent = urgent;
+    xwayland_attention(toplevel, urgent);
 }
 
 /* X11 grab requests carry no serial; accept them only while a button is held. */
@@ -4813,7 +8699,7 @@ static void xwayland_request_maximize(struct wl_listener *listener, void *data) 
 static void xwayland_request_fullscreen(struct wl_listener *listener, void *data) {
     struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, request_fullscreen);
     if (xwayland_managed(toplevel))
-        set_fullscreen(toplevel, toplevel->xsurface->fullscreen);
+        set_client_fullscreen(toplevel, toplevel->xsurface->fullscreen);
 }
 
 static void xwayland_request_minimize(struct wl_listener *listener, void *data) {
@@ -4849,6 +8735,9 @@ static void server_new_xwayland_surface(struct wl_listener *listener, void *data
     add_listener(&xsurface->events.set_geometry, &toplevel->x_geometry, xwayland_set_geometry);
     add_listener(&xsurface->events.set_decorations, &toplevel->x_decorations,
                  xwayland_set_decorations);
+    add_listener(&xsurface->events.request_demands_attention, &toplevel->x_attention,
+                 xwayland_demands_attention);
+    add_listener(&xsurface->events.set_hints, &toplevel->x_hints, xwayland_set_hints);
     add_listener(&xsurface->events.set_title, &toplevel->title_changed, toplevel_title_changed);
     add_listener(&xsurface->events.set_class, &toplevel->app_id_changed, toplevel_app_id_changed);
     add_listener(&xsurface->events.request_move, &toplevel->request_move, xwayland_request_move);
@@ -5060,28 +8949,52 @@ static void control_reply(int fd, const char *text) {
     }
 }
 
+/* workspace, focused, minimized, tiled, x, y, width, height, app_id, title, output,
+ * visible, scratchpad, sticky, group (0 for none) — one line. A window hidden in the
+ * scratchpad is minimized. */
+static void control_describe_window(struct sh_server *server, int fd,
+                                    struct sh_toplevel *toplevel) {
+    char line[1024], app_id[256], title[512];
+    const char *raw_app_id = toplevel_app_id(toplevel), *raw_title = toplevel_title(toplevel);
+    snprintf(app_id, sizeof(app_id), "%s", raw_app_id ? raw_app_id : "");
+    snprintf(title, sizeof(title), "%s", raw_title ? raw_title : "");
+    // Neither can break the columns.
+    for (char *c = app_id; *c; ++c)
+        *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
+    for (char *c = title; *c; ++c)
+        *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
+    struct wlr_box geometry = toplevel_geometry(toplevel);
+    snprintf(line, sizeof(line), "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%s\t%s\t%s\t%d\t%d\t%d\t%u\n",
+             toplevel->workspace + 1, server->focused_toplevel == toplevel, toplevel->minimized,
+             toplevel->tiled, toplevel->scene_tree->node.x, toplevel->scene_tree->node.y,
+             geometry.width, geometry.height, app_id, title, toplevel->output,
+             toplevel_visible(toplevel), toplevel->scratchpad, toplevel->sticky,
+             toplevel->group);
+    control_reply(fd, line);
+}
+
 static void control_describe_windows(struct sh_server *server, int fd) {
     control_reply(fd, "ok\n");
     struct sh_toplevel *toplevel;
-    // workspace, focused, minimized, tiled, x, y, width, height, app_id, title, output,
-    // visible, scratchpad, sticky — one per line. A window hidden in the scratchpad is minimized.
-    wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
-        char line[1024], app_id[256], title[512];
-        const char *raw_app_id = toplevel_app_id(toplevel), *raw_title = toplevel_title(toplevel);
-        snprintf(app_id, sizeof(app_id), "%s", raw_app_id ? raw_app_id : "");
-        snprintf(title, sizeof(title), "%s", raw_title ? raw_title : "");
-        // Neither can break the columns.
-        for (char *c = app_id; *c; ++c)
-            *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
-        for (char *c = title; *c; ++c)
-            *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
-        struct wlr_box geometry = toplevel_geometry(toplevel);
-        snprintf(line, sizeof(line), "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%s\t%s\t%s\t%d\t%d\t%d\n",
-                 toplevel->workspace + 1, server->focused_toplevel == toplevel, toplevel->minimized,
-                 toplevel->tiled, toplevel->scene_tree->node.x, toplevel->scene_tree->node.y,
-                 geometry.width, geometry.height, app_id, title, toplevel->output,
-                 toplevel_visible(toplevel), toplevel->scratchpad, toplevel->sticky);
-        control_reply(fd, line);
+    wl_list_for_each_reverse(toplevel, &server->toplevels, link)
+        control_describe_window(server, fd, toplevel);
+}
+
+/* The urgent windows in the columns of `get windows`, the one that has waited longest first. */
+static void control_describe_urgent(struct sh_server *server, int fd) {
+    control_reply(fd, "ok\n");
+    unsigned last = 0;
+    for (;;) {
+        struct sh_toplevel *toplevel, *next = NULL;
+        wl_list_for_each(toplevel, &server->toplevels, link) {
+            if (toplevel->urgent && toplevel->urgent_order > last &&
+                (!next || toplevel->urgent_order < next->urgent_order))
+                next = toplevel;
+        }
+        if (!next)
+            return;
+        last = next->urgent_order;
+        control_describe_window(server, fd, next);
     }
 }
 
@@ -5144,6 +9057,560 @@ static void control_describe_output(struct sh_server *server, int fd, struct sh_
     control_reply(fd, line);
 }
 
+/* Sessions: `session save NAME` writes what every output and window is doing to a file (see
+ * shaode/session.h); `session restore NAME [launch]` puts matching windows back, and with
+ * `launch` starts the applications that are missing, placing their windows as they open. */
+static pid_t toplevel_pid(struct sh_toplevel *toplevel) {
+#if WLR_HAS_XWAYLAND
+    if (toplevel->xsurface)
+        return toplevel->xsurface->pid;
+#endif
+    pid_t pid = 0;
+    wl_client_get_credentials(wl_resource_get_client(toplevel->xdg_toplevel->resource), &pid,
+                              NULL, NULL);
+    return pid;
+}
+
+static void session_read_command(struct sh_toplevel *toplevel, struct sh_session_window *window) {
+    pid_t pid = toplevel_pid(toplevel);
+    window->command[0] = '\0';
+    if (pid <= 1 || pid == getpid())
+        return;
+    char path[64], cmdline[4096];
+    snprintf(path, sizeof(path), "/proc/%d/cmdline", (int)pid);
+    FILE *file = fopen(path, "r");
+    if (!file)
+        return;
+    size_t length = fread(cmdline, 1, sizeof(cmdline), file);
+    fclose(file);
+    if (length < sizeof(cmdline))
+        sh_session_set_command(window, cmdline, length);
+}
+
+static void session_capture(struct sh_server *server, struct sh_session *session) {
+    const struct sh_settings *settings = server_settings(server);
+    memset(session, 0, sizeof(*session));
+    for (size_t i = 0; i < sizeof(server->output_workspaces) / sizeof(*server->output_workspaces) &&
+                       session->output_count < SH_SESSION_MAX_OUTPUTS;
+         ++i) {
+        const char *name = server->output_workspaces[i].name;
+        if (!name[0])
+            continue;
+        struct sh_session_output *o = &session->outputs[session->output_count++];
+        snprintf(o->name, sizeof(o->name), "%s", name);
+        o->workspace = server->output_workspaces[i].current;
+        struct wlr_output *output = find_output(server, name);
+        o->tiling = output ? output_tiles(server, output) : server->output_workspaces[i].tiling;
+        for (int workspace = 0; workspace < settings->workspaces &&
+                                session->layout_count < SH_SESSION_MAX_LAYOUTS;
+             ++workspace) {
+            enum sh_tile_layout layout = sh_tiling_layout(server->tiling, name, workspace);
+            double ratio = sh_tiling_ratio(server->tiling, name, workspace);
+            int count = sh_tiling_master_count(server->tiling, name, workspace);
+            enum sh_tile_layout default_layout;
+            double default_ratio;
+            int default_count;
+            sh_tiling_output_defaults(server->tiling, name, &default_layout, &default_ratio,
+                                      &default_count);
+            double widths[SH_SESSION_MAX_COLUMNS];
+            int width_count = sh_tiling_scroll_widths(server->tiling, name, workspace, widths,
+                                                      SH_SESSION_MAX_COLUMNS);
+            if (layout == default_layout && fabs(ratio - default_ratio) < 0.0001 &&
+                count == default_count && width_count == 0)
+                continue;
+            struct sh_session_layout *l = &session->layouts[session->layout_count++];
+            memcpy(l->widths, widths, sizeof(double) * (size_t)width_count);
+            l->width_count = width_count;
+            snprintf(l->output, sizeof(l->output), "%s", name);
+            l->workspace = workspace;
+            l->layout = layout;
+            l->ratio = ratio;
+            l->master_count = count;
+        }
+    }
+    // Oldest first, so that restoring in this order ends with the newest on top.
+    struct sh_toplevel *toplevel;
+    wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
+#if WLR_HAS_XWAYLAND
+        if (toplevel->unmanaged)
+            continue;
+#endif
+        if (!toplevel_mapped(toplevel) || toplevel->group_hidden || toplevel->swallowed || session->window_count >= SH_SESSION_MAX_WINDOWS)
+            continue;
+        struct sh_session_window *w = &session->windows[session->window_count++];
+        const char *app_id = toplevel_app_id(toplevel), *title = toplevel_title(toplevel);
+        snprintf(w->output, sizeof(w->output), "%s", toplevel->output);
+        w->workspace = toplevel->workspace;
+        w->flags = (toplevel->tiled ? SH_SESSION_TILED : 0) |
+                   (toplevel->floating ? SH_SESSION_FLOATING : 0) |
+                   (toplevel->minimized && !toplevel->scratchpad ? SH_SESSION_MINIMIZED : 0) |
+                   (toplevel->sticky ? SH_SESSION_STICKY : 0) |
+                   (toplevel->fullscreen ? SH_SESSION_FULLSCREEN : 0) |
+                   (toplevel->arranged && toplevel->arrangement == SH_MAXIMIZE && !toplevel->tiled
+                        ? SH_SESSION_MAXIMIZED
+                        : 0) |
+                   (toplevel->scratchpad ? SH_SESSION_SCRATCHPAD : 0) |
+                   (server->focused_toplevel == toplevel ? SH_SESSION_FOCUSED : 0);
+        // A tile is saved with the place it floats at; a window that has none floats on its tile.
+        struct wlr_box box = toplevel_box(toplevel);
+        if (toplevel->tiled && toplevel->restore_box.width > 0 && toplevel->restore_box.height > 0)
+            box = toplevel->restore_box;
+        else if (toplevel->fullscreen && toplevel->fullscreen_restore.width > 0)
+            box = toplevel->fullscreen_restore;
+        else if (toplevel->arranged && toplevel->restore_box.width > 0 &&
+                 toplevel->restore_box.height > 0 && !toplevel->tiled)
+            box = toplevel->restore_box;
+        w->x = box.x, w->y = box.y, w->width = box.width, w->height = box.height;
+        snprintf(w->app_id, sizeof(w->app_id), "%s", app_id ? app_id : "");
+        snprintf(w->title, sizeof(w->title), "%s", title ? title : "");
+        session_read_command(toplevel, w);
+        int row = 0, column = toplevel->tiled ? sh_tiling_scroll_column(server->tiling, toplevel, &row) : -1;
+        if (column >= 0) {
+            w->scroll_column = column + 1;
+            w->scroll_row = row + 1;
+        }
+    }
+}
+
+static bool make_directories(char *path) {
+    for (char *c = path + 1; *c; ++c) {
+        if (*c != '/')
+            continue;
+        *c = '\0';
+        int result = mkdir(path, 0700);
+        *c = '/';
+        if (result < 0 && errno != EEXIST)
+            return false;
+    }
+    return mkdir(path, 0700) == 0 || errno == EEXIST;
+}
+
+static bool session_save(struct sh_server *server, const char *name, int *windows, char *error,
+                         size_t error_size) {
+    char path[PATH_MAX], directory[PATH_MAX], temporary[PATH_MAX + 8];
+    if (!sh_session_valid_name(name)) {
+        snprintf(error, error_size, "a session name is letters, digits, '.', '_' and '-'");
+        return false;
+    }
+    if (!sh_session_path(NULL, directory, sizeof(directory)) ||
+        !sh_session_path(name, path, sizeof(path)) || !make_directories(directory)) {
+        snprintf(error, error_size, "cannot create the sessions directory");
+        return false;
+    }
+    struct sh_session *session = malloc(sizeof(*session));
+    if (!session) {
+        snprintf(error, error_size, "out of memory");
+        return false;
+    }
+    session_capture(server, session);
+    snprintf(temporary, sizeof(temporary), "%s.new", path);
+    FILE *file = fopen(temporary, "w");
+    bool ok = file && sh_session_write(session, file);
+    if (file && fclose(file) != 0)
+        ok = false;
+    if (ok && rename(temporary, path) != 0)
+        ok = false;
+    if (!ok) {
+        unlink(temporary);
+        snprintf(error, error_size, "cannot write %s: %s", path, strerror(errno));
+    }
+    *windows = session->window_count;
+    free(session);
+    return ok;
+}
+
+/* Runs a command with an ordinary signal mask (the compositor blocks signals for its event
+ * loop); the child is reaped with the others. */
+static bool session_spawn(char *const *argv) {
+    posix_spawnattr_t attributes;
+    if (posix_spawnattr_init(&attributes) != 0)
+        return false;
+    sigset_t mask;
+    sigemptyset(&mask);
+    posix_spawnattr_setsigmask(&attributes, &mask);
+    posix_spawnattr_setflags(&attributes, POSIX_SPAWN_SETSIGMASK);
+    pid_t pid;
+    extern char **environ;
+    int error = posix_spawnp(&pid, argv[0], NULL, &attributes, argv, environ);
+    posix_spawnattr_destroy(&attributes);
+    if (error)
+        wlr_log(WLR_ERROR, "Cannot launch %s: %s", argv[0], strerror(error));
+    return error == 0;
+}
+
+/* Puts a live window where the session had its match. */
+static void session_place(struct sh_server *server, struct sh_toplevel *toplevel,
+                          const struct sh_session_window *saved) {
+    const struct sh_settings *settings = server_settings(server);
+    struct wlr_output *output = find_output(server, saved->output);
+    if (!output)
+        output = home_output(toplevel);
+    if (!output)
+        return;
+    if (toplevel->fullscreen)
+        set_fullscreen(toplevel, false);
+    if (toplevel->sticky)
+        set_sticky(toplevel, false, false);
+    toplevel->scratchpad = false;
+    untile_toplevel(toplevel, false);
+    if (toplevel->arranged)
+        unarrange_in_place(toplevel);
+    toplevel->minimized = false;
+    set_toplevel_output(toplevel, output);
+    toplevel->workspace = saved->workspace < settings->workspaces ? saved->workspace
+                                                                   : settings->workspaces - 1;
+    toplevel->floating = (saved->flags & SH_SESSION_FLOATING) || toplevel_is_dialog(toplevel);
+    toplevel->placed = false;
+    if ((saved->flags & SH_SESSION_TILED) && !(saved->flags & SH_SESSION_FLOATING) &&
+        wants_tiling(toplevel, output)) {
+        // The place it floats at, if it is ever floated, is the saved one.
+        if (saved->width > 0 && saved->height > 0)
+            toplevel->restore_box = (struct wlr_box){saved->x, saved->y, saved->width, saved->height};
+        tile_toplevel(toplevel, output, NULL, false);
+    } else if (saved->width > 0 && saved->height > 0) {
+        struct wlr_box box = rebase_box(
+            server, (struct wlr_box){saved->x, saved->y, saved->width, saved->height}, output);
+        toplevel_set_states(toplevel, false, 0);
+        toplevel_configure_box(toplevel, box);
+    }
+    if (saved->flags & SH_SESSION_MAXIMIZED)
+        place_by_hand(toplevel, SH_MAXIMIZE);
+    if (saved->flags & SH_SESSION_STICKY && settings->sticky)
+        set_sticky(toplevel, true, false);
+    wlr_scene_node_set_enabled(&toplevel->scene_tree->node, toplevel_visible(toplevel));
+    if (saved->flags & SH_SESSION_SCRATCHPAD)
+        hide_in_scratchpad(toplevel);
+    else if (saved->flags & SH_SESSION_MINIMIZED)
+        minimize_toplevel(toplevel);
+    else if (saved->flags & SH_SESSION_FULLSCREEN)
+        set_fullscreen(toplevel, true);
+}
+
+/* Puts the tiles of the scrolling layout back into the columns they sat in, with the saved
+ * widths. Only windows found now are placed; the ones launched by the restore arrive later and
+ * open as usual, right of the focused column. */
+static void session_restore_columns(struct sh_server *server, const struct sh_session *session,
+                                    struct sh_toplevel *const *live, const int *assignment) {
+    const struct sh_settings *settings = server_settings(server);
+    for (int i = 0; i < session->layout_count; ++i) {
+        const struct sh_session_layout *l = &session->layouts[i];
+        struct wlr_output *output = find_output(server, l->output);
+        if (!output || l->workspace >= settings->workspaces || l->layout != SH_LAYOUT_SCROLL)
+            continue;
+        void *windows[SH_SESSION_MAX_WINDOWS];
+        int columns[SH_SESSION_MAX_WINDOWS], rows[SH_SESSION_MAX_WINDOWS], count = 0;
+        for (int j = 0; j < session->window_count; ++j) {
+            const struct sh_session_window *saved = &session->windows[j];
+            if (assignment[j] < 0 || saved->scroll_column < 1 || saved->workspace != l->workspace ||
+                strcmp(saved->output, l->output) != 0)
+                continue;
+            struct sh_toplevel *toplevel = live[assignment[j]];
+            if (!toplevel->tiled || strcmp(toplevel->output, output->name) != 0)
+                continue;
+            windows[count] = toplevel;
+            columns[count] = saved->scroll_column - 1;
+            rows[count++] = saved->scroll_row - 1;
+        }
+        if (count && sh_tiling_scroll_restore(server->tiling, output->name, l->workspace, windows,
+                                              columns, rows, count, l->widths, l->width_count))
+            reflow_output(server, output);
+    }
+}
+
+static bool session_restore(struct sh_server *server, const char *name, bool launch,
+                            int *restored, int *launched, int *missing, char *error,
+                            size_t error_size) {
+    char path[PATH_MAX];
+    if (!sh_session_path(name, path, sizeof(path))) {
+        snprintf(error, error_size, "a session name is letters, digits, '.', '_' and '-'");
+        return false;
+    }
+    FILE *file = fopen(path, "r");
+    if (!file) {
+        snprintf(error, error_size, "no session named %s", name);
+        return false;
+    }
+    struct sh_session *session = malloc(sizeof(*session));
+    bool ok = session && sh_session_read(session, file, error, error_size);
+    fclose(file);
+    if (!session) {
+        snprintf(error, error_size, "out of memory");
+        return false;
+    }
+    if (!ok) {
+        free(session);
+        return false;
+    }
+    const struct sh_settings *settings = server_settings(server);
+    for (int i = 0; i < session->output_count; ++i) {
+        struct wlr_output *output = find_output(server, session->outputs[i].name);
+        if (output && session->outputs[i].tiling >= 0)
+            set_tiling(server, output, session->outputs[i].tiling == 1);
+    }
+    for (int i = 0; i < session->layout_count; ++i) {
+        const struct sh_session_layout *l = &session->layouts[i];
+        struct wlr_output *output = find_output(server, l->output);
+        if (!output || l->workspace >= settings->workspaces || l->layout >= SH_LAYOUT_COUNT)
+            continue;
+        sh_tiling_set_layout(server->tiling, output->name, l->workspace,
+                             (enum sh_tile_layout)l->layout);
+        sh_tiling_adjust(server->tiling, output->name, l->workspace,
+                         l->ratio - sh_tiling_ratio(server->tiling, output->name, l->workspace),
+                         l->master_count -
+                             sh_tiling_master_count(server->tiling, output->name, l->workspace));
+        reflow_output(server, output);
+    }
+    struct sh_toplevel *live[SH_SESSION_MAX_WINDOWS * 2];
+    const char *live_app_ids[SH_SESSION_MAX_WINDOWS * 2], *live_titles[SH_SESSION_MAX_WINDOWS * 2];
+    int live_count = 0;
+    struct sh_toplevel *toplevel;
+    wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
+#if WLR_HAS_XWAYLAND
+        if (toplevel->unmanaged)
+            continue;
+#endif
+        if (!toplevel_mapped(toplevel) || live_count >= SH_SESSION_MAX_WINDOWS * 2)
+            continue;
+        const char *app_id = toplevel_app_id(toplevel), *title = toplevel_title(toplevel);
+        live[live_count] = toplevel;
+        live_app_ids[live_count] = app_id ? app_id : "";
+        live_titles[live_count++] = title ? title : "";
+    }
+    int assignment[SH_SESSION_MAX_WINDOWS];
+    sh_session_match(session->windows, session->window_count, live_app_ids, live_titles,
+                     live_count, assignment);
+    *restored = *launched = *missing = 0;
+    struct sh_toplevel *focus = NULL;
+    for (int i = 0; i < session->window_count; ++i) {
+        const struct sh_session_window *saved = &session->windows[i];
+        if (assignment[i] >= 0) {
+            session_place(server, live[assignment[i]], saved);
+            if (saved->flags & SH_SESSION_FOCUSED)
+                focus = live[assignment[i]];
+            ++*restored;
+            continue;
+        }
+        char **argv = launch ? sh_session_argv(saved->command) : NULL;
+        size_t slot = 0, slots = sizeof(server->session_pending) / sizeof(*server->session_pending);
+        int64_t now = monotonic_ms();
+        while (slot < slots && server->session_pending[slot].used &&
+               server->session_pending[slot].deadline >= now)
+            ++slot;
+        if (argv && slot < slots && session_spawn(argv)) {
+            server->session_pending[slot].window = *saved;
+            server->session_pending[slot].deadline = now + 30000;
+            server->session_pending[slot].used = true;
+            ++*launched;
+        } else {
+            ++*missing;
+        }
+        free(argv);
+    }
+    session_restore_columns(server, session, live, assignment);
+    for (int i = 0; i < session->output_count; ++i) {
+        struct wlr_output *output = find_output(server, session->outputs[i].name);
+        if (output && session->outputs[i].workspace < settings->workspaces)
+            switch_workspace(server, output, session->outputs[i].workspace);
+    }
+    if (focus && toplevel_visible(focus))
+        focus_toplevel(focus);
+    notify_subscribers(server);
+    free(session);
+    return true;
+}
+
+static int session_name_compare(const struct dirent **a, const struct dirent **b) {
+    return strcmp((*a)->d_name, (*b)->d_name);
+}
+static int session_name_filter(const struct dirent *entry) {
+    return sh_session_valid_name(entry->d_name);
+}
+
+static void control_session(struct sh_server *server, int fd, const char *arguments) {
+    char verb[16] = "", name[SH_SESSION_NAME_MAX + 8] = "", option[16] = "", extra[8] = "";
+    int count = sscanf(arguments, " %15s %71s %15s %7s", verb, name, option, extra);
+    char error[300] = "", reply[512];
+    if (!strcmp(verb, "list") && count == 1) {
+        char directory[PATH_MAX];
+        control_reply(fd, "ok\n");
+        struct dirent **entries = NULL;
+        int found = sh_session_path(NULL, directory, sizeof(directory))
+                        ? scandir(directory, &entries, session_name_filter, session_name_compare)
+                        : -1;
+        for (int i = 0; i < found; ++i) {
+            char path[PATH_MAX];
+            struct stat info;
+            sh_session_path(entries[i]->d_name, path, sizeof(path));
+            if (stat(path, &info) == 0 && S_ISREG(info.st_mode)) {
+                int windows = 0;
+                FILE *file = fopen(path, "r");
+                char line[8192];
+                while (file && fgets(line, sizeof(line), file))
+                    windows += !strncmp(line, "window\t", 7);
+                if (file)
+                    fclose(file);
+                snprintf(reply, sizeof(reply), "%s\t%d\t%lld\n", entries[i]->d_name, windows,
+                         (long long)info.st_mtime);
+                control_reply(fd, reply);
+            }
+            free(entries[i]);
+        }
+        free(entries);
+        return;
+    }
+    if (!strcmp(verb, "save") && count == 2) {
+        int windows = 0;
+        if (session_save(server, name, &windows, error, sizeof(error)))
+            snprintf(reply, sizeof(reply), "ok\nsaved %s: %d windows\n", name, windows);
+        else
+            snprintf(reply, sizeof(reply), "error: %s\n", error);
+        control_reply(fd, reply);
+        return;
+    }
+    if (!strcmp(verb, "restore") && (count == 2 || (count == 3 && !strcmp(option, "launch")))) {
+        int restored, launched, missing;
+        if (session_restore(server, name, count == 3, &restored, &launched, &missing, error,
+                            sizeof(error)))
+            snprintf(reply, sizeof(reply), "ok\nrestored %d, launched %d, not found %d\n",
+                     restored, launched, missing);
+        else
+            snprintf(reply, sizeof(reply), "error: %s\n", error);
+        control_reply(fd, reply);
+        return;
+    }
+    if (!strcmp(verb, "delete") && count == 2) {
+        char path[PATH_MAX];
+        if (!sh_session_path(name, path, sizeof(path)))
+            snprintf(reply, sizeof(reply), "error: a session name is letters, digits, '.', '_' and '-'\n");
+        else if (unlink(path) != 0)
+            snprintf(reply, sizeof(reply), "error: no session named %s\n", name);
+        else
+            snprintf(reply, sizeof(reply), "ok\n");
+        control_reply(fd, reply);
+        return;
+    }
+    control_reply(fd, "error: usage: session save NAME | restore NAME [launch] | list | delete NAME\n");
+}
+
+/* An output, enabled or not, by connector name. */
+static struct sh_output *sh_output_for_name(struct sh_server *server, const char *name) {
+    struct wl_list *lists[] = {&server->outputs, &server->disabled_outputs};
+    for (size_t i = 0; i < 2; ++i) {
+        struct sh_output *output;
+        wl_list_for_each(output, lists[i], link) {
+            if (!strcmp(output->wlr_output->name, name))
+                return output;
+        }
+    }
+    return NULL;
+}
+
+static void find_headless(struct wlr_backend *backend, void *data) {
+    struct wlr_backend **found = data;
+    if (wlr_backend_is_headless(backend))
+        *found = backend;
+}
+
+/* "headless_output add [NAME] [WIDTHxHEIGHT]" plugs in a virtual output, and "headless_output
+ * remove NAME" unplugs one, so tests can exercise hotplug without a display. Only under
+ * --headless. */
+static void control_headless_output(struct sh_server *server, int fd, const char *args) {
+    struct wlr_backend *headless = NULL;
+    if (wlr_backend_is_headless(server->backend))
+        headless = server->backend;
+    else if (wlr_backend_is_multi(server->backend))
+        wlr_multi_for_each_backend(server->backend, find_headless, &headless);
+    if (!headless) {
+        control_reply(fd, "error: headless_output needs --headless\n");
+        return;
+    }
+    char verb[16] = "", first[64] = "", second[64] = "";
+    int fields = sscanf(args, "%15s %63s %63s", verb, first, second);
+    if (!strcmp(verb, "add") && fields >= 1 && fields <= 3) {
+        unsigned width = 1280, height = 720;
+        char name[64] = "";
+        for (int i = 1; i < fields; ++i) {
+            const char *token = i == 1 ? first : second;
+            char extra;
+            if (sscanf(token, "%ux%u%c", &width, &height, &extra) == 2)
+                continue;
+            if (name[0]) {
+                control_reply(fd, "error: usage: headless_output add [NAME] [WIDTHxHEIGHT]\n");
+                return;
+            }
+            snprintf(name, sizeof(name), "%s", token);
+        }
+        if (!width || !height || width > 16384 || height > 16384) {
+            control_reply(fd, "error: bad size\n");
+            return;
+        }
+        if (name[0] && sh_output_for_name(server, name)) {
+            control_reply(fd, "error: an output with that name exists\n");
+            return;
+        }
+        snprintf(server->pending_output_name, sizeof(server->pending_output_name), "%s", name);
+        struct wlr_output *added = wlr_headless_add_output(headless, width, height);
+        server->pending_output_name[0] = '\0';
+        if (!added) {
+            control_reply(fd, "error: cannot add an output\n");
+            return;
+        }
+        char reply[96];
+        snprintf(reply, sizeof(reply), "ok\n%s\n", added->name);
+        control_reply(fd, reply);
+        return;
+    }
+    if (!strcmp(verb, "remove") && fields == 2) {
+        struct sh_output *output = sh_output_for_name(server, first);
+        if (!output) {
+            control_reply(fd, "error: no such output\n");
+            return;
+        }
+        wlr_output_destroy(output->wlr_output);
+        control_reply(fd, "ok\n");
+        return;
+    }
+    control_reply(fd, "error: usage: headless_output add [NAME] [WIDTHxHEIGHT] | remove NAME\n");
+}
+
+/* "osd TEXT [PERCENT]": shows the shell's on-screen display on the focused output. A last word
+ * that is a whole number from 0 to 100, with an optional %, is the level; the shell hears
+ * "osd OUTPUT PERCENT TEXT", the percent -1 for none. */
+static void control_osd(struct sh_server *server, int fd, const char *arguments) {
+    char text[512];
+    snprintf(text, sizeof(text), "%s", arguments);
+    for (char *c = text; *c; ++c)
+        if (*c == '\n' || *c == '\r' || *c == '\t')
+            *c = ' ';
+    size_t length = strlen(text);
+    while (length && text[length - 1] == ' ')
+        text[--length] = '\0';
+    char *start = text;
+    while (*start == ' ')
+        ++start;
+    if (!*start) {
+        control_reply(fd, "error: usage: osd TEXT [PERCENT]\n");
+        return;
+    }
+    int percent = -1;
+    char *last = strrchr(start, ' ');
+    if (last) {
+        char *end = NULL;
+        long value = strtol(last + 1, &end, 10);
+        if (end != last + 1 && (!*end || (!strcmp(end, "%"))) && value >= 0 && value <= 100) {
+            percent = (int)value;
+            while (last > start && last[-1] == ' ')
+                --last;
+            *last = '\0';
+        }
+    }
+    struct wlr_output *output = focused_output(server);
+    char line[640];
+    snprintf(line, sizeof(line), "osd %s %d %s\n", output ? output->name : "-", percent, start);
+    send_shell_line(server, line);
+    control_reply(fd, "ok\n");
+}
+
 static void control_handle(struct sh_server *server, int fd, const char *request) {
     if (!strcmp(request, "get outputs")) {
         control_reply(fd, "ok\n");
@@ -5177,21 +9644,202 @@ static void control_handle(struct sh_server *server, int fd, const char *request
         }
         return;
     }
+    if (!strncmp(request, "get layout", 10) && (!request[10] || request[10] == ' ')) {
+        // Layout, master ratio and master count of the focused output's current workspace, or
+        // of "get layout OUTPUT [WORKSPACE]" (from 1).
+        static const char *const names[] = {"dwindle", "master", "spiral", "monocle", "scroll"};
+        struct wlr_output *output = focused_output(server);
+        int workspace = output ? *output_workspace(server, output->name) : 0;
+        if (request[10]) {
+            char name[64];
+            int number = 0, fields = sscanf(request + 11, "%63s %d", name, &number);
+            output = fields >= 1 ? find_output(server, name) : NULL;
+            if (!output || (fields == 2 && (number < 1 || number > server_settings(server)->workspaces))) {
+                control_reply(fd, "error: usage: get layout [OUTPUT [WORKSPACE]]\n");
+                return;
+            }
+            workspace = fields == 2 ? number - 1 : *output_workspace(server, output->name);
+        }
+        char reply[96] = "ok\ndwindle\t0.55\t1\n";
+        if (output) {
+            snprintf(reply, sizeof(reply), "ok\n%s\t%.2f\t%d\n",
+                     names[sh_tiling_layout(server->tiling, output->name, workspace)],
+                     sh_tiling_ratio(server->tiling, output->name, workspace),
+                     sh_tiling_master_count(server->tiling, output->name, workspace));
+        }
+        control_reply(fd, reply);
+        return;
+    }
     if (!strcmp(request, "get tiling")) {
         control_reply(fd, output_tiles(server, focused_output(server)) ? "ok\non\n" : "ok\noff\n");
+        return;
+    }
+    if (!strcmp(request, "get urgent")) {
+        control_describe_urgent(server, fd);
         return;
     }
     if (!strcmp(request, "get windows")) {
         control_describe_windows(server, fd);
         return;
     }
+    if (!strcmp(request, "get swallow")) {
+        // Per window, oldest first: app_id, whether it is swallowed (hidden), and the app_id of
+        // the window it swallowed or was swallowed by ("-" for none).
+        control_reply(fd, "ok\n");
+        struct sh_toplevel *toplevel;
+        wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
+            char line[640];
+            const char *app_id = toplevel_app_id(toplevel);
+            const char *peer = toplevel->swallow_peer ? toplevel_app_id(toplevel->swallow_peer) : NULL;
+            snprintf(line, sizeof(line), "%s\t%d\t%d\t%s\n", app_id && *app_id ? app_id : "-",
+                     toplevel->swallowed, toplevel_visible(toplevel),
+                     toplevel->swallow_peer ? (peer && *peer ? peer : "?") : "-");
+            control_reply(fd, line);
+        }
+        return;
+    }
+    if (!strcmp(request, "get guides")) {
+        // The magnet guide lines (vertical, then horizontal): shown, x, y, width, height.
+        control_reply(fd, "ok\n");
+        for (int i = 0; i < 2; ++i) {
+            struct wlr_scene_rect *rect = server->guides[i];
+            char line[96];
+            snprintf(line, sizeof(line), "%d\t%d\t%d\t%d\t%d\n",
+                     rect && rect->node.enabled, rect ? rect->node.x : 0, rect ? rect->node.y : 0,
+                     rect ? rect->width : 0, rect ? rect->height : 0);
+            control_reply(fd, line);
+        }
+        return;
+    }
     if (!strcmp(request, "get animations")) {
         // Running animations, and the scene trees stacked for windows (with closing copies).
         char reply[64];
-        snprintf(reply, sizeof(reply), "ok\n%zu\t%d\n", sh_animator_running(server->animator),
+        snprintf(reply, sizeof(reply), "ok\n%zu\t%d\t%zu\n", sh_animator_running(server->animator),
                  wl_list_length(&server->windows->children) +
-                     wl_list_length(&server->fullscreen->children));
+                     wl_list_length(&server->fullscreen->children) +
+                     wl_list_length(&server->fullscreen_cover->children),
+                 sh_animator_tweens(server->animator));
         control_reply(fd, reply);
+        return;
+    }
+    if (!strcmp(request, "get stats")) {
+        // frames, their time and the worst (ns), window commits and their time (ns), placements.
+        const struct sh_stats *stats = &server->stats;
+        char reply[480];
+        snprintf(reply, sizeof(reply), "ok\n%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\n",
+                 (unsigned long long)stats->frames, (unsigned long long)stats->frame_ns,
+                 (unsigned long long)stats->frame_max_ns, (unsigned long long)stats->commits,
+                 (unsigned long long)stats->commit_ns, (unsigned long long)stats->configures,
+                 (unsigned long long)stats->opacity_rules, (unsigned long long)stats->motions,
+                 (unsigned long long)stats->motion_ns, (unsigned long long)stats->reflows,
+                 (unsigned long long)stats->reflow_ns);
+        control_reply(fd, reply);
+        return;
+    }
+    if (!strcmp(request, "get frame_times")) {
+        // Total frames so far, then the retained ones (oldest first) as "spent\tinterval" in us.
+        const struct sh_stats *stats = &server->stats;
+        size_t kept = stats->frames < SH_FRAME_RING ? stats->frames : SH_FRAME_RING;
+        char *reply = malloc(64 + kept * 24);
+        if (!reply) {
+            control_reply(fd, "error\nout of memory\n");
+            return;
+        }
+        int used = snprintf(reply, 64, "ok\n%llu\n", (unsigned long long)stats->frames);
+        for (size_t i = 0; i < kept; ++i) {
+            size_t slot = (stats->frames - kept + i) % SH_FRAME_RING;
+            used += snprintf(reply + used, 24, "%u\t%u\n", stats->frame_us[slot], stats->interval_us[slot]);
+        }
+        control_reply(fd, reply);
+        free(reply);
+        return;
+    }
+    if (!strcmp(request, "get dim")) {
+        // Per window, front to back: focused, how opaque its dimming is now, and where that is
+        // heading (both in thousandths), and whether a dimming node exists.
+        control_reply(fd, "ok\n");
+        int64_t now = now_ms();
+        struct sh_toplevel *toplevel;
+        wl_list_for_each(toplevel, &server->toplevels, link) {
+            char line[128];
+            snprintf(line, sizeof(line), "%d\t%ld\t%ld\t%d\n", server->focused_toplevel == toplevel,
+                     lround(1000 * sh_fade_value(&toplevel->dim_fade, now)),
+                     lround(1000 * toplevel->dim_fade.to), toplevel->dim != NULL);
+            control_reply(fd, line);
+        }
+        return;
+    }
+    if (!strcmp(request, "get peek")) {
+        // How far windows have faded toward the desktop (thousandths), whether peeking, and
+        // whether a held key keeps it up.
+        char reply[64];
+        snprintf(reply, sizeof(reply), "ok\n%ld\t%d\t%d\n",
+                 lround(1000 * sh_fade_value(&server->peek_fade, now_ms())), server->peeking,
+                 server->peek_keycode != 0);
+        control_reply(fd, reply);
+        return;
+    }
+    if (!strcmp(request, "get opacities")) {
+        // app_id, title, focused, opacity applied to its buffers — one window per line.
+        control_reply(fd, "ok\n");
+        struct sh_toplevel *toplevel;
+        wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
+            char line[1024], app_id[256], title[512];
+            const char *raw_app_id = toplevel_app_id(toplevel), *raw_title = toplevel_title(toplevel);
+            snprintf(app_id, sizeof(app_id), "%s", raw_app_id ? raw_app_id : "");
+            snprintf(title, sizeof(title), "%s", raw_title ? raw_title : "");
+            for (char *c = app_id; *c; ++c)
+                *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
+            for (char *c = title; *c; ++c)
+                *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
+            snprintf(line, sizeof(line), "%s\t%s\t%d\t%.3f\n", app_id, title,
+                     server->focused_toplevel == toplevel, toplevel->opacity);
+            control_reply(fd, line);
+        }
+        return;
+    }
+    if (!strcmp(request, "get zoom")) {
+        // The magnification now and its target (thousandths), and the number of outputs that
+        // drew the last frame magnified.
+        int zoomed = 0;
+        struct sh_output *output;
+        wl_list_for_each(output, &server->outputs, link) zoomed += output->zoomed;
+        char reply[64];
+        snprintf(reply, sizeof(reply), "ok\n%ld\t%ld\t%d\n",
+                 lround(1000 * zoom_level(server, now_ms())), lround(1000 * server->zoom_target),
+                 zoomed);
+        control_reply(fd, reply);
+        return;
+    }
+    if (!strcmp(request, "get night_light")) {
+        // The temperature applied now, the override (0 schedule, 1 forced neutral, 2 forced
+        // warm), and whether the schedule is enabled.
+        char reply[64];
+        snprintf(reply, sizeof(reply), "ok\n%d\t%d\t%d\n", server->night_kelvin,
+                 server->night_mode, server_settings(server)->effects.night_light);
+        control_reply(fd, reply);
+        return;
+    }
+    if (!strcmp(request, "get overview")) {
+        // The state (open, closing or closed) and how far the glide has gone (thousandths),
+        // then the overview line and a line per thumbnail and per strip cell, as sent to the
+        // shell.
+        size_t size = 1024 + (size_t)(OVERVIEW_MAX + OVERVIEW_WORKSPACES) * 512;
+        char *text = malloc(size);
+        if (!text) {
+            control_reply(fd, "error: out of memory\n");
+            return;
+        }
+        control_reply(fd, "ok\n");
+        snprintf(text, size, "%s %ld\n",
+                 server->overview.open ? "open" : server->overview.visible ? "closing" : "closed",
+                 lround(1000 * server->overview.progress));
+        control_reply(fd, text);
+        if (server->overview.visible) {
+            overview_describe(server, text, size);
+            control_reply(fd, text);
+        }
+        free(text);
         return;
     }
     if (!strcmp(request, "get layers")) {
@@ -5200,6 +9848,55 @@ static void control_handle(struct sh_server *server, int fd, const char *request
     }
     if (server->locked) {
         control_reply(fd, "error: the session is locked\n");
+        return;
+    }
+    if (!strncmp(request, "headless_output", 15) && (!request[15] || request[15] == ' ')) {
+        control_headless_output(server, fd, request + (request[15] ? 16 : 15));
+        return;
+    }
+    if (!strncmp(request, "session", 7) && (!request[7] || request[7] == ' ')) {
+        control_session(server, fd, request + 7);
+        return;
+    }
+    if (!strncmp(request, "dnd", 3) && (!request[3] || request[3] == ' ')) {
+        // "dnd [on|off|toggle]": the shell's notification daemon stops or resumes its cards.
+        const char *verb = request[3] ? request + 4 : "toggle";
+        if (strcmp(verb, "on") && strcmp(verb, "off") && strcmp(verb, "toggle")) {
+            control_reply(fd, "error: usage: dnd [on|off|toggle]\n");
+            return;
+        }
+        char line[32];
+        snprintf(line, sizeof(line), "dnd %s\n", verb);
+        send_shell_line(server, line);
+        control_reply(fd, "ok\n");
+        return;
+    }
+    if (!strncmp(request, "osd", 3) && (!request[3] || request[3] == ' ')) {
+        control_osd(server, fd, request[3] ? request + 4 : "");
+        return;
+    }
+    if (!strncmp(request, "overview ", 9) || !strcmp(request, "overview")) {
+        // "overview filter [TEXT]", "overview select N" and "overview view N" (from 1) drive
+        // the open overview, as typing, arrows and the strip do.
+        const char *verb = request + (request[8] ? 9 : 8);
+        char *end = NULL;
+        long number = strtol(verb + (!strncmp(verb, "select ", 7) ? 7 : !strncmp(verb, "view ", 5) ? 5 : 0), &end, 10);
+        if (!server->overview.open) {
+            control_reply(fd, "error: the overview is not open\n");
+        } else if (!strncmp(verb, "filter", 6) && (!verb[6] || verb[6] == ' ')) {
+            overview_set_filter(server, verb[6] ? verb + 7 : "");
+            control_reply(fd, "ok\n");
+        } else if (!strncmp(verb, "select ", 7) && end && !*end && number >= 1 &&
+                   number <= server->overview.count) {
+            overview_select(server, (int)number - 1);
+            control_reply(fd, "ok\n");
+        } else if (!strncmp(verb, "view ", 5) && end && !*end && number >= 1 &&
+                   number <= server->overview.workspaces) {
+            overview_view(server, (int)number - 1);
+            control_reply(fd, "ok\n");
+        } else {
+            control_reply(fd, "error: usage: overview filter [TEXT] | select N | view N\n");
+        }
         return;
     }
     // "output NAME ACTION": workspace actions switch that output instead of the focused one.
@@ -5254,13 +9951,29 @@ static void control_client_close(struct sh_control_client *client) {
     free(client);
 }
 
-/* The state subscribers get: "tiling on|off" and "workspace N" for the focused output, and
+/* The state subscribers get: "tiling on|off", "workspace N" and "focused NAME" for the focused output, and
  * "output NAME N USED TILING" for each output, with its current workspace, those holding
  * windows ("1,3", or "-"), and whether it tiles ("on" or "off"). */
+/* Removes a multi-byte character cut short at the end of `text`, as snprintf leaves one. */
+static void drop_partial_utf8(char *text) {
+    size_t length = strlen(text), start = length;
+    while (start > 0 && ((unsigned char)text[start - 1] & 0xC0) == 0x80)
+        --start;
+    if (start == 0)
+        return;
+    unsigned char lead = (unsigned char)text[start - 1];
+    if (lead < 0xC0)
+        return; // ASCII, or stray continuation bytes: nothing was cut
+    size_t needed = lead >= 0xF0 ? 3 : lead >= 0xE0 ? 2 : lead >= 0xC0 ? 1 : 0;
+    if (length - start < needed)
+        text[start - 1] = '\0';
+}
+
 static void describe_state(struct sh_server *server, char *state, size_t size) {
-    size_t length = snprintf(state, size, "tiling %s\nworkspace %d\n",
-                             output_tiles(server, focused_output(server)) ? "on" : "off",
-                             focused_workspace(server));
+    struct wlr_output *focused = focused_output(server);
+    size_t length = snprintf(state, size, "tiling %s\nworkspace %d\nfocused %s\n",
+                             output_tiles(server, focused) ? "on" : "off",
+                             focused_workspace(server), focused ? focused->name : "-");
     struct sh_output *output;
     wl_list_for_each_reverse(output, &server->outputs, link) {
         char used[128];
@@ -5271,10 +9984,62 @@ static void describe_state(struct sh_server *server, char *state, size_t size) {
                                *output_workspace(server, output->wlr_output->name) + 1, used,
                                output_tiles(server, output->wlr_output) ? "on" : "off");
     }
+    // "urgent COUNT", then "urgent-output NAME 2,3" for each output with urgent windows, the
+    // workspaces they are on, and "urgent-window OUTPUT WORKSPACE APP_ID TITLE" (tab separated
+    // after the name) for each, the one that has waited longest first.
+    unsigned count = 0;
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) count += toplevel->urgent;
+    if (length < size)
+        length += snprintf(state + length, size - length, "urgent %u\n", count);
+    wl_list_for_each_reverse(output, &server->outputs, link) {
+        unsigned used = 0;
+        wl_list_for_each(toplevel, &server->toplevels, link) {
+            if (toplevel->urgent && toplevel->workspace < 32 &&
+                !strcmp(toplevel->output, output->wlr_output->name))
+                used |= 1u << toplevel->workspace;
+        }
+        if (!used || length >= size)
+            continue;
+        length += snprintf(state + length, size - length, "urgent-output %s", output->wlr_output->name);
+        for (int i = 0, first = 1; i < 32 && length < size; ++i) {
+            if (used & 1u << i) {
+                length += snprintf(state + length, size - length, "%s%d", first ? " " : ",", i + 1);
+                first = 0;
+            }
+        }
+        if (length < size)
+            length += snprintf(state + length, size - length, "\n");
+    }
+    unsigned last = 0;
+    for (unsigned listed = 0; listed < count && listed < 16 && length < size; ++listed) {
+        struct sh_toplevel *next = NULL;
+        wl_list_for_each(toplevel, &server->toplevels, link) {
+            if (toplevel->urgent && toplevel->urgent_order > last &&
+                (!next || toplevel->urgent_order < next->urgent_order))
+                next = toplevel;
+        }
+        if (!next)
+            break;
+        last = next->urgent_order;
+        // The title as the taskbar has it (the shell finds the window by it), cut short at a
+        // character boundary.
+        char app_id[64], title[256];
+        const char *raw_app_id = toplevel_app_id(next), *raw_title = toplevel_title(next);
+        snprintf(app_id, sizeof(app_id), "%s", raw_app_id ? raw_app_id : "");
+        snprintf(title, sizeof(title), "%s", raw_title ? raw_title : "Untitled");
+        drop_partial_utf8(title);
+        for (char *c = app_id; *c; ++c)
+            *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
+        for (char *c = title; *c; ++c)
+            *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
+        length += snprintf(state + length, size - length, "urgent-window %s\t%d\t%s\t%s\n",
+                           next->output, next->workspace + 1, app_id, title);
+    }
 }
 
-/* Subscribers get the state after each change, and "launcher OUTPUT" when a binding asks the
- * shell for its application menu; a subscriber that cannot keep up is dropped rather than
+/* Subscribers get the state after each change, and "launcher OUTPUT" or "palette OUTPUT" when a binding
+ * asks the shell for its application menu or command palette; a subscriber that cannot keep up is dropped rather than
  * blocking the compositor. */
 static bool control_send_state(struct sh_control_client *client, const char *state) {
     size_t length = strlen(state);
@@ -5282,6 +10047,7 @@ static bool control_send_state(struct sh_control_client *client, const char *sta
 }
 
 static void notify_subscribers(struct sh_server *server) {
+    overview_touch(server, true); // a change of windows or workspaces, when it is open
     char state[sizeof(server->sent_state)];
     describe_state(server, state, sizeof(state));
     if (!strcmp(state, server->sent_state))
@@ -5303,16 +10069,30 @@ static void send_event(struct sh_server *server, const char *text, size_t length
     }
 }
 
-static void request_launcher(struct sh_server *server) {
+/* Asks the shell to open something (`what`: "launcher" or "palette") on the output under the
+ * pointer. */
+static void request_shell(struct sh_server *server, const char *what) {
     struct wlr_output *output =
         wlr_output_layout_output_at(server->output_layout, server->cursor->x, server->cursor->y);
     if (!output)
         return;
     char line[128];
-    int length = snprintf(line, sizeof(line), "launcher %s\n", output->name);
+    int length = snprintf(line, sizeof(line), "%s %s\n", what, output->name);
     if (length < 0 || (size_t)length >= sizeof(line))
         return;
     send_event(server, line, (size_t)length);
+}
+
+static void send_shell_line(struct sh_server *server, const char *line) {
+    send_event(server, line, strlen(line));
+}
+
+static void request_launcher(struct sh_server *server) {
+    request_shell(server, "launcher");
+}
+
+static void request_palette(struct sh_server *server) {
+    request_shell(server, "palette");
 }
 
 static int control_client_readable(int fd, uint32_t mask, void *data) {
@@ -5395,7 +10175,7 @@ static void open_control_socket(struct sh_server *server, const char *wayland_so
     strcpy(address.sun_path, server->control_path);
     unlink(server->control_path); // A stale socket from a crashed session.
     int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
-    if (fd < 0 || bind(fd, (struct sockaddr *)&address, sizeof(address)) < 0 || listen(fd, 8) < 0) {
+    if (fd < 0 || bind(fd, (struct sockaddr *)&address, sizeof(address)) < 0 || listen(fd, SOMAXCONN) < 0) {
         wlr_log_errno(WLR_ERROR, "Cannot create control socket %s", server->control_path);
         if (fd >= 0)
             close(fd);
@@ -5431,6 +10211,17 @@ static int reload_signal(int signal_number, void *data) {
     reload_config(data);
     return 0;
 }
+#define CONFIG_SETTLE_MS 150
+static int config_settled(void *data) {
+    reload_config(data);
+    return 0;
+}
+static int config_watch_ready(int fd, uint32_t mask, void *data) {
+    struct sh_server *server = data;
+    if (server->callbacks->config_changed(server->callbacks->userdata) && server->config_timer)
+        wl_event_source_timer_update(server->config_timer, CONFIG_SETTLE_MS);
+    return 0;
+}
 static int reap_children(int signal_number, void *data) {
     struct sh_server *server = data;
     pid_t pid;
@@ -5456,7 +10247,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     if (mode == SH_BACKEND_HEADLESS)
         setenv("WLR_HEADLESS_OUTPUTS", "1", 0); // tests may ask for more
 
-    struct sh_server server = {.callbacks = callbacks};
+    struct sh_server server = {.callbacks = callbacks, .config_generation = 1};
     wl_list_init(&server.subscribers);
     server.tiling = sh_tiling_create();
     if (!server.tiling)
@@ -5477,6 +10268,27 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     if (!server.animator)
         return 1;
     configure_animations(&server);
+    configure_layouts(&server);
+    server.night_kelvin = SH_KELVIN_NEUTRAL;
+    sh_fade_init(&server.zoom_fade, 1);
+    server.zoom_target = 1;
+    server.night_clock = -1;
+    if (getenv("SHAODE_NIGHT_LIGHT_TIME")) {
+        // A fixed clock, so tests can run at any hour.
+        double minutes = 0;
+        if (sh_parse_clock(getenv("SHAODE_NIGHT_LIGHT_TIME"), &minutes))
+            server.night_clock = minutes;
+    }
+    server.night_timer = wl_event_loop_add_timer(loop, night_light_tick, &server);
+    server.corner_timer = wl_event_loop_add_timer(loop, hot_corner_tick, &server);
+    server.urgent_timer = wl_event_loop_add_timer(loop, urgent_tick, &server);
+    int config_fd = callbacks->config_watch(callbacks->userdata);
+    if (config_fd >= 0) {
+        server.config_timer = wl_event_loop_add_timer(loop, config_settled, &server);
+        server.config_watch = wl_event_loop_add_fd(loop, config_fd, WL_EVENT_READABLE,
+                                                   config_watch_ready, &server);
+    }
+    sh_corner_dwell_init(&server.corner_dwell);
 
     server.backend = wlr_backend_autocreate(loop,
 #if WLR_HAS_SESSION
@@ -5553,8 +10365,8 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     // Stacking order, bottom to top.
     struct wlr_scene_tree **stack[] = {
         &server.backgrounds, &server.layer_trees[0], &server.layer_trees[1],
-        &server.windows,     &server.layer_trees[2], &server.fullscreen,
-        &server.unmanaged,   &server.layer_trees[3], &server.drag_icons,
+        &server.windows,     &server.fullscreen,     &server.layer_trees[2], &server.fullscreen_cover,
+        &server.unmanaged,   &server.guide_layer,    &server.overview_layer, &server.layer_trees[3], &server.drag_icons,
         &server.lock_tree,
     };
     for (size_t i = 0; i < sizeof(stack) / sizeof(stack[0]); ++i)
@@ -5654,6 +10466,10 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     add_listener(&server.constraints->events.new_constraint, &server.new_constraint,
                  server_new_constraint);
     server.idle_notifier = wlr_idle_notifier_v1_create(server.wl_display);
+    // wlr-randr, kanshi, and graphical display settings tools.
+    server.output_manager = wlr_output_manager_v1_create(server.wl_display);
+    add_listener(&server.output_manager->events.apply, &server.output_apply, output_config_apply);
+    add_listener(&server.output_manager->events.test, &server.output_test, output_config_test);
     struct wlr_idle_inhibit_manager_v1 *idle_inhibit =
         wlr_idle_inhibit_v1_create(server.wl_display);
     add_listener(&idle_inhibit->events.new_inhibitor, &server.new_inhibitor, server_new_inhibitor);
@@ -5697,6 +10513,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
 #else
     (void)compositor;
 #endif
+    night_light_update(&server);
     server.running = true;
     callbacks->startup(callbacks->userdata);
 
@@ -5750,6 +10567,8 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     wl_list_remove(&server.new_output.link);
     wl_list_remove(&server.new_lock.link);
     wl_list_remove(&server.new_inhibitor.link);
+    wl_list_remove(&server.output_apply.link);
+    wl_list_remove(&server.output_test.link);
 #if WLR_HAS_SESSION
     if (server.session)
         wl_list_remove(&server.session_active.link);
@@ -5757,11 +10576,26 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
         close(server.sleep_inhibitor);
 #endif
 
+    if (server.night_timer)
+        wl_event_source_remove(server.night_timer);
+    if (server.corner_timer)
+        wl_event_source_remove(server.corner_timer);
+    if (server.overview.timer)
+        wl_event_source_remove(server.overview.timer);
+    if (server.urgent_timer)
+        wl_event_source_remove(server.urgent_timer);
+    if (server.config_watch)
+        wl_event_source_remove(server.config_watch);
+    if (server.config_timer)
+        wl_event_source_remove(server.config_timer);
+    if (server.night_transform)
+        wlr_color_transform_unref(server.night_transform);
     wlr_backend_destroy(server.backend);
     sh_animator_destroy(server.animator);
     wlr_scene_node_destroy(&server.scene->tree.node);
     for (size_t i = 0; i < sizeof(server.deco_buffers) / sizeof(*server.deco_buffers); ++i)
         wlr_buffer_drop(server.deco_buffers[i]);
+    wlr_buffer_drop(server.black);
     wlr_xcursor_manager_destroy(server.cursor_mgr);
     wlr_cursor_destroy(server.cursor);
     wlr_allocator_destroy(server.allocator);

@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.25)
 project(shaoDe VERSION 0.1.0 LANGUAGES C CXX)
 
+# An unoptimised compositor is noticeably slower; default to an optimised build with symbols
+# unless the caller (or a multi-config generator) chose one.
+get_property(SHAODE_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(NOT CMAKE_BUILD_TYPE AND NOT SHAODE_MULTI_CONFIG)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInfo MinSizeRel)
+endif()
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 20)
@@ -19,13 +27,23 @@ option(SHAODE_INSTALL_SESSION "Install the experimental display-manager session 
 option(SHAODE_BUILD_SHELL "Build the Qt Quick desktop shell" ON)
 option(SHAODE_SHELL_PREVIEW_ONLY "Build only the shell UI preview without LayerShellQt" OFF)
 
-add_library(shaode_config src/config.cpp src/layout.cpp src/tiling.cpp
+add_library(shaode_config src/curve.c src/session.c src/tabs.c src/config.cpp src/config_schema.cpp src/layout.cpp src/tiling.cpp
+    src/overview_layout.cpp src/window_placement.cpp
     src/import/common.cpp src/import/hyprland.cpp src/import/waybar.cpp src/import/import.cpp)
 target_include_directories(shaode_config PUBLIC include)
-target_link_libraries(shaode_config PRIVATE PkgConfig::LUA PUBLIC PkgConfig::XKB)
+target_link_libraries(shaode_config PRIVATE shaode_effects PkgConfig::LUA PUBLIC PkgConfig::XKB)
 target_compile_options(shaode_config PRIVATE -Wall -Wextra -Wpedantic)
+# The source tree's example stands in for a configuration with an error when shaoDe runs
+# uninstalled.
 target_compile_definitions(shaode_config PRIVATE
-    SHAODE_DEFAULT_CONFIG="${CMAKE_INSTALL_FULL_DATADIR}/shaode/init.lua")
+    SHAODE_DEFAULT_CONFIG="${CMAKE_INSTALL_FULL_DATADIR}/shaode/init.lua"
+    SHAODE_SOURCE_CONFIG="${CMAKE_CURRENT_SOURCE_DIR}/config/init.lua")
+
+# Arithmetic of the desktop effects (fades, night light, corners, zoom); no wlroots.
+add_library(shaode_effects STATIC src/effects.c)
+target_include_directories(shaode_effects PUBLIC include)
+target_link_libraries(shaode_effects PRIVATE m)
+target_compile_options(shaode_effects PRIVATE -Wall -Wextra -Wpedantic)
 
 include(CTest)
 if(BUILD_TESTING)
@@ -36,15 +54,56 @@ if(BUILD_TESTING)
     add_executable(config_tests tests/config_tests.cpp)
     target_link_libraries(config_tests PRIVATE shaode_config)
     add_test(NAME config COMMAND config_tests ${EXAMPLE_CONFIG})
+    add_executable(config_diagnostics_tests tests/config_diagnostics_tests.cpp)
+    target_link_libraries(config_diagnostics_tests PRIVATE shaode_config)
+    add_test(NAME config_diagnostics COMMAND config_diagnostics_tests ${EXAMPLE_CONFIG}
+             ${CMAKE_CURRENT_SOURCE_DIR}/docs/config-reference.md)
+    add_executable(config_robustness_tests tests/config_robustness_tests.cpp)
+    target_link_libraries(config_robustness_tests PRIVATE shaode_config)
+    add_test(NAME config_robustness COMMAND config_robustness_tests ${EXAMPLE_CONFIG})
+    set_tests_properties(config_robustness PROPERTIES TIMEOUT 120)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME docs_consistency COMMAND ${Python3_EXECUTABLE}
+             ${CMAKE_CURRENT_SOURCE_DIR}/tests/docs_consistency.py ${CMAKE_CURRENT_SOURCE_DIR})
     add_executable(layout_tests tests/layout_tests.cpp)
     target_link_libraries(layout_tests PRIVATE shaode_config)
     add_test(NAME layout COMMAND layout_tests)
+    add_executable(curve_tests tests/curve_tests.cpp)
+    target_link_libraries(curve_tests PRIVATE shaode_config)
+    add_test(NAME curve COMMAND curve_tests)
+    add_executable(window_placement_tests tests/window_placement_tests.cpp)
+    target_link_libraries(window_placement_tests PRIVATE shaode_config)
+    add_test(NAME window_placement COMMAND window_placement_tests)
+    add_executable(overview_layout_tests tests/overview_layout_tests.cpp)
+    target_link_libraries(overview_layout_tests PRIVATE shaode_config)
+    add_test(NAME overview_layout COMMAND overview_layout_tests)
     add_executable(tiling_tests tests/tiling_tests.cpp)
     target_link_libraries(tiling_tests PRIVATE shaode_config)
     add_test(NAME tiling COMMAND tiling_tests)
+    add_executable(effects_tests tests/effects_tests.cpp)
+    target_link_libraries(effects_tests PRIVATE shaode_effects)
+    add_test(NAME effects COMMAND effects_tests)
+    add_executable(effects_config_tests tests/effects_config_tests.cpp)
+    target_link_libraries(effects_config_tests PRIVATE shaode_config)
+    add_test(NAME effects_config COMMAND effects_config_tests)
+    add_executable(notifications_config_tests tests/notifications_config_tests.cpp)
+    target_link_libraries(notifications_config_tests PRIVATE shaode_config)
+    add_test(NAME notifications_config COMMAND notifications_config_tests)
+    add_executable(profiles_config_tests tests/profiles_config_tests.cpp)
+    target_link_libraries(profiles_config_tests PRIVATE shaode_config)
+    add_test(NAME profiles_config COMMAND profiles_config_tests)
+    add_executable(window_features_tests tests/window_features_tests.cpp)
+    target_link_libraries(window_features_tests PRIVATE shaode_config)
+    add_test(NAME window_features COMMAND window_features_tests)
     add_executable(import_tests tests/import_tests.cpp)
     target_link_libraries(import_tests PRIVATE shaode_config)
     add_test(NAME import COMMAND import_tests ${CMAKE_CURRENT_SOURCE_DIR}/tests/import)
+    add_executable(urgent_config_tests tests/urgent_config_tests.cpp)
+    target_link_libraries(urgent_config_tests PRIVATE shaode_config)
+    add_test(NAME urgent_config COMMAND urgent_config_tests)
+    add_executable(productivity_tests tests/productivity_tests.cpp)
+    target_link_libraries(productivity_tests PRIVATE shaode_config)
+    add_test(NAME productivity COMMAND productivity_tests)
 endif()
 option(SHAODE_BUILD_COMPOSITOR "Build the wlroots compositor" ON)
 if(SHAODE_BUILD_COMPOSITOR)
@@ -56,7 +115,8 @@ if(SHAODE_BUILD_COMPOSITOR)
     find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
     set(WLR_PROTOCOL_HEADERS)
     set(WLR_CLIENT_PROTOCOL_SOURCES)
-    foreach(PROTOCOL wlr-layer-shell-unstable-v1 wlr-foreign-toplevel-management-unstable-v1)
+    foreach(PROTOCOL wlr-layer-shell-unstable-v1 wlr-foreign-toplevel-management-unstable-v1
+            wlr-output-management-unstable-v1)
         add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-protocol.h
             COMMAND ${WAYLAND_SCANNER} server-header
             ${CMAKE_CURRENT_SOURCE_DIR}/protocols/${PROTOCOL}.xml
@@ -82,15 +142,16 @@ if(SHAODE_BUILD_COMPOSITOR)
         ${PROTOCOL_DIR}/stable/xdg-shell/xdg-shell.xml
         ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.h
         DEPENDS ${PROTOCOL_DIR}/stable/xdg-shell/xdg-shell.xml)
-    add_executable(shaode src/main.cpp src/backend.c src/decoration.c src/animation.c src/sleep.c
+    add_executable(shaode src/main.cpp src/backend.c src/decoration.c src/animation.c src/effects_scene.c src/sleep.c
         ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.h ${WLR_PROTOCOL_HEADERS})
+    target_sources(shaode PRIVATE src/overview_scene.c)
     target_include_directories(shaode PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_compile_definitions(shaode PRIVATE WLR_USE_UNSTABLE)
     target_compile_definitions(shaode PRIVATE
         SHAODE_VERSION="${PROJECT_VERSION}"
         SHAODE_DEFAULT_CONFIG="${CMAKE_INSTALL_FULL_DATADIR}/shaode/init.lua")
     target_compile_options(shaode PRIVATE -Wall -Wextra -Wno-unused-parameter)
-    target_link_libraries(shaode PRIVATE shaode_config PkgConfig::WLROOTS PkgConfig::WAYLAND m)
+    target_link_libraries(shaode PRIVATE shaode_config shaode_effects PkgConfig::WLROOTS PkgConfig::WAYLAND m)
     # A standalone session keeps the machine awake through logind while it is on screen.
     pkg_search_module(SDBUS IMPORTED_TARGET libsystemd libelogind basu)
     if(SDBUS_FOUND)
@@ -119,6 +180,17 @@ if(SHAODE_BUILD_COMPOSITOR)
     else()
         message(STATUS "wlroots lacks XWayland support; X11 applications will not run")
     endif()
+    # Rounded window corners need wlroots patched by
+    # packaging/patches/wlroots-rounded-corners.patch; without it windows stay square.
+    find_file(SHAODE_WLR_SCENE_H wlr/types/wlr_scene.h PATHS ${WLROOTS_INCLUDE_DIRS}
+              NO_DEFAULT_PATH)
+    file(READ ${SHAODE_WLR_SCENE_H} SHAODE_WLR_SCENE)
+    if(SHAODE_WLR_SCENE MATCHES "wlr_scene_tree_set_rounded_clip")
+        target_compile_definitions(shaode PRIVATE SHAODE_ROUNDED_CORNERS=1)
+    else()
+        message(STATUS "wlroots lacks rounded clips; window corners stay square "
+            "(see packaging/patches/wlroots-rounded-corners.patch)")
+    endif()
     # Pointer settings reach libinput devices directly (standalone sessions only).
     if(SHAODE_WLR_CONFIG MATCHES "WLR_HAS_LIBINPUT_BACKEND 1")
         pkg_check_modules(LIBINPUT REQUIRED IMPORTED_TARGET libinput)
@@ -126,7 +198,7 @@ if(SHAODE_BUILD_COMPOSITOR)
     endif()
     install(TARGETS shaode RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(FILES config/init.lua DESTINATION ${CMAKE_INSTALL_DATADIR}/shaode)
-    install(FILES README.md docs/gentoo.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+    install(FILES README.md CHANGELOG.md docs/gentoo.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
     install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/shaode)
     install(FILES vendor/tinywl/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/shaode
         RENAME TinyWL-LICENSE)
@@ -157,22 +229,88 @@ if(SHAODE_BUILD_COMPOSITOR)
             ${PROTOCOL_DIR}/stable/xdg-shell/xdg-shell.xml
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.c
             DEPENDS ${PROTOCOL_DIR}/stable/xdg-shell/xdg-shell.xml)
+        set(ACTIVATION_XML ${PROTOCOL_DIR}/staging/xdg-activation/xdg-activation-v1.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xdg-activation-v1-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header ${ACTIVATION_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-activation-v1-client-protocol.h
+            DEPENDS ${ACTIVATION_XML})
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xdg-activation-v1-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code ${ACTIVATION_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-activation-v1-protocol.c
+            DEPENDS ${ACTIVATION_XML})
         add_executable(wayland_probe tests/wayland_probe.c
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client-protocol.h
-            ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.c ${WLR_CLIENT_PROTOCOL_SOURCES})
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.c
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-activation-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-activation-v1-protocol.c
+            ${WLR_CLIENT_PROTOCOL_SOURCES})
         target_include_directories(wayland_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
         target_link_libraries(wayland_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
         target_compile_options(wayland_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        set(VPTR_XML ${CMAKE_CURRENT_SOURCE_DIR}/protocols/wlr-virtual-pointer-unstable-v1.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/wlr-virtual-pointer-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header ${VPTR_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-virtual-pointer-client-protocol.h
+            DEPENDS ${VPTR_XML})
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/wlr-virtual-pointer-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code ${VPTR_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-virtual-pointer-protocol.c
+            DEPENDS ${VPTR_XML})
+        set(VKBD_XML ${CMAKE_CURRENT_SOURCE_DIR}/protocols/virtual-keyboard-unstable-v1.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/virtual-keyboard-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header ${VKBD_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/virtual-keyboard-client-protocol.h
+            DEPENDS ${VKBD_XML})
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/virtual-keyboard-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code ${VKBD_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/virtual-keyboard-protocol.c
+            DEPENDS ${VKBD_XML})
+        add_executable(pointer_probe tests/pointer_probe.c
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-virtual-pointer-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-virtual-pointer-protocol.c
+            ${CMAKE_CURRENT_BINARY_DIR}/virtual-keyboard-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/virtual-keyboard-protocol.c)
+        target_include_directories(pointer_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        target_link_libraries(pointer_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
+        target_compile_options(pointer_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        add_executable(output_management_probe tests/output_management_probe.c
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-output-management-unstable-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-output-management-unstable-v1-protocol.c)
+        target_include_directories(output_management_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        target_link_libraries(output_management_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
+        target_compile_options(output_management_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        add_test(NAME output_management COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_management_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:output_management_probe>)
+        set_tests_properties(output_management PROPERTIES TIMEOUT 60)
         add_test(NAME compositor_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/compositor_smoke.py
             $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(compositor_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME auto_reload_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/auto_reload_smoke.py $<TARGET_FILE:shaode>
+            ${EXAMPLE_CONFIG})
+        set_tests_properties(auto_reload_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME workspaces COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/workspace_smoke.py
             $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(workspaces PROPERTIES TIMEOUT 60)
+        add_test(NAME control_fuzz_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/control_fuzz_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>
+            ${EXAMPLE_CONFIG})
+        set_tests_properties(control_fuzz_smoke PROPERTIES TIMEOUT 120)
+        add_test(NAME swallow_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/swallow_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>
+            ${EXAMPLE_CONFIG})
+        set_tests_properties(swallow_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME placement_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/placement_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(placement_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME sticky_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/sticky_smoke.py
             $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>
@@ -209,6 +347,18 @@ if(SHAODE_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/per_output_tiling_smoke.py
             $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(per_output_tiling_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME output_layout_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_layout_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(output_layout_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME output_hotplug_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_hotplug_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(output_hotplug_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME output_workspace_move_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_workspace_move_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(output_workspace_move_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME move_window_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/move_window_smoke.py
             $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
@@ -217,18 +367,84 @@ if(SHAODE_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/focus_output_smoke.py
             $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(focus_output_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME workspace_names_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/workspace_names_smoke.py $<TARGET_FILE:shaode>)
+        set_tests_properties(workspace_names_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME profile_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/profile_smoke.py $<TARGET_FILE:shaode>)
+        set_tests_properties(profile_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME session_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/session_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(session_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME session_scroll_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/session_scroll_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(session_scroll_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME focus_last_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/focus_last_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(focus_last_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME switcher_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/switcher_smoke.py
             $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(switcher_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME overview_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/overview_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(overview_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME overview_pointer_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/overview_pointer_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>)
+        set_tests_properties(overview_pointer_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME overview_fuzz_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/overview_fuzz_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(overview_fuzz_smoke PROPERTIES TIMEOUT 120)
+        add_test(NAME overview_output_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/overview_output_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>)
+        set_tests_properties(overview_output_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME panel_focus_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/panel_focus_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>)
+        set_tests_properties(panel_focus_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME scratchpad_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/scratchpad_smoke.py
             $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(scratchpad_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME group_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/group_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(group_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME group_edge_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/group_edge_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(group_edge_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME group_fuzz_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/group_fuzz_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(group_fuzz_smoke PROPERTIES TIMEOUT 120)
+        add_test(NAME reload_fuzz_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/reload_fuzz_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(reload_fuzz_smoke PROPERTIES TIMEOUT 120)
         add_test(NAME tile_focus_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/tile_focus_smoke.py
             $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(tile_focus_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME layout_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/layout_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(layout_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME scroll_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/scroll_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(scroll_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME scroll_follow_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/scroll_follow_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(scroll_follow_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME keyboard_resize_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/keyboard_resize_smoke.py
             $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
@@ -249,6 +465,12 @@ if(SHAODE_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_follow_smoke.py
             $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(output_follow_smoke PROPERTIES TIMEOUT 60)
+        add_executable(animation_tests tests/animation_tests.c src/animation.c)
+        target_compile_definitions(animation_tests PRIVATE WLR_USE_UNSTABLE)
+        target_compile_options(animation_tests PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        target_link_libraries(animation_tests PRIVATE shaode_config PkgConfig::WLROOTS
+            PkgConfig::WAYLAND m)
+        add_test(NAME animation COMMAND animation_tests)
         add_test(NAME animation_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/animation_smoke.py
             $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
@@ -257,6 +479,46 @@ if(SHAODE_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/fullscreen_panel_smoke.py
             $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(fullscreen_panel_smoke PROPERTIES TIMEOUT 60)
+        find_program(GRIM grim)
+        add_test(NAME dim_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/dim_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe> "${GRIM}")
+        set_tests_properties(dim_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME urgent_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/urgent_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe> "${GRIM}")
+        set_tests_properties(urgent_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME urgent_border_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/urgent_border_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe> "${GRIM}")
+        set_tests_properties(urgent_border_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME peek_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/peek_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe> "${GRIM}")
+        set_tests_properties(peek_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME magnet_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/magnet_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>
+            "${GRIM}")
+        set_tests_properties(magnet_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME night_light_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/night_light_smoke.py
+            $<TARGET_FILE:shaode>)
+        set_tests_properties(night_light_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME hot_corners_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/hot_corners_smoke.py $<TARGET_FILE:shaode>)
+        set_tests_properties(hot_corners_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME zoom_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/zoom_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:wayland_probe> "${GRIM}")
+        set_tests_properties(zoom_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME zoom_output_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/zoom_output_smoke.py $<TARGET_FILE:shaode>)
+        set_tests_properties(zoom_output_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME example_snippets COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/example_snippets.py $<TARGET_FILE:shaode>
+            ${CMAKE_CURRENT_SOURCE_DIR}/config/init.lua)
+        set_tests_properties(example_snippets PROPERTIES TIMEOUT 120)
         set(LOCK_XML ${PROTOCOL_DIR}/staging/ext-session-lock/ext-session-lock-v1.xml)
         add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/ext-session-lock-v1-client-protocol.h
             COMMAND ${WAYLAND_SCANNER} client-header ${LOCK_XML}
@@ -279,6 +541,22 @@ if(SHAODE_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaode> $<TARGET_FILE:lock_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(session_lock PROPERTIES TIMEOUT 60)
+        # The compositor benchmark (tools/bench/bench.py); see docs/performance.md.
+        add_executable(shaode-bench-client tools/bench/bench_client.c
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.c)
+        target_include_directories(shaode-bench-client PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        target_link_libraries(shaode-bench-client PRIVATE PkgConfig::WAYLAND_CLIENT)
+        target_compile_options(shaode-bench-client PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        add_test(NAME bench_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tools/bench/bench.py --quick
+            --compositor $<TARGET_FILE:shaode> --client $<TARGET_FILE:shaode-bench-client>
+            --pointer-probe $<TARGET_FILE:pointer_probe>)
+        set_tests_properties(bench_smoke PROPERTIES TIMEOUT 120)
+        add_test(NAME opacity_rules_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/opacity_rules_smoke.py
+            $<TARGET_FILE:shaode> $<TARGET_FILE:shaode-bench-client>)
+        set_tests_properties(opacity_rules_smoke PROPERTIES TIMEOUT 60)
         # XWayland coverage needs wlroots built with X support and an Xwayland binary.
         find_program(XWAYLAND_BINARY Xwayland)
         if(SHAODE_HAS_XWAYLAND AND XWAYLAND_BINARY)
@@ -290,6 +568,14 @@ if(SHAODE_BUILD_COMPOSITOR)
                 $<TARGET_FILE:shaode> $<TARGET_FILE:x11_probe> $<TARGET_FILE:wayland_probe>
                 ${EXAMPLE_CONFIG})
             set_tests_properties(xwayland_smoke PROPERTIES TIMEOUT 60)
+            add_test(NAME swallow_x11_smoke COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/swallow_x11_smoke.py
+                $<TARGET_FILE:shaode> $<TARGET_FILE:x11_probe> $<TARGET_FILE:wayland_probe>)
+            set_tests_properties(swallow_x11_smoke PROPERTIES TIMEOUT 90)
+            add_test(NAME xwayland_urgent_smoke COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/xwayland_urgent_smoke.py
+                $<TARGET_FILE:shaode> $<TARGET_FILE:x11_probe> $<TARGET_FILE:wayland_probe>)
+            set_tests_properties(xwayland_urgent_smoke PROPERTIES TIMEOUT 60)
         else()
             message(STATUS "XWayland test skipped: needs an Xwayland binary and wlroots X support")
         endif()
