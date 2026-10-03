@@ -657,9 +657,6 @@ bool overview_button(struct sh_server *server, const struct wlr_pointer_button_e
 bool overview_motion(struct sh_server *server);
 void overview_hot_corner(struct sh_server *server);
 bool overview_axis(struct sh_server *server, const struct wlr_pointer_axis_event *event);
-bool scratchpad_enabled(struct sh_server *server);
-void hide_in_scratchpad(struct sh_toplevel *toplevel);
-void scratchpad_show(struct sh_server *server);
 void reload_config(struct sh_server *server);
 
 /* actions.c */
@@ -799,6 +796,13 @@ struct sh_rect floating_area(struct sh_server *server, struct wlr_output *output
 void unarrange_in_place(struct sh_toplevel *toplevel);
 void move_window(struct sh_server *server, enum sh_action action);
 void resize_window(struct sh_server *server, enum sh_action action, int amount);
+
+/* scratchpad.c */
+bool scratchpad_enabled(struct sh_server *server);
+void center_scratchpad(struct sh_toplevel *toplevel, struct wlr_output *output);
+void hide_in_scratchpad(struct sh_toplevel *toplevel);
+void scratchpad_show(struct sh_server *server);
+void empty_scratchpad(struct sh_server *server);
 
 /* session.c */
 pid_t toplevel_pid(struct sh_toplevel *toplevel);
