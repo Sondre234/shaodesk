@@ -13,11 +13,15 @@
 #include <spawn.h>
 #include <sstream>
 #include <stdexcept>
+#include <string>
+#include <string_view>
+#include <sys/inotify.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <utility>
+#include <vector>
 
 extern char **environ;
 namespace {
@@ -25,12 +29,25 @@ bool has_env(const char *name) {
     const char *value = std::getenv(name);
     return value && *value;
 }
-pid_t spawn(const shaode::Command &command) {
+pid_t spawn(const shaode::Command &command, const std::vector<std::string> &extra_env = {}) {
     std::vector<char *> argv;
     for (const auto &arg : command)
         argv.push_back(const_cast<char *>(arg.c_str()));
     argv.push_back(nullptr);
     pid_t pid = 0;
+    std::vector<char *> env;
+    auto overridden = [&](const char *entry) {
+        for (const auto &extra : extra_env)
+            if (std::strncmp(entry, extra.c_str(), extra.find('=') + 1) == 0)
+                return true;
+        return false;
+    };
+    for (char **entry = environ; entry && *entry; ++entry)
+        if (!overridden(*entry))
+            env.push_back(*entry);
+    for (const auto &entry : extra_env)
+        env.push_back(const_cast<char *>(entry.c_str()));
+    env.push_back(nullptr);
     // Wayland's signal event sources block signals in the compositor. Children
     // need an ordinary signal mask so their own shutdown handling still works.
     posix_spawnattr_t attributes;
@@ -45,7 +62,7 @@ pid_t spawn(const shaode::Command &command) {
     if (!error)
         error = posix_spawnattr_setflags(&attributes, POSIX_SPAWN_SETSIGMASK);
     if (!error)
-        error = posix_spawnp(&pid, argv[0], nullptr, &attributes, argv.data(), environ);
+        error = posix_spawnp(&pid, argv[0], nullptr, &attributes, argv.data(), env.data());
     posix_spawnattr_destroy(&attributes);
     if (error)
         std::cerr << "Cannot launch " << command.front() << ": " << std::strerror(error) << '\n';
@@ -192,6 +209,14 @@ struct Runtime {
     pid_t shell_pid = -1;
     // The running screenshot script; another request is refused until it exits.
     pid_t screenshot_pid = -1;
+    std::string target; // the output target of the action last resolved
+    bool watch = false; // whether saving a configuration file reloads (off in headless tests)
+    int watch_fd = -1;
+
+    ~Runtime() {
+        if (watch_fd >= 0)
+            close(watch_fd);
+    }
 
     void start_shell() {
 #if SHAODE_HAS_SHELL
@@ -200,7 +225,19 @@ struct Runtime {
         try {
             auto binary =
                 std::filesystem::canonical("/proc/self/exe").parent_path() / "shaode-shell";
-            shell_pid = spawn({binary.string(), "-platform", "wayland", "--config", path.string()});
+            // Software rendering never uses GLX, but libGLX loads the GPU vendor's whole GLX
+            // driver when the process starts: with NVIDIA that is about 16 MB of memory the shell
+            // does not need. A vendor name that matches nothing keeps it out; the shell puts the
+            // original back (SHAODE_GLX_VENDOR) so the applications it launches see no change.
+            std::vector<std::string> extra_env;
+            if (config.shell.software_renderer && !std::getenv("QT_QUICK_BACKEND") &&
+                !std::getenv("QSG_RHI_BACKEND")) {
+                extra_env.push_back("__GLX_VENDOR_LIBRARY_NAME=shaode-none");
+                if (const char *vendor = std::getenv("__GLX_VENDOR_LIBRARY_NAME"))
+                    extra_env.push_back(std::string("SHAODE_GLX_VENDOR=") + vendor);
+            }
+            shell_pid = spawn(
+                {binary.string(), "-platform", "wayland", "--config", path.string()}, extra_env);
         } catch (const std::exception &error) {
             std::cerr << "Cannot start desktop shell: " << error.what() << '\n';
         }
@@ -240,6 +277,7 @@ struct Runtime {
         *argument = binding->action == SH_SCREENSHOT ? binding->screenshot : binding->workspace;
         if (shaode::action_takes_amount(binding->action))
             *argument = binding->amount;
+        self.target = binding->output;
         return binding->action;
     }
     static sh_action button(void *data, uint32_t modifiers, uint32_t button,
@@ -253,18 +291,23 @@ struct Runtime {
         *argument = binding->action == SH_SCREENSHOT ? binding->screenshot : binding->workspace;
         if (shaode::action_takes_amount(binding->action))
             *argument = binding->amount;
+        self.target = binding->output;
         return binding->action;
     }
     /* Control requests: "<action> [workspace]", "screenshot [region|output|window]",
-     * "resize_<direction> [pixels]", "switcher_confirm [N]", or "spawn PROGRAM [ARGS...]". */
+     * "resize_<direction> [pixels]", "switcher_confirm [N]", "profile NAME|next|prev", or
+     * "spawn PROGRAM [ARGS...]". */
     static sh_action command(void *data, const char *request, int *argument, char *error,
                              size_t error_size) {
         auto &self = *static_cast<Runtime *>(data);
+        self.target.clear();
         std::istringstream stream(request);
         std::vector<std::string> words{std::istream_iterator<std::string>(stream), {}};
         try {
             if (words.empty())
                 throw std::runtime_error("empty request");
+            if (words[0] == "profile")
+                return self.pick_profile(words);
             sh_action action = shaode::parse_action(words[0]);
             if (action == SH_HANDLED) {
                 if (words.size() < 2)
@@ -274,13 +317,27 @@ struct Runtime {
                 return action;
             }
             if (shaode::action_takes_workspace(action)) {
-                std::size_t used = 0;
-                int number = words.size() == 2 ? std::stoi(words[1], &used) : 0;
-                if (words.size() != 2 || used != words[1].size() || number < 1 ||
-                    number > self.config.settings.workspaces)
+                // A number, or a name from layout.workspace_names (which may hold spaces).
+                std::string name;
+                for (std::size_t i = 1; i < words.size(); ++i)
+                    name += (i > 1 ? " " : "") + words[i];
+                int number = self.config.workspace_number(name);
+                if (!number)
                     throw std::runtime_error(words[0] + " needs a workspace from 1 to " +
-                                             std::to_string(self.config.settings.workspaces));
+                                             std::to_string(self.config.settings.workspaces) +
+                                             ", or a workspace name");
                 *argument = number;
+            } else if (shaode::action_takes_output(action)) {
+                // A description may hold spaces.
+                std::string target;
+                for (std::size_t i = 1; i < words.size(); ++i)
+                    target += (i > 1 ? " " : "") + words[i];
+                if (words.size() == 1 && action == SH_SWAP_WORKSPACES)
+                    target = "next";
+                if (!shaode::valid_output_target(target))
+                    throw std::runtime_error(words[0] + " takes one output: left, right, next, "
+                                                        "prev, or a connector name");
+                self.target = target;
             } else if (action == SH_SCREENSHOT) {
                 if (words.size() > 2)
                     throw std::runtime_error(
@@ -301,7 +358,8 @@ struct Runtime {
                     throw std::runtime_error(words[0] + " takes a size in pixels, from 1 to " +
                                              std::to_string(shaode::max_resize_amount));
                 *argument = amount;
-            } else if (action == SH_SWITCHER_CONFIRM && words.size() == 2) {
+            } else if ((action == SH_SWITCHER_CONFIRM || action == SH_OVERVIEW_CONFIRM) &&
+                       words.size() == 2) {
                 std::size_t used = 0;
                 int number = 0;
                 try {
@@ -310,7 +368,7 @@ struct Runtime {
                 }
                 if (used != words[1].size() || number < 1)
                     throw std::runtime_error(
-                        "switcher_confirm takes a window's place in the list, from 1");
+                        words[0] + " takes a window's place in the list, from 1");
                 *argument = number;
             } else if (words.size() != 1) {
                 throw std::runtime_error(words[0] + " takes no argument");
@@ -320,6 +378,46 @@ struct Runtime {
             std::snprintf(error, error_size, "%s", failure.what());
             return SH_NONE;
         }
+    }
+    /* "profile NAME", or "profile next|prev" for the neighbouring one in name order, wrapping:
+     * saves the choice and reloads, so the compositor and the shell both take it up. */
+    sh_action pick_profile(const std::vector<std::string> &words) {
+        const auto &names = config.profiles;
+        if (words.size() != 2)
+            throw std::runtime_error("profile takes one profile name, next, or prev");
+        if (names.empty())
+            throw std::runtime_error("the configuration has no profiles");
+        auto name = words[1];
+        if (name == "next" || name == "prev") {
+            auto at = std::find(names.begin(), names.end(), config.profile);
+            auto index = static_cast<std::size_t>(at - names.begin());
+            if (at == names.end())
+                index = name == "next" ? 0 : names.size() - 1;
+            else
+                index = (index + (name == "next" ? 1 : names.size() - 1)) % names.size();
+            name = names[index];
+        } else if (std::find(names.begin(), names.end(), name) == names.end()) {
+            std::string list;
+            for (const auto &known : names)
+                list += (list.empty() ? "" : ", ") + known;
+            throw std::runtime_error("no profile " + name + "; the profiles are " + list);
+        }
+        shaode::save_profile(name);
+        return SH_RELOAD;
+    }
+    static const char *action_target(void *data) {
+        return static_cast<Runtime *>(data)->target.c_str();
+    }
+    static sh_action hot_corner(void *data, int corner, int *argument) {
+        auto &self = *static_cast<Runtime *>(data);
+        if (corner < 0 || corner >= 4 || self.config.hot_corners[corner].empty())
+            return SH_NONE;
+        char error[256] = "";
+        auto action = command(data, self.config.hot_corners[corner].c_str(), argument, error,
+                              sizeof(error));
+        if (action == SH_NONE)
+            std::cerr << "shaode: hot corner: " << error << '\n';
+        return action;
     }
     std::filesystem::path screenshot_directory() const {
         const auto &directory = config.screenshots.directory;
@@ -380,18 +478,69 @@ struct Runtime {
     static bool reload(void *data) {
         auto &self = *static_cast<Runtime *>(data);
         try {
-            auto next = shaode::load_config(self.path);
+            std::string error;
+            auto next = shaode::load_config_or_default(self.path, error);
             self.config = std::move(next);
+            // The shell loads the file too, and shows the error.
             if (self.shell_pid > 0)
                 kill(self.shell_pid, SIGHUP);
             else
                 self.start_shell();
-            std::cerr << "Configuration reloaded: " << self.path << '\n';
+            if (!error.empty())
+                report_error(error);
+            std::cerr << "Configuration reloaded: " << self.path;
+            if (!self.config.profile.empty())
+                std::cerr << " (profile " << self.config.profile << ')';
+            std::cerr << '\n';
             return true;
         } catch (const std::exception &error) {
             std::cerr << "Reload rejected; keeping active configuration: " << error.what() << '\n';
             return false;
+        } catch (...) {
+            std::cerr << "Reload rejected; keeping active configuration: unexpected error\n";
+            return false;
         }
+    }
+    /* Watches the configuration's directory (and, when the file is a link, its target's), as
+     * editors often save by writing a new file and renaming it over the old one. */
+    static int config_watch(void *data) {
+        auto &self = *static_cast<Runtime *>(data);
+        if (!self.watch)
+            return -1;
+        self.watch_fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
+        if (self.watch_fd < 0) {
+            std::cerr << "Cannot watch the configuration: " << std::strerror(errno) << '\n';
+            return -1;
+        }
+        std::vector<std::filesystem::path> directories{self.path.parent_path()};
+        std::error_code failure;
+        auto target = std::filesystem::canonical(self.path, failure);
+        if (!failure && target.parent_path() != directories.front())
+            directories.push_back(target.parent_path());
+        for (const auto &directory : directories)
+            if (inotify_add_watch(self.watch_fd, directory.c_str(),
+                                  IN_CLOSE_WRITE | IN_MOVED_TO | IN_MOVED_FROM | IN_DELETE) < 0)
+                std::cerr << "Cannot watch " << directory.string() << ": "
+                          << std::strerror(errno) << '\n';
+        return self.watch_fd;
+    }
+    static bool config_changed(void *data) {
+        auto &self = *static_cast<Runtime *>(data);
+        bool changed = false;
+        alignas(inotify_event) char buffer[4096];
+        for (ssize_t count; (count = read(self.watch_fd, buffer, sizeof(buffer))) > 0;) {
+            for (char *at = buffer; at < buffer + count;) {
+                auto *event = reinterpret_cast<inotify_event *>(at);
+                std::string_view name = event->len ? event->name : "";
+                if (name.ends_with(".lua"))
+                    changed = true;
+                at += sizeof(inotify_event) + event->len;
+            }
+        }
+        return changed && self.config.auto_reload;
+    }
+    static void report_error(const std::string &error) {
+        std::cerr << "Configuration error; using the default configuration: " << error << '\n';
     }
     static void startup(void *data) {
         auto &self = *static_cast<Runtime *>(data);
@@ -580,10 +729,19 @@ int main(int argc, char **argv) {
         }
         if (path.empty())
             path = default_config();
-        Runtime runtime{std::filesystem::absolute(path), shaode::load_config(path),
+        // A configuration with an error still starts the session, with the default one, so
+        // that it can be fixed from there; --check-config reports it instead.
+        std::string error;
+        Runtime runtime{std::filesystem::absolute(path),
+                        check ? shaode::load_config(path)
+                              : shaode::load_config_or_default(path, error),
                         std::move(command)};
+        if (!error.empty())
+            Runtime::report_error(error);
         runtime.allow_shell = !no_shell && mode != SH_BACKEND_HEADLESS;
         runtime.standalone = mode == SH_BACKEND_SESSION;
+        // Tests rewrite their configuration and reload it themselves.
+        runtime.watch = mode != SH_BACKEND_HEADLESS || has_env("SHAODE_AUTO_RELOAD");
         if (check) {
             std::cout << "Configuration valid: " << path << " (" << runtime.config.bindings.size()
                       << " bindings)\n";
@@ -597,7 +755,9 @@ int main(int argc, char **argv) {
         const sh_callbacks callbacks{
             &runtime,           Runtime::settings, Runtime::key,          Runtime::button,
             Runtime::command,   Runtime::reload,   Runtime::startup,      Runtime::child_exited,
-            Runtime::opacity,   Runtime::screenshot, Runtime::window_rule};
+            Runtime::opacity,   Runtime::screenshot, Runtime::window_rule,
+            Runtime::hot_corner, Runtime::action_target, Runtime::config_watch,
+            Runtime::config_changed};
         int result = sh_run(&callbacks, mode);
         if (runtime.shell_pid > 0)
             kill(runtime.shell_pid, SIGTERM);

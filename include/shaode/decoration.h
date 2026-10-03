@@ -4,6 +4,7 @@
  * (minimize, fullscreen, close from left to right) with thin glyphs on a dark translucent strip
  * over the window's top-right corner. */
 #include <stdbool.h>
+#include <stdint.h>
 
 struct wlr_buffer;
 
@@ -23,3 +24,7 @@ struct wlr_buffer *sh_decoration_render(int scale, enum sh_deco_part hovered);
 
 /* The part at strip-local logical coordinates. */
 enum sh_deco_part sh_decoration_part_at(double x, double y);
+
+/* Wraps premultiplied ARGB pixels (malloc'd, `width` by `height`) in a buffer that frees them
+ * with its last reference. Returns NULL, freeing them, when out of memory. */
+struct wlr_buffer *sh_pixel_buffer(uint32_t *pixels, int width, int height);

@@ -122,6 +122,7 @@ shaoDe before it can be imported, **won't** = deliberately not carried over.
 | Blur | `decoration:blur` | — | blocked: needs scenefx or a custom renderer | no |
 | Shadows | `decoration:shadow` | — | blocked: needs scenefx or a custom renderer | no |
 | Animations on/off | `animations:enabled` | `animations.enabled` | done | yes |
+| Focus a window that asks for it | `misc:focus_on_activate` | `windows.activation` (`"focus"`; unset keeps the default `"urgent"`, which marks the window instead) | done | yes |
 | Animation styles, speeds, curves | `animation`, `bezier` | — (fixed fade, scale, and glide; `animations.duration`) | won't (for now) | — |
 
 ### Input

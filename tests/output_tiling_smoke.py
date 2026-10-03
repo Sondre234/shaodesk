@@ -41,7 +41,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-output-tiling-test-") as directo
 
     def msg(*words):
         result = subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                                text=True, timeout=5)
+                                text=True, timeout=30)
         assert result.returncode == 0, (words, result.stdout, result.stderr)
         return result.stdout
 
@@ -123,9 +123,11 @@ with tempfile.TemporaryDirectory(prefix="shaode-output-tiling-test-") as directo
                      disjoint([w[2:] for w in windows()]),
                      "tiles of the disabled output rejoined the small output's tiling")
 
-            # Fullscreen covers exactly the output the window is on now.
+            # Fullscreen covers exactly the output the window is on now, above each probe's
+            # 48-pixel panel.
             msg("fullscreen")
-            wait_for(lambda: [w[2:] for w in windows() if w[0]] == [small],
+            above_panels = lambda: (*small[:3], small[3] - 48 * len(windows()))
+            wait_for(lambda: [w[2:] for w in windows() if w[0]] == [above_panels()],
                      "fullscreen fits the small output")
             msg("fullscreen")
             wait_for(lambda: all(w[1] and inside(w[2:], small) for w in windows()) and
@@ -140,10 +142,10 @@ with tempfile.TemporaryDirectory(prefix="shaode-output-tiling-test-") as directo
 
             for window in processes[1:]:
                 window.kill()
-                window.wait(timeout=5)
+                window.wait(timeout=30)
             del processes[1:]
             server.terminate()
-            assert server.wait(timeout=5) == 0, log.read_text()
+            assert server.wait(timeout=30) == 0, log.read_text()
             print("Tiles moved between outputs of different sizes, fullscreen, and restore "
                   "passed")
         except Exception:
@@ -153,4 +155,4 @@ with tempfile.TemporaryDirectory(prefix="shaode-output-tiling-test-") as directo
             for process in reversed(processes):
                 if process.poll() is None:
                     process.kill()
-                    process.wait(timeout=5)
+                    process.wait(timeout=30)

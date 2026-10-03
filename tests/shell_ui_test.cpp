@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "audio.hpp"
 #include "controller.hpp"
+#include "system_status.hpp"
 #include "view.hpp"
 #include <QDir>
 #include <QFile>
 #include <QGuiApplication>
+#include <QImage>
 #include <QJSValue>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickItem>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QWheelEvent>
@@ -41,6 +44,11 @@ class FakeAudio : public Audio {
     }
 };
 } // namespace
+#ifdef __SANITIZE_ADDRESS__
+// The QML objects a test script creates are still reachable to Qt at exit, not to LeakSanitizer.
+extern "C" const char *__asan_default_options() { return "detect_leaks=0"; }
+#endif
+
 int main(int argc, char **argv) {
     // A named screen, as compositor outputs are: the workspace indicator is keyed by it.
     QTemporaryDir screens;
@@ -68,6 +76,7 @@ int main(int argc, char **argv) {
     qputenv("XDG_DATA_HOME", screens.filePath("data").toLocal8Bit());
     qputenv("XDG_DATA_DIRS", screens.filePath("none").toLocal8Bit());
     qputenv("XDG_STATE_HOME", screens.filePath("state").toLocal8Bit());
+    qputenv("XDG_CACHE_HOME", screens.filePath("cache").toLocal8Bit());
     const auto pins = screens.filePath("state/shaode/pinned");
     QGuiApplication app(argc, argv);
     if (argc != 2)
@@ -77,33 +86,51 @@ int main(int argc, char **argv) {
         return 1;
     auto config = directory.filePath("init.lua");
     auto marker = directory.filePath("launched");
+    // Two pictures for the wallpaper picker, in two subfolders.
+    const auto walls = directory.filePath("walls");
+    for (const auto *name : {"a/one.png", "b/two.png"}) {
+        QDir(walls).mkpath(QFileInfo(name).path());
+        QImage picture(64, 36, QImage::Format_RGB32);
+        picture.fill(Qt::darkCyan);
+        if (!picture.save(walls + "/" + name))
+            return 1;
+    }
     QFile file(config);
     if (!file.open(QIODevice::WriteOnly))
         return 1;
     // Long Lua strings preserve paths without shell interpolation.
     file.write(
         (QString(
-             "return {shell={launchers={{name='Test app',command={[[%1]],'-E','touch',[[%2]]}}}}}")
-             .arg(QString::fromLocal8Bit(argv[1]), marker))
+             "return {layout={workspace_names={'web','','','mail'}},"
+             "profile='dark',profiles={dark={},light={shell={accent='#336699'}}},"
+             "shell={wallpaper='walls/a/one.png',wallpapers=[[%3]],"
+             "launchers={{name='Test app',command={[[%1]],'-E','touch',[[%2]]}}}}}")
+             .arg(QString::fromLocal8Bit(argv[1]), marker, walls))
             .toUtf8());
     file.close();
     // A stand-in for the compositor's control socket, with this screen as its only output.
     // Tiling is per output; the focused one it reports first is always the opposite of this
     // screen's, as if another monitor had focus, so the panel must show its own.
     const auto output = app.primaryScreen()->name();
-    auto state = [&output](bool tiling, int workspace) {
-        return QString("tiling %1\nworkspace %2\noutput %3 %2 1,2 %4\n")
-            .arg(tiling ? "off" : "on")
-            .arg(workspace)
-            .arg(output)
-            .arg(tiling ? "on" : "off")
+    QString urgentLines; // what a state says about windows asking for attention
+    auto state = [&output, &urgentLines](bool tiling, int workspace) {
+        return (QString("tiling %1\nworkspace %2\noutput %3 %2 1,2 %4\n")
+                    .arg(tiling ? "off" : "on")
+                    .arg(workspace)
+                    .arg(output)
+                    .arg(tiling ? "on" : "off") +
+                urgentLines)
             .toUtf8();
     };
     QLocalServer compositor;
     QLocalSocket *subscriber = nullptr;
     bool toggled = false;
     int currentWorkspace = 2;
-    QStringList switches;
+    QStringList switches, requests;
+    bool holdSessions = false;
+    QLocalSocket *pendingSessions = nullptr;
+    // What the compositor does with "profile NAME": saves it and reloads the shell.
+    std::function<void(const QString &)> pickProfile;
     QObject::connect(&compositor, &QLocalServer::newConnection, [&] {
         auto *client = compositor.nextPendingConnection();
         QObject::connect(client, &QLocalSocket::readyRead, [&, client] {
@@ -118,7 +145,26 @@ int main(int argc, char **argv) {
                 client->write("ok\n");
                 client->disconnectFromServer();
                 subscriber->write(state(toggled, currentWorkspace));
-            } else if (request.startsWith("output ")) {
+            } else if (request.startsWith("profile ")) {
+                requests.push_back(QString::fromUtf8(request).trimmed());
+                client->write("ok\n");
+                client->disconnectFromServer();
+                pickProfile(QString::fromUtf8(request).trimmed().section(' ', 1));
+            } else if (request == "session list\n") {
+                if (holdSessions) { // answered later, by the test
+                    pendingSessions = client;
+                    return;
+                }
+                client->write("ok\nwork\t3\t1700000000\n");
+                client->disconnectFromServer();
+            } else if (request.startsWith("output ") || request.startsWith("session ") ||
+                       request == "toggle_tiling\n" || request == "layout_monocle\n") {
+                if (!request.startsWith("output ")) {
+                    requests.push_back(QString::fromUtf8(request).trimmed());
+                    client->write("ok\n");
+                    client->disconnectFromServer();
+                    return;
+                }
                 switches.push_back(QString::fromUtf8(request).trimmed());
                 client->write("ok\n");
                 client->disconnectFromServer();
@@ -131,12 +177,44 @@ int main(int argc, char **argv) {
         return 1;
     qputenv("SHAODE_SOCKET", compositor.fullServerName().toLocal8Bit());
     ShellController controller(config.toStdString());
+    pickProfile = [&controller](const QString &name) {
+        shaode::save_profile(name.toStdString());
+        controller.reload();
+    };
     ShellView view(controller, app.primaryScreen(), false, true);
-    if (view.status() != QQuickView::Ready)
+    if (view.status() != QQuickView::Ready) {
+        for (const auto &error : view.errors())
+            std::cerr << error.toString().toStdString() << '\n';
         return 1;
+    }
+    // An application picks its own app ID: a path in it is no icon to load from disk.
+    if (controller.iconFor("/etc/hostname") != "application-x-executable" ||
+        controller.iconFor("../../x") != "application-x-executable" ||
+        controller.iconFor("org.example.App") != "org.example.App") {
+        std::cerr << "a window's app ID can name a file for the icon\n";
+        return 1;
+    }
     view.show();
     if (!QTest::qWaitForWindowExposed(&view))
         return 1;
+    // Loader items, Repeater items and the like are found through the item tree rather than as
+    // QObject children.
+    std::function<QQuickItem *(QQuickItem *, const QString &)> find =
+        [&find](QQuickItem *item, const QString &name) -> QQuickItem * {
+        if (item->objectName() == name)
+            return item;
+        for (auto *child : item->childItems())
+            if (auto *found = find(child, name))
+                return found;
+        return nullptr;
+    };
+    // The popups are made on first use, not with the panel.
+    for (const char *popup : {"audioMixer", "calendar", "audioOutputs", "contextMenu", "groupList",
+                              "applicationSearch"})
+        if (find(view.rootObject(), popup)) {
+            std::cerr << popup << " was made before it was needed\n";
+            return 1;
+        }
     const QPoint start(30, controller.panelHeight() / 2);
     QTest::mouseMove(&view, start);
     QTest::qWait(200); // Hover first: a tooltip must not swallow the following press.
@@ -145,7 +223,7 @@ int main(int argc, char **argv) {
         std::cerr << "hover then click did not open the launcher\n";
         return 1;
     }
-    auto *search = view.rootObject()->findChild<QQuickItem *>("applicationSearch");
+    auto *search = find(view.rootObject(), "applicationSearch");
     if (!search || !QTest::qWaitFor([&] { return search->hasActiveFocus(); })) {
         std::cerr << "launcher search did not receive keyboard focus\n";
         return 1;
@@ -159,6 +237,17 @@ int main(int argc, char **argv) {
     }
     if (view.rootObject()->property("launcherOpen").toBool()) {
         std::cerr << "launcher remained open after launching\n";
+        return 1;
+    }
+    // A moment after startup the popups are made ahead of their first use.
+    view.rootObject()->setProperty("warm", true);
+    if (!QTest::qWaitFor([&] {
+            for (const char *popup : {"audioMixer", "calendar", "audioOutputs", "contextMenu", "groupList"})
+                if (!find(view.rootObject(), popup))
+                    return false;
+            return true;
+        })) {
+        std::cerr << "the popups were not made ahead of use\n";
         return 1;
     }
     auto panelTiling = [&view] { return view.rootObject()->property("tiling").toBool(); };
@@ -176,16 +265,6 @@ int main(int argc, char **argv) {
         return 1;
     }
     // The workspace indicator shows this output's state and switches it.
-    // Repeater items are found through the item tree rather than as QObject children.
-    std::function<QQuickItem *(QQuickItem *, const QString &)> find =
-        [&find](QQuickItem *item, const QString &name) -> QQuickItem * {
-        if (item->objectName() == name)
-            return item;
-        for (auto *child : item->childItems())
-            if (auto *found = find(child, name))
-                return found;
-        return nullptr;
-    };
     auto workspace = [&](int number) {
         return find(view.rootObject(), QString("workspace%1").arg(number));
     };
@@ -194,6 +273,13 @@ int main(int argc, char **argv) {
         !workspace(1)->property("occupied").toBool() ||
         workspace(3)->property("occupied").toBool()) {
         std::cerr << "the workspace indicator does not show the output's workspaces\n";
+        return 1;
+    }
+    if (workspace(1)->property("label").toString() != "web" ||
+        workspace(4)->property("label").toString() != "mail" ||
+        !workspace(2)->property("label").toString().isEmpty() ||
+        workspace(1)->width() <= workspace(2)->width()) {
+        std::cerr << "the workspace indicator does not show workspace names\n";
         return 1;
     }
     auto centre = [&](QQuickItem *item) {
@@ -225,11 +311,173 @@ int main(int argc, char **argv) {
                   << switches.join(", ").toStdString() << '\n';
         return 1;
     }
+    // A window asking for attention marks its workspace in the indicator (and is listed); when
+    // it is done, the marks go.
+    if (controller.urgentCount() != 0 || workspace(3)->property("urgent").toBool()) {
+        std::cerr << "a workspace is urgent before anything asked\n";
+        return 1;
+    }
+    urgentLines = "urgent 2\nurgent-output " + output + " 1,3\n"
+                  "urgent-window " + output + "\t3\tfake\tFake\n"
+                  "urgent-window " + output + "\t1\t\tNo app id\n";
+    subscriber->write(state(toggled, currentWorkspace));
+    if (!QTest::qWaitFor([&] { return controller.urgentCount() == 2; }) ||
+        !workspace(3)->property("urgent").toBool() || !workspace(1)->property("urgent").toBool() ||
+        workspace(2)->property("urgent").toBool() || workspace(4)->property("urgent").toBool()) {
+        std::cerr << "the workspace indicator does not mark workspaces with urgent windows\n";
+        return 1;
+    }
+    const auto asking = controller.urgentWindows();
+    if (asking.size() != 2 || asking[0].toMap()["appId"].toString() != "fake" ||
+        asking[0].toMap()["title"].toString() != "Fake" ||
+        asking[0].toMap()["workspace"].toInt() != 3 || !asking[1].toMap()["appId"].toString().isEmpty() ||
+        asking[1].toMap()["title"].toString() != "No app id") {
+        std::cerr << "the urgent windows were not parsed in order\n";
+        return 1;
+    }
+    if (!find(workspace(3), "workspaceUrgent3") || !find(workspace(3), "workspaceUrgent3")->isVisible() ||
+        find(workspace(2), "workspaceUrgent2")->isVisible()) {
+        std::cerr << "the urgent marker of a workspace is not shown where it should be\n";
+        return 1;
+    }
+    urgentLines = "urgent 0\n";
+    subscriber->write(state(toggled, currentWorkspace));
+    if (!QTest::qWaitFor([&] { return controller.urgentCount() == 0; }) ||
+        workspace(3)->property("urgent").toBool() || workspace(1)->property("urgent").toBool() ||
+        !controller.urgentWindows().isEmpty()) {
+        std::cerr << "the workspace marks did not go when the windows stopped asking\n";
+        return 1;
+    }
+    // The window switcher's list says which windows are asking for attention (an older
+    // five-field line means none).
+    subscriber->write(("switcher " + output + " 0 3\n"
+                       "switcher-window fake\tFake\t" + output + "\t3\t0\t1\n"
+                       "switcher-window \tNo app id\t" + output + "\t1\t1\t0\n"
+                       "switcher-window old\tOld\t" + output + "\t1\t0\n").toUtf8());
+    if (!QTest::qWaitFor([&] { return controller.switcherWindows().size() == 3; })) {
+        std::cerr << "the switcher's windows were not parsed\n";
+        return 1;
+    }
+    const auto listed = controller.switcherWindows();
+    if (!listed[0].toMap()["urgent"].toBool() || listed[1].toMap()["urgent"].toBool() ||
+        listed[2].toMap()["urgent"].toBool() || !listed[1].toMap()["minimized"].toBool() ||
+        !listed[1].toMap()["appId"].toString().isEmpty()) {
+        std::cerr << "the switcher does not say which windows are urgent\n";
+        return 1;
+    }
+    subscriber->write("switcher-close\n");
+    if (!QTest::qWaitFor([&] { return controller.switcherWindows().isEmpty(); })) {
+        std::cerr << "the switcher did not close\n";
+        return 1;
+    }
+    // Battery and network widgets show what a (fake) sysfs reports, and only where it exists.
+    {
+        QDir sys(screens.filePath("sys"));
+        auto put = [&](const QString &path, const QString &text) {
+            sys.mkpath(QFileInfo(sys.filePath(path)).path());
+            QFile f(sys.filePath(path));
+            return f.open(QIODevice::WriteOnly | QIODevice::Truncate) && f.write(text.toUtf8()) >= 0;
+        };
+        SystemStatus fake(sys.path());
+        QQmlEngine::setObjectOwnership(&fake, QQmlEngine::CppOwnership);
+        view.rootObject()->setProperty("statusSource", QVariant::fromValue(&fake));
+        auto *battery = find(view.rootObject(), "batteryWidget");
+        auto *network = find(view.rootObject(), "networkWidget");
+        if (!battery || !network || battery->isVisible() || network->isVisible()) {
+            std::cerr << "battery or network widget shown without hardware\n";
+            return 1;
+        }
+        if (!put("class/power_supply/BAT0/type", "Battery\n") ||
+            !put("class/power_supply/BAT0/capacity", "10\n") ||
+            !put("class/power_supply/BAT0/status", "Discharging\n") ||
+            !put("class/net/wlan0/device", "") || !put("class/net/wlan0/wireless", "") ||
+            !put("class/net/wlan0/operstate", "up\n"))
+            return 1;
+        fake.refresh();
+        auto *level = find(view.rootObject(), "batteryLevel");
+        if (!QTest::qWaitFor([&] { return battery->isVisible() && network->isVisible(); }) ||
+            !level || battery->property("low").toBool() != true ||
+            network->property("linkDown").toBool()) {
+            std::cerr << "battery and network widgets did not appear from sysfs\n";
+            return 1;
+        }
+        const qreal nearlyEmpty = level->width();
+        if (!put("class/power_supply/BAT0/capacity", "90\n") ||
+            !put("class/power_supply/BAT0/status", "Charging\n") ||
+            !put("class/net/wlan0/operstate", "down\n"))
+            return 1;
+        fake.refresh();
+        if (!QTest::qWaitFor([&] { return level->width() > nearlyEmpty * 5; }) ||
+            battery->property("low").toBool() || !network->property("linkDown").toBool()) {
+            std::cerr << "battery and network widgets did not follow sysfs changes\n";
+            return 1;
+        }
+        view.rootObject()->setProperty("statusSource", QVariant::fromValue(controller.status()));
+    }
+    // The clock wakes once a minute, aimed just past the next minute change, not every second.
+    {
+        auto *text = find(view.rootObject(), "clock");
+        auto *tick = text ? text->findChild<QObject *>("clockTick") : nullptr;
+        const int interval = tick ? tick->property("interval").toInt() : 0;
+        if (!tick || !tick->property("running").toBool() || interval < 50 || interval > 60050) {
+            std::cerr << "the clock does not tick at the minute (interval " << interval << ")\n";
+            return 1;
+        }
+    }
+    // The clock opens a month calendar, which pages through months and returns to today.
+    {
+        auto *clock = find(view.rootObject(), "clockButton");
+        auto *calendar = find(view.rootObject(), "calendar");
+        if (!clock || !calendar || calendar->isVisible()) {
+            std::cerr << "calendar missing or open at start\n";
+            return 1;
+        }
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(clock));
+        if (!QTest::qWaitFor([&] { return calendar->isVisible(); })) {
+            std::cerr << "clicking the clock did not open the calendar\n";
+            return 1;
+        }
+        // Every day of the six-week grid is laid out in its own cell.
+        auto *grid = find(view.rootObject(), "monthGrid");
+        auto *days = grid ? grid->property("contentItem").value<QQuickItem *>() : nullptr;
+        auto laidOut = [&] {
+            int cells = 0; // The grid's Repeater is a child too, and has no size.
+            for (QQuickItem *day : days ? days->childItems() : QList<QQuickItem *>())
+                cells += day->width() >= 20 && day->height() >= 20;
+            return cells == 42;
+        };
+        if (!QTest::qWaitFor(laidOut)) {
+            std::cerr << "the calendar's days were not laid out:";
+            if (days)
+                for (QQuickItem *day : days->childItems())
+                    std::cerr << ' ' << day->width() << 'x' << day->height();
+            std::cerr << '\n';
+            return 1;
+        }
+        const int month = calendar->property("month").toInt();
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier,
+                          centre(find(view.rootObject(), "calendarNext")));
+        if (!QTest::qWaitFor([&] { return calendar->property("month").toInt() == (month + 1) % 12; })) {
+            std::cerr << "the calendar did not page to the next month\n";
+            return 1;
+        }
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier,
+                          centre(find(view.rootObject(), "calendarTitle")));
+        if (!QTest::qWaitFor([&] { return calendar->property("month").toInt() == month; })) {
+            std::cerr << "the calendar title did not return to this month\n";
+            return 1;
+        }
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(clock));
+        if (!QTest::qWaitFor([&] { return !calendar->isVisible(); })) {
+            std::cerr << "clicking the clock again did not close the calendar\n";
+            return 1;
+        }
+    }
     // Context menus: a task's, then the bar's. Stand-in tasks replace the Wayland ones.
     auto *tasks = view.rootObject()->findChild<QQuickItem *>("taskList");
     QQmlComponent fakeTasks(view.engine());
     fakeTasks.setData("import QtQml.Models\nListModel { ListElement { taskId: 7; title: 'Fake'; "
-                      "appId: 'fake'; active: false; minimized: false } }",
+                      "appId: 'fake'; active: false; minimized: false; urgent: false } }",
                       QUrl());
     QObject *fakeModel = fakeTasks.create();
     if (!tasks || !fakeModel)
@@ -255,10 +503,33 @@ int main(int argc, char **argv) {
     };
     if (!(task = listedTask(0)))
         return 1;
+    // A window's title is its own: shown as plain text, never read as markup.
+    {
+        editTasks("model.append({taskId: 99, title: '<b>bold</b>', appId: 'evil', active: false, "
+                  "minimized: false, urgent: false})");
+        QQuickItem *hostile = listedTask(1);
+        int shown = 0;
+        bool markup = false;
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
+            if (item->property("text").toString() == "<b>bold</b>") {
+                ++shown;
+                markup = markup || item->property("textFormat").toInt() != Qt::PlainText;
+            }
+            for (auto *child : item->childItems())
+                walk(child);
+        };
+        if (hostile)
+            walk(hostile);
+        if (!hostile || shown == 0 || markup) {
+            std::cerr << "a window title is not shown as plain text (" << shown << " shown)\n";
+            return 1;
+        }
+        editTasks("model.remove(1)");
+    }
     auto center = [](QQuickItem *item) {
         return item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint();
     };
-    auto *menu = view.rootObject()->findChild<QQuickItem *>("contextMenu");
+    auto *menu = find(view.rootObject(), "contextMenu");
     // Repeater delegates are visual children only, so walk the item tree.
     std::function<QQuickItem *(QQuickItem *, const QString &)> findMenuItem =
         [&](QQuickItem *parent, const QString &text) -> QQuickItem * {
@@ -378,7 +649,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     editTasks("model.append({ taskId: 7, title: 'Fake', appId: 'fake', active: false, "
-              "minimized: false })");
+              "minimized: false, urgent: false })");
     if (!(task = listedTask(0)))
         return 1;
     // Empty bar space, right of the only task, opens the bar menu.
@@ -397,12 +668,171 @@ int main(int argc, char **argv) {
         std::cerr << "the bar menu did not toggle tiling off\n";
         return 1;
     }
+    // The bar menu's appearance entry lists the profiles in its place; picking one switches.
+    QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, empty);
+    if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Appearance: dark …"); })) {
+        std::cerr << "the bar menu lacks the appearance profiles\n";
+        return 1;
+    }
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(menuItem("Appearance: dark …")));
+    if (!QTest::qWaitFor([&] {
+            return menuShown() && menuItem("‹ Back") && menuItem("✓ dark") && menuItem("light");
+        }) || menuItem("Applications")) {
+        std::cerr << "the appearance entry did not list the profiles\n";
+        return 1;
+    }
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(menuItem("light")));
+    if (!QTest::qWaitFor([&] {
+            return requests == QStringList{"profile light"} && controller.profile() == "light" &&
+                   controller.accent() == QColor("#336699") &&
+                   !view.rootObject()->property("barMenuOpen").toBool();
+        })) {
+        std::cerr << "picking a profile did not switch to it: " << requests.join("|").toStdString()
+                  << " " << controller.profile().toStdString() << '\n';
+        return 1;
+    }
+    requests.clear();
+    QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, empty);
+    if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Appearance: light …"); }) ||
+        menuItem("‹ Back")) {
+        std::cerr << "the bar menu did not open on its own entries with the new profile\n";
+        return 1;
+    }
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(menuItem("Show desktop")));
+    // The profile button on the bar lists the profiles, the one in use marked, and switches.
+    auto *profilesButton = find(view.rootObject(), "profilesButton");
+    if (!QTest::qWaitFor([&] { return !view.rootObject()->property("menuOpen").toBool(); }) ||
+        !profilesButton || !profilesButton->isVisible()) {
+        std::cerr << "the bar lacks the profile button\n";
+        return 1;
+    }
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(profilesButton));
+    std::function<QQuickItem *(QQuickItem *, const QString &)> findProfile =
+        [&](QQuickItem *parent, const QString &name) -> QQuickItem * {
+        for (auto *item : parent->childItems()) {
+            if (item->objectName() == "profileItem" && item->property("text") == name)
+                return item;
+            if (auto *found = findProfile(item, name))
+                return found;
+        }
+        return nullptr;
+    };
+    QQuickItem *profileList = nullptr;
+    if (!QTest::qWaitFor([&] {
+            profileList = find(view.rootObject(), "profileList");
+            return profileList && profileList->isVisible() && findProfile(profileList, "dark") &&
+                   findProfile(profileList, "light") &&
+                   findProfile(profileList, "light")->property("current").toBool() &&
+                   !findProfile(profileList, "dark")->property("current").toBool() &&
+                   view.height() >= profileList->height() + controller.panelExtent();
+        })) {
+        std::cerr << "the profile button did not list the profiles\n";
+        return 1;
+    }
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier,
+                      center(findProfile(profileList, "dark")));
+    if (!QTest::qWaitFor([&] {
+            return requests == QStringList{"profile dark"} && controller.profile() == "dark" &&
+                   !profileList->isVisible();
+        })) {
+        std::cerr << "picking a profile from the bar did not switch to it\n";
+        return 1;
+    }
+    requests.clear();
+    // The wallpaper button shows the pictures of shell.wallpapers as thumbnails, the one in use
+    // marked; clicking another shows it, keeps it for the profile and leaves the picker open.
+    auto *wallpapersButton = find(view.rootObject(), "wallpapersButton");
+    if (!wallpapersButton || !wallpapersButton->isVisible()) {
+        std::cerr << "the bar lacks the wallpaper button\n";
+        return 1;
+    }
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(wallpapersButton));
+    std::function<void(QQuickItem *, QList<QQuickItem *> &)> wallpaperItems =
+        [&](QQuickItem *parent, QList<QQuickItem *> &found) {
+            for (auto *item : parent->childItems()) {
+                if (item->objectName() == "wallpaperItem" && item->isVisible())
+                    found << item;
+                wallpaperItems(item, found);
+            }
+        };
+    auto wallpaperItem = [&](const QString &name) -> QQuickItem * {
+        QList<QQuickItem *> found;
+        if (auto *picker = find(view.rootObject(), "wallpaperPicker"))
+            wallpaperItems(picker, found);
+        for (auto *item : found)
+            if (item->property("modelData").toMap().value("name") == name)
+                return item;
+        return nullptr;
+    };
+    QQuickItem *picker = nullptr;
+    if (!QTest::qWaitFor([&] {
+            picker = find(view.rootObject(), "wallpaperPicker");
+            return picker && picker->isVisible() && wallpaperItem("one") && wallpaperItem("two") &&
+                   wallpaperItem("one")->property("current").toBool() &&
+                   !wallpaperItem("two")->property("current").toBool() &&
+                   view.height() >= picker->height() + controller.panelExtent();
+        })) {
+        std::cerr << "the wallpaper button did not show the pictures: " << (picker ? picker->isVisible() : -1)
+                  << " " << controller.wallpapers().size() << " " << !!wallpaperItem("one") << !!wallpaperItem("two")
+                  << " " << (picker ? picker->height() : 0) << " " << view.height() << '\n';
+        return 1;
+    }
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(wallpaperItem("two")));
+    const auto picked = screens.filePath("state/shaode/wallpapers");
+    auto pickedText = [&picked] {
+        QFile f(picked);
+        return f.open(QIODevice::ReadOnly) ? QString::fromUtf8(f.readAll()) : QString();
+    };
+    if (!QTest::qWaitFor([&] {
+            return controller.wallpaperFile() == walls + "/b/two.png" &&
+                   controller.wallpaper() == QUrl::fromLocalFile(walls + "/b/two.png") &&
+                   wallpaperItem("two")->property("current").toBool() && picker->isVisible() &&
+                   pickedText() == "dark\twalls/a/one.png\t" + walls + "/b/two.png\n";
+        })) {
+        std::cerr << "picking a wallpaper did not show and keep it: " << pickedText().toStdString() << '\n';
+        return 1;
+    }
+    if (!QTest::qWaitFor([&] {
+            return QDir(screens.filePath("cache/thumbnails/large")).entryList(QDir::Files).size() == 2;
+        })) {
+        std::cerr << "the wallpaper thumbnails were not cached\n";
+        return 1;
+    }
+    controller.pickWallpaper("");
+    if (controller.wallpaperFile() != directory.filePath("walls/a/one.png") || pickedText() != "") {
+        std::cerr << "clearing the picked wallpaper did not go back to the configured one\n";
+        return 1;
+    }
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(wallpapersButton));
+    if (!QTest::qWaitFor([&] { return !picker->isVisible(); })) {
+        std::cerr << "the wallpaper button did not close the picker\n";
+        return 1;
+    }
+    // A task asking for attention is marked, and unmarked when it stops.
+    if (task->property("shownUrgent").toBool() || find(task, "taskUrgent")->isVisible()) {
+        std::cerr << "a task is marked urgent before it asked\n";
+        return 1;
+    }
+    editTasks("model.setProperty(0, 'urgent', true)");
+    if (!QTest::qWaitFor([&] {
+            return task->property("shownUrgent").toBool() && find(task, "taskUrgent")->isVisible();
+        })) {
+        std::cerr << "a task asking for attention is not marked\n";
+        return 1;
+    }
+    editTasks("model.setProperty(0, 'urgent', false)");
+    if (!QTest::qWaitFor([&] {
+            return !task->property("shownUrgent").toBool() && !find(task, "taskUrgent")->isVisible();
+        })) {
+        std::cerr << "a task that stopped asking for attention is still marked\n";
+        return 1;
+    }
     // Dragging a task along the bar moves it, not the whole list, as far as it is dragged.
     // Each belongs to a different application, or they would share a button.
     editTasks("model.append({ taskId: 8, title: 'Second', appId: 'second', active: false, "
-              "minimized: false })");
+              "minimized: false, urgent: false })");
     editTasks("model.append({ taskId: 9, title: 'Third', appId: 'third', active: false, "
-              "minimized: false })");
+              "minimized: false, urgent: false })");
     QQuickItem *third = listedTask(2);
     if (!third)
         return 1;
@@ -426,9 +856,9 @@ int main(int argc, char **argv) {
     }
     // An application's windows share one stacked button showing how many there are.
     editTasks("model.append({ taskId: 10, title: 'Group one', appId: 'grouped', active: false, "
-              "minimized: false })");
+              "minimized: false, urgent: false })");
     editTasks("model.append({ taskId: 11, title: 'Group two', appId: 'grouped', active: true, "
-              "minimized: false })");
+              "minimized: false, urgent: false })");
     QQuickItem *stack = nullptr;
     if (!QTest::qWaitFor([&] {
             stack = listedTask(3);
@@ -442,7 +872,7 @@ int main(int argc, char **argv) {
     }
     // Hovering it lists both windows above the bar, without taking the keyboard; leaving hides
     // the list and shrinks the panel again.
-    auto *groupList = view.rootObject()->findChild<QQuickItem *>("groupList");
+    auto *groupList = find(view.rootObject(), "groupList");
     auto groupRows = [&] {
         int rows = 0;
         std::function<void(QQuickItem *)> count = [&](QQuickItem *item) {
@@ -545,6 +975,15 @@ int main(int argc, char **argv) {
         std::cerr << "the volume control did not appear\n";
         return 1;
     }
+    // Its tooltip says the volume, not the tooltip's own (empty) accessible name.
+    bool tooltipText = false;
+    for (auto *child : volume->children())
+        if (child->property("text").toString().startsWith("Volume 50%"))
+            tooltipText = true;
+    if (!tooltipText) {
+        std::cerr << "the volume control's tooltip does not show the volume\n";
+        return 1;
+    }
     auto wheel = [&](int delta) {
         QWheelEvent event(center(volume), view.mapToGlobal(center(volume)), {}, {0, delta},
                           Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
@@ -567,8 +1006,8 @@ int main(int argc, char **argv) {
         return popup->isVisible() && box.bottom() <= widget.top() &&
                box.left() <= widget.center().x() && box.right() >= widget.center().x();
     };
-    auto *outputs = view.rootObject()->findChild<QQuickItem *>("audioOutputs");
-    auto *mixer = view.rootObject()->findChild<QQuickItem *>("audioMixer");
+    auto *outputs = find(view.rootObject(), "audioOutputs");
+    auto *mixer = find(view.rootObject(), "audioMixer");
     QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, center(volume));
     if (!outputs || !QTest::qWaitFor([&] { return above(outputs); }) ||
         !view.rootObject()->property("menuOpen").toBool()) {
@@ -630,8 +1069,295 @@ int main(int argc, char **argv) {
         std::cerr << "the mixer did not close\n";
         return 1;
     }
+    // The command palette: one search over actions, sessions, workspaces, windows and apps.
+    {
+        PaletteView paletteView(controller, app.primaryScreen());
+        if (paletteView.status() != QQuickView::Ready) {
+            for (const auto &error : paletteView.errors())
+                std::cerr << error.toString().toStdString() << '\n';
+            return 1;
+        }
+        auto palette = controller.palette();
+        auto titlesNow = [&] {
+            QStringList titles;
+            for (const auto &item : palette->results())
+                titles << item.toMap()["title"].toString();
+            return titles;
+        };
+        auto openPalette = [&] {
+            palette->open(output);
+            return QTest::qWaitFor([&] { return paletteView.isVisible(); }) &&
+                   QTest::qWaitFor([&] {
+                       return find(paletteView.rootObject(), "paletteInput")->hasActiveFocus();
+                   });
+        };
+        auto type = [&](const QString &text) {
+            for (const auto &c : text)
+                QTest::keyClick(&paletteView, c.toLatin1() ? static_cast<Qt::Key>(c.toUpper().unicode()) : Qt::Key_unknown,
+                                Qt::NoModifier);
+        };
+        if (!openPalette()) {
+            std::cerr << "the palette did not open with keyboard focus\n";
+            return 1;
+        }
+        // Saved sessions arrive from the compositor after it opens.
+        if (!QTest::qWaitFor([&] { return titlesNow().contains("Restore session work"); })) {
+            std::cerr << "the palette lacks the saved session: " << titlesNow().join("|").toStdString() << '\n';
+            return 1;
+        }
+        if (!titlesNow().contains("Workspace 1: web") || !titlesNow().contains("Fake app") ||
+            !titlesNow().contains("Toggle tiling") || !titlesNow().contains("Appearance: dark")) {
+            std::cerr << "the palette lacks workspaces, apps or actions\n";
+            return 1;
+        }
+        type("tiling");
+        if (!QTest::qWaitFor([&] { return !titlesNow().isEmpty() && titlesNow()[0].contains("tiling", Qt::CaseInsensitive); })) {
+            std::cerr << "typing did not filter the palette: " << titlesNow().join("|").toStdString() << '\n';
+            return 1;
+        }
+        QTest::keyClick(&paletteView, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return requests == QStringList{"toggle_tiling"}; }) ||
+            !QTest::qWaitFor([&] { return !paletteView.isVisible(); }) || !palette->output().isEmpty()) {
+            std::cerr << "running an action from the palette failed: " << requests.join("|").toStdString() << " results " << titlesNow().join("|").toStdString() << " q=" << palette->query().toStdString() << "\n";
+            return 1;
+        }
+        // The arrows move the selection; a filter prefix narrows the kind.
+        requests.clear();
+        if (!openPalette()) {
+            std::cerr << "the palette did not open again\n";
+            return 1;
+        }
+        if (!palette->query().isEmpty()) {
+            std::cerr << "the palette kept its last search\n";
+            return 1;
+        }
+        type(">layoutmon");
+        QTest::keyClick(&paletteView, Qt::Key_Down);
+        QTest::keyClick(&paletteView, Qt::Key_Up);
+        if (!QTest::qWaitFor([&] { return titlesNow().contains("Layout: monocle") && palette->selected() == 0; })) {
+            std::cerr << "the action filter or the selection is wrong: " << titlesNow().join("|").toStdString() << '\n';
+            return 1;
+        }
+        QTest::keyClick(&paletteView, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return requests == QStringList{"layout_monocle"}; })) {
+            std::cerr << "the layout action was not sent\n";
+            return 1;
+        }
+        // A late answer with the saved sessions does not move the selection off the entry the
+        // user has reached.
+        holdSessions = true;
+        pendingSessions = nullptr;
+        if (!openPalette() || !QTest::qWaitFor([&] { return pendingSessions != nullptr; })) {
+            std::cerr << "the palette did not ask for the sessions\n";
+            return 1;
+        }
+        QTest::keyClick(&paletteView, Qt::Key_Down);
+        QTest::keyClick(&paletteView, Qt::Key_Down);
+        QTest::keyClick(&paletteView, Qt::Key_Down);
+        const auto reached = titlesNow().value(palette->selected());
+        if (palette->selected() != 3 || reached.isEmpty()) {
+            std::cerr << "the arrows did not move the selection\n";
+            return 1;
+        }
+        pendingSessions->write("ok\nwork\t3\t1700000000\n");
+        pendingSessions->disconnectFromServer();
+        if (!QTest::qWaitFor([&] { return titlesNow().contains("Restore session work"); }) ||
+            titlesNow().value(palette->selected()) != reached) {
+            std::cerr << "the sessions arriving moved the selection from '"
+                      << reached.toStdString() << "' to '"
+                      << titlesNow().value(palette->selected()).toStdString() << "'\n";
+            return 1;
+        }
+        holdSessions = false;
+        palette->close();
+        // A session restores by name, and the text typed can name a new one.
+        requests.clear();
+        openPalette();
+        type("%work");
+        QTest::keyClick(&paletteView, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return requests == QStringList{"session restore work"}; })) {
+            std::cerr << "restoring a session from the palette failed: " << requests.join("|").toStdString() << '\n';
+            return 1;
+        }
+        requests.clear();
+        openPalette();
+        type("evening");
+        if (!QTest::qWaitFor([&] { return titlesNow().contains("Save session as evening"); })) {
+            std::cerr << "the palette does not offer to save a session by the typed name\n";
+            return 1;
+        }
+        QTest::keyClick(&paletteView, Qt::Key_Up); // wraps to the last: the save entry
+        QTest::keyClick(&paletteView, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return requests == QStringList{"session save evening"}; })) {
+            std::cerr << "saving a session from the palette failed: " << requests.join("|").toStdString() << '\n';
+            return 1;
+        }
+        // A workspace switches the palette's own output.
+        switches.clear();
+        openPalette();
+        type("#3");
+        QTest::keyClick(&paletteView, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return switches == QStringList{"output " + output + " workspace 3"}; })) {
+            std::cerr << "switching workspace from the palette failed: " << switches.join("|").toStdString() << '\n';
+            return 1;
+        }
+        // Escape closes without running anything, and so does losing the keyboard.
+        requests.clear();
+        openPalette();
+        type("tiling");
+        QTest::keyClick(&paletteView, Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !paletteView.isVisible(); }) || !requests.isEmpty()) {
+            std::cerr << "Escape did not close the palette quietly\n";
+            return 1;
+        }
+    }
+    // Notifications: the bell, the cards, their buttons and the history, fed by hand the way the
+    // D-Bus service feeds them.
+    {
+        auto *daemon = controller.notifications();
+        auto *bell = find(view.rootObject(), "notificationBell");
+        if (!bell || bell->isVisible()) {
+            std::cerr << "the bell shows without a notification daemon\n";
+            return 1;
+        }
+        daemon->setServing(true);
+        if (!QTest::qWaitFor([&] { return bell->isVisible() && bell->x() > 0; })) {
+            std::cerr << "the bell did not appear once the daemon served\n";
+            return 1;
+        }
+        CardsView cards(controller, app.primaryScreen());
+        if (cards.status() != QQuickView::Ready) {
+            for (const auto &error : cards.errors())
+                std::cerr << error.toString().toStdString() << '\n';
+            return 1;
+        }
+        if (cards.isVisible()) {
+            std::cerr << "the cards' surface is up with nothing to show\n";
+            return 1;
+        }
+        QSignalSpy invoked(daemon, &NotificationCenter::actionInvoked);
+        QSignalSpy closed(daemon, &NotificationCenter::closed);
+        auto make = [&](const QString &summary, bool actions) {
+            Notification n;
+            n.app = "Test";
+            n.summary = summary;
+            n.body = "with <b>bold</b>";
+            n.timeout = 60000;
+            if (actions)
+                n.actions = {{"default", "Open"}, {"yes", "Yes"}};
+            return daemon->notify(n);
+        };
+        auto card = [&]() { return find(cards.rootObject(), "notificationCard"); };
+        uint id = make("Hello", true);
+        if (!QTest::qWaitFor([&] { return cards.isVisible() && card() && card()->height() > 20; }) ||
+            controller.cardsOutput() != output) {
+            std::cerr << "a notification did not raise a card on its output\n";
+            return 1;
+        }
+        // Top right of the output, inside the surface, whose width is the card and its margins.
+        const auto box = card()->mapRectToScene(QRectF(0, 0, card()->width(), card()->height()));
+        if (box.right() > cards.width() || box.left() < 0 || box.width() < 300) {
+            std::cerr << "the card is not laid out inside its surface\n";
+            return 1;
+        }
+        if (auto *badge = find(view.rootObject(), "notificationBadge");
+            !badge || !QTest::qWaitFor([&] { return badge->isVisible(); })) {
+            std::cerr << "the bell has no badge for an unread notification\n";
+            return 1;
+        }
+        // (Hovering a card holds its timer; offscreen Qt sends no hover to these items, so
+        // notifications_smoke checks that with a real pointer.)
+        // An action's button runs it and dismisses the card; the surface goes once it has left.
+        auto *button = find(cards.rootObject(), "notificationAction");
+        if (!button || button->property("text").toString() != "Yes") {
+            std::cerr << "the card has no button for its action (and none for the default one)\n";
+            return 1;
+        }
+        QTest::mouseClick(&cards, Qt::LeftButton, Qt::NoModifier, center(button));
+        if (!QTest::qWaitFor([&] { return invoked.count() == 1; }) ||
+            invoked.at(0).at(1).toString() != "yes" || closed.count() != 1 ||
+            closed.at(0).at(1).toUInt() != NotificationCenter::Dismissed) {
+            std::cerr << "clicking an action's button did not run it and dismiss the card\n";
+            return 1;
+        }
+        if (!QTest::qWaitFor([&] { return !cards.isVisible(); }, 3000)) {
+            std::cerr << "the cards' surface stayed up after the last card left\n";
+            return 1;
+        }
+        // A click on the card runs its default action.
+        invoked.clear();
+        closed.clear();
+        id = make("Again", true);
+        if (!QTest::qWaitFor([&] { return cards.isVisible() && card() && card()->height() > 20; }))
+            return 1;
+        QTest::qWait(300); // the slide in
+        QTest::mouseClick(&cards, Qt::LeftButton, Qt::NoModifier,
+                          card()->mapToScene(QPointF(card()->width() - 60, 12)).toPoint());
+        if (!QTest::qWaitFor([&] { return invoked.count() == 1; }) ||
+            invoked.at(0).at(1).toString() != "default") {
+            std::cerr << "clicking a card did not run its default action\n";
+            return 1;
+        }
+        QTest::qWaitFor([&] { return !cards.isVisible(); }, 3000);
+        // The close button dismisses without running anything.
+        invoked.clear();
+        closed.clear();
+        make("Quiet", false);
+        if (!QTest::qWaitFor([&] { return cards.isVisible() && card() && card()->height() > 20; }))
+            return 1;
+        QTest::qWait(300);
+        auto *close = find(cards.rootObject(), "notificationClose");
+        QTest::mouseClick(&cards, Qt::LeftButton, Qt::NoModifier, center(close));
+        if (!QTest::qWaitFor([&] { return closed.count() == 1; }) || invoked.count() != 0) {
+            std::cerr << "the close button did not dismiss the card\n";
+            return 1;
+        }
+        QTest::qWaitFor([&] { return !cards.isVisible(); }, 3000);
+        // The history opens from the bell, marks what it shows as seen, and clears.
+        auto *history = find(view.rootObject(), "notificationHistory");
+        if (!history || history->isVisible()) {
+            std::cerr << "the history is missing or open at start\n";
+            return 1;
+        }
+        make("Kept one", false);
+        make("Kept two", false);
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(bell));
+        if (!QTest::qWaitFor([&] { return history->isVisible(); }) || daemon->unread() != 0) {
+            std::cerr << "clicking the bell did not open the history and mark it read\n";
+            return 1;
+        }
+        auto *list = find(view.rootObject(), "notificationList");
+        if (!list || !QTest::qWaitFor([&] { return list->property("count").toInt() == daemon->history()->count(); })) {
+            std::cerr << "the history does not list the notifications\n";
+            return 1;
+        }
+        auto *dndSwitch = find(view.rootObject(), "dndSwitch");
+        QTest::qWait(300);
+        QTest::mouseMove(&view, center(dndSwitch));
+        QTest::qWait(50);
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(dndSwitch), 80);
+        if (!QTest::qWaitFor([&] { return daemon->dnd(); })) {
+            std::cerr << "the do-not-disturb switch did nothing\n";
+            return 1;
+        }
+        daemon->setDnd(false);
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(find(view.rootObject(), "clearNotifications")));
+        if (!QTest::qWaitFor([&] { return daemon->history()->count() == 0; })) {
+            std::cerr << "Clear did not empty the history\n";
+            return 1;
+        }
+        // Right-clicking the bell toggles do-not-disturb.
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(bell)); // close the popup
+        QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, center(bell));
+        if (!QTest::qWaitFor([&] { return daemon->dnd(); })) {
+            std::cerr << "right-clicking the bell did not turn do-not-disturb on\n";
+            return 1;
+        }
+        daemon->setDnd(false);
+    }
     std::cout << "Hover/click, launcher keyboard focus, search, command launch, tiling toggle, and "
                  "workspace indicator, task and bar context menus, pinning into a window's slot, "
                  "reordering pins, "
-                 "task reordering, grouped windows, and the volume control passed\n";
+                 "task reordering, grouped windows, the volume control, the command palette, and the "
+                 "notification bell, cards and history passed\n";
 }

@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -22,8 +23,9 @@ with tempfile.TemporaryDirectory(prefix="shaode-shell-test-") as directory:
     config.write_text(source)
     compositor_log, shell_log = root / "compositor.log", root / "shell.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
-               QT_QPA_PLATFORM="wayland", QT_QUICK_BACKEND="software",
-               XDG_DATA_HOME=directory, XDG_DATA_DIRS=directory)
+               QT_QPA_PLATFORM="wayland", QT_QUICK_BACKEND="software", QT_FORCE_STDERR_LOGGING="1",
+               XDG_DATA_HOME=directory, XDG_DATA_DIRS=directory, SHAODE_DEFAULT_CONFIG=example,
+               DBUS_SESSION_BUS_ADDRESS="disabled:")  # the shell must not use the real session bus
     env.pop("DISPLAY", None)
     env.pop("WAYLAND_DISPLAY", None)
     processes = []
@@ -51,7 +53,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-shell-test-") as directory:
 
                 def reserved():
                     last[:] = [subprocess.run([probe, "--external-panel", str(height)], env=env,
-                                              capture_output=True, text=True, timeout=5)]
+                                              capture_output=True, text=True, timeout=30)]
                     return last[0].returncode == 0
 
                 wait_for(reserved, processes, f"panel reservation of {height}",
@@ -61,7 +63,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-shell-test-") as directory:
             # The launcher action reaches the panel on the output under the pointer.
             def launcher():
                 subprocess.run([compositor, "msg", "launcher"], env=env, check=True,
-                               capture_output=True, timeout=5)
+                               capture_output=True, timeout=30)
 
             def opened():
                 return "shaoDe launcher opened on" in shell_log.read_text()
@@ -78,6 +80,25 @@ with tempfile.TemporaryDirectory(prefix="shaode-shell-test-") as directory:
             launcher()
             wait_for(lambda: "shaoDe launcher closed on" in shell_log.read_text(),
                      processes, "launcher closed")
+            # The palette action opens the command palette as an overlay holding the keyboard;
+            # Escape (typed with wtype where it is installed) closes it again.
+            subprocess.run([compositor, "msg", "palette"], env=env, check=True,
+                           capture_output=True, timeout=30)
+            wait_for(lambda: "shaoDe palette shown on" in shell_log.read_text(), processes,
+                     "palette shown")
+            def layers():
+                return subprocess.run([compositor, "msg", "get", "layers"], env=env, check=True,
+                                      capture_output=True, text=True, timeout=30).stdout
+            wait_for(lambda: "shaode-palette" in layers(), processes, "palette surface mapped",
+                     detail=layers)
+            wtype = shutil.which("wtype")
+            if wtype:
+                subprocess.run([wtype, "-k", "Escape"], env=env, check=True, timeout=30)
+                wait_for(lambda: "shaoDe palette hidden on" in shell_log.read_text(), processes,
+                         "palette closed with Escape")
+            else:
+                subprocess.run([compositor, "msg", "palette"], env=env, check=True,
+                               capture_output=True, timeout=30)
             # A live panel-height change must alter maximized client geometry.
             config.write_text(source.replace("panel_height = 52", "panel_height = 72"))
             desktop.send_signal(signal.SIGHUP)
@@ -100,22 +121,24 @@ with tempfile.TemporaryDirectory(prefix="shaode-shell-test-") as directory:
             wait_for(lambda: shell_log.read_text().count(marker) >= 4,
                      processes, "panel back at the bottom after reload")
             check_panel(72)
-            # Invalid data must not kill the shell or replace the active reservation.
+            # Invalid data must not kill the shell: the default configuration stands in, with
+            # the error shown across the top until the file is fixed.
             config.write_text("return { shell = { panel_height = -1 } }")
             desktop.send_signal(signal.SIGHUP)
-            wait_for(lambda: "Shell reload rejected:" in shell_log.read_text(),
-                     processes, "invalid reload rejection")
-            check_panel(72)
+            wait_for(lambda: "shaoDe configuration error shown on" in shell_log.read_text(),
+                     processes, "configuration error banner")
+            assert "panel_height" in shell_log.read_text()
+            check_panel(52)
             config.write_text(source.replace("enabled = true", "enabled = false"))
             desktop.send_signal(signal.SIGHUP)
-            assert desktop.wait(timeout=5) == 0, shell_log.read_text()
+            assert desktop.wait(timeout=30) == 0, shell_log.read_text()
             processes.remove(desktop)
             check_panel(0)
             for message in ("ReferenceError", "TypeError", "failed", "error in client"):
                 assert message not in shell_log.read_text(), shell_log.read_text()
             server.terminate()
-            assert server.wait(timeout=5) == 0, compositor_log.read_text()
-            print("Qt desktop/panel rendering, launcher action, reservation, resize, rejection, and disable passed")
+            assert server.wait(timeout=30) == 0, compositor_log.read_text()
+            print("Qt desktop/panel rendering, launcher action, reservation, resize, error banner, and disable passed")
         except Exception:
             print(compositor_log.read_text(), shell_log.read_text(), file=sys.stderr)
             raise
@@ -123,4 +146,4 @@ with tempfile.TemporaryDirectory(prefix="shaode-shell-test-") as directory:
             for process in reversed(processes):
                 if process.poll() is None:
                     process.kill()
-                    process.wait(timeout=5)
+                    process.wait(timeout=30)

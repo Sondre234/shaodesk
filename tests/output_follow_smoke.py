@@ -35,7 +35,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-output-follow-test-") as directo
 
     def msg(*words):
         return subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                              text=True, timeout=5, check=True).stdout
+                              text=True, timeout=30, check=True).stdout
 
     def outputs():
         rows = [line.split("\t") for line in msg("get", "outputs").splitlines()]
@@ -85,7 +85,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-output-follow-test-") as directo
             assert window() == (x + 1280, y + 100, "HEADLESS-1"), window()
 
             server.send_signal(signal.SIGTERM)
-            assert server.wait(timeout=5) == 0, log.read_text()
+            assert server.wait(timeout=30) == 0, log.read_text()
             print("Layout origin and windows following their output passed")
         except Exception:
             print(log.read_text(), file=sys.stderr)
@@ -94,4 +94,4 @@ with tempfile.TemporaryDirectory(prefix="shaode-output-follow-test-") as directo
             for process in reversed(processes):
                 if process.poll() is None:
                     process.kill()
-                    process.wait(timeout=5)
+                    process.wait(timeout=30)

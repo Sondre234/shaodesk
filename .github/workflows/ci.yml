@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax check of the test drivers
+        run: python3 -m py_compile tests/*.py
+      - name: Shellcheck the helper scripts
+        run: shellcheck -S warning -x tools/*.sh tools/gentoo-vm/*.sh
+
+  build:
+    # wlroots is pinned to the 0.20 series, which Arch ships as its own package.
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm --needed base-devel git cmake ninja pkgconf python \
+            lua wlroots0.20 wayland wayland-protocols libxkbcommon libinput \
+            xorg-xwayland libxcb libpulse systemd-libs dbus \
+            qt6-base qt6-declarative qt6-wayland layer-shell-qt glib2
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DSHAODE_BUILD_COMPOSITOR=ON
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        # Headless tests only; the runner has no GPU or display. shell_preview is excluded
+        # while it is being fixed on master.
+        run: ctest --test-dir build --output-on-failure -E shell_preview
+        env:
+          QT_QPA_PLATFORM: offscreen

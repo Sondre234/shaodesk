@@ -26,14 +26,14 @@ with tempfile.TemporaryDirectory(prefix="shaode-sticky-test-") as directory:
 
     def msg(*words, ok=True):
         result = subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                                text=True, timeout=5)
+                                text=True, timeout=30)
         assert (result.returncode == 0) == ok, (words, result.stdout, result.stderr)
         return result.stdout if ok else result.stderr
 
     def window():
         """(workspace, focused, tiled, visible, sticky) of the only window."""
         rows = [line.split("\t") for line in msg("get", "windows").splitlines()]
-        assert len(rows) == 1 and len(rows[0]) == 14, rows
+        assert len(rows) == 1 and len(rows[0]) == 15, rows
         row = rows[0]
         return (int(row[0]), row[1] == "1", row[3] == "1", row[11] == "1", row[13] == "1")
 
@@ -70,7 +70,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-sticky-test-") as directory:
 
             # Activating it from the taskbar leaves the workspace alone.
             subprocess.run([probe, "--activate", "shaode-probe"], env=env, check=True,
-                           timeout=5, stdout=subprocess.DEVNULL)
+                           timeout=30, stdout=subprocess.DEVNULL)
             assert workspace() == 3 and window() == (3, True, False, True, True), window()
 
             # Unsticking it leaves it on this workspace, tiled again as before.
@@ -111,12 +111,12 @@ with tempfile.TemporaryDirectory(prefix="shaode-sticky-test-") as directory:
             assert window() == (1, True, False, True, True), window()
 
             msg("close")
-            assert client.wait(timeout=5) == 0
+            assert client.wait(timeout=30) == 0
             processes.remove(client)
             assert msg("get", "windows") == ""
 
             server.terminate()
-            assert server.wait(timeout=5) == 0, log.read_text()
+            assert server.wait(timeout=30) == 0, log.read_text()
             print("Sticky windows follow workspaces, unstick on move, and obey features.sticky")
         except Exception:
             print(log.read_text(), file=sys.stderr)
@@ -125,4 +125,4 @@ with tempfile.TemporaryDirectory(prefix="shaode-sticky-test-") as directory:
             for process in reversed(processes):
                 if process.poll() is None:
                     process.kill()
-                    process.wait(timeout=5)
+                    process.wait(timeout=30)

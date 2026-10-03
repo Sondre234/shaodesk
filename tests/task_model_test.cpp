@@ -55,6 +55,31 @@ int main(int argc, char **argv) {
         wait([&] { return value(TaskModel::Minimized).toBool(); }, "show desktop failed");
         model.activate(id);
         wait([&] { return value(TaskModel::Active).toBool(); }, "second activation failed");
+        // The compositor names urgent windows by app id and title; a match marks the task, and
+        // only that announces a change of the role.
+        int urgentSignals = 0;
+        QObject::connect(&model, &QAbstractItemModel::dataChanged, &model,
+                         [&](const QModelIndex &, const QModelIndex &, const QList<int> &roles) {
+                             if (roles.contains(TaskModel::Urgent))
+                                 ++urgentSignals;
+                         });
+        if (value(TaskModel::Urgent).toBool())
+            throw std::runtime_error("a task is urgent before anything asked");
+        model.setUrgent({{"shaode-probe", "another title"}, {"other-app", "shaoDe protocol probe"}});
+        if (value(TaskModel::Urgent).toBool() || urgentSignals != 0)
+            throw std::runtime_error("an urgent window with another title or app marked the task");
+        model.setUrgent({{"shaode-probe", "shaoDe protocol probe"}});
+        if (!value(TaskModel::Urgent).toBool() || urgentSignals != 1)
+            throw std::runtime_error("the urgent window did not mark its task");
+        model.setUrgent({{"shaode-probe", "shaoDe protocol probe"}});
+        if (urgentSignals != 1)
+            throw std::runtime_error("an unchanged urgent list announced a change");
+        model.setUrgent({});
+        if (value(TaskModel::Urgent).toBool() || urgentSignals != 2)
+            throw std::runtime_error("clearing the urgent list did not unmark the task");
+        if (model.roleNames().value(TaskModel::Urgent) != "urgent")
+            throw std::runtime_error("the urgent role is not named for QML");
+        model.setUrgent({{"shaode-probe", "shaoDe protocol probe"}});
         model.close(id);
         wait([&] { return model.rowCount() == 0; }, "closed task was not removed");
         if ((client.state() != QProcess::NotRunning && !client.waitForFinished(2000)) ||

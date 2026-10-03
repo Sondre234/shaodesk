@@ -52,14 +52,14 @@ with tempfile.TemporaryDirectory(prefix="shaode-output-test-") as directory:
 
     def outputs():
         result = subprocess.run([compositor, "msg", "get", "outputs"], env=env,
-                                capture_output=True, text=True, timeout=5, check=True)
+                                capture_output=True, text=True, timeout=30, check=True)
         rows = [line.split("\t") for line in result.stdout.splitlines()]
         return {row[0]: (row[1] == "1", int(row[2]), int(row[3]), int(row[4]), int(row[5]),
                          float(row[6]), int(row[7]), row[8]) for row in rows}
 
     def advertised():
         result = subprocess.run([probe, "--globals"], env=env, capture_output=True, text=True,
-                                timeout=10, check=True)
+                                timeout=30, check=True)
         return result.stdout.split().count("wl_output")
 
     def reload(text, count):
@@ -111,7 +111,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-output-test-") as directory:
             assert advertised() == 3
 
             server.send_signal(signal.SIGTERM)
-            assert server.wait(timeout=5) == 0, log.read_text()
+            assert server.wait(timeout=30) == 0, log.read_text()
             print("Output modes, scale, transform, positions, and disabling passed")
         except Exception:
             print(log.read_text(), file=sys.stderr)

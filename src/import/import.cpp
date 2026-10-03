@@ -238,6 +238,17 @@ class Translator {
         }
         used_.insert("decoration:rounding_power");
         flag("animations:enabled", {"animations", "enabled"});
+        // Hyprland focuses an activating window only when asked; shaoDe marks it urgent instead
+        // unless windows.activation says "focus".
+        if (auto *value = option("misc:focus_on_activate")) {
+            if (auto parsed = parse_bool(value->text)) {
+                if (*parsed)
+                    theme_.set({"windows", "activation"}, quote("focus"), value->origin);
+            } else {
+                report_.skip(files_, value->origin,
+                             "misc:focus_on_activate = " + value->text + " is not a boolean");
+            }
+        }
 
         text("input:kb_layout", {"keyboard", "layout"});
         text("input:kb_options", {"keyboard", "options"});

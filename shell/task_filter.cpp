@@ -18,6 +18,28 @@ void TaskFilter::setSourceModel(QAbstractItemModel *source) {
     for (const auto &connection : sourceConnections_)
         disconnect(connection);
     sourceConnections_.clear();
+    forget();
+    roleIds_.clear();
+    if (source) {
+        // Connected ahead of the proxy's own handlers, which ask filterAcceptsRow at once.
+        const auto forgetting = [this] { forget(); };
+        sourceConnections_ = {
+            connect(source, &QAbstractItemModel::dataChanged, this,
+                    [this](const QModelIndex &, const QModelIndex &, const QList<int> &roles) {
+                        if (roles.isEmpty() || roles.contains(roleId("appId")))
+                            forget();
+                    }),
+            connect(source, &QAbstractItemModel::rowsInserted, this, forgetting),
+            connect(source, &QAbstractItemModel::rowsRemoved, this, forgetting),
+            connect(source, &QAbstractItemModel::rowsMoved, this, forgetting),
+            connect(source, &QAbstractItemModel::layoutChanged, this, forgetting),
+            connect(source, &QAbstractItemModel::modelReset, this,
+                    [this] {
+                        forget();
+                        roleIds_.clear();
+                    }),
+        };
+    }
     QSortFilterProxyModel::setSourceModel(source);
     if (!source)
         return;
@@ -28,14 +50,21 @@ void TaskFilter::setSourceModel(QAbstractItemModel *source) {
         if (grouped_)
             refilter();
     };
-    sourceConnections_ = {
-        connect(source, &QAbstractItemModel::dataChanged, this, &TaskFilter::refilter),
+    // Only the application id decides where a window belongs, so its other changes (a title
+    // changing is the commonest event of all) leave the rows as they are.
+    sourceConnections_ += {
+        connect(source, &QAbstractItemModel::dataChanged, this,
+                [this](const QModelIndex &, const QModelIndex &, const QList<int> &roles) {
+                    if (roles.isEmpty() || roles.contains(roleId("appId")))
+                        refilter();
+                }),
         connect(source, &QAbstractItemModel::rowsInserted, this, regroup),
         connect(source, &QAbstractItemModel::rowsRemoved, this, regroup),
         connect(source, &QAbstractItemModel::rowsMoved, this, regroup),
     };
 }
 void TaskFilter::refilter() {
+    forget();
 #if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
     beginFilterChange();
     endFilterChange(Direction::Rows);
@@ -77,9 +106,19 @@ void TaskFilter::setGrouped(bool grouped) {
     refilter();
     Q_EMIT groupedChanged();
 }
+int TaskFilter::roleId(const char *role) const {
+    auto found = roleIds_.constFind(role);
+    if (found != roleIds_.cend())
+        return *found;
+    // A model may gain roles as it fills (a QML ListModel), so only a role found is remembered.
+    const int id = sourceModel()->roleNames().key(role, -1);
+    if (id >= 0)
+        roleIds_.insert(role, id);
+    return id;
+}
 QVariant TaskFilter::sourceValue(int row, const char *role) const {
     auto *source = sourceModel();
-    return source->data(source->index(row, 0), source->roleNames().key(role, -1));
+    return source->data(source->index(row, 0), roleId(role));
 }
 int TaskFilter::value(int row, const char *role) const {
     return sourceValue(mapToSource(index(row, 0)).row(), role).toInt();
@@ -95,18 +134,27 @@ bool TaskFilter::belongs(int row) const {
 QString TaskFilter::groupOf(int row) const {
     return app_.isEmpty() ? sourceValue(row, "appId").toString() : app_;
 }
+void TaskFilter::computeAccepted() const {
+    const int rows = sourceModel()->rowCount();
+    accepted_.assign(rows, 0);
+    QSet<QString> seen;
+    for (int row = 0; row < rows; ++row) {
+        if (!belongs(row))
+            continue;
+        const auto group = grouped_ ? groupOf(row) : QString();
+        // The first window of an application stands for it; windows without one stand alone.
+        accepted_[row] = group.isEmpty() || !seen.contains(group);
+        if (!group.isEmpty())
+            seen.insert(group);
+    }
+    acceptedValid_ = true;
+}
 bool TaskFilter::filterAcceptsRow(int row, const QModelIndex &parent) const {
-    if (parent.isValid() || !belongs(row))
+    if (parent.isValid() || row < 0)
         return false;
-    if (!grouped_)
-        return true;
-    const auto group = groupOf(row);
-    if (group.isEmpty())
-        return true;
-    for (int earlier = 0; earlier < row; ++earlier)
-        if (belongs(earlier) && groupOf(earlier) == group)
-            return false;
-    return true;
+    if (!acceptedValid_ || row >= accepted_.size())
+        computeAccepted();
+    return row < accepted_.size() && accepted_[row];
 }
 int TaskFilter::activeTask() const {
     for (int row = 0; row < rowCount(); ++row)
@@ -119,6 +167,12 @@ bool TaskFilter::minimized() const {
         if (!value(row, "minimized"))
             return false;
     return rowCount() > 0;
+}
+bool TaskFilter::urgent() const {
+    for (int row = 0; row < rowCount(); ++row)
+        if (value(row, "urgent"))
+            return true;
+    return false;
 }
 int TaskFilter::nextTask() const {
     if (rowCount() == 0)

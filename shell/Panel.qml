@@ -6,25 +6,37 @@ import ShaoDe
 
 Item {
     id: root
+    // Set by the view: itself, and the compositor's name for the output it is on.
+    required property var shellView
+    required property string outputName
     property bool launcherOpen: false
+    // The popups are made when first needed, or a moment after startup so that the first use
+    // finds them ready: what the bar shows first does not wait for them.
+    property bool warm: false
+    Timer { interval: 1500; running: true; onTriggered: root.warm = true }
     // The context menu belongs to a task, a pinned application (pinMenuApp), or the bar itself
     // when barMenuOpen is set. A task's menu offers to pin the application it belongs to.
     property int taskMenuId: -1
     property string taskMenuApp: ""
     property var pinMenuApp: null
     property bool barMenuOpen: false
+    // The bar menu shows the appearance profiles instead of its own entries.
+    property bool profileMenu: false
     property real contextMenuX: 0
     // The windows the taskbar shows; a stand-in model replaces it in tests.
     property var taskSource: shell.tasks
     // The sound server, replaced in tests too. Its popup is "mixer" (a slider per application)
     // or "outputs" (the output to play through), shown above the volume control.
     property var audioSource: shell.audio
+    // Battery and network state; tests swap in one that reads a fake sysfs.
+    property var statusSource: shell.status
     property string audioPopup: ""
     property real audioPopupX: 0
     property bool menuOpen: launcherOpen || taskMenuId >= 0 || pinMenuApp !== null || barMenuOpen || audioPopup !== ""
     // Hovering an application's stacked button lists its windows above it: those of the pinned
     // application groupSlot, or with the app id groupWindowApp outside the pinned slots.
     property bool groupOpen: false
+    readonly property bool groupListHovered: groupListLoader.item ? groupListLoader.item.hovered : false
     property string groupSlot: ""
     property string groupWindowApp: ""
     property string groupIcon: ""
@@ -38,7 +50,7 @@ Item {
         shellView.setExpanded(expanded, menuOpen)
     }
     onLauncherOpenChanged: {
-        if (launcherOpen) { taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; search.text = ""; search.forceActiveFocus() }
+        if (launcherOpen) { taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = "" }
     }
     function closeMenus() { launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false }
     // A stacked button hovered for a moment, or at once while another's list is open, shows its
@@ -67,7 +79,7 @@ Item {
     Timer { id: groupShow; interval: 350; onTriggered: root.showGroup() }
     Timer {
         id: groupHide; interval: 300
-        onTriggered: if (!groupHover.hovered && !(root.groupPending && root.groupPending.hovered)) root.groupOpen = false
+        onTriggered: if (!root.groupListHovered && !(root.groupPending && root.groupPending.hovered)) root.groupOpen = false
     }
     // Opens on press, as a desktop context menu does: waiting for a tap lost a press held
     // past the long-press time or moved while held. The new menu opens before the old one
@@ -77,6 +89,7 @@ Item {
         if (taskId >= 0) { taskMenuId = taskId; taskMenuApp = shell.appFor(app || ""); pinMenuApp = null; barMenuOpen = false }
         else if (app) { pinMenuApp = app; taskMenuId = -1; barMenuOpen = false }
         else { barMenuOpen = true; taskMenuId = -1; pinMenuApp = null }
+        profileMenu = false
         launcherOpen = false; audioPopup = ""
     }
     // Opens (or, when it is already open, closes) one of the volume control's popups.
@@ -117,9 +130,11 @@ Item {
         required property string appId
         required property bool active
         required property bool minimized
+        required property bool urgent
         // Inline components do not see this file's ids, so each use passes the panel in.
         required property Item panel
-        property string iconName: appId
+        // A window names its own app ID; a path in it is no icon to load from disk.
+        property string iconName: appId.indexOf("/") >= 0 ? "application-x-executable" : appId
         property TaskFilter group: null
         // Where the hover list finds the group's windows (see the panel's groupSlot).
         property string groupSlot: ""
@@ -128,6 +143,8 @@ Item {
         readonly property bool stacked: windows > 1
         readonly property bool shownActive: group && group.count > 0 ? group.activeTask >= 0 : active
         readonly property bool shownMinimized: group && group.count > 0 ? group.minimized : minimized
+        // Asking for attention: any window of a stack will do.
+        readonly property bool shownUrgent: group && group.count > 0 ? group.urgent : urgent
         height: shell.panelHeight - 10
         // Hovering a stacked button lists its windows, whatever the platform thinks of hover.
         hoverEnabled: true
@@ -138,7 +155,7 @@ Item {
             shell.tasks.activate(stacked ? group.nextTask() : taskId)
         }
         onHoveredChanged: task.panel.hoverGroup(task, hovered)
-        Accessible.name: stacked ? title + " and " + (windows - 1) + " more" : title
+        Accessible.name: (stacked ? title + " and " + (windows - 1) + " more" : title) + (shownUrgent ? " (needs attention)" : "")
         // The panel's surface is only as tall as the bar, so an in-window tooltip would be
         // squeezed onto the icon and swallow its clicks; a popup window of its own sits above
         // the bar instead. Qt before 6.8 has no popup windows and draws it in the bar.
@@ -147,12 +164,16 @@ Item {
             visible: shell.iconsOnly && !task.stacked && task.hovered && !task.panel.expanded && !task.pressed
             delay: 500
             text: task.title
+            // A title is text, not markup; the default content item would read it as either.
+            contentItem: Text { text: tip.text; textFormat: Text.PlainText; font: tip.font; wrapMode: Text.Wrap; color: tip.palette.toolTipText }
             y: task.panel.onTop ? task.height + 6 : -implicitHeight - 6
             Component.onCompleted: if ("popupType" in tip) tip.popupType = Popup.Window
         }
         background: Rectangle {
             radius: 6
-            color: task.shownActive ? Qt.lighter(shell.panelColor, 1.7) : (task.hovered ? Qt.lighter(shell.panelColor, 1.4) : "transparent")
+            color: task.shownUrgent ? Qt.rgba(shell.urgentColor.r, shell.urgentColor.g, shell.urgentColor.b, 0.24)
+                   : task.shownActive ? Qt.lighter(shell.panelColor, 1.7) : (task.hovered ? Qt.lighter(shell.panelColor, 1.4) : "transparent")
+            border.width: task.shownUrgent ? 1 : 0; border.color: shell.urgentColor
             // Several windows: a second button's edge peeks out behind this one.
             Rectangle {
                 visible: task.stacked
@@ -167,8 +188,22 @@ Item {
                     model: task.stacked ? 2 : 1
                     Rectangle {
                         width: task.shownActive ? (shell.iconsOnly ? 18 : 28) / (task.stacked ? 2 : 1) : (task.stacked ? 6 : 10)
-                        height: 3; radius: 1; color: task.shownMinimized ? "#627084" : shell.accent
+                        height: 3; radius: 1; color: task.shownUrgent ? shell.urgentColor : task.shownMinimized ? "#627084" : shell.accent
                     }
+                }
+            }
+            // A dot that pulses a few times when the window asks for attention, then holds.
+            Rectangle {
+                objectName: "taskUrgent"
+                visible: task.shownUrgent
+                anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 2
+                width: 8; height: 8; radius: 4
+                color: shell.urgentColor
+                SequentialAnimation on opacity {
+                    running: task.shownUrgent
+                    loops: 6; alwaysRunToEnd: true
+                    NumberAnimation { to: 0.3; duration: 450 }
+                    NumberAnimation { to: 1; duration: 450 }
                 }
             }
             Rectangle {
@@ -188,7 +223,7 @@ Item {
                 source: "image://icons/" + task.iconName; sourceSize: Qt.size(size, size)
                 Layout.preferredWidth: size; Layout.preferredHeight: size
             }
-            Text { visible: !shell.iconsOnly; text: task.title; color: shell.textColor; elide: Text.ElideRight; Layout.fillWidth: true; font.pixelSize: shell.fontSize; font.family: task.panel.uiFont }
+            Text { visible: !shell.iconsOnly; text: task.title; textFormat: Text.PlainText; color: shell.textColor; elide: Text.ElideRight; Layout.fillWidth: true; font.pixelSize: shell.fontSize; font.family: task.panel.uiFont }
             Item { Layout.fillWidth: shell.iconsOnly }
         }
         // Right-click opens the task's menu; middle-click closes its window.
@@ -205,38 +240,84 @@ Item {
         }
     }
 
-    // A loudspeaker with a wave per third of the volume, or crossed out while muted.
-    component SpeakerIcon: Canvas {
-        id: speaker
-        property int level: 0
-        property bool muted: false
-        property color color: shell.textColor
-        width: 22; height: 18
-        onLevelChanged: requestPaint()
-        onMutedChanged: requestPaint()
-        onColorChanged: requestPaint()
-        onPaint: {
-            var ctx = getContext("2d")
-            ctx.reset()
-            ctx.fillStyle = speaker.color; ctx.strokeStyle = speaker.color
-            ctx.lineWidth = 1.8; ctx.lineCap = "round"
-            ctx.beginPath()
-            ctx.moveTo(1.5, 6.5); ctx.lineTo(5, 6.5); ctx.lineTo(9.5, 2.5)
-            ctx.lineTo(9.5, 15.5); ctx.lineTo(5, 11.5); ctx.lineTo(1.5, 11.5)
-            ctx.closePath(); ctx.fill()
-            if (speaker.muted || speaker.level === 0) {
-                ctx.beginPath()
-                ctx.moveTo(13.5, 6); ctx.lineTo(19.5, 12); ctx.moveTo(19.5, 6); ctx.lineTo(13.5, 12)
-                ctx.stroke()
-                return
+    // A tooltip in a popup window of its own: the panel's surface is only as tall as the bar.
+    component BarTip: ToolTip {
+        id: barTip
+        required property Item owner
+        visible: owner.hovered && !owner.pressed && text.length > 0 && !root.menuOpen
+        delay: 500
+        y: root.onTop ? owner.height + 6 : -implicitHeight - 6
+        Component.onCompleted: if ("popupType" in barTip) barTip.popupType = Popup.Window
+    }
+
+    // The battery: an outline filled to the charge, red when nearly empty and not charging,
+    // in the accent colour while charging.
+    component BatteryWidget: Button {
+        id: battery
+        objectName: "batteryWidget"
+        readonly property var status: root.statusSource
+        readonly property bool low: status.batteryPercent <= 15 && status.batteryState !== "charging"
+        readonly property color tint: low ? "#ff6b6b" : (status.batteryState === "charging" ? shell.accent : shell.textColor)
+        visible: shell.widgets.battery && status.batteryPresent
+        Layout.preferredWidth: 62; Layout.preferredHeight: bar.height - 10
+        hoverEnabled: true
+        Accessible.name: status.batteryText
+        background: Rectangle { radius: 7; color: battery.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
+        BarTip { owner: battery; text: battery.status.batteryText }
+        contentItem: Row {
+            spacing: 5
+            anchors.centerIn: parent
+            Item {
+                anchors.verticalCenter: parent.verticalCenter; width: 24; height: 12
+                Rectangle {
+                    width: 21; height: 12; radius: 2; color: "transparent"
+                    border.color: battery.tint; border.width: 1
+                    Rectangle {
+                        objectName: "batteryLevel"
+                        x: 2; y: 2; height: parent.height - 4; radius: 1
+                        width: Math.max(1, (parent.width - 4) * battery.status.batteryPercent / 100)
+                        color: battery.tint
+                    }
+                }
+                Rectangle { x: 21; y: 4; width: 2; height: 4; color: battery.tint }
             }
-            var waves = speaker.level > 66 ? 3 : speaker.level > 33 ? 2 : 1
-            for (var i = 0; i < waves; ++i) {
-                ctx.beginPath()
-                ctx.arc(9.5, 9, 4 + i * 3.8, -0.75, 0.75)
-                ctx.stroke()
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: battery.status.batteryPercent + "%"
+                color: battery.tint
+                font.pixelSize: Math.max(6, shell.fontSize - 1); font.family: root.uiFont
             }
         }
+    }
+
+    // The network: ascending bars for Wi-Fi, a plug for a wired link, dimmed and struck through
+    // when the interface is down.
+    component NetworkWidget: Button {
+        id: network
+        objectName: "networkWidget"
+        readonly property var status: root.statusSource
+        readonly property bool linkDown: status.networkState === "disconnected"
+        readonly property color tint: down ? "#8a96a8" : shell.textColor
+        visible: shell.widgets.network && status.networkState !== "none"
+        Layout.preferredWidth: 34; Layout.preferredHeight: bar.height - 10
+        hoverEnabled: true
+        Accessible.name: status.networkText
+        background: Rectangle { radius: 7; color: network.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
+        BarTip { owner: network; text: network.status.networkText }
+        contentItem: Item {
+            Icon {
+                anchors.centerIn: parent
+                name: network.status.networkState === "ethernet" ? "ethernet-port" : (network.linkDown ? "wifi-off" : "wifi")
+                color: network.tint
+            }
+        }
+    }
+
+    // A loudspeaker with a wave per half of the volume, or crossed out while muted.
+    component SpeakerIcon: Icon {
+        property int level: 0
+        property bool muted: false
+        name: muted || level === 0 ? "volume-x" : level > 50 ? "volume-2" : "volume-1"
     }
     component AudioSlider: Slider {
         id: slider
@@ -273,271 +354,683 @@ Item {
     }
 
     // Left-clicking the volume control: the default output's volume, then each application's.
-    Rectangle {
-        id: audioMixer
-        objectName: "audioMixer"
-        readonly property int rowHeight: 50
-        readonly property string outputName: {
-            var outputs = root.audioSource.outputs
-            for (var i = 0; i < outputs.length; ++i)
-                if (outputs[i].name === root.audioSource.output) return outputs[i].description
-            return "No output"
-        }
-        visible: root.audioPopup === "mixer"
-        width: 340
-        height: Math.min(root.height - shell.panelExtent - 20,
-                         30 + 2 * 26 + rowHeight + Math.max(1, streamList.count) * rowHeight + 10)
-        x: Math.max(8, Math.min(root.audioPopupX - width / 2, root.width - width - 8))
-        anchors.bottom: root.onTop ? undefined : bar.top; anchors.bottomMargin: 8
-        anchors.top: root.onTop ? bar.bottom : undefined; anchors.topMargin: 8
-        color: shell.panelColor; radius: 12
-        border.color: Qt.lighter(shell.panelColor, 1.6)
-        MouseArea { anchors.fill: parent }
-        ColumnLayout {
-            anchors.fill: parent; anchors.margins: 14; spacing: 0
-            Text {
-                Layout.fillWidth: true; Layout.preferredHeight: 26
-                text: audioMixer.outputName; elide: Text.ElideRight
-                color: shell.textColor; font.pixelSize: shell.fontSize; font.weight: Font.DemiBold; font.family: root.uiFont
-            }
-            RowLayout {
-                Layout.fillWidth: true; Layout.preferredHeight: audioMixer.rowHeight
-                spacing: 8
-                MuteButton {
-                    objectName: "audioMute"
-                    level: root.audioSource.volume; muted: root.audioSource.muted
-                    Accessible.name: muted ? "Unmute" : "Mute"
-                    onClicked: root.audioSource.toggleMute()
+    Loader {
+        id: mixerLoader
+        asynchronous: !(root.audioPopup === "mixer")
+        active: root.audioPopup === "mixer" || root.warm || used
+        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+        property bool used: false
+        onLoaded: used = true
+        sourceComponent: Component {
+            Rectangle {
+                id: audioMixer
+                parent: root
+                objectName: "audioMixer"
+                readonly property int rowHeight: 50
+                readonly property string outputName: {
+                    var outputs = root.audioSource.outputs
+                    for (var i = 0; i < outputs.length; ++i)
+                        if (outputs[i].name === root.audioSource.output) return outputs[i].description
+                    return "No output"
                 }
-                AudioSlider {
-                    objectName: "audioVolumeSlider"
-                    Layout.fillWidth: true
-                    value: root.audioSource.volume; muted: root.audioSource.muted
-                    onMoved: root.audioSource.setVolume(Math.round(value))
-                }
-                Text { text: root.audioSource.volume + "%"; color: shell.textColor; font.pixelSize: shell.fontSize - 1; font.family: root.uiFont; Layout.preferredWidth: 38; horizontalAlignment: Text.AlignRight }
-            }
-            Text {
-                Layout.fillWidth: true; Layout.preferredHeight: 26
-                text: "Applications"; verticalAlignment: Text.AlignBottom
-                color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize - 1; font.family: root.uiFont
-            }
-            ListView {
-                id: streamList
-                objectName: "audioStreams"
-                Layout.fillWidth: true; Layout.fillHeight: true
-                clip: true
-                model: root.audioSource.streams
-                ScrollBar.vertical: ScrollBar {}
-                delegate: RowLayout {
-                    id: streamRow
-                    required property int streamId
-                    required property string name
-                    required property string icon
-                    required property int volume
-                    required property bool muted
-                    width: ListView.view.width; height: audioMixer.rowHeight
-                    spacing: 8
-                    Image { source: "image://icons/" + streamRow.icon; sourceSize: Qt.size(24, 24); Layout.preferredWidth: 24; Layout.preferredHeight: 24; Layout.leftMargin: 4; Layout.rightMargin: 4 }
-                    ColumnLayout {
-                        Layout.fillWidth: true; spacing: 0
-                        Text { Layout.fillWidth: true; text: streamRow.name; elide: Text.ElideRight; color: shell.textColor; font.pixelSize: shell.fontSize - 1; font.family: root.uiFont }
+                visible: root.audioPopup === "mixer"
+                width: 340
+                height: Math.min(root.height - shell.panelExtent - 20,
+                                 30 + 2 * 26 + rowHeight + Math.max(1, streamList.count) * rowHeight + 10)
+                x: Math.max(8, Math.min(root.audioPopupX - width / 2, root.width - width - 8))
+                y: root.onTop ? bar.y + bar.height + 8 : bar.y - height - 8
+                color: shell.panelColor; radius: 12
+                border.color: Qt.lighter(shell.panelColor, 1.6)
+                MouseArea { anchors.fill: parent }
+                ColumnLayout {
+                    anchors.fill: parent; anchors.margins: 14; spacing: 0
+                    Text {
+                        Layout.fillWidth: true; Layout.preferredHeight: 26
+                        text: audioMixer.outputName; elide: Text.ElideRight
+                        color: shell.textColor; font.pixelSize: shell.fontSize; font.weight: Font.DemiBold; font.family: root.uiFont
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true; Layout.preferredHeight: audioMixer.rowHeight
+                        spacing: 8
+                        MuteButton {
+                            objectName: "audioMute"
+                            level: root.audioSource.volume; muted: root.audioSource.muted
+                            Accessible.name: muted ? "Unmute" : "Mute"
+                            onClicked: root.audioSource.toggleMute()
+                        }
                         AudioSlider {
-                            objectName: "audioStreamSlider"
-                            Layout.fillWidth: true; Layout.preferredHeight: 24
-                            value: streamRow.volume; muted: streamRow.muted
-                            onMoved: root.audioSource.setStreamVolume(streamRow.streamId, Math.round(value))
+                            objectName: "audioVolumeSlider"
+                            Layout.fillWidth: true
+                            value: root.audioSource.volume; muted: root.audioSource.muted
+                            onMoved: root.audioSource.setVolume(Math.round(value))
+                        }
+                        Text { text: root.audioSource.volume + "%"; color: shell.textColor; font.pixelSize: shell.fontSize - 1; font.family: root.uiFont; Layout.preferredWidth: 38; horizontalAlignment: Text.AlignRight }
+                    }
+                    Text {
+                        Layout.fillWidth: true; Layout.preferredHeight: 26
+                        text: "Applications"; verticalAlignment: Text.AlignBottom
+                        color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize - 1; font.family: root.uiFont
+                    }
+                    ListView {
+                        id: streamList
+                        objectName: "audioStreams"
+                        Layout.fillWidth: true; Layout.fillHeight: true
+                        clip: true
+                        model: root.audioSource.streams
+                        ScrollBar.vertical: ScrollBar {}
+                        delegate: RowLayout {
+                            id: streamRow
+                            required property int streamId
+                            required property string name
+                            required property string icon
+                            required property int volume
+                            required property bool muted
+                            width: ListView.view.width; height: audioMixer.rowHeight
+                            spacing: 8
+                            Image { source: "image://icons/" + streamRow.icon; sourceSize: Qt.size(24, 24); Layout.preferredWidth: 24; Layout.preferredHeight: 24; Layout.leftMargin: 4; Layout.rightMargin: 4 }
+                            ColumnLayout {
+                                Layout.fillWidth: true; spacing: 0
+                                Text { Layout.fillWidth: true; text: streamRow.name; elide: Text.ElideRight; color: shell.textColor; font.pixelSize: shell.fontSize - 1; font.family: root.uiFont }
+                                AudioSlider {
+                                    objectName: "audioStreamSlider"
+                                    Layout.fillWidth: true; Layout.preferredHeight: 24
+                                    value: streamRow.volume; muted: streamRow.muted
+                                    onMoved: root.audioSource.setStreamVolume(streamRow.streamId, Math.round(value))
+                                }
+                            }
+                            MuteButton {
+                                level: streamRow.volume; muted: streamRow.muted
+                                Accessible.name: (muted ? "Unmute " : "Mute ") + streamRow.name
+                                onClicked: root.audioSource.toggleStreamMute(streamRow.streamId)
+                            }
+                        }
+                        Text { anchors.centerIn: parent; visible: streamList.count === 0; text: "No applications are playing sound"; color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize - 1; font.family: root.uiFont }
+                    }
+                }
+            }
+        }
+    }
+
+    // Clicking the clock: a month calendar with the current day marked.
+    Loader {
+        id: calendarLoader
+        asynchronous: !(root.audioPopup === "calendar")
+        active: root.audioPopup === "calendar" || root.warm || used
+        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+        property bool used: false
+        onLoaded: used = true
+        sourceComponent: Component {
+            Rectangle {
+                id: calendar
+                parent: root
+                objectName: "calendar"
+                property int month: new Date().getMonth()
+                property int year: new Date().getFullYear()
+                function step(delta) {
+                    var d = new Date(year, month + delta, 1)
+                    year = d.getFullYear(); month = d.getMonth()
+                }
+                function today() { var d = new Date(); year = d.getFullYear(); month = d.getMonth() }
+                visible: root.audioPopup === "calendar"
+                onVisibleChanged: if (visible) today()
+                width: 288; height: 330
+                x: Math.max(8, Math.min(root.audioPopupX - width / 2, root.width - width - 8))
+                y: root.onTop ? bar.y + bar.height + 8 : bar.y - height - 8
+                color: shell.panelColor; radius: 12
+                border.color: Qt.lighter(shell.panelColor, 1.6)
+                MouseArea { anchors.fill: parent }
+                ColumnLayout {
+                    anchors.fill: parent; anchors.margins: 14; spacing: 6
+                    RowLayout {
+                        Layout.fillWidth: true; spacing: 4
+                        Button {
+                            objectName: "calendarPrevious"
+                            text: "\u2039"; Layout.preferredWidth: 32; Layout.preferredHeight: 30
+                            onClicked: calendar.step(-1)
+                            Accessible.name: "Previous month"
+                            background: Rectangle { radius: 6; color: parent.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
+                            contentItem: Text { text: parent.text; color: shell.textColor; font.pixelSize: 20; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                        }
+                        Button {
+                            objectName: "calendarTitle"
+                            Layout.fillWidth: true; Layout.preferredHeight: 30
+                            onClicked: calendar.today()
+                            Accessible.name: "Go to today"
+                            background: Rectangle { radius: 6; color: parent.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
+                            contentItem: Text {
+                                text: Qt.locale().monthName(calendar.month) + " " + calendar.year
+                                color: shell.textColor; font.pixelSize: shell.fontSize + 1; font.weight: Font.DemiBold; font.family: root.uiFont
+                                horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                            }
+                        }
+                        Button {
+                            objectName: "calendarNext"
+                            text: "\u203a"; Layout.preferredWidth: 32; Layout.preferredHeight: 30
+                            onClicked: calendar.step(1)
+                            Accessible.name: "Next month"
+                            background: Rectangle { radius: 6; color: parent.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
+                            contentItem: Text { text: parent.text; color: shell.textColor; font.pixelSize: 20; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                         }
                     }
-                    MuteButton {
-                        level: streamRow.volume; muted: streamRow.muted
-                        Accessible.name: (muted ? "Unmute " : "Mute ") + streamRow.name
-                        onClicked: root.audioSource.toggleStreamMute(streamRow.streamId)
+                    // Both size their cells only when their own size changes, which can happen
+                    // before the cells exist when the popup is made ahead of use; size them here.
+                    DayOfWeekRow {
+                        id: weekRow
+                        Layout.fillWidth: true; Layout.preferredHeight: 24
+                        locale: Qt.locale()
+                        spacing: 0
+                        delegate: Text {
+                            required property string shortName
+                            width: weekRow.availableWidth / 7; height: weekRow.availableHeight
+                            text: shortName; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                            color: Qt.darker(shell.textColor, 1.5); font.pixelSize: shell.fontSize - 1; font.family: root.uiFont
+                        }
+                    }
+                    MonthGrid {
+                        id: monthGrid
+                        objectName: "monthGrid"
+                        Layout.fillWidth: true; Layout.fillHeight: true
+                        month: calendar.month; year: calendar.year
+                        locale: Qt.locale()
+                        spacing: 0
+                        delegate: Item {
+                            id: dayCell
+                            required property var model
+                            width: monthGrid.availableWidth / 7; height: monthGrid.availableHeight / 6
+                            readonly property bool inMonth: model.month === monthGrid.month
+                            Rectangle {
+                                anchors.centerIn: parent; width: Math.min(parent.width, parent.height) - 2; height: width; radius: width / 2
+                                visible: dayCell.model.today && dayCell.inMonth
+                                color: shell.accent
+                            }
+                            Text {
+                                anchors.centerIn: parent
+                                text: dayCell.model.day
+                                color: dayCell.model.today && dayCell.inMonth ? shell.panelColor : shell.textColor
+                                opacity: dayCell.inMonth ? 1 : 0.35
+                                font.pixelSize: shell.fontSize; font.family: root.uiFont
+                                font.weight: dayCell.model.today && dayCell.inMonth ? Font.DemiBold : Font.Normal
+                            }
+                        }
                     }
                 }
-                Text { anchors.centerIn: parent; visible: streamList.count === 0; text: "No applications are playing sound"; color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize - 1; font.family: root.uiFont }
             }
         }
     }
 
     // Right-clicking the volume control: the outputs to play through.
-    Rectangle {
-        id: audioOutputs
-        objectName: "audioOutputs"
-        visible: root.audioPopup === "outputs"
-        width: 300; height: 12 + 30 + root.audioSource.outputs.length * 42
-        x: Math.max(8, Math.min(root.audioPopupX - width / 2, root.width - width - 8))
-        anchors.bottom: root.onTop ? undefined : bar.top; anchors.bottomMargin: 8
-        anchors.top: root.onTop ? bar.bottom : undefined; anchors.topMargin: 8
-        color: shell.panelColor; radius: 10
-        border.color: Qt.lighter(shell.panelColor, 1.6)
-        MouseArea { anchors.fill: parent }
-        Column {
-            anchors.fill: parent; anchors.margins: 6; spacing: 0
-            Text {
-                width: parent.width; height: 30; leftPadding: 10; verticalAlignment: Text.AlignVCenter
-                text: "Output"; color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize - 1; font.family: root.uiFont
-            }
-            Repeater {
-                model: root.audioSource.outputs
-                delegate: Button {
-                    id: outputItem
-                    required property var modelData
-                    readonly property bool current: modelData.name === root.audioSource.output
-                    objectName: "audioOutputItem"
-                    width: parent.width; height: 42
-                    text: modelData.description
-                    Accessible.name: modelData.description
-                    onClicked: { root.audioSource.setOutput(modelData.name); root.audioPopup = "" }
-                    background: Rectangle { color: outputItem.hovered ? Qt.lighter(shell.panelColor, 1.5) : "transparent"; radius: 6 }
-                    contentItem: RowLayout {
-                        spacing: 10
-                        Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; Layout.leftMargin: 4; radius: 4; color: outputItem.current ? shell.accent : "transparent"; border.color: outputItem.current ? shell.accent : Qt.lighter(shell.panelColor, 2.2) }
-                        Text { Layout.fillWidth: true; text: outputItem.modelData.description; elide: Text.ElideRight; color: outputItem.current ? shell.accent : shell.textColor; font.pixelSize: shell.fontSize; font.family: root.uiFont }
+    Loader {
+        id: outputsLoader
+        asynchronous: !(root.audioPopup === "outputs")
+        active: root.audioPopup === "outputs" || root.warm || used
+        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+        property bool used: false
+        onLoaded: used = true
+        sourceComponent: Component {
+            Rectangle {
+                id: audioOutputs
+                parent: root
+                objectName: "audioOutputs"
+                visible: root.audioPopup === "outputs"
+                width: 300; height: 12 + 30 + root.audioSource.outputs.length * 42
+                x: Math.max(8, Math.min(root.audioPopupX - width / 2, root.width - width - 8))
+                y: root.onTop ? bar.y + bar.height + 8 : bar.y - height - 8
+                color: shell.panelColor; radius: 10
+                border.color: Qt.lighter(shell.panelColor, 1.6)
+                MouseArea { anchors.fill: parent }
+                Column {
+                    anchors.fill: parent; anchors.margins: 6; spacing: 0
+                    Text {
+                        width: parent.width; height: 30; leftPadding: 10; verticalAlignment: Text.AlignVCenter
+                        text: "Output"; color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize - 1; font.family: root.uiFont
                     }
-                }
-            }
-        }
-    }
-
-    Rectangle {
-        id: launcher
-        visible: root.launcherOpen
-        width: Math.min(460, root.width - 24)
-        height: root.height - shell.panelExtent - 20
-        anchors.left: parent.left
-        anchors.leftMargin: 12 + shell.panelMarginLeft
-        anchors.bottom: root.onTop ? undefined : bar.top
-        anchors.top: root.onTop ? bar.bottom : undefined
-        anchors.bottomMargin: 10
-        anchors.topMargin: 10
-        color: shell.panelColor
-        border.color: Qt.lighter(shell.panelColor, 1.65)
-        radius: 14
-        MouseArea { anchors.fill: parent }
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 20
-            spacing: 14
-            RowLayout {
-                Layout.fillWidth: true
-                Text { text: "Applications"; color: shell.textColor; font.pixelSize: 21; font.weight: Font.DemiBold; font.family: root.uiFont }
-                Item { Layout.fillWidth: true }
-                Button {
-                    text: "Refresh"
-                    onClicked: shell.refreshApps()
-                    palette.buttonText: shell.textColor
-                    background: Rectangle { color: parent.hovered ? "#304058" : "transparent"; radius: 6 }
-                }
-            }
-            TextField {
-                id: search
-                objectName: "applicationSearch"
-                Layout.fillWidth: true
-                Layout.preferredHeight: 42
-                placeholderText: "Search applications"
-                placeholderTextColor: Qt.darker(shell.textColor, 1.5)
-                color: shell.textColor
-                selectByMouse: true
-                leftPadding: 12
-                font.pixelSize: 14; font.family: root.uiFont
-                background: Rectangle {
-                    radius: 7
-                    color: Qt.darker(shell.panelColor, 1.2)
-                    border.color: search.activeFocus ? shell.accent : Qt.lighter(shell.panelColor, 1.7)
-                }
-                onAccepted: {
-                    if (applications.count > 0 && shell.launch(applications.model[0].appId)) root.closeMenus()
-                }
-                Keys.onEscapePressed: root.closeMenus()
-            }
-            ListView {
-                id: applications
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                clip: true
-                spacing: 3
-                model: shell.apps.filter(function(app) {
-                    return (app.name + " " + app.appId).toLowerCase().indexOf(search.text.toLowerCase()) >= 0
-                })
-                ScrollBar.vertical: ScrollBar {}
-                delegate: Button {
-                    required property var modelData
-                    width: ListView.view.width - 10
-                    height: 48
-                    onClicked: { if (shell.launch(modelData.appId)) root.closeMenus() }
-                    background: Rectangle { radius: 7; color: parent.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
-                    contentItem: RowLayout {
-                        spacing: 12
-                        Image { source: "image://icons/" + modelData.icon; sourceSize: Qt.size(30, 30); Layout.preferredWidth: 30; Layout.preferredHeight: 30 }
-                        Text { text: modelData.name; color: shell.textColor; font.pixelSize: 14; elide: Text.ElideRight; Layout.fillWidth: true; font.family: root.uiFont }
-                        Text { visible: modelData.configured; text: "Pinned"; color: shell.accent; font.pixelSize: 10; font.family: root.uiFont }
-                        // Installed applications pin and unpin here; shown while hovered or pinned.
-                        Button {
-                            id: pinToggle
-                            objectName: "pinToggle"
-                            visible: !modelData.configured && (modelData.pinned || parent.parent.hovered || hovered)
-                            text: modelData.pinned ? "Unpin" : "Pin"
-                            Accessible.name: (modelData.pinned ? "Unpin " : "Pin ") + modelData.name + (modelData.pinned ? " from" : " to") + " taskbar"
-                            onClicked: modelData.pinned ? shell.unpin(modelData.appId) : shell.pin(modelData.appId)
-                            Layout.preferredHeight: 26
-                            font.pixelSize: 11; font.family: root.uiFont
-                            palette.buttonText: modelData.pinned ? shell.accent : shell.textColor
-                            background: Rectangle { radius: 5; color: pinToggle.hovered ? Qt.lighter(shell.panelColor, 1.9) : "transparent"; border.color: Qt.lighter(shell.panelColor, 1.9) }
+                    Repeater {
+                        model: root.audioSource.outputs
+                        delegate: Button {
+                            id: outputItem
+                            required property var modelData
+                            readonly property bool current: modelData.name === root.audioSource.output
+                            objectName: "audioOutputItem"
+                            width: parent.width; height: 42
+                            text: modelData.description
+                            Accessible.name: modelData.description
+                            onClicked: { root.audioSource.setOutput(modelData.name); root.audioPopup = "" }
+                            background: Rectangle { color: outputItem.hovered ? Qt.lighter(shell.panelColor, 1.5) : "transparent"; radius: 6 }
+                            contentItem: RowLayout {
+                                spacing: 10
+                                Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; Layout.leftMargin: 4; radius: 4; color: outputItem.current ? shell.accent : "transparent"; border.color: outputItem.current ? shell.accent : Qt.lighter(shell.panelColor, 2.2) }
+                                Text { Layout.fillWidth: true; text: outputItem.modelData.description; elide: Text.ElideRight; color: outputItem.current ? shell.accent : shell.textColor; font.pixelSize: shell.fontSize; font.family: root.uiFont }
+                            }
                         }
                     }
                 }
-                Text { anchors.centerIn: parent; visible: applications.count === 0; text: "No matching applications"; color: shell.textColor; font.family: root.uiFont }
-            }
-            Text {
-                Layout.fillWidth: true
-                text: "shaoDe"
-                color: Qt.darker(shell.textColor, 1.7)
-                font.pixelSize: 11; font.family: root.uiFont
             }
         }
     }
 
-    Rectangle {
-        id: contextMenu
-        objectName: "contextMenu"
-        readonly property var actions: root.taskMenuId >= 0
-            ? [{ text: "Maximize / restore", run: function(id) { shell.tasks.maximize(id) } },
-               { text: "Minimize", run: function(id) { shell.tasks.minimize(id) } }]
-              .concat(root.taskMenuApp ? [root.pinAction(root.taskMenuApp)] : [])
-              .concat([{ text: "Close window", run: function(id) { shell.tasks.close(id) } }])
-            : root.pinMenuApp !== null
-            ? [{ text: "Open " + root.pinMenuApp.name, run: function() { shell.launch(root.pinMenuApp.appId) } }]
-              .concat(root.pinMenuApp.configured ? [] : [root.pinAction(root.pinMenuApp.appId)])
-            : [{ text: root.tiling ? "Turn tiling off" : "Turn tiling on", enabled: shell.tilingAvailable,
-                 run: function() { shell.toggleTiling(outputName) } },
-               { text: "Applications", run: function() { root.launcherOpen = true } },
-               { text: "Show desktop", run: function() { shell.tasks.showDesktop() } }]
-        visible: root.taskMenuId >= 0 || root.pinMenuApp !== null || root.barMenuOpen
-        width: 220; height: 12 + actions.length * 44 + (actions.length - 1) * 2
-        x: Math.max(8, Math.min(root.contextMenuX, root.width - width - 8))
-        anchors.bottom: root.onTop ? undefined : bar.top; anchors.bottomMargin: 8
-        anchors.top: root.onTop ? bar.bottom : undefined; anchors.topMargin: 8
-        color: shell.panelColor; radius: 10
-        border.color: Qt.lighter(shell.panelColor, 1.6)
-        MouseArea { anchors.fill: parent }
-        Column {
-            anchors.fill: parent; anchors.margins: 6; spacing: 2
-            Repeater {
-                model: contextMenu.actions
-                delegate: Button {
-                    required property var modelData
-                    objectName: "contextMenuItem"
-                    width: parent.width; height: 44
-                    text: modelData.text
-                    enabled: modelData.enabled !== false
-                    opacity: enabled ? 1 : 0.4
-                    palette.buttonText: shell.textColor
-                    background: Rectangle { color: parent.hovered ? Qt.lighter(shell.panelColor, 1.5) : "transparent"; radius: 6 }
-                    // Run before closing, so opening the launcher keeps the surface expanded.
-                    onClicked: {
-                        modelData.run(root.taskMenuId)
-                        root.taskMenuId = -1; root.pinMenuApp = null; root.barMenuOpen = false
+    // The profile button: the appearance profiles, the one in use marked.
+    Loader {
+        id: profilesLoader
+        asynchronous: !(root.audioPopup === "profiles")
+        active: root.audioPopup === "profiles" || root.warm || used
+        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+        property bool used: false
+        onLoaded: used = true
+        sourceComponent: Component {
+            Rectangle {
+                id: profileList
+                parent: root
+                objectName: "profileList"
+                visible: root.audioPopup === "profiles"
+                width: 240; height: 12 + 30 + shell.profiles.length * 42
+                x: Math.max(8, Math.min(root.audioPopupX - width / 2, root.width - width - 8))
+                y: root.onTop ? bar.y + bar.height + 8 : bar.y - height - 8
+                color: shell.panelColor; radius: 10
+                border.color: Qt.lighter(shell.panelColor, 1.6)
+                MouseArea { anchors.fill: parent }
+                Column {
+                    anchors.fill: parent; anchors.margins: 6; spacing: 0
+                    Text {
+                        width: parent.width; height: 30; leftPadding: 10; verticalAlignment: Text.AlignVCenter
+                        text: "Appearance"; color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize - 1; font.family: root.uiFont
+                    }
+                    Repeater {
+                        model: shell.profiles
+                        delegate: Button {
+                            id: profileItem
+                            required property string modelData
+                            readonly property bool current: modelData === shell.profile
+                            objectName: "profileItem"
+                            width: parent.width; height: 42
+                            text: modelData
+                            Accessible.name: modelData + (current ? ", in use" : "")
+                            onClicked: {
+                                root.audioPopup = ""
+                                if (!current)
+                                    shell.pickProfile(modelData)
+                            }
+                            background: Rectangle { color: profileItem.hovered ? Qt.lighter(shell.panelColor, 1.5) : "transparent"; radius: 6 }
+                            contentItem: RowLayout {
+                                spacing: 10
+                                Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; Layout.leftMargin: 4; radius: 4; color: profileItem.current ? shell.accent : "transparent"; border.color: profileItem.current ? shell.accent : Qt.lighter(shell.panelColor, 2.2) }
+                                Text { Layout.fillWidth: true; text: profileItem.modelData; elide: Text.ElideRight; color: profileItem.current ? shell.accent : shell.textColor; font.pixelSize: shell.fontSize; font.family: root.uiFont }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // The wallpaper button: thumbnails of the pictures in shell.wallpapers, by subfolder, with
+    // a filter; clicking one shows it at once and keeps the picker open to try another.
+    Loader {
+        id: wallpapersLoader
+        asynchronous: !(root.audioPopup === "wallpapers")
+        active: root.audioPopup === "wallpapers" || used
+        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+        property bool used: false
+        onLoaded: used = true
+        sourceComponent: Component {
+            Rectangle {
+                id: wallpaperPicker
+                parent: root
+                objectName: "wallpaperPicker"
+                visible: root.audioPopup === "wallpapers"
+                // "" shows every folder.
+                property string folder: ""
+                readonly property var folders: {
+                    var seen = [], list = shell.wallpapers
+                    for (var i = 0; i < list.length; ++i)
+                        if (seen.indexOf(list[i].folder) < 0) seen.push(list[i].folder)
+                    return seen
+                }
+                readonly property var shown: {
+                    var words = filter.text.toLowerCase().split(/\s+/).filter(function(w) { return w.length > 0 })
+                    var folder = wallpaperPicker.folder
+                    return shell.wallpapers.filter(function(w) {
+                        if (folder !== "" && w.folder !== folder) return false
+                        var text = (w.folder + "/" + w.name).toLowerCase()
+                        return words.every(function(word) { return text.indexOf(word) >= 0 })
+                    })
+                }
+                function opened() { shell.findWallpapers(); filter.forceActiveFocus() }
+                onVisibleChanged: if (visible) opened()
+                Component.onCompleted: if (visible) opened()
+                width: Math.min(880, root.width - 16)
+                height: Math.max(220, Math.min(500, root.height - bar.height - shell.panelMarginTop - shell.panelMarginBottom - 16))
+                x: Math.max(8, Math.min(root.audioPopupX - width / 2, root.width - width - 8))
+                y: root.onTop ? bar.y + bar.height + 8 : bar.y - height - 8
+                color: shell.panelColor; radius: 10
+                border.color: Qt.lighter(shell.panelColor, 1.6)
+                MouseArea { anchors.fill: parent }
+                ColumnLayout {
+                    anchors.fill: parent; anchors.margins: 10; spacing: 8
+                    RowLayout {
+                        Layout.fillWidth: true; spacing: 8
+                        Text {
+                            text: "Wallpapers"; color: shell.textColor; font.pixelSize: shell.fontSize + 1; font.bold: true; font.family: root.uiFont
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: wallpaperPicker.shown.length + (wallpaperPicker.shown.length === 1 ? " picture" : " pictures")
+                            elide: Text.ElideRight
+                            color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize - 1; font.family: root.uiFont
+                        }
+                        TextField {
+                            id: filter
+                            objectName: "wallpaperFilter"
+                            Layout.preferredWidth: 220; Layout.preferredHeight: 30
+                            placeholderText: "Filter"
+                            color: shell.textColor; placeholderTextColor: Qt.darker(shell.textColor, 1.6)
+                            font.pixelSize: shell.fontSize; font.family: root.uiFont
+                            background: Rectangle { radius: 6; color: Qt.lighter(shell.panelColor, 1.35); border.color: filter.activeFocus ? shell.accent : "transparent" }
+                            Keys.onEscapePressed: root.closeMenus()
+                            Keys.onReturnPressed: if (wallpaperPicker.shown.length > 0) shell.pickWallpaper(wallpaperPicker.shown[0].path)
+                        }
+                        Button {
+                            id: shuffle
+                            objectName: "wallpaperShuffle"
+                            Layout.preferredWidth: 30; Layout.preferredHeight: 30
+                            enabled: wallpaperPicker.shown.length > 0
+                            Accessible.name: "Random wallpaper"
+                            onClicked: shell.pickWallpaper(wallpaperPicker.shown[Math.floor(Math.random() * wallpaperPicker.shown.length)].path)
+                            background: Rectangle { radius: 6; color: shuffle.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
+                            contentItem: Item { Icon { anchors.centerIn: parent; name: "shuffle"; size: 16 } }
+                        }
+                    }
+                    // The subfolders, as tabs.
+                    ListView {
+                        id: folderTabs
+                        Layout.fillWidth: true; Layout.preferredHeight: 28
+                        visible: wallpaperPicker.folders.length > 1
+                        orientation: ListView.Horizontal; spacing: 6; clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        model: [""].concat(wallpaperPicker.folders)
+                        delegate: Button {
+                            id: folderTab
+                            required property string modelData
+                            readonly property bool current: modelData === wallpaperPicker.folder
+                            height: 28
+                            onClicked: wallpaperPicker.folder = modelData
+                            background: Rectangle {
+                                radius: 14
+                                color: folderTab.current ? shell.accent : (folderTab.hovered ? Qt.lighter(shell.panelColor, 1.55) : Qt.lighter(shell.panelColor, 1.25))
+                            }
+                            contentItem: Text {
+                                leftPadding: 6; rightPadding: 6
+                                text: folderTab.modelData === "" ? "All" : folderTab.modelData
+                                verticalAlignment: Text.AlignVCenter
+                                color: folderTab.current ? shell.panelColor : shell.textColor
+                                font.pixelSize: shell.fontSize - 1; font.family: root.uiFont
+                            }
+                        }
+                        WheelHandler {
+                            onWheel: (event) => {
+                                var delta = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x
+                                folderTabs.contentX = Math.max(0, Math.min(folderTabs.contentWidth - folderTabs.width, folderTabs.contentX - delta))
+                            }
+                        }
+                    }
+                    GridView {
+                        id: wallpaperGrid
+                        objectName: "wallpaperGrid"
+                        Layout.fillWidth: true; Layout.fillHeight: true
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        readonly property int columns: Math.max(2, Math.floor(width / 200))
+                        cellWidth: Math.floor(width / columns)
+                        cellHeight: Math.floor((cellWidth - 8) * 9 / 16) + 8
+                        model: wallpaperPicker.shown
+                        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                        Text {
+                            anchors.centerIn: parent
+                            visible: wallpaperGrid.count === 0
+                            width: parent.width - 40
+                            horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap
+                            text: shell.wallpapers.length === 0 ? "No pictures in " + shell.wallpaperFolder : "Nothing matches"
+                            color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize; font.family: root.uiFont
+                        }
+                        delegate: Button {
+                            id: thumb
+                            objectName: "wallpaperItem"
+                            required property var modelData
+                            readonly property bool current: modelData.path === shell.wallpaperFile
+                            width: wallpaperGrid.cellWidth; height: wallpaperGrid.cellHeight
+                            Accessible.name: modelData.name + (current ? ", in use" : "")
+                            onClicked: shell.pickWallpaper(modelData.path)
+                            background: Item {}
+                            contentItem: Item {
+                                Rectangle {
+                                    anchors.fill: parent; anchors.margins: 4
+                                    radius: 6
+                                    color: Qt.lighter(shell.panelColor, 1.25)
+                                    Image {
+                                        anchors.fill: parent; anchors.margins: 2
+                                        source: "image://thumbs/" + encodeURIComponent(thumb.modelData.path)
+                                        sourceSize: Qt.size(256, 256)
+                                        fillMode: Image.PreserveAspectCrop
+                                        asynchronous: true
+                                        smooth: true
+                                        opacity: status === Image.Ready ? 1 : 0
+                                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                                    }
+                                    // The name, over the picture while hovered (bar tooltips stay
+                                    // hidden while a popup is open).
+                                    Rectangle {
+                                        anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+                                        anchors.margins: 2
+                                        height: nameText.implicitHeight + 6
+                                        visible: thumb.hovered
+                                        color: Qt.rgba(shell.panelColor.r, shell.panelColor.g, shell.panelColor.b, 0.85)
+                                        Text {
+                                            id: nameText
+                                            anchors.fill: parent; anchors.leftMargin: 6; anchors.rightMargin: 6
+                                            verticalAlignment: Text.AlignVCenter; elide: Text.ElideMiddle
+                                            text: thumb.modelData.name
+                                            color: shell.textColor; font.pixelSize: shell.fontSize - 2; font.family: root.uiFont
+                                        }
+                                    }
+                                    // The border sits over the picture: the software renderer
+                                    // cannot clip it to rounded corners.
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        radius: 6; color: "transparent"
+                                        border.width: thumb.current ? 3 : (thumb.hovered ? 2 : 0)
+                                        border.color: thumb.current ? shell.accent : Qt.rgba(shell.textColor.r, shell.textColor.g, shell.textColor.b, 0.7)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // The bell's notification history.
+    Loader {
+        id: historyLoader
+        asynchronous: !(root.audioPopup === "notifications")
+        active: shell.notifications.serving && (root.audioPopup === "notifications" || root.warm || used)
+        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+        property bool used: false
+        onLoaded: used = true
+        sourceComponent: Component { NotificationHistory { panel: root; barItem: bar } }
+    }
+
+    Loader {
+        id: launcherLoader
+        asynchronous: !(root.launcherOpen)
+        active: root.launcherOpen || root.warm || used
+        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+        property bool used: false
+        onLoaded: used = true
+        sourceComponent: Component {
+            Rectangle {
+                id: launcher
+                parent: root
+                visible: root.launcherOpen
+                function focusSearch() { search.text = ""; search.forceActiveFocus() }
+                onVisibleChanged: if (visible) focusSearch()
+                Component.onCompleted: if (visible) focusSearch()
+                width: Math.min(460, root.width - 24)
+                height: root.height - shell.panelExtent - 20
+                anchors.left: parent.left
+                anchors.leftMargin: 12 + shell.panelMarginLeft
+                y: root.onTop ? bar.y + bar.height + 10 : bar.y - height - 10
+                color: shell.panelColor
+                border.color: Qt.lighter(shell.panelColor, 1.65)
+                radius: 14
+                MouseArea { anchors.fill: parent }
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 20
+                    spacing: 14
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Text { text: "Applications"; color: shell.textColor; font.pixelSize: 21; font.weight: Font.DemiBold; font.family: root.uiFont }
+                        Item { Layout.fillWidth: true }
+                        Button {
+                            text: "Refresh"
+                            onClicked: shell.refreshApps()
+                            palette.buttonText: shell.textColor
+                            background: Rectangle { color: parent.hovered ? "#304058" : "transparent"; radius: 6 }
+                        }
+                    }
+                    TextField {
+                        id: search
+                        objectName: "applicationSearch"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 42
+                        placeholderText: "Search applications"
+                        placeholderTextColor: Qt.darker(shell.textColor, 1.5)
+                        color: shell.textColor
+                        selectByMouse: true
+                        leftPadding: 12
+                        font.pixelSize: 14; font.family: root.uiFont
+                        background: Rectangle {
+                            radius: 7
+                            color: Qt.darker(shell.panelColor, 1.2)
+                            border.color: search.activeFocus ? shell.accent : Qt.lighter(shell.panelColor, 1.7)
+                        }
+                        onAccepted: {
+                            if (applications.count > 0 && shell.launch(applications.model[0].appId)) root.closeMenus()
+                        }
+                        Keys.onEscapePressed: root.closeMenus()
+                    }
+                    ListView {
+                        id: applications
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+                        spacing: 3
+                        model: shell.apps.filter(function(app) {
+                            return (app.name + " " + app.appId).toLowerCase().indexOf(search.text.toLowerCase()) >= 0
+                        })
+                        ScrollBar.vertical: ScrollBar {}
+                        delegate: Button {
+                            required property var modelData
+                            width: ListView.view.width - 10
+                            height: 48
+                            onClicked: { if (shell.launch(modelData.appId)) root.closeMenus() }
+                            background: Rectangle { radius: 7; color: parent.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
+                            contentItem: RowLayout {
+                                spacing: 12
+                                Image { source: "image://icons/" + modelData.icon; sourceSize: Qt.size(30, 30); Layout.preferredWidth: 30; Layout.preferredHeight: 30 }
+                                Text { text: modelData.name; textFormat: Text.PlainText; color: shell.textColor; font.pixelSize: 14; elide: Text.ElideRight; Layout.fillWidth: true; font.family: root.uiFont }
+                                Text { visible: modelData.configured; text: "Pinned"; color: shell.accent; font.pixelSize: 10; font.family: root.uiFont }
+                                // Installed applications pin and unpin here; shown while hovered or pinned.
+                                Button {
+                                    id: pinToggle
+                                    objectName: "pinToggle"
+                                    visible: !modelData.configured && (modelData.pinned || parent.parent.hovered || hovered)
+                                    text: modelData.pinned ? "Unpin" : "Pin"
+                                    Accessible.name: (modelData.pinned ? "Unpin " : "Pin ") + modelData.name + (modelData.pinned ? " from" : " to") + " taskbar"
+                                    onClicked: modelData.pinned ? shell.unpin(modelData.appId) : shell.pin(modelData.appId)
+                                    Layout.preferredHeight: 26
+                                    font.pixelSize: 11; font.family: root.uiFont
+                                    palette.buttonText: modelData.pinned ? shell.accent : shell.textColor
+                                    background: Rectangle { radius: 5; color: pinToggle.hovered ? Qt.lighter(shell.panelColor, 1.9) : "transparent"; border.color: Qt.lighter(shell.panelColor, 1.9) }
+                                }
+                            }
+                        }
+                        Text { anchors.centerIn: parent; visible: applications.count === 0; text: "No matching applications"; color: shell.textColor; font.family: root.uiFont }
+                    }
+                    Text {
+                        Layout.fillWidth: true
+                        text: "shaoDe"
+                        color: Qt.darker(shell.textColor, 1.7)
+                        font.pixelSize: 11; font.family: root.uiFont
+                    }
+                }
+            }
+        }
+    }
+
+    Loader {
+        id: contextMenuLoader
+        asynchronous: !(root.taskMenuId >= 0 || root.pinMenuApp !== null || root.barMenuOpen)
+        active: root.taskMenuId >= 0 || root.pinMenuApp !== null || root.barMenuOpen || root.warm || used
+        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+        property bool used: false
+        onLoaded: used = true
+        sourceComponent: Component {
+            Rectangle {
+                id: contextMenu
+                parent: root
+                objectName: "contextMenu"
+                readonly property var actions: root.taskMenuId >= 0
+                    ? [{ text: "Maximize / restore", run: function(id) { shell.tasks.maximize(id) } },
+                       { text: "Minimize", run: function(id) { shell.tasks.minimize(id) } }]
+                      .concat(root.taskMenuApp ? [root.pinAction(root.taskMenuApp)] : [])
+                      .concat([{ text: "Close window", run: function(id) { shell.tasks.close(id) } }])
+                    : root.pinMenuApp !== null
+                    ? [{ text: "Open " + root.pinMenuApp.name, run: function() { shell.launch(root.pinMenuApp.appId) } }]
+                      .concat(root.pinMenuApp.configured ? [] : [root.pinAction(root.pinMenuApp.appId)])
+                    : root.profileMenu
+                    ? [{ text: "‹ Back", run: function() { root.profileMenu = false; return true } }]
+                      .concat(shell.profiles.map(function(name) {
+                          return { text: (name === shell.profile ? "✓ " : "") + name,
+                                   run: function() { shell.pickProfile(name) } } }))
+                    : [{ text: root.tiling ? "Turn tiling off" : "Turn tiling on", enabled: shell.tilingAvailable,
+                         run: function() { shell.toggleTiling(outputName) } },
+                       { text: "Applications", run: function() { root.launcherOpen = true } },
+                       { text: "Show desktop", run: function() { shell.tasks.showDesktop() } }]
+                      .concat(shell.profiles.length > 0
+                          ? [{ text: "Appearance: " + (shell.profile || "none") + " …",
+                               run: function() { root.profileMenu = true; return true } }]
+                          : [])
+                visible: root.taskMenuId >= 0 || root.pinMenuApp !== null || root.barMenuOpen
+                width: 220; height: 12 + actions.length * 44 + (actions.length - 1) * 2
+                x: Math.max(8, Math.min(root.contextMenuX, root.width - width - 8))
+                y: root.onTop ? bar.y + bar.height + 8 : bar.y - height - 8
+                color: shell.panelColor; radius: 10
+                border.color: Qt.lighter(shell.panelColor, 1.6)
+                MouseArea { anchors.fill: parent }
+                Column {
+                    anchors.fill: parent; anchors.margins: 6; spacing: 2
+                    Repeater {
+                        model: contextMenu.actions
+                        delegate: Button {
+                            required property var modelData
+                            objectName: "contextMenuItem"
+                            width: parent.width; height: 44
+                            text: modelData.text
+                            enabled: modelData.enabled !== false
+                            opacity: enabled ? 1 : 0.4
+                            palette.buttonText: shell.textColor
+                            background: Rectangle { color: parent.hovered ? Qt.lighter(shell.panelColor, 1.5) : "transparent"; radius: 6 }
+                            // Run before closing, so opening the launcher keeps the surface expanded.
+                            onClicked: {
+                                // Running an entry can rebuild the entries, destroying this button.
+                                var panel = root
+                                // An entry that leads to more entries returns true to stay open.
+                                if (modelData.run(panel.taskMenuId) === true)
+                                    return
+                                panel.taskMenuId = -1; panel.pinMenuApp = null; panel.barMenuOpen = false
+                            }
+                        }
                     }
                 }
             }
@@ -546,83 +1039,96 @@ Item {
 
     // The windows of the hovered stacked button: clicking one focuses it (or minimizes it when
     // focused already), the cross or a middle click closes it, and a right click opens its menu.
-    Rectangle {
-        id: groupList
-        objectName: "groupList"
-        readonly property int rowHeight: 40
-        visible: root.groupOpen
-        width: 280; height: 12 + groupWindows.count * rowHeight + Math.max(0, groupWindows.count - 1) * 2
-        x: Math.max(8, Math.min(root.groupX - width / 2, root.width - width - 8))
-        anchors.bottom: root.onTop ? undefined : bar.top; anchors.bottomMargin: 8
-        anchors.top: root.onTop ? bar.bottom : undefined; anchors.topMargin: 8
-        color: shell.panelColor; radius: 10
-        border.color: Qt.lighter(shell.panelColor, 1.6)
-        HoverHandler {
-            id: groupHover
-            onHoveredChanged: if (hovered) groupHide.stop(); else groupHide.restart()
-        }
-        TaskFilter {
-            id: groupWindows
-            controller: shell; sourceModel: root.taskSource
-            app: root.groupSlot; windowApp: root.groupWindowApp
-            // A window closing may leave nothing to choose between.
-            onCountChanged: if (count < 2) root.groupOpen = false
-        }
-        Column {
-            anchors.fill: parent; anchors.margins: 6; spacing: 2
-            Repeater {
-                model: root.groupOpen ? groupWindows : null
-                delegate: Button {
-                    id: groupWindow
-                    required property int taskId
-                    required property string title
-                    required property string appId
-                    required property bool active
-                    required property bool minimized
-                    objectName: "groupWindow"
-                    width: parent.width; height: groupList.rowHeight
-                    Accessible.name: title
-                    // Closing the list destroys this row, so it goes last.
-                    onClicked: { shell.tasks.activate(taskId); root.groupOpen = false }
-                    background: Rectangle {
-                        radius: 6
-                        color: groupWindow.hovered ? Qt.lighter(shell.panelColor, 1.5) : (groupWindow.active ? Qt.lighter(shell.panelColor, 1.3) : "transparent")
-                        Rectangle { visible: groupWindow.active; x: 0; anchors.verticalCenter: parent.verticalCenter; width: 3; height: 16; radius: 1; color: shell.accent }
-                    }
-                    contentItem: RowLayout {
-                        spacing: 8
-                        Image {
-                            Layout.leftMargin: 4
-                            Layout.preferredWidth: 20; Layout.preferredHeight: 20
-                            source: "image://icons/" + root.groupIcon; sourceSize: Qt.size(20, 20)
-                            opacity: groupWindow.minimized ? 0.5 : 1
-                        }
-                        Text {
-                            Layout.fillWidth: true
-                            text: groupWindow.title; elide: Text.ElideRight
-                            color: groupWindow.minimized ? Qt.darker(shell.textColor, 1.4) : shell.textColor
-                            font.pixelSize: shell.fontSize; font.family: root.uiFont
-                        }
-                        Button {
-                            id: closeWindow
-                            objectName: "groupWindowClose"
-                            visible: groupWindow.hovered || hovered
-                            Layout.preferredWidth: 24; Layout.preferredHeight: 24
-                            Accessible.name: "Close " + groupWindow.title
-                            onClicked: shell.tasks.close(groupWindow.taskId)
-                            background: Rectangle { radius: 5; color: closeWindow.hovered ? "#c4443c" : "transparent" }
-                            contentItem: Text { text: "\u2715"; color: shell.textColor; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 12 }
-                        }
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        acceptedButtons: Qt.RightButton | Qt.MiddleButton
-                        onPressed: (mouse) => {
-                            if (mouse.button === Qt.RightButton)
-                                root.openContextMenu(groupWindow, 0, groupWindow.taskId, groupWindow.appId)
-                        }
-                        onClicked: (mouse) => {
-                            if (mouse.button === Qt.MiddleButton) shell.tasks.close(groupWindow.taskId)
+    Loader {
+        id: groupListLoader
+        asynchronous: !(root.groupOpen)
+        active: root.groupOpen || root.warm || used
+        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+        property bool used: false
+        onLoaded: used = true
+        sourceComponent: Component {
+            Rectangle {
+                id: groupList
+                parent: root
+                objectName: "groupList"
+                readonly property int rowHeight: 40
+                visible: root.groupOpen
+                width: 280; height: 12 + groupWindows.count * rowHeight + Math.max(0, groupWindows.count - 1) * 2
+                x: Math.max(8, Math.min(root.groupX - width / 2, root.width - width - 8))
+                y: root.onTop ? bar.y + bar.height + 8 : bar.y - height - 8
+                color: shell.panelColor; radius: 10
+                border.color: Qt.lighter(shell.panelColor, 1.6)
+                HoverHandler {
+                    id: groupHover
+                    onHoveredChanged: if (hovered) groupHide.stop(); else groupHide.restart()
+                }
+                readonly property bool hovered: groupHover.hovered
+                TaskFilter {
+                    id: groupWindows
+                    controller: shell; sourceModel: root.taskSource
+                    app: root.groupSlot; windowApp: root.groupWindowApp
+                    // A window closing may leave nothing to choose between.
+                    onCountChanged: if (count < 2) root.groupOpen = false
+                }
+                Column {
+                    anchors.fill: parent; anchors.margins: 6; spacing: 2
+                    Repeater {
+                        model: root.groupOpen ? groupWindows : null
+                        delegate: Button {
+                            id: groupWindow
+                            required property int taskId
+                            required property string title
+                            required property string appId
+                            required property bool active
+                            required property bool minimized
+                            required property bool urgent
+                            objectName: "groupWindow"
+                            width: parent.width; height: groupList.rowHeight
+                            Accessible.name: title
+                            // Closing the list destroys this row, so it goes last.
+                            onClicked: { shell.tasks.activate(taskId); root.groupOpen = false }
+                            background: Rectangle {
+                                radius: 6
+                                color: groupWindow.hovered ? Qt.lighter(shell.panelColor, 1.5) : (groupWindow.active ? Qt.lighter(shell.panelColor, 1.3) : "transparent")
+                                Rectangle { visible: groupWindow.active; x: 0; anchors.verticalCenter: parent.verticalCenter; width: 3; height: 16; radius: 1; color: shell.accent }
+                                Rectangle { objectName: "groupWindowUrgent"; visible: groupWindow.urgent; x: 0; anchors.verticalCenter: parent.verticalCenter; width: 3; height: 16; radius: 1; color: shell.urgentColor }
+                            }
+                            contentItem: RowLayout {
+                                spacing: 8
+                                Image {
+                                    Layout.leftMargin: 4
+                                    Layout.preferredWidth: 20; Layout.preferredHeight: 20
+                                    source: "image://icons/" + root.groupIcon; sourceSize: Qt.size(20, 20)
+                                    opacity: groupWindow.minimized ? 0.5 : 1
+                                }
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: groupWindow.title; textFormat: Text.PlainText; elide: Text.ElideRight
+                                    color: groupWindow.urgent ? shell.urgentColor : groupWindow.minimized ? Qt.darker(shell.textColor, 1.4) : shell.textColor
+                                    font.pixelSize: shell.fontSize; font.family: root.uiFont
+                                }
+                                Button {
+                                    id: closeWindow
+                                    objectName: "groupWindowClose"
+                                    visible: groupWindow.hovered || hovered
+                                    Layout.preferredWidth: 24; Layout.preferredHeight: 24
+                                    Accessible.name: "Close " + groupWindow.title
+                                    onClicked: shell.tasks.close(groupWindow.taskId)
+                                    background: Rectangle { radius: 5; color: closeWindow.hovered ? "#c4443c" : "transparent" }
+                                    contentItem: Text { text: "\u2715"; color: shell.textColor; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 12 }
+                                }
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                acceptedButtons: Qt.RightButton | Qt.MiddleButton
+                                onPressed: (mouse) => {
+                                    if (mouse.button === Qt.RightButton)
+                                        root.openContextMenu(groupWindow, 0, groupWindow.taskId, groupWindow.appId)
+                                }
+                                onClicked: (mouse) => {
+                                    if (mouse.button === Qt.MiddleButton) shell.tasks.close(groupWindow.taskId)
+                                }
+                            }
                         }
                     }
                 }
@@ -724,7 +1230,10 @@ Item {
                     Behavior on shiftX { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
                     spacing: 4
                     z: dragging ? 1 : 0
+                    // The transform's own x, not the item's: it does not fight the layout.
+                    // qmllint disable Quick.layout-positioning
                     transform: Translate { x: pinnedSlot.dragging ? pinnedSlot.dragX : pinnedSlot.shiftX }
+                    // qmllint enable Quick.layout-positioning
                     Button {
                         id: pinnedButton
                         objectName: "pinned:" + pinnedSlot.modelData.appId
@@ -869,7 +1378,7 @@ Item {
                     if (number >= 1 && number <= shell.workspaceCount && number !== workspaceState.current)
                         shell.showWorkspace(outputName, number)
                 }
-                visible: shell.workspaceCount > 1
+                visible: shell.workspaceCount > 1 && shell.widgets.workspaces
                 spacing: 2
                 Layout.alignment: Qt.AlignVCenter
                 Repeater {
@@ -880,21 +1389,40 @@ Item {
                         readonly property int number: index + 1
                         readonly property bool current: workspaceIndicator.workspaceState.current === number
                         readonly property bool occupied: workspaceIndicator.workspaceState.occupied.indexOf(number) >= 0
+                        // A window on this workspace is asking for attention.
+                        readonly property bool urgent: (workspaceIndicator.workspaceState.urgent || []).indexOf(number) >= 0
+                        readonly property string label: shell.workspaceNames[index] || ""
                         objectName: "workspace" + number
-                        width: 26; height: bar.height - 14
+                        width: label ? Math.max(26, workspaceText.implicitWidth + 14) : 26
+                        height: bar.height - 14
                         onClicked: { root.closeMenus(); workspaceIndicator.show(number) }
-                        Accessible.name: "Workspace " + number
+                        Accessible.name: "Workspace " + number + (label ? " " + label : "") + (urgent ? " (needs attention)" : "")
+                BarTip { owner: workspaceButton; text: "Workspace " + number + (label ? ": " + label : "") + (occupied ? "" : " (empty)") + (urgent ? ", needs attention" : "") }
                         background: Rectangle {
                             radius: 6
                             color: workspaceButton.current ? Qt.lighter(shell.panelColor, 1.8) : (workspaceButton.hovered ? Qt.lighter(shell.panelColor, 1.4) : "transparent")
                         }
                         contentItem: Item {
                             Text {
+                                id: workspaceText
                                 anchors.centerIn: parent
-                                text: workspaceButton.number
-                                color: workspaceButton.current ? shell.accent : shell.textColor
+                                text: workspaceButton.label ? workspaceButton.label : workspaceButton.number
+                                color: workspaceButton.urgent && !workspaceButton.current ? shell.urgentColor : workspaceButton.current ? shell.accent : shell.textColor
                                 font.pixelSize: shell.fontSize; font.family: root.uiFont
                                 font.weight: workspaceButton.current ? Font.DemiBold : Font.Normal
+                            }
+                            Rectangle {
+                                objectName: "workspaceUrgent" + workspaceButton.number
+                                visible: workspaceButton.urgent
+                                anchors.right: parent.right; anchors.top: parent.top; anchors.topMargin: 2
+                                width: 6; height: 6; radius: 3
+                                color: shell.urgentColor
+                                SequentialAnimation on opacity {
+                                    running: workspaceButton.urgent
+                                    loops: 6; alwaysRunToEnd: true
+                                    NumberAnimation { to: 0.3; duration: 450 }
+                                    NumberAnimation { to: 1; duration: 450 }
+                                }
                             }
                             Rectangle {
                                 visible: workspaceButton.occupied
@@ -920,47 +1448,94 @@ Item {
                     }
                 }
             }
+            // The wallpaper picker.
+            Button {
+                id: wallpapersButton
+                objectName: "wallpapersButton"
+                visible: shell.widgets.wallpapers
+                Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
+                onClicked: root.toggleAudioPopup("wallpapers", wallpapersButton)
+                Accessible.name: "Wallpapers"
+                BarTip { owner: wallpapersButton; text: "Wallpapers" }
+                background: Rectangle {
+                    radius: 7
+                    color: root.audioPopup === "wallpapers" ? Qt.lighter(shell.panelColor, 1.8) : (wallpapersButton.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
+                }
+                contentItem: Item {
+                    Icon { anchors.centerIn: parent; name: "image"; color: root.audioPopup === "wallpapers" ? shell.accent : shell.textColor }
+                }
+            }
+            // The appearance profile in use; clicking lists the profiles to switch to.
+            Button {
+                id: profilesButton
+                objectName: "profilesButton"
+                visible: shell.widgets.profiles && shell.profiles.length > 1
+                Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
+                onClicked: root.toggleAudioPopup("profiles", profilesButton)
+                Accessible.name: "Appearance: " + (shell.profile || "none")
+                BarTip { owner: profilesButton; text: "Appearance: " + (shell.profile || "none") }
+                background: Rectangle {
+                    radius: 7
+                    color: root.audioPopup === "profiles" ? Qt.lighter(shell.panelColor, 1.8) : (profilesButton.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
+                }
+                // Three swatches of the profile in use: accent, desktop background, text.
+                contentItem: Item {
+                    Row {
+                        anchors.centerIn: parent; spacing: 2
+                        Repeater {
+                            model: [shell.accent, shell.background, shell.textColor]
+                            // A ring in the text colour keeps a swatch close to the panel's own
+                            // colour visible.
+                            Rectangle {
+                                required property color modelData
+                                width: 10; height: 10; radius: 5
+                                color: modelData
+                                border.width: 1
+                                border.color: Qt.rgba(shell.textColor.r, shell.textColor.g, shell.textColor.b, 0.5)
+                            }
+                        }
+                    }
+                }
+            }
             Button {
                 id: tilingToggle
                 objectName: "tilingToggle"
+                visible: shell.widgets.tiling
                 Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
                 enabled: shell.tilingAvailable
                 opacity: enabled ? 1 : 0.4
                 onClicked: { root.closeMenus(); shell.toggleTiling(outputName) }
                 Accessible.name: root.tiling ? "Tiling on" : "Tiling off"
+                BarTip { owner: tilingToggle; text: root.tiling ? "Tiling on: click for floating" : "Floating: click to tile" }
                 background: Rectangle {
                     radius: 7
                     color: root.tiling ? Qt.lighter(shell.panelColor, 1.8) : (tilingToggle.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
                 }
-                // On: a dwindle split in the accent colour. Off: two overlapping windows.
+                // On: a split layout in the accent colour. Off: two overlapping windows.
                 contentItem: Item {
-                    Item {
-                        anchors.centerIn: parent; width: 22; height: 16
-                        visible: root.tiling
-                        Rectangle { width: 10; height: 16; radius: 2; color: shell.accent }
-                        Rectangle { x: 12; width: 10; height: 7; radius: 2; color: shell.accent }
-                        Rectangle { x: 12; y: 9; width: 10; height: 7; radius: 2; color: shell.accent }
-                    }
-                    Item {
-                        anchors.centerIn: parent; width: 22; height: 16
-                        visible: !root.tiling
-                        Rectangle { width: 15; height: 11; radius: 2; color: "transparent"; border.color: shell.textColor; border.width: 2 }
-                        Rectangle { x: 7; y: 5; width: 15; height: 11; radius: 2; color: tilingToggle.hovered ? Qt.lighter(shell.panelColor, 1.55) : shell.panelColor; border.color: shell.textColor; border.width: 2 }
+                    Icon {
+                        anchors.centerIn: parent
+                        name: root.tiling ? "layout-panel-left" : "copy"
+                        color: root.tiling ? shell.accent : shell.textColor
                     }
                 }
             }
+            NotificationBell { panel: root; barHeight: bar.height }
+            NetworkWidget {}
+            BatteryWidget {}
             // The default output's volume. Left-click: per-application volumes; right-click: the
             // output; wheel: louder or quieter; middle-click: mute.
             Button {
                 id: audioWidget
                 objectName: "audioWidget"
-                visible: root.audioSource.available
-                Layout.preferredWidth: 64; Layout.preferredHeight: bar.height - 10
+                visible: root.audioSource.available && shell.widgets.volume
+                Layout.preferredWidth: 60; Layout.preferredHeight: bar.height - 10
                 onClicked: root.toggleAudioPopup("mixer", audioWidget)
                 Accessible.name: "Volume " + root.audioSource.volume + "%" + (root.audioSource.muted ? ", muted" : "")
+                BarTip { owner: audioWidget; text: audioWidget.Accessible.name }
                 background: Rectangle {
                     radius: 7
-                    color: root.audioPopup !== "" ? Qt.lighter(shell.panelColor, 1.8) : (audioWidget.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
+                    color: (root.audioPopup === "mixer" || root.audioPopup === "outputs") ? Qt.lighter(shell.panelColor, 1.8) : (audioWidget.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
                 }
                 contentItem: Item {
                     Row {
@@ -997,19 +1572,44 @@ Item {
                     }
                 }
             }
-            Text {
-                id: clock
-                property date now: new Date()
-                text: Qt.formatTime(now, "HH:mm") + "\n" + Qt.formatDate(now, "ddd d MMM")
-                color: shell.textColor; horizontalAlignment: Text.AlignRight
-                font.pixelSize: Math.max(6, shell.fontSize - 1); font.family: root.uiFont
-                Layout.preferredWidth: 82
-                Timer { interval: 1000; running: true; repeat: true; onTriggered: clock.now = new Date() }
+            // The time and date. Clicking it opens the month calendar.
+            Button {
+                id: clockButton
+                objectName: "clockButton"
+                visible: shell.widgets.clock
+                Layout.preferredWidth: clock.implicitWidth + 12; Layout.preferredHeight: bar.height - 10
+                hoverEnabled: true
+                enabled: shell.widgets.calendar
+                onClicked: root.toggleAudioPopup("calendar", clockButton)
+                Accessible.name: Qt.formatDateTime(clock.now, "dddd d MMMM yyyy, HH:mm")
+                background: Rectangle {
+                    radius: 7
+                    color: root.audioPopup === "calendar" ? Qt.lighter(shell.panelColor, 1.8) : (clockButton.hovered && clockButton.enabled ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
+                }
+                BarTip { owner: clockButton; text: Qt.formatDate(clock.now, "dddd d MMMM yyyy") }
+                contentItem: Text {
+                    id: clock
+                    objectName: "clock"
+                    property date now: new Date()
+                    text: Qt.formatTime(now, "HH:mm")
+                    color: shell.textColor; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                    font.pixelSize: shell.fontSize; font.weight: Font.DemiBold; font.family: root.uiFont
+                    // The clock shows minutes, so it wakes once a minute, just after the minute changes.
+                    Timer {
+                        id: tick
+                        objectName: "clockTick"
+                        function untilMinute() { var d = new Date(); return 60050 - d.getSeconds() * 1000 - d.getMilliseconds() }
+                        interval: untilMinute(); running: true; repeat: true
+                        onTriggered: { clock.now = new Date(); interval = untilMinute() }
+                    }
+                }
             }
             Button {
+                id: showDesktopButton
                 Layout.preferredWidth: 14; Layout.fillHeight: true
                 onClicked: { root.closeMenus(); shell.tasks.showDesktop() }
                 Accessible.name: "Show desktop"
+                BarTip { owner: showDesktopButton; text: "Show desktop" }
                 background: Rectangle { color: parent.hovered ? shell.accent : Qt.lighter(shell.panelColor, 1.6); width: 3; anchors.right: parent.right }
             }
         }

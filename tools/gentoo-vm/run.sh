@@ -14,7 +14,7 @@ display=(-display "${SHAODE_VM_DISPLAY:-gtk,gl=on}" -device virtio-vga-gl)
 if [[ ${1:-} == --headless ]]; then
     display=(-display none -device VGA)
     shift
-elif ! qemu-system-x86_64 -device help | grep -q '"virtio-vga-gl"'; then
+elif ! qemu-system-x86_64 -device help | grep '"virtio-vga-gl"' >/dev/null; then
     echo "QEMU lacks virtio-vga-gl (or use --headless). On Arch install:" >&2
     echo "  qemu-hw-display-virtio-{gpu,vga,gpu-pci}{,-gl}" >&2
     exit 1

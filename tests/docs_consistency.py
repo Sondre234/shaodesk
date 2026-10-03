@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""The documentation matches the code: every binding action the configuration accepts is
+described in the README, and every action the example configuration binds exists."""
+from pathlib import Path
+import re
+import sys
+
+root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent
+source = (root / "src/config.cpp").read_text()
+table = source[source.index("action_table[] = {"):]
+table = table[:table.index("};")]
+actions = re.findall(r'\{"([a-z_0-9]+)",\s*SH_', table)
+assert len(actions) > 80, f"the action table was not found ({len(actions)} entries)"
+
+readme = (root / "README.md").read_text()
+missing = [name for name in actions
+           if not re.search(rf"(?<![a-z_0-9]){name}(?![a-z_0-9])", readme)]
+assert not missing, f"actions the README never mentions: {missing}"
+
+example = (root / "config/init.lua").read_text()
+active = [line for line in example.splitlines() if not line.lstrip().startswith("--")]
+bound = set(re.findall(r'action = "([a-z_0-9]+)"', "\n".join(active)))
+unknown = sorted(bound - set(actions) - {"none"})
+assert not unknown, f"config/init.lua binds actions the code does not have: {unknown}"
+
+# An action that only exists in a comment of the example is still an action.
+commented = set(re.findall(r'action = "([a-z_0-9]+)"', example))
+unknown = sorted(commented - set(actions) - {"none"})
+assert not unknown, f"config/init.lua mentions actions the code does not have: {unknown}"
+print(f"{len(actions)} actions documented; {len(bound)} bound by default")

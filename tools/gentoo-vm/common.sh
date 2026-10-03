@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Shared settings for the Gentoo test VM scripts. Sourced, not executed.
+# shellcheck shell=sh disable=SC2034
 
 VM_DIR=${SHAODE_VM_DIR:-$HOME/vms/shaode-gentoo}
 VM_USER=${SHAODE_VM_USER:-$USER}

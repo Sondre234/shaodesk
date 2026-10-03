@@ -7,6 +7,10 @@ searchable application launcher.
 
 This is an early development project, not a replacement desktop session yet.
 
+shaosde is a fork (a copy) of shaoDe. The project, its executables (`shaode`,
+`shaode-shell`), the Lua and config paths (`~/.config/shaode`), and the code identifiers
+keep the shaoDe name, so this README says shaoDe throughout.
+
 ## Build and run
 
 The first working compositor supports real Wayland applications, focus follows mouse,
@@ -19,10 +23,11 @@ through LayerShellQt, with a panel and desktop on every monitor.
 Requirements: CMake 3.25+, C11 and C++20 compilers, pkg-config, Lua 5.4,
 xkbcommon, wlroots **0.20.x**, wayland-server, wayland-protocols, and
 wayland-scanner. The shell also needs Qt 6.5+ (Core, Gui, Network, Qml, Quick, Quick Controls
-Basic, Quick Layouts, and the Wayland platform plugin), LayerShellQt 6.6+, GLib/GIO,
-and wayland-client. Tests use Python 3. Ninja is used below.
+Basic, Quick Layouts, and the Wayland platform plugin, plus DBus for the notification daemon),
+LayerShellQt 6.6+, GLib/GIO, and wayland-client. Tests use Python 3. Ninja is used below.
 Gentoo setup and standalone-session instructions are in [docs/gentoo.md](docs/gentoo.md).
-The build supports a normal install prefix and DESTDIR staging.
+The build supports a normal install prefix and DESTDIR staging. With no `CMAKE_BUILD_TYPE` it
+builds `RelWithDebInfo` (optimised, with symbols); pass `-DCMAKE_BUILD_TYPE=Debug` for a debug build.
 
 ```sh
 cmake -S . -B build -G Ninja -DSHAODE_BUILD_COMPOSITOR=ON
@@ -36,7 +41,7 @@ The compositor opens a nested window in the current Wayland session.
 It selects only the Wayland backend; `--headless` selects the headless backend
 for testing. The separate `--session` option selects DRM/libinput from a TTY; that physical
 backend is experimental: it has run on an AMD laptop (one built-in screen) and an
-NVIDIA desktop with three monitors; hotplug and suspend are untested. Session-file
+NVIDIA desktop with three monitors; hotplug is tested only with virtual outputs and suspend is untested. Session-file
 installation is opt-in with `SHAODE_INSTALL_SESSION=ON`.
 Applications launched through `--exec`, startup entries, or bindings inherit
 the nested Wayland socket. Commands after `--exec` consume all remaining
@@ -46,10 +51,13 @@ mode never starts the shell automatically. No other applications start
 automatically with the example configuration.
 
 The shell has pinned desktop shortcuts (double-click to launch), a taskbar with
-window activation/minimization and a right-click window menu (maximize/restore,
+window activation/minimization (clicking a window's button focuses it, or minimizes it when it
+is focused already, as on Windows, from any monitor's bar) and a right-click window menu (maximize/restore,
 minimize, pin to taskbar, close), middle-click to close a window, a right-click menu on empty bar space (tiling,
 applications, show desktop), an application
-search menu, a tiling on/off button for its monitor, a clock, and a show-desktop button. Installed applications are read
+search menu, a tiling on/off button for its monitor, a workspace indicator, battery and network status,
+the default output's volume, a clock, and a show-desktop button. Buttons show a tooltip
+on hover. Installed applications are read
 from desktop entries through GIO. Lua configures the panel's height, top or
 bottom placement (`panel_position`), margins that make it float (`panel_margin`, one
 number or `{ top, right, bottom, left }`), corner radius, font and text size, colors
@@ -59,9 +67,23 @@ by right-clicking their button; those pins are kept in
 `$XDG_STATE_HOME/shaode/pinned` (`~/.local/state/shaode/pinned`), one desktop id per
 line, and stay off the desktop. An application's windows share one taskbar button, stacked
 with a count when there are several: clicking it cycles through them, and hovering lists them
-to pick or close one. `group_windows = false` gives every window its own button. In a nested
+to pick or close one. `group_windows = false` gives every window its own button. The workspace indicator lists the monitor's workspaces (click one to switch, scroll to page
+through them). The battery shows the charge of the first battery in `/sys/class/power_supply`
+(red when nearly empty, accent-coloured while charging) and is left out on machines without
+one; the network icon shows Wi-Fi, a wired link, or a dimmed struck-through icon when the
+interface is down, read from `/sys/class/net` (physical interfaces only, wired preferred), and
+is left out without any interface. Both refresh every five seconds. Clicking the clock opens a
+month calendar (previous and next month buttons; the title returns to today). Each widget is
+switched off from Lua: `shell = { widgets = { battery = false, calendar = false } }`, with
+`workspaces`, `battery`, `network`, `volume`, `clock`, `calendar` (the clock stays, the
+calendar goes), `tiling`, and `profiles` (the appearance profile picker) all on by default. All of them take the panel's `accent`,
+`panel_color`, `text_color`, `font` and `font_size`. In a nested
 session, applications that reuse an existing process or D-Bus service can open
 in the host session instead.
+
+Every Lua setting, with its type, default, and range, is listed in
+[docs/config-reference.md](docs/config-reference.md); `shaode --check-config` reports mistakes
+with the file and line.
 
 Default bindings (edit [config/init.lua](config/init.lua)):
 
@@ -76,15 +98,28 @@ Default bindings (edit [config/init.lua](config/init.lua)):
 | Super + F | Toggle fullscreen |
 | Super + T | Arrange the current output's windows in a grid (floating mode) |
 | Super + S | Turn automatic tiling on or off for the focused monitor |
-| Super + P | Make the focused window sticky (shown on every workspace of its monitor), or not |
+| Super + P | Open the command palette (see below) |
+| Super + Shift + P | Make the focused window sticky (shown on every workspace of its monitor), or not |
 | Alt + Tab / Alt + Shift + Tab | Window switcher over every window on every monitor and workspace, shown on the focused monitor (see [Window switcher](#window-switcher)) |
 | Super + Left/Right/Up/Down | Focus the nearest window in that direction |
 | Super + Shift + arrows | Move the window that way, as Hyprland's `movewindow`: a tile trades places with its neighbour, a floating window goes to that edge; past the edge, on to the next monitor |
+| Super + Space / Super + Shift + Space | Next / previous tiling layout of the current workspace (see [Tiling layouts](#tiling-layouts)) |
+| Super + Return | Promote the focused tile to the first place (master) |
+| Super + J / K | Focus the next / previous tile in order; Super + Shift + J / K swap with it |
+| Super + H / L | Shrink / grow the master column; Super + comma / period: one more / fewer master |
 | Super + Ctrl + Shift + arrows | Resize the window by 40 pixels: a tile's split moves that way, a floating window's right or bottom edge moves that way (see [Tiling](#tiling)) |
 | Super + 1–4 | Switch to workspace 1–4 |
 | Super + Shift + 1–4 | Move the focused window to workspace 1–4 |
 | Super + Ctrl + Left/Right | Previous / next workspace |
 | Super + Tab | Back to the workspace the monitor showed before |
+| Super + Ctrl + comma / period | Send the monitor's workspace, with its windows and layout, to the monitor on the left / right (`move_workspace_to_output`; see [Workspaces between monitors](#workspaces-between-monitors)) |
+| Super + O | Overview: every window of the monitor's workspace as a live thumbnail, workspaces in a strip above (`toggle_overview`; see [Overview](#overview)) |
+| Super + ` | Focus the window focused before this one, on any workspace; repeated, it flips between two windows (`focus_last`) |
+| Super + N / Super + Shift + N | Open the notification history above the panel's bell / turn do-not-disturb on or off (`notification_history`, `dnd_toggle`; see [Notifications](#notifications-and-on-screen-display)) |
+| Super + U | Focus the window that has asked for attention the longest, switching workspace (`focus_urgent`; see [Urgent windows](#urgent-windows)) |
+| Super + G | Make the focused window a tab group (new windows join it), or dissolve its group (`group_toggle`) |
+| Super + Shift + G | Take the focused window out of its group (`ungroup`) |
+| Super + ] / [ | Show the next / previous tab of the group (`group_next`, `group_prev`) |
 | Super + Shift + minus | Hide the focused window in the scratchpad |
 | Super + minus | Show a scratchpad window, hide it again, or show the next one |
 | Super + Shift + R | Reload Lua configuration |
@@ -108,6 +143,41 @@ switches, unseen. Bound to a key without modifiers, or sent as
 list), `switcher_cancel`, Return, or Escape. `cycle` is the older action that raises the
 least recently focused window on the spot.
 
+### Overview
+
+Super + O (`toggle_overview`) shows the focused monitor's workspace as an Exposé: every
+window as a live, scaled thumbnail in a grid that fits them as large as possible (never larger
+than the window itself) and keeps each one's proportions, with a strip of the monitor's
+workspaces above it. The compositor draws it from scaled copies of the windows' own scene
+nodes, so the thumbnails move with the windows' contents (video, a terminal) and cost no more
+than a few scene nodes each; the shell draws only text over it. The thumbnails glide out of
+the windows' places when it opens and back into them when it closes. It changes nothing until
+you pick something:
+
+- Type to filter by title or application (several words must all match; the grid then lists
+  matching windows from every workspace and minimized ones). Backspace deletes, Escape clears
+  the filter, and a second Escape closes the overview.
+- The arrow keys move the selection through the grid (Tab and Shift + Tab step through it,
+  Home and End jump to the ends). Return, or a click on a thumbnail, focuses that window,
+  switching to its workspace if needed. The mouse selects by pointing.
+- Delete, or a middle click on a thumbnail, closes that window.
+- The strip shows each workspace with its windows; Page Up and Page Down, Ctrl + Left and
+  Right, or the mouse wheel show another workspace in the grid without switching to it. A
+  click on a workspace in the strip shows it; a second click, or Return on an empty one,
+  switches to it. Dragging a thumbnail onto a workspace in the strip moves the window there.
+- Escape, Super + O again, or a click on the backdrop closes it without changing anything.
+- Placing the pointer in a screen corner opens it (`overview.hot_corner`; the general
+  `hot_corners` table can bind `toggle_overview` to a corner too, with a dwell time).
+
+Keys and the mouse do not reach applications while it is open. Fullscreen windows are lowered
+under it, so it opens over them. Settings are in the `overview` table (`enabled`, `gap`,
+`animation`, `duration`, `strip`, `hot_corner`, `dim`; see `docs/config-reference.md`).
+Scripts can drive it: `shaode msg toggle_overview`, `overview_confirm [N]`, `overview_cancel`,
+`overview filter TEXT`, `overview select N`, `overview view N` (from 1), and `get overview`,
+which lists the state, the selection and the rectangle of every thumbnail and strip cell.
+Subscribers get `overview` lines (see `overview_describe` in `src/backend.c`) as it opens
+and changes.
+
 The host compositor can consume shortcuts before the nested compositor receives
 them: a host that grabs Super (Hyprland, GNOME) keeps these, so set `mod = "Alt"` in
 the Lua file for nested sessions. SIGHUP also requests a reload, and
@@ -126,9 +196,9 @@ it, maximizes it below the panels; dragging it away again restores its earlier s
 window focuses it without raising it (`mouse.focus_follows = false` turns this off), except
 while dragging, while a menu or popup is open, or while a panel or launcher has the keyboard.
 
-The panel and other bars stay hidden on a monitor showing a fullscreen window, even after
-another window takes focus, until the window leaves fullscreen or its workspace is switched
-away; the panel still shows while its launcher or a menu is open.
+A window you fullscreen with a binding or its title bar fills its monitor except the panel and
+other bars, which stay shown. Fullscreen a program asks for itself, like a video player or a
+browser's fullscreen video, covers the whole monitor, panels included, while it has focus.
 
 Limitations: snapping is keyboard-driven, without edge-drag previews. Window
 placement during interactive resize is immediate, without waiting for the
@@ -174,7 +244,7 @@ space back to its neighbour.
   the focused tile with it (`focus_left` … `focus_down`, `move_left` … `move_down`). With
   `focus_follows` on, these and Alt+Tab put the pointer just inside the window's bottom-right
   corner, out of the way.
-- Super + Ctrl + Shift + arrows (`resize_left` … `resize_down`) resize from the keyboard, by
+- Super + Ctrl + Shift + arrows (`resize_left`, `resize_right`, `resize_up`, `resize_down`) resize from the keyboard, by
   40 pixels or the binding's `amount` (`shaode msg resize_right 80`). On a tile the arrow
   moves a split beside it that way: the one on that side of the tile if there is one, growing
   it, else the one on its other side, shrinking it. With two tiles side by side, Right always
@@ -187,8 +257,135 @@ space back to its neighbour.
   `repeat_rate`. `features = { keyboard_resize = false }` turns the actions off.
 
 Not yet: per-workspace on/off, and keeping floating windows above tiles. Windows tiled on a
-monitor that is unplugged keep their place until it returns; a monitor disabled in the config
-hands its tiles to the nearest one, where they float if that one does not tile.
+monitor that is disabled in the config hands its tiles to the nearest one, where they float if
+that one does not tile. Unplugging a monitor does the same with all its windows (floating ones
+keep their relative place, tiles join the tiling of the nearest monitor, workspace numbers are
+kept), and with `outputs.return_windows` (on by default) they go back to the same workspace and
+into its tiling when the monitor is plugged in again, unless it is turned off or the windows were
+put elsewhere by hand. With no other monitor left, windows stay where they are.
+
+### Workspaces between monitors
+
+`move_workspace_to_output` sends the focused monitor's current workspace to another monitor:
+its windows, and the layout, master ratio and count, splits or scroll columns it had, all
+travel, and the other monitor shows it. The workspace with the same number there takes its
+place, so nothing is merged or lost. `swap_workspaces` trades all workspaces of two monitors, and
+with them what each one shows. Both take a target: `left` or `right` (the neighbouring monitor
+that way), `next` or `prev` (left to right, wrapping), a connector name, or `desc:` and the start
+of "make model serial". Bind them with `output = ...` (`swap_workspaces` defaults to `next`), or
+run `shaode msg move_workspace_to_output left`, `shaode msg output DP-1 swap_workspaces DP-2`.
+Super + Ctrl + comma / period are bound to the first with `left` / `right`; `swap_workspaces` has
+no default binding.
+
+Floating windows keep their place relative to the monitor's usable area and glide across;
+tiles glide to their new places. On a monitor that does not tile, the arriving tiles float, and
+floating windows sent from one that does not tile join the tiling. Sticky windows and the
+scratchpad stay with their monitor.
+
+### Tiling layouts
+
+Dwindle is the default, but every output and workspace can tile with another layout, chosen
+with `layout_next` / `layout_prev` (Super + Space, Super + Shift + Space), which cycle
+dwindle, master, spiral, monocle, scroll, or by name with `layout_dwindle`, `layout_master`,
+`layout_spiral`, `layout_monocle` and `layout_scroll` (unbound by default; `shaode msg layout_master` works
+too). `shaode msg get layout` prints the focused monitor's current workspace as `NAME RATIO
+MASTER_COUNT`.
+
+- **master**: the first `master_count` tiles share a column on the left, `master_ratio` of
+  the width; the rest are stacked in a column beside it. With no more tiles than masters,
+  the master column takes the whole width.
+- **spiral**: each tile takes `master_ratio` of the space the earlier ones left, turning
+  clockwise (left, top, right, bottom, ...), the last tile getting what remains.
+- **monocle**: every tile fills the area, the focused one on top; Super + J / K (`focus_next`
+  / `focus_prev`) or the arrows step between them, and Alt + Tab lists them as usual.
+
+- **scroll**: see [Scrolling layout](#scrolling-layout).
+
+The layouts other than dwindle order the tiles as a list (the dwindle tree read left to
+right): a new window joins the end wherever it is opened or dropped, and Super + Shift +
+arrows trade places with the next or previous one in the list rather than the geometric
+neighbour. `promote` (Super + Return) swaps the focused tile with the first, or with the
+second when it is the first; `swap_next` / `swap_prev` (Super + Shift + J / K) trade with the
+next or previous; `focus_next` / `focus_prev` step focus in order, wrapping, in every layout.
+`master_grow` / `master_shrink` (Super + L / H) move the ratio by 5% of the width and
+`master_more` / `master_less` (Super + comma / period) add or remove a master, from 1 to 8;
+in master, `resize_right` / `resize_left` and dragging the boundary move the ratio too. A
+ratio stays between 10% and 90%. Switching layouts never loses the dwindle tree: swaps
+stay, but its splits return exactly as they were.
+
+```lua
+layout = {
+    tile_layout = "master",  -- what workspaces start with: dwindle, master, spiral, monocle, scroll
+    master_ratio = 0.55,     -- 0.1 to 0.9
+    master_count = 1,        -- 1 to 8
+},
+```
+
+A workspace keeps the layout, ratio and master count it was given until the compositor
+restarts; a reload changes the starting values only for workspaces that have not chosen
+one.
+
+Each monitor can start with its own values in `layout.outputs`, keyed by connector name or
+`"desc:"` and the start of "make model serial" as in `outputs.monitors`:
+
+```lua
+layout = {
+    outputs = {
+        ["DP-1"] = { tile_layout = "scroll" },
+        ["desc:Dell U2720"] = { tile_layout = "master", master_ratio = 0.6, master_count = 2 },
+    },
+},
+```
+
+These apply to the monitor's workspaces that were not set by hand (a layout chosen with an
+action, or a ratio changed, is kept), also to windows already open when the configuration is
+reloaded, and again when the monitor is plugged back in. `shaode msg get layout OUTPUT
+[WORKSPACE]` prints another monitor's or workspace's values.
+
+### Scrolling layout
+
+`layout_scroll` tiles like niri and PaperWM: windows live in columns on a strip much wider
+than the screen, and the screen is a view onto it that follows focus, gliding like any
+other tile move. A new window opens in a column of its own right of the focused one. A
+column has a width, a share of the screen (`layout.scroll.width`, half by default), and
+stacks its windows evenly. Beside its own actions, the usual keys work: `focus_left` /
+`focus_right` step between columns and `focus_up` / `focus_down` within one, `move_left` /
+`move_right` move the focused column along the strip and `move_up` / `move_down` trade
+places within a stack, `focus_next` / `focus_prev` step through every window in order,
+`master_grow` / `master_shrink` (Super + L / H) and dragging a column's side resize it,
+and the Alt + Tab switcher brings any window into view.
+
+| Action | Does |
+| --- | --- |
+| `scroll_left`, `scroll_right` | focus the column to the left or right (the view moves to show it, even with `follow = "never"`) |
+| `column_cycle_width` | step the focused column through `presets` (a third, half, two thirds, full), wrapping |
+| `column_widen`, `column_narrow` | change its width by `step` (10% of the screen), from 10% to 100% |
+| `consume_left`, `consume_right` | stack the focused window into the column on that side; a column left empty disappears |
+| `expel` | move the focused window out of a stack into a column of its own on the right |
+| `center_column` | center the focused column in the view |
+
+```lua
+layout = {
+    tile_layout = "scroll",
+    scroll = {
+        follow = "center",                  -- center: always centered; edge: only as far as
+                                            -- needed; never: only scroll actions, new windows
+                                            -- and center_column move the view
+        width = 0.5,                        -- width of a new column, 0.1 to 1
+        step = 0.1,                         -- column_widen / column_narrow
+        presets = { 1/3, 1/2, 2/3, 1 },     -- column_cycle_width; up to 8 widths
+    },
+},
+```
+
+With `mouse.focus_follows` on, columns that scroll under a still pointer can take focus on
+its next move; keyboard-driven scrolling takes the pointer along, but if the mouse causes
+trouble, use `follow = "edge"`, which moves the view least.
+
+The scroll layout is per workspace like the others; windows opened under another layout get
+a column each, at the end, when it is switched to. The columns are remembered when you
+switch away and back. Only the scroll actions need key bindings, none are bound by default
+(`config/init.lua` has commented examples).
 
 Pointer devices in a standalone `--session` take `mouse.speed` (-1 to 1),
 `mouse.acceleration` (`"flat"` or `"adaptive"`), and `mouse.natural_scroll`; touchpads also
@@ -201,8 +398,10 @@ from the host, so these do nothing there.
 since Hyprland adds it on both sides. The `windows` table draws a border around each window
 (`border_width`, `border_color` for the focused one, `border_inactive_color`) and sets
 `opacity` and `inactive_opacity`, per application too with `rules`. Fullscreen windows have no
-border and stay opaque. Rounded corners, blur, and shadows need a renderer that wlroots' scene
-graph does not provide.
+border and stay opaque. Windows on a monitor with tiling on (floating ones too) and their
+border get rounded corners (`corner_radius`, 10 by default, 0 for square ones) when wlroots is
+built with `packaging/patches/wlroots-rounded-corners.patch`; stock wlroots keeps them square.
+Blur and shadows need a renderer that wlroots' scene graph does not provide.
 
 Each entry of `windows.rules` matches windows by `app_id`, `title`, or both, each a regular
 expression searched in the window's app ID or title (X11 windows match their `WM_CLASS` class
@@ -246,7 +445,22 @@ the layout changes; their new size shows as soon as the application draws it. Th
 has no transform for a whole window, so the scaling resizes each of its surfaces about the
 window's center. `animations = { enabled = false }` turns this off, and `duration` sets the
 length in milliseconds (default 120, 10–1000). Window positions reported by `shaode msg` are
-always the final ones.
+always the final ones, and clicks and hovering use them too: input never waits for an
+animation or lands in the middle of one.
+
+Animations are interruptible: a tile that is gliding when the layout changes again continues
+from where it is drawn, at the speed it has, and never snaps. Each kind (`open`, `close`,
+`move`, `workspace`, `fullscreen`, `focus`) can have its own `duration` (0 turns just that
+kind off) and easing `curve`: `"linear"`, `"ease-in"`, `"ease-out"`, `"ease-in-out"`,
+`"ease-out-quint"`, `"overshoot"`, `"spring"`, or `"bezier(x1, y1, x2, y2)"`. Moves use the
+spring by default. `speed` scales every animation (2 is twice as fast), and a frame later
+than `late_frame_ms` (default 80) finishes what is running rather than stuttering through it.
+Switching workspace slides the old windows out (copies of their last frames) and the new
+ones in, fading, toward the side of the higher-numbered workspace; `animations.workspace.distance`
+sets the slide as a share of the monitor's width (default 0.08, 0 only fades). Sticky windows
+stay put.
+When focus moves, a window's opacity and border color fade to their new values (the `focus`
+kind) instead of switching.
 
 Every monitor has its own workspaces, numbered 1 to `layout.workspaces` (1–10), and all
 start on 1. Workspace shortcuts switch the focused monitor: the one whose window was
@@ -257,6 +471,10 @@ or Super + R then act on the empty monitor. A window belongs to the
 monitor it is on; moved to another monitor, it joins the workspace showing there. The
 panel on each monitor shows that monitor's workspaces, marking the current one and those
 with windows; scrolling over it pages through them and clicking a number switches to it.
+`layout.workspace_names = { "web", "code" }` labels workspaces 1, 2, ...: the panel shows the name
+instead of the number, and `workspace` and `move_to_workspace` accept it, in bindings
+(`workspace = "web"`) and from the control socket (`shaode msg workspace web`; a name with spaces
+is written as is).
 The taskbar lists windows from every workspace, and activating one switches its monitor
 to its workspace. Window shortcuts act only on visible windows.
 
@@ -278,13 +496,19 @@ so the mouse can still find them; activating one there shows it as `scratchpad_s
 windows back to the current workspace.
 
 A sticky window, as with sway's `sticky enable`, shows on every workspace of its monitor:
-`toggle_sticky` (Super + P, `shaode msg toggle_sticky`, or a mouse button binding for the
+`toggle_sticky` (Super + Shift + P, `shaode msg toggle_sticky`, or a mouse button binding for the
 window under the pointer) floats it, and switching that monitor's workspace keeps it shown
 and raises it over the workspace's windows. Moved to another monitor, it stays sticky there;
 `move_to_workspace` unsticks it and moves it. Unsticking a window that was a tile tiles it
 again on the current workspace (Super + V does the same). The taskbar keeps listing it, and
 activating it does not switch workspaces. `features = { sticky = false }` turns the action
 off, and a reload that sets it returns sticky windows to their monitor's current workspace.
+
+Monitors can also be changed while running with any wlr-output-management client (`wlr-randr`,
+`kanshi`, `wdisplays`): mode, scale, rotation, position, and turning outputs on or off. Those
+settings replace the `outputs.monitors` entry of the outputs they touch until the Lua
+configuration is reloaded, which brings the configured setup back. The last enabled output
+cannot be turned off.
 
 Portals run as D-Bus services, started with the bus's environment rather than the
 compositor's. A standalone `--session` therefore exports `WAYLAND_DISPLAY`, `DISPLAY`,
@@ -338,6 +562,196 @@ it with `theme = "theme.lua"` and overrides any of it; `--dry-run` only prints. 
 [docs/dotfile-import.md](docs/dotfile-import.md) for the details and for the settings shaoDe
 still lacks (rounding, blur, shadows).
 
+### Appearance profiles
+
+A profile is a named set of look settings, from `appearance`, `windows` and `shell`, that is laid
+over the rest of the configuration (and its theme and defaults) while it is in use. Settings a
+profile leaves out keep their usual values, and switching profiles changes nothing else:
+
+```lua
+profile = "default", -- the one to start with
+profiles = {
+    default = {},    -- the configuration as it is
+    light = {
+        appearance = { background = "#dfe4ec" },
+        windows = { border_color = "#3d6fd9", border_inactive_color = "#c3cad6" },
+        shell = { accent = "#3d6fd9", panel_color = "#f4f6fa", text_color = "#1b2230" },
+    },
+},
+```
+
+Pick one from the panel: the profile button beside the tiling button (three swatches of the
+current accent, background and text colours) lists them, the one in use marked, whenever there
+are two or more (`shell.widgets.profiles = false` hides it). Right-clicking empty bar space and
+choosing **Appearance: NAME …** lists them too (the one in use is ticked). The command palette (Super + P) lists them as
+**Appearance: NAME** too, and scripts and hot corners can use `shaode msg profile NAME`, or
+`profile next` and `profile prev` to step through them in name order. A pick is saved in
+`$XDG_STATE_HOME/shaode/profile` (`~/.local/state/shaode/profile`) and reloads the
+configuration, so the compositor and the shell change together, and it stays after a restart.
+While that file names a profile the configuration still has, it wins over `profile`; delete it
+to go back to `profile`. Every profile is checked when the configuration loads, so a mistake in
+one that is not in use is still reported, with its line. The example configuration ships
+`default` and `light`; a file with `extends = "default"` gets them only when it defines no
+`profiles` of its own.
+
+### Command palette
+
+`palette` (Super + P, or `shaode msg palette`) opens a search box in the shell, on the monitor
+under the pointer, that reaches everything from one place: open windows, installed applications,
+workspaces (switching to one, or moving the focused window there), compositor actions such as
+`layout_monocle` or `group_toggle`, and saved sessions (restore, restore and launch what is
+missing, and save the current arrangement under the name typed). Type to narrow the list; each
+word must match, in any order, as letters in sequence of the title or its small print, favouring
+runs of letters and word starts (`gc` finds Google Chrome, `lay mon` finds Layout: monocle).
+Up and Down, Tab and Shift + Tab, Ctrl + N and Ctrl + P, or the pointer select; Enter or a click
+runs the entry; Escape, or clicking elsewhere, closes it. A leading `>` searches only actions, `@`
+windows, `#` workspaces and `%` sessions. The palette needs the shell (`shaode-shell`), which
+draws it, and the compositor's control socket for actions and sessions. On a machine with 600
+entries a keystroke re-ranks them in under a millisecond (an optimized build; see
+`tests/palette_test.cpp`). Super + P used to toggle sticky windows; that moved to Super + Shift + P.
+
+### Window groups
+
+A group puts several windows in one slot, a tile or a floating place, and shows one at a time.
+`group_toggle` (Super + G) makes the focused window a group of one; with `features.group_join_new`
+(on by default) every window that opens while a group has focus joins it as a new tab and takes
+its slot. `group_next` and `group_prev` (Super + ] and [) step through the tabs, wrapping, and
+`ungroup` (Super + Shift + G) takes the focused window out into a tile of its own beside the
+group. `group_merge_left`, `group_merge_right`, `group_merge_up` and `group_merge_down` move the focused window into the group of
+the window beside it in that direction (making that window a group if it is none), where it
+becomes the shown tab; they have no default binding. `group_toggle` inside a group dissolves it:
+the hidden windows tile beside the shown one again. Closing the shown window shows the next tab,
+and a group left with a single window dissolves.
+
+The group's windows are drawn as a strip of tabs, a thin bar over the top edge of the shown
+window, one segment per member with the shown one lit. A click on a segment brings that window
+forward. The strip carries no titles: the compositor has no text rendering, so the taskbar (which
+lists every member, and switches tabs when a hidden one is activated) and the window switcher
+name the windows. `shaode msg get windows` ends each line with the window's group number (0 for
+none). Hidden members are off the screen, in no tiling, and follow the shown window to another
+workspace or monitor. `features.groups = false` turns the actions off and dissolves every group
+on reload. `session save` keeps only the shown window of a group, not the group.
+
+### Magnetic edges
+
+A floating window that is dragged (Alt + left drag, or a client-decorated window's own title
+bar) or resized (Alt + right drag, or its border) sticks to nearby edges, so windows line up
+without pixel hunting. Within
+`windows.magnet.distance` (12 px by default) an edge of the window lands on the edge of the
+output, of the area the panels leave free, or of another window, and a translucent guide line
+(`guide_color`) is drawn along the edge that holds it, from one window to the other. It works
+per axis (a corner can catch both), and against a window only where the two overlap in the other
+direction, so a window far above or below does not pull. The window follows the pointer's own
+position, so it stays held until the pointer has moved the distance away, then follows it again;
+hold the `bypass` modifier (Shift by default; `"none"` for no modifier) to drag freely.
+`windows.magnet = { enabled = false }` turns it off, and `guides = false` leaves the lines out.
+Tiles and windows lifted out of the tiling to be dropped somewhere are not affected, and
+dropping a window at the top of the screen still maximizes it (that goes by the pointer). When
+resizing, only the edges being pulled stick. It does not act on keyboard moves or resizes, or on
+snap actions. Tested headless with a virtual
+pointer and keyboard, including the guide's pixels (`tests/magnet_smoke.py`); the feel of the
+distance with a real mouse has not been judged.
+
+### Window placement
+
+`windows.placement` chooses where a new floating window opens (a tile goes where the layout
+puts it, and a window rule's `position` wins over all of these). `"cascade"`, the default, steps
+each window 32 pixels down and right from 40 pixels in, one step for every window already open,
+wrapping after eight. `"center"` opens it in the middle of the area the panels leave free on
+the pointer's monitor. `"smart"` looks for the place where it covers the other windows on that
+monitor and workspace least: it tries the positions flush against the screen's and the windows'
+edges and in the middle of each gap between them, takes the one that covers nothing with the
+most room around it (a window beside another lands in the middle of the free part of the
+screen, the first window in the middle of the screen), and cascades when there is no free space
+for it. Windows on other workspaces and monitors, and hidden ones, do not count. The choice is
+made from the size the window asked for when it opens; the algorithm has unit tests
+(`tests/window_placement_tests.cpp`) and the modes are checked headless with a panel
+(`tests/placement_smoke.py`).
+
+### Urgent windows
+
+An application that is not focused can ask for attention: a chat client with a new message, a
+terminal's bell, a browser opening a link from another program. Wayland clients do it with
+xdg-activation, X11 clients with `_NET_WM_STATE_DEMANDS_ATTENTION` or the urgency flag of
+`WM_HINTS`. `windows.activation` decides what happens:
+
+| value | effect |
+|-------|--------|
+| `"urgent"` (default) | The window is marked urgent and focus stays where it is, so nothing steals it. |
+| `"focus"` | The window is focused, switching to its workspace, as before this setting existed. |
+| `"ignore"` | The request is dropped. |
+
+An urgent window's border pulses for four seconds in `windows.urgent_color` (orange by default)
+and then holds it, also on windows without a `border_width`, where a two pixel frame is drawn
+inside the window's edge without moving anything. Its taskbar button (or the stack it is in) gets
+a tinted background and a pulsing dot, the workspace indicator marks its workspace, the overview
+frames its thumbnail and colours its workspace, the window switcher puts a dot on its icon,
+and the command palette lists it first with "needs attention". `focus_urgent` (Super + U, `shaode msg focus_urgent`) focuses the window that
+has been urgent the longest, switching workspace and showing it if it was minimized or in the
+scratchpad; a window that gets focus any other way, or closes, is no longer urgent. The focused
+window is never urgent, and a client that clears its X11 hint or demand ends it too.
+
+`shaode msg get urgent` prints the urgent windows, the longest waiting first, in the columns of
+`get windows`. Subscribers to the control socket receive `urgent COUNT` in every state, then an
+`urgent-output NAME 1,3` line per monitor with the workspaces holding urgent windows and an
+`urgent-window OUTPUT WORKSPACE APP_ID TITLE` line (tab-separated after the name) for each of the
+first sixteen, so a script or a panel can follow them without polling. The shell finds a task
+by app ID and title, which the foreign-toplevel protocol has no urgent state for; two windows of
+one application with the same title are told apart only by their order.
+
+### Window swallowing
+
+With `windows.swallow = { enabled = true }` a window started from a terminal takes the terminal's
+place and hides it, as in Hyprland and dwm's swallow patch: run `mpv clip.mkv` or `imv photo.png`
+in a terminal and the player opens in the terminal's tile (or floating rectangle, size and
+place), and closing it brings the terminal back there, with focus. It is off by default.
+
+The match is by process ancestry, not by guessing: the new window's process (its Wayland
+client's pid, or the X11 window's) has to descend from the process of a terminal's window, however many shells and
+launchers lie between, read from `/proc`. Only windows whose `app_id` (X11 class) is in
+`windows.swallow.terminals` (compared without regard to case; by default kitty, foot, footclient,
+Alacritty, wezterm, ghostty, xterm, URxvt and konsole) can be swallowed. A window that is
+itself a terminal never swallows (so a terminal started from a terminal opens beside it), nor
+does a dialog, an `app_id` in `windows.swallow.exceptions`, or a window a rule sends elsewhere
+(floating, another workspace or monitor, sticky). When a process has several windows (a
+`foot --server`), the focused one, else the last focused, is the one swallowed. A terminal that is minimized, in the
+scratchpad, sticky or in a group is left alone.
+
+A swallowed terminal is hidden, leaves the taskbar, the window switcher and the overview, and
+follows its window to another workspace or monitor; the window is an ordinary one (it can be
+floated, moved and resized), and the terminal returns to wherever it is when it closes. If the
+terminal closes first, the window keeps the place. `swallow_toggle` (no default binding; it
+works with `enabled = false` too) does it by hand: pressed on a window that swallowed a terminal it
+gives the terminal a place beside it again, otherwise the window takes the place of the terminal
+it was started from, or of the terminal last focused on the workspace. `shaode msg get swallow`
+lists each window with whether it is swallowed and its partner. Only applications that stay
+descendants of the terminal can be swallowed: one that hands the request to a running instance
+(a browser opening a new window) belongs to the other process. This is checked headless with
+process ancestry through a shell, and with an X11 window (`tests/swallow_smoke.py`,
+`tests/swallow_x11_smoke.py`); with real terminals (foot, kitty) it has not been.
+
+### Sessions
+
+`shaode msg session save NAME` writes what the desktop looks like to
+`$XDG_STATE_HOME/shaode/sessions/NAME` (`~/.local/state/shaode/sessions`): each monitor's
+current workspace, tiling on or off and the tiling layouts of its workspaces, and for every
+window its monitor, workspace, floating place, tiled, floating, minimized, sticky, maximized,
+fullscreen, scratchpad and focus state, the app ID and title to find it by, and the command line
+it was started with. `session restore NAME` puts every window that matches back where it was (app
+ID and title first, then app ID alone; a window is matched once), switches the monitors to their
+saved workspaces and refocuses the window that had focus. Windows of applications that are no
+longer running are left alone, unless the request is `session restore NAME launch`, which
+starts their saved command lines and places each new window as it opens (the first window with
+the app ID, within 30 seconds). `session list` prints `NAME`, its window count and when it
+was saved; `session delete NAME` removes one. Names are letters, digits, `.`, `_` and `-`.
+Applications that do not restart from their own command line (Flatpak launchers, single-instance
+programs that hand over to a running copy) are matched but may not relaunch.
+
+For workspaces that tile with the scrolling layout the session also keeps the width of each
+column and which column, and place in its stack, each tile had; a restore puts the windows it
+finds back into those columns. A window started by `restore ... launch` arrives later and opens
+as usual, right of the focused column.
+
 A control socket runs any Lua action from scripts or other tools:
 `shaode msg workspace 2`, `shaode msg toggle_tiling`, `shaode msg spawn foot`,
 `shaode msg screenshot window`, `shaode msg resize_left 80`. Prefixing
@@ -350,15 +764,17 @@ workspaces holding windows, such as `1,3`, or `-`, and tiling, `on` or `off`),
 enabled, x, y, logical width and height, scale, transform, mode, and "make model serial"), and
 `shaode msg get windows` prints one tab-separated line per window:
 workspace, focused, minimized, tiled, x, y, width, height, app ID, title, monitor,
-visible, scratchpad (a window hidden there is also minimized), and sticky. `shaode msg get layers` prints one line per panel or other layer-shell surface:
+visible, scratchpad (a window hidden there is also minimized), sticky, and its window group
+(a number; 0 for none). `shaode msg get layers` prints one line per panel or other layer-shell surface:
 namespace, output, layer (0 background to 3 overlay), and whether it is shown.
 `shaode msg get animations` prints the number of running animations and of window trees in
-the scene (closing windows count until their animation ends), mainly for tests. A client
+the scene (closing windows count until their animation ends), and of focus fades, mainly
+for tests. A client
 that sends `subscribe` keeps its connection and receives `tiling on|off` and
 `workspace N` (the focused monitor's), and one `output NAME N USED TILING` line per monitor
 (as in `get workspaces`) after every change, plus `launcher OUTPUT` when the `launcher` action
 (Super + R) asks the panel on that monitor to open or close its application menu; the panel uses this. The window switcher sends `switcher OUTPUT SELECTED COUNT` followed by
-COUNT lines `switcher-window APP_ID TITLE OUTPUT WORKSPACE MINIMIZED` (tab-separated) when it
+COUNT lines `switcher-window APP_ID TITLE OUTPUT WORKSPACE MINIMIZED URGENT` (tab-separated) when it
 opens or a listed window closes, `switcher-select N` as the selection moves (both counting
 from 0), and `switcher-close`. Children of the session find the socket through `SHAODE_SOCKET`. Actions are
 refused while the session is locked.
@@ -421,13 +837,125 @@ window manager every 250 ms while Xwayland runs. With wlroots patched by
 Lua currently configures the exposed settings/actions; custom layout functions
 and shell widgets are later work.
 
+## Effects
+
+Small effects that are off, or harmless, until you ask for them. Each has settings in
+[docs/config-reference.md](docs/config-reference.md).
+
+**Dim inactive windows.** `windows.dim_inactive = 0.25` lays black over windows without focus,
+so the focused one stands out; it works for every application (unlike `inactive_opacity`,
+nothing shows through) and fades over `windows.dim_duration` milliseconds (`animations.enabled =
+false` or a duration of 0 switches at once). Fullscreen windows are never dimmed, and clicks go
+through the black to the window.
+
+**Peek.** Bind `peek` to a key and every window fades to `peek.opacity` (0.12 by default; 0 hides
+them) for as long as the key is held, showing the desktop behind them; borders, the panel and
+dimming go with it. `peek_toggle` (and `shaode msg peek_toggle`) switches it on and off instead.
+The fade takes `peek.duration` milliseconds.
+
+**Night light.** `night_light = { enabled = true, night_temperature = 3400 }` turns the screen
+warm in the evening and neutral again in the morning, easing over `transition` minutes around
+sunset and sunrise. Give the times (`sunrise = "06:30"`, `sunset = "21:00"`) or a `latitude` and
+`longitude` and shaoDe works them out for each day. The actions `night_light_toggle`,
+`night_light_on`, `night_light_off` and `night_light_auto` (back to the schedule) override it,
+also as `shaode msg night_light_toggle`; `shaode msg get night_light` prints the temperature in
+kelvin, the override (0 schedule, 1 neutral, 2 warm) and whether the schedule is enabled. The
+colours go through the output's gamma table, the way `wlsunset` does it, and a client using
+`wlr-gamma-control` still works alongside.
+
+**Magnifier.** `zoom_in`, `zoom_out` and `zoom_reset` (bind them, or `shaode msg zoom_in`)
+magnify the screen by `zoom.step` (1.25) per step up to `zoom.max` (8), easing over
+`zoom.duration` milliseconds. The view follows the pointer and keeps it over the point it clicks:
+the pointer moving across the screen pans across the whole desktop. With `zoom.scroll_modifier =
+"Super"`, Super plus the scroll wheel steps in and out. Only the output the pointer is on is
+magnified, and outputs that are rotated stay at 1x. Screenshots and screen recordings of the
+output see the magnified picture. `shaode msg get zoom` prints the level and its target in
+thousandths.
+
+**Hot corners.** Push the pointer into a screen corner and leave it there for
+`hot_corners.delay` milliseconds (150) and the corner's request runs, once per visit:
+
+```lua
+hot_corners = {
+    top_left = "toggle_overview",
+    top_right = "spawn foot",
+    bottom_left = "peek_toggle",
+    bottom_right = "workspace_next",
+}
+```
+
+A request is written as for `shaode msg`: an action with its argument, or `spawn PROGRAM ARGS`.
+The corner is `hot_corners.size` pixels (2) square. Nothing runs while a button is held, a drag is
+under way, the session is locked, or a fullscreen window covers the output.
+
+## Notifications and on-screen display
+
+The shell is a notification daemon. It owns `org.freedesktop.Notifications` on the session bus
+(spec 1.2: `Notify`, `CloseNotification`, `GetCapabilities`, `GetServerInformation`, and the
+`NotificationClosed` and `ActionInvoked` signals), so `notify-send`, browsers, chat clients and
+`shaode`'s own screenshot message reach it without setup. Each notification is a card in the top
+right corner of the monitor that has the focus (`notifications.position` moves it to another
+corner); further cards stack under it and slide in and out.
+
+- The card shows the application, the summary, the body (the spec's markup: `<b>`, `<i>`, `<u>`,
+  `<a href>` for web and mail links, `<br>`; anything else is dropped), the icon (`app_icon`, or
+  the `image-path`, `image-data` and `desktop-entry` hints), a progress bar for the `value` hint,
+  and a button for each action. A click on the card runs the action named `default`, or dismisses
+  the card when there is none; the × dismisses it too.
+- `replaces_id` updates a notification in place, and so does a repeated
+  `x-canonical-private-synchronous` (or `synchronous`, `x-dunst-stack-tag`) hint from the same
+  application, which volume and brightness scripts use. `resident` keeps a notification after
+  one of its actions runs, and `transient` keeps it out of the history.
+- Cards leave after `notifications.timeout` (6 s), or the application's own timeout. Critical
+  notifications stay until dismissed. Hovering a card pauses its timer, which continues with
+  the time it had left. At most `notifications.max_visible` cards show; the oldest makes room.
+- The bell in the panel keeps the last `notifications.history` notifications. Its badge counts
+  those not yet seen; opening the list marks them seen. Clicking an entry runs its default action,
+  × removes it, Clear empties the list. It opens with `notification_history` too (Super + N).
+- Do-not-disturb (`dnd_toggle`, `dnd_on`, `dnd_off`, `shaode msg dnd [on|off|toggle]`, a
+  right-click on the bell, or the switch in the list, or `notifications.dnd = true` to start that
+  way) keeps cards away and lets everything reach the history; critical notifications still show.
+  A reload of the configuration does not undo what was toggled.
+
+The on-screen display is a small pill near the bottom centre of the focused monitor with an icon,
+a label and a level, which fades out after `osd.timeout` (1.5 s). It appears when the default
+sound output's volume or mute changes, whether from the panel's volume control, a media key bound
+to `wpctl` or `pactl`, or another program; when a backlight's brightness changes (a laptop's
+keys, `brightnessctl`); when do-not-disturb changes; and for
+`shaode msg osd TEXT [PERCENT]`, where a last word from 0 to 100 (optionally with `%`) is the
+level, e.g. `shaode msg osd "Keyboard light" 60`. Set `osd.enabled = false`, or only
+`osd.volume`/`osd.brightness` to false, to turn it off.
+
+```lua
+notifications = { position = "top-right", timeout = 6000, max_visible = 4, dnd = false },
+osd = { position = "bottom", timeout = 1500 },
+```
+
+Set `notifications.enabled = false` to run another daemon (mako, dunst): the shell then leaves
+the bus name alone, and if another daemon already holds it the shell logs that and serves
+nothing (the bell hides). The daemon needs Qt's D-Bus module at build time; without it (or with
+`-DSHAODE_NOTIFICATIONS=OFF`) the shell builds without notifications and the display still works.
+Settings are in the [configuration reference](docs/config-reference.md).
+
+The tests start a dbus-daemon of their own on a private address and never touch the session bus:
+`notifications_test` (the model, timers and markup), `notifications_dbus_test` (the interface on
+that bus), `notifications_smoke` (a headless compositor and shell: cards, a click, expiry, hover,
+do-not-disturb, the display and the history), and the configuration tests.
+
 ## Configuration and testing
 
 Lua configuration returns a versioned table. Settings and shortcuts are validated
-before application; an invalid reload retains the active configuration. Lua can
+before application. Saving the file reloads it, like Hyprland; a file with an error (at
+startup too) loads the default configuration instead and shows the error in a red bar across
+the top of every monitor until a save fixes it. `auto_reload = false` turns the reload on
+save off. Lua can
 use base functions, tables, strings, math, and UTF-8 to compute settings. Process
 and file I/O libraries are not exposed. Configuration is user-controlled code;
 the evaluator is not a security boundary for untrusted scripts.
+
+The `keyboard` table sets the XKB `layout`, `variant`, `model` and `options` (for example
+`{ layout = "us,no", variant = ",", options = "grp:alt_shift_toggle" }`), and the `repeat_rate` and
+`repeat_delay` clients see. An unknown combination is rejected with the rest of the file.
 
 Without `--config`, the executable looks for `$XDG_CONFIG_HOME/shaode/init.lua`,
 or `~/.config/shaode/init.lua` when `XDG_CONFIG_HOME` is unset, then falls back
@@ -452,6 +980,11 @@ return {
 
 Its bindings take their keys first and the defaults fill in the rest; `action = "none"`
 leaves a key unbound.
+
+Actions without a section of their own: `quit` ends the session (Super + M), `snap_left` and
+`snap_right` fill half of the monitor with the focused floating window (no default binding),
+and `workspace_prev` is the counterpart of `workspace_next` (Super + Ctrl + Left). The full
+list, with what each takes, is generated into `docs/config-reference.md`.
 
 Bindings can use a mouse button (`left`, `right`, `middle`, `side`, `extra`, `forward`,
 `back`; most mice send `side` and `extra` from their back and forward thumb buttons) in place
@@ -506,9 +1039,10 @@ remaining limitations.
 
 ## Branches
 
-`master` holds tested work, `develop` holds finished work waiting to be tested,
-and new work happens on `feat/*` or `fix/*` branches started from `develop`. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
+`master` is the only long-lived branch. Work is done in git worktrees, committed in small
+steps, and pushed straight to `master` once the build and `ctest` pass. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and [CHANGELOG.md](CHANGELOG.md) for
+notable changes.
 
 ## Development sequence
 
@@ -541,3 +1075,4 @@ version 3 or (at your option) any later version. See [LICENSE](LICENSE).
 The compositor adapter derives from TinyWL. Its upstream MIT license is
 preserved in [vendor/tinywl/LICENSE](vendor/tinywl/LICENSE). The protocol
 files in `protocols/` keep the licenses stated in each file.
+

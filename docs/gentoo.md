@@ -16,8 +16,8 @@ between release series. Relevant Gentoo packages are:
 - `dev-lang/lua:5.4`
 - `dev-libs/wayland` and `dev-libs/wayland-protocols`
 - `dev-util/wayland-scanner` and `x11-libs/libxkbcommon`
-- `dev-qt/qtbase:6` (with its default `network` USE flag), `dev-qt/qtdeclarative:6`,
-  and `dev-qt/qtwayland:6`
+- `dev-qt/qtbase:6` (with its default `network` USE flag, and `dbus` for the notification
+  daemon), `dev-qt/qtdeclarative:6`, and `dev-qt/qtwayland:6`
 - `kde-plasma/layer-shell-qt:6` (6.6+) and `dev-libs/glib:2` for the desktop shell
 - Optional: `media-libs/libpulse` for the panel's volume control (PipeWire's
   `sound-server` USE flag serves it); without it the control is left out
@@ -37,9 +37,14 @@ between release series. Relevant Gentoo packages are:
 Standalone operation requires wlroots built with `drm`, `libinput`, and `session`
 USE flags. X11 applications additionally need wlroots with the `X` USE flag and
 `x11-base/xwayland`; shaoDe then links `x11-libs/libxcb` and enables XWayland
-automatically. To fix wlroots' lost X11 windows at the source, copy
+automatically (the XWM waker also needs `xcb-xfixes`, part of libxcb). To fix wlroots' lost X11 windows at the source, copy
 `packaging/patches/wlroots-xwm-drain.patch` into `/etc/portage/patches/gui-libs/wlroots/`,
-re-emerge wlroots, and configure shaoDe with `-DSHAODE_XWM_WAKER=OFF`. A GLES2-capable graphics stack is needed. The upstream Gentoo ebuild
+re-emerge wlroots, and configure shaoDe with `-DSHAODE_XWM_WAKER=OFF`. Rounded corners on
+tiled windows (`windows.corner_radius`) need
+`packaging/patches/wlroots-rounded-corners.patch` in the same directory; shaoDe finds the
+patched wlroots by itself when it is next configured, and keeps windows square without it.
+Portage applies these patches only when it builds from source: with binary packages enabled,
+re-emerge with `emerge --oneshot --usepkg=n gui-libs/wlroots:0.20`. A GLES2-capable graphics stack is needed. The upstream Gentoo ebuild
 lists the backend dependencies and flags:
 [wlroots 0.20.2 ebuild](https://github.com/gentoo/gentoo/blob/master/gui-libs/wlroots/wlroots-0.20.2.ebuild).
 Check the package version/keywords available in your own tree before installing.
@@ -89,8 +94,8 @@ development add `-DSHAODE_BUILD_SHELL=OFF`; Qt, GIO, and LayerShellQt are then
 unnecessary. `--no-shell` skips shell startup at runtime. Lua's `shell` table
 controls its colors, panel height, wallpaper path, and pinned launchers;
 `layout.tiling = true` starts with automatic tiling, which the panel button and
-Super+S toggle at runtime. Reload with Super+Shift+R after editing the file. Invalid configuration retains the last
-working settings.
+Super+S toggle at runtime. Saving the file reloads it (or reload with Super+Shift+R). A file with an error
+loads the default configuration and shows the error across the top of the screen until it is fixed.
 
 `BUILD_TESTING=OFF` omits the test tools/Python requirement. `DESTDIR` staging and
 GNU install directories are supported for packaging. The display-manager session

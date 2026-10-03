@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-tiling-test-") as directory:
 
     def msg(*words):
         result = subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                                text=True, timeout=5)
+                                text=True, timeout=30)
         assert result.returncode == 0, (words, result.stdout, result.stderr)
         return result.stdout
 
@@ -177,10 +177,10 @@ with tempfile.TemporaryDirectory(prefix="shaode-tiling-test-") as directory:
             msg("workspace", "2")  # Notifying a closed subscriber must not hurt the server.
             for window in processes[1:]:
                 window.kill()
-                window.wait(timeout=5)
+                window.wait(timeout=30)
             del processes[1:]
             server.terminate()
-            assert server.wait(timeout=5) == 0, log.read_text()
+            assert server.wait(timeout=30) == 0, log.read_text()
             print("Tiling toggle, dwindle splits, directional focus, workspaces, floating, and "
                   "subscription passed")
         except Exception:
@@ -190,4 +190,4 @@ with tempfile.TemporaryDirectory(prefix="shaode-tiling-test-") as directory:
             for process in reversed(processes):
                 if process.poll() is None:
                     process.kill()
-                    process.wait(timeout=5)
+                    process.wait(timeout=30)

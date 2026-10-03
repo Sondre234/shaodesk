@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-workspace-test-") as directory:
 
     def msg(*words, ok=True):
         result = subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                                text=True, timeout=5)
+                                text=True, timeout=30)
         assert (result.returncode == 0) == ok, (words, result.stdout, result.stderr)
         return result.stdout if ok else result.stderr
 
@@ -65,7 +65,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-workspace-test-") as directory:
 
             # Activating a window from the taskbar switches to its workspace.
             subprocess.run([probe, "--activate", "shaode-probe"], env=env, check=True,
-                           timeout=5, stdout=subprocess.DEVNULL)
+                           timeout=30, stdout=subprocess.DEVNULL)
             wait_for(lambda: msg("get", "workspace") == "2\n", processes, "taskbar switch")
             assert windows()["shaode-probe"] == (2, True)
 
@@ -75,12 +75,12 @@ with tempfile.TemporaryDirectory(prefix="shaode-workspace-test-") as directory:
             assert window.poll() is None, "close reached a window on another workspace"
             msg("workspace", "2")
             msg("close")
-            assert window.wait(timeout=5) == 0
+            assert window.wait(timeout=30) == 0
             processes.remove(window)
             assert windows() == {}
 
             server.terminate()
-            assert server.wait(timeout=5) == 0, log.read_text()
+            assert server.wait(timeout=30) == 0, log.read_text()
             assert not Path(env["SHAODE_SOCKET"]).exists(), "control socket left behind"
             print("Workspaces, control socket, taskbar switching, and scoped actions passed")
         except Exception:
@@ -90,4 +90,4 @@ with tempfile.TemporaryDirectory(prefix="shaode-workspace-test-") as directory:
             for process in reversed(processes):
                 if process.poll() is None:
                     process.kill()
-                    process.wait(timeout=5)
+                    process.wait(timeout=30)

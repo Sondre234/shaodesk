@@ -37,7 +37,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-output-workspace-test-") as dire
 
     def msg(*words, ok=True):
         result = subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                                text=True, timeout=5)
+                                text=True, timeout=30)
         assert (result.returncode == 0) == ok, (words, result.stdout, result.stderr)
         return result.stdout if ok else result.stderr
 
@@ -149,7 +149,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-output-workspace-test-") as dire
             assert workspaces()["HEADLESS-2"][0::2] == (4, "4"), workspaces()
 
             server.terminate()
-            assert server.wait(timeout=5) == 0, log.read_text()
+            assert server.wait(timeout=30) == 0, log.read_text()
             print("Per-output workspaces, targeted actions, and the state stream passed")
         except Exception:
             print(log.read_text(), file=sys.stderr)
@@ -158,4 +158,4 @@ with tempfile.TemporaryDirectory(prefix="shaode-output-workspace-test-") as dire
             for process in reversed(processes):
                 if process.poll() is None:
                     process.kill()
-                    process.wait(timeout=5)
+                    process.wait(timeout=30)

@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "shaode/curve.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -61,6 +63,95 @@ enum sh_action {
     SH_SWITCHER_PREV,
     SH_SWITCHER_CONFIRM, /* argument: the window's place in the list from 1, or 0: the selected */
     SH_SWITCHER_CANCEL,
+    /* Tiling layouts of the focused output's current workspace. */
+    SH_LAYOUT_NEXT,
+    SH_LAYOUT_PREV,
+    SH_SET_LAYOUT_DWINDLE, /* these five are in the order of enum sh_tile_layout */
+    SH_SET_LAYOUT_MASTER,
+    SH_SET_LAYOUT_SPIRAL,
+    SH_SET_LAYOUT_MONOCLE,
+    SH_SET_LAYOUT_SCROLL,
+    SH_PROMOTE,     /* the focused tile swaps with the first, or with the second if it is first */
+    SH_FOCUS_NEXT,  /* the next and previous tile in order, wrapping */
+    SH_FOCUS_PREV,
+    SH_SWAP_NEXT,   /* the focused tile trades places with the next or previous one */
+    SH_SWAP_PREV,
+    SH_MASTER_GROW, /* the master and spiral ratio, 5 percent of the area at a time */
+    SH_MASTER_SHRINK,
+    SH_MASTER_MORE, /* one more or fewer window in the master column */
+    SH_MASTER_LESS,
+    /* Focuses the window focused before the current one, on any workspace or output; repeated,
+     * it flips between two windows. */
+    SH_FOCUS_LAST,
+    /* Focuses the window that has been urgent the longest (see windows.activation), on any
+     * workspace or output; nothing happens when none is. */
+    SH_FOCUS_URGENT,
+    /* The overview (Expose): every window of the focused output's workspace as a live
+     * thumbnail in a grid, with the workspaces in a strip above. Toggling opens or closes it;
+     * confirm (argument: the thumbnail's place from 1, or 0: the selected one) focuses a
+     * window; cancel closes it without changing anything. */
+    SH_OVERVIEW_TOGGLE,
+    SH_OVERVIEW_CONFIRM,
+    SH_OVERVIEW_CANCEL,
+    /* The scrolling layout: focus the column to the left or right; widen, narrow, or cycle the
+     * width of the focused column through the presets; move the focused window into the column
+     * on its left or right, or out of a stack into a column of its own; center the view on
+     * the focused column. */
+    SH_SCROLL_LEFT,
+    SH_SCROLL_RIGHT,
+    SH_COLUMN_WIDEN,
+    SH_COLUMN_NARROW,
+    SH_COLUMN_CYCLE_WIDTH,
+    SH_CONSUME_LEFT,
+    SH_CONSUME_RIGHT,
+    SH_EXPEL,
+    SH_CENTER_COLUMN,
+    /* Peek: every window turns almost transparent to show the desktop. Bound to a key it lasts
+     * while the key is held; from the control socket it toggles, like peek_toggle. */
+    SH_PEEK,
+    SH_PEEK_TOGGLE,
+    /* Window groups: several windows share one slot (a tile, or a floating place) and show
+     * one at a time under a strip of tabs. Toggle makes the focused window a group, or
+     * dissolves its group; next and prev show another member; ungroup takes the focused window
+     * out into a slot of its own; merge moves the focused window into the group of the window
+     * beside it, that way (left, right, up, down in this order). */
+    SH_GROUP_TOGGLE,
+    SH_GROUP_NEXT,
+    SH_GROUP_PREV,
+    SH_UNGROUP,
+    SH_GROUP_MERGE_LEFT,
+    SH_GROUP_MERGE_RIGHT,
+    SH_GROUP_MERGE_UP,
+    SH_GROUP_MERGE_DOWN,
+    /* Night light: flip between warm and neutral, force either, or go back to the schedule. */
+    SH_NIGHT_LIGHT_TOGGLE,
+    SH_NIGHT_LIGHT_ON,
+    SH_NIGHT_LIGHT_OFF,
+    SH_NIGHT_LIGHT_AUTO,
+    /* Asks the shell for its command palette on the output under the pointer: one search over
+     * windows, applications, workspaces, actions and saved sessions. */
+    SH_PALETTE,
+    /* Magnifier: one step in or out, or back to 1x. The view follows the pointer. */
+    SH_ZOOM_IN,
+    SH_ZOOM_OUT,
+    SH_ZOOM_RESET,
+    /* Window swallowing: the focused window takes the place of the terminal it was started
+     * from and hides it, or, when it already swallowed one, gives the terminal a place beside
+     * it again. */
+    SH_SWALLOW_TOGGLE,
+    /* Workspaces between outputs. The target (see sh_callbacks.action_target) is "left" or
+     * "right" (the next output that way), "next" or "prev" (in order, wrapping), a connector
+     * name, or "desc:" and the start of a description. move_workspace_to_output sends the
+     * focused output's workspace there, trading places with the workspace of the same number
+     * there; swap_workspaces trades every workspace of the two outputs, and the screens. */
+    SH_MOVE_WORKSPACE_TO_OUTPUT,
+    SH_SWAP_WORKSPACES,
+    /* Do-not-disturb of the shell's notification daemon, and its history popover on the output
+     * under the pointer. */
+    SH_DND_TOGGLE,
+    SH_DND_ON,
+    SH_DND_OFF,
+    SH_NOTIFICATION_HISTORY,
 };
 
 enum sh_screenshot_mode {
@@ -88,6 +179,38 @@ struct sh_monitor {
     int tiling;    /* automatic tiling: -1 follows sh_settings.tiling, else 0 or 1 */
 };
 
+/* layout.outputs: defaults for the workspaces of the outputs matching `name` (as sh_monitor's
+ * name); tile_layout is negative, master_ratio and master_count 0, when unset. */
+struct sh_output_layout {
+    char name[64];
+    int tile_layout;
+    float master_ratio;
+    int master_count;
+};
+
+/* Lua `peek`, `night_light`, `hot_corners` and `zoom`. */
+struct sh_effect_settings {
+    float peek_opacity; /* what windows fade to while peeking, 0 to 0.9 */
+    int peek_duration;  /* milliseconds */
+    /* night_light: minutes after midnight for sunrise and sunset, or -1 to take them from the
+     * location (`located`) for the day. */
+    bool night_light;
+    int day_kelvin, night_kelvin;
+    double sunrise, sunset;
+    double latitude, longitude;
+    bool located;
+    double transition; /* minutes */
+    /* hot_corners: the corner square in pixels, how long the pointer must stay in it in
+     * milliseconds, and a bit per corner (sh_corner order) that has something to run. */
+    int corner_size, corner_delay;
+    unsigned corner_mask;
+    /* zoom: the factor of one step, the largest level, the fade in milliseconds, and the
+     * modifiers that turn the wheel into steps (0 for none). */
+    float zoom_step, zoom_max;
+    int zoom_duration;
+    unsigned zoom_scroll_modifier;
+};
+
 struct sh_settings {
     float background[4];
     uint32_t mouse_modifier;
@@ -96,19 +219,35 @@ struct sh_settings {
     int gap_inner; /* between neighbouring windows */
     int gap_outer; /* between windows and the edges of the usable area */
     char keyboard_layout[128];
+    char keyboard_variant[128];
+    char keyboard_model[128];
     char keyboard_options[128];
     bool xwayland; /* read at startup; changing it needs a restart */
     bool tiling;   /* automatic tiling on outputs without their own; toggled per output */
+    int tile_layout;     /* enum sh_tile_layout of workspaces that have not chosen another */
+    float master_ratio;  /* share of the width of the master column and of a spiral's first tile */
+    int master_count;    /* windows in the master column */
+    int scroll_follow;   /* enum sh_scroll_follow */
+    float scroll_width;  /* share of the width new columns of the scrolling layout take */
+    float scroll_step;   /* what column_widen and column_narrow add or remove */
+    float scroll_presets[8]; /* the widths column_cycle_width steps through */
+    int scroll_preset_count;
     int workspaces;
     /* Outputs named here sit left to right in this order; others follow as they appear.
      * The primary output (or the leftmost, if unnamed) sits at the layout origin. */
     char output_order[8][32];
     int output_count;
     char primary_output[32];
+    bool return_windows; /* windows return to an output that is plugged back in */
     struct sh_monitor monitors[8];
     int monitor_count;
+    /* layout.outputs */
+    struct sh_output_layout output_layouts[8];
+    int output_layout_count;
     /* Drawn outside each window's geometry; placed windows shrink to keep it in their slot. */
     int border_width;
+    /* Radius of the corners of tiled windows and their border; 0 keeps them square. */
+    int corner_radius;
     float border_active[4], border_inactive[4]; /* premultiplied RGBA */
     /* Pointer devices (libinput only). A negative value keeps the device's own default. */
     double pointer_speed; /* -1 to 1; used when pointer_speed_set */
@@ -119,6 +258,10 @@ struct sh_settings {
     bool focus_follows_mouse; /* hovering a window focuses it, without raising it */
     bool animations;          /* windows fade in and out, and tiles glide into place */
     int animation_duration;   /* milliseconds */
+    float animation_speed;    /* multiplies the speed of every animation */
+    int animation_late_ms;    /* a later frame finishes running animations; 0 never skips */
+    float animation_slide;    /* workspace slide distance, as a share of the output's width */
+    struct sh_anim_style animation_styles[SH_ANIM_KINDS]; /* resolved per kind */
     /* features.workspace_back_and_forth: SH_WORKSPACE naming the workspace already shown
      * switches back to the previous one, as sway's workspace_auto_back_and_forth. */
     bool workspace_back_and_forth;
@@ -131,6 +274,46 @@ struct sh_settings {
     /* features.window_rules: the actions of windows.rules (see sh_window_rule). Opacity rules
      * apply either way. */
     bool window_rules;
+    /* features.groups: the group_* actions. Off dissolves every group. */
+    bool groups;
+    /* features.group_join_new: a window that opens while a group has focus joins it. */
+    bool group_join_new;
+    /* Lua `overview`. */
+    bool overview;          /* the overview actions work */
+    int overview_gap;       /* pixels between thumbnails */
+    bool overview_animation; /* windows glide between their places and the grid */
+    int overview_duration;  /* milliseconds */
+    bool overview_strip;    /* a strip of the workspaces above the grid */
+    int overview_hot_corner; /* 0 none, else 1 top-left, 2 top-right, 3 bottom-left, 4 bottom-right */
+    float overview_dim;     /* opacity of the backdrop behind the thumbnails */
+    /* windows.dim_inactive: black laid over windows without focus, this opaque (0: none), fading
+     * in and out over dim_duration milliseconds. */
+    float dim_inactive;
+    int dim_duration;
+    /* windows.activation: what a client asking for attention (xdg-activation, an X11 urgency
+     * hint) gets. */
+    int activation; /* enum sh_activation */
+    float urgent_color[4]; /* the border of an urgent window, premultiplied RGBA */
+    struct sh_effect_settings effects;
+    /* windows.swallow: a window started from one of the terminals (matched by app_id, without
+     * regard to case) takes the terminal's place and hides it while it lives. Exceptions are
+     * app_ids that never swallow. */
+    bool swallow;
+    char swallow_terminals[32][64];
+    int swallow_terminal_count;
+    char swallow_exceptions[32][64];
+    int swallow_exception_count;
+    /* windows.magnet: while a floating window is dragged its edges stick to the edges of the
+     * output, of its usable area and of other windows within `magnet_distance` pixels. The
+     * `magnet_bypass` modifier (0: none) held during the drag turns it off; guides draw a line
+     * along the edge that holds the window. */
+    bool magnet;
+    int magnet_distance;
+    bool magnet_guides;
+    uint32_t magnet_bypass;
+    float magnet_guide_color[4]; /* premultiplied RGBA */
+    /* windows.placement: enum sh_place_mode, where new floating windows open. */
+    int placement;
 };
 
 /* What a mouse button was pressed over. */
@@ -181,6 +364,18 @@ struct sh_callbacks {
      * false, leaving `rule` unset, when none applies. */
     bool (*window_rule)(void *, const char *app_id, const char *title,
                         struct sh_window_rule *rule);
+    /* What a hot corner (sh_corner order) runs, as a control request; like `command`, SH_NONE
+     * means it could not be run. */
+    enum sh_action (*hot_corner)(void *, int corner, int *argument);
+    /* The output target of the action that key, button, command or hot_corner returned last,
+     * for SH_MOVE_WORKSPACE_TO_OUTPUT and SH_SWAP_WORKSPACES; "" when it named none. */
+    const char *(*action_target)(void *);
+    /* A descriptor that turns readable when configuration files change, or -1 for none; asked
+     * once at startup. */
+    int (*config_watch)(void *);
+    /* Reads what is pending on that descriptor; true when a configuration file changed and the
+     * configuration should be reloaded. */
+    bool (*config_changed)(void *);
 };
 
 enum sh_backend_mode { SH_BACKEND_NESTED, SH_BACKEND_HEADLESS, SH_BACKEND_SESSION };
@@ -191,6 +386,16 @@ struct sh_rect {
 };
 bool sh_placement(enum sh_action action, struct sh_rect area, int gap, int index, int count,
                   struct sh_rect *result);
+
+/* Where a new floating window of `width` x `height` opens in `area` (the output less its
+ * panels), given the rectangles `others` of the windows already showing there. Cascade steps
+ * the window 32 pixels down and right for each `index` (0, 1, 2, ..., wrapping every 8),
+ * center centers it, and smart puts it where it overlaps the others least, centered in the
+ * free space (in the largest gap that holds it), and cascades when nothing is free. Only the
+ * position of `result` is set from the mode; its size is the one given. */
+enum sh_place_mode { SH_PLACE_CASCADE, SH_PLACE_CENTER, SH_PLACE_SMART };
+bool sh_place_window(enum sh_place_mode mode, struct sh_rect area, const struct sh_rect *others,
+                     int other_count, int width, int height, int index, struct sh_rect *result);
 
 /* Automatic tiling in the style of Hyprland's dwindle layout: one binary split tree per output
  * name and workspace. Each split divides its box along the longer side; a new window splits an
@@ -225,6 +430,109 @@ bool sh_tiling_resize(struct sh_tiling *tiling, const void *window, uint32_t edg
  * changed. */
 bool sh_tiling_resize_by(struct sh_tiling *tiling, const void *window, uint32_t direction,
                          int amount);
+
+/* Layouts. Dwindle is the tree itself; the others arrange the tree's windows as a list in
+ * order, ignoring where new windows are dropped (they join the end): MASTER puts the first
+ * `count` windows in a column on the left, `ratio` of the width, and the rest stacked in a
+ * column beside it; SPIRAL gives each window `ratio` of what the earlier ones left, turning
+ * clockwise; MONOCLE gives every window the whole area. Each output and workspace has its
+ * own, starting at the defaults. Nothing is arranged until sh_tiling_arrange. */
+enum sh_tile_layout {
+    SH_LAYOUT_DWINDLE,
+    SH_LAYOUT_MASTER,
+    SH_LAYOUT_SPIRAL,
+    SH_LAYOUT_MONOCLE,
+    SH_LAYOUT_SCROLL,
+    SH_LAYOUT_COUNT,
+};
+/* SCROLL lays the windows in columns on an endless strip, in the style of niri and PaperWM:
+ * a column has a width (a share of the area) and stacks its windows evenly, and the area is
+ * a viewport onto the strip that follows the focused window. New windows open in a column
+ * to the right of the focused one. */
+/* What an unfocused client that asks for attention gets: URGENT marks the window (border,
+ * taskbar, workspace indicator) and leaves focus alone; FOCUS focuses it, switching workspace
+ * if need be; IGNORE drops the request. */
+enum sh_activation {
+    SH_ACTIVATION_URGENT,
+    SH_ACTIVATION_FOCUS,
+    SH_ACTIVATION_IGNORE,
+};
+enum sh_scroll_follow {
+    SH_SCROLL_FOLLOW_CENTER, /* the focused column is always centered */
+    SH_SCROLL_FOLLOW_EDGE,   /* the view moves only as far as needed to show it */
+    SH_SCROLL_FOLLOW_NEVER,  /* only scroll actions, new windows and center_column move it */
+};
+void sh_tiling_set_defaults(struct sh_tiling *tiling, enum sh_tile_layout layout, double ratio,
+                            int count);
+/* Trades everything two workspaces hold: their windows and splits, chosen layout, ratio and
+ * count, and scroll columns. Choices not made stay with the output's defaults. False when they
+ * are the same workspace. */
+bool sh_tiling_exchange(struct sh_tiling *tiling, const char *output_a, int workspace_a,
+                        const char *output_b, int workspace_b);
+/* Defaults for the workspaces of one output, in place of the global ones: a layout (negative
+ * for none), a master ratio (0 or less for none) and a master count (0 for none). Workspaces that
+ * chose their own layout, ratio or count by hand keep it; the rest follow at once. */
+void sh_tiling_set_output_defaults(struct sh_tiling *tiling, const char *output, int layout,
+                                   double ratio, int count);
+void sh_tiling_clear_output_defaults(struct sh_tiling *tiling);
+/* What a workspace of `output` has unless it chose otherwise; NULL arguments are skipped. */
+void sh_tiling_output_defaults(const struct sh_tiling *tiling, const char *output,
+                               enum sh_tile_layout *layout, double *ratio, int *count);
+enum sh_tile_layout sh_tiling_layout(const struct sh_tiling *tiling, const char *output,
+                                     int workspace);
+void sh_tiling_set_layout(struct sh_tiling *tiling, const char *output, int workspace,
+                          enum sh_tile_layout layout);
+/* Steps forward (or backward, when negative) through the layouts; returns the new one. */
+enum sh_tile_layout sh_tiling_cycle_layout(struct sh_tiling *tiling, const char *output,
+                                           int workspace, int step);
+/* Adds to the ratio (kept between 0.1 and 0.9) and the master count (1 to 8). Returns whether
+ * either changed. */
+bool sh_tiling_adjust(struct sh_tiling *tiling, const char *output, int workspace,
+                      double ratio_delta, int count_delta);
+double sh_tiling_ratio(const struct sh_tiling *tiling, const char *output, int workspace);
+int sh_tiling_master_count(const struct sh_tiling *tiling, const char *output, int workspace);
+/* Trades the places of two windows of the same tree. False when either is untiled or they
+ * are in different trees. */
+bool sh_tiling_swap(struct sh_tiling *tiling, const void *a, const void *b);
+/* Puts `replacement` (not tiled) into the slot of the tiled window `old_window`, which leaves the
+ * tiling: a window group shows one member at a time in one slot. False when nothing changed. */
+bool sh_tiling_replace(struct sh_tiling *tiling, const void *old_window, void *replacement);
+/* The window `step` places after `window` in its tree's order, wrapping; NULL when it is alone
+ * or untiled. */
+void *sh_tiling_neighbour(const struct sh_tiling *tiling, const void *window, int step);
+/* Scrolling layout settings: how the view follows focus, the width of new columns, the step of
+ * column_widen and column_narrow, and the presets column_cycle_width steps through (up to 8,
+ * kept between 0.1 and 1). Shares are of the area's width. */
+void sh_tiling_set_scroll(struct sh_tiling *tiling, enum sh_scroll_follow follow, double width,
+                          double step, const float *presets, int preset_count);
+/* Tells the layout which window has focus. Returns whether the scrolling view may have to move,
+ * so the caller arranges again. */
+bool sh_tiling_set_focus(struct sh_tiling *tiling, const void *window);
+/* The column of `window` counted from 0 (and with `row` its place in the stack), or -1 when it
+ * is not tiled in the scrolling layout. */
+int sh_tiling_scroll_column(struct sh_tiling *tiling, const void *window, int *row);
+/* The widths of the columns of a workspace that tiles with the scrolling layout, left to right;
+ * returns how many were written (at most `max`), 0 for another layout. */
+int sh_tiling_scroll_widths(struct sh_tiling *tiling, const char *output, int workspace,
+                            double *widths, int max);
+/* Sets the columns of a workspace from a saved arrangement: window i goes to column columns[i],
+ * row rows[i] (both from 0; equal columns share one, in the order of their rows), each column
+ * taking widths[its saved number] when there is one. Windows not tiled there are ignored, and
+ * tiles not listed keep their columns to the right of these. Returns whether it changed. */
+bool sh_tiling_scroll_restore(struct sh_tiling *tiling, const char *output, int workspace,
+                              void *const *windows, const int *columns, const int *rows,
+                              int count, const double *widths, int width_count);
+/* The window `columns` columns to the right of `window` (negative: left) at the same place in
+ * its stack, or `rows` down the same column, without wrapping; NULL when there is none or the
+ * layout is not scrolling. The view moves to show it once it is focused. */
+void *sh_tiling_scroll_step(struct sh_tiling *tiling, const void *window, int columns, int rows);
+/* Trades the column of `window` with its neighbour on the left (step -1) or right (1). */
+bool sh_tiling_scroll_move(struct sh_tiling *tiling, const void *window, int step);
+/* SH_COLUMN_*, SH_CONSUME_*, SH_EXPEL and SH_CENTER_COLUMN on the column of `window`. Returns
+ * whether anything changed and the output needs arranging again. */
+bool sh_tiling_scroll_action(struct sh_tiling *tiling, const void *window, enum sh_action action);
+/* The first window of the tree, or NULL when it is empty. */
+void *sh_tiling_master(const struct sh_tiling *tiling, const char *output, int workspace);
 
 #ifdef __cplusplus
 }

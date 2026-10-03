@@ -19,6 +19,8 @@ class TaskFilter : public QSortFilterProxyModel {
     // The focused window among these, or -1, and whether every one of them is minimized.
     Q_PROPERTY(int activeTask READ activeTask NOTIFY summaryChanged)
     Q_PROPERTY(bool minimized READ minimized NOTIFY summaryChanged)
+    // Whether any of them is asking for attention.
+    Q_PROPERTY(bool urgent READ urgent NOTIFY summaryChanged)
   public:
     explicit TaskFilter(QObject *parent = nullptr);
     QObject *controller() const;
@@ -33,6 +35,7 @@ class TaskFilter : public QSortFilterProxyModel {
     void setSourceModel(QAbstractItemModel *source) override;
     int activeTask() const;
     bool minimized() const;
+    bool urgent() const;
     // The window after the focused one, wrapping around, or the first when none is focused.
     Q_INVOKABLE int nextTask() const;
     // Moves within the source model, so dragging reorders the whole task list. Grouped, a
@@ -54,6 +57,15 @@ class TaskFilter : public QSortFilterProxyModel {
     QString app_, windowApp_;
     bool grouped_ = false;
     QList<QMetaObject::Connection> sourceConnections_;
+    // Which source rows the filter accepts, worked out for all of them at once the first time
+    // the proxy asks after a change (a filter that looks at each row's predecessors is
+    // otherwise quadratic, and the panel has a filter for every stacked button).
+    mutable QList<char> accepted_;
+    mutable bool acceptedValid_ = false;
+    mutable QHash<QByteArray, int> roleIds_;
+    int roleId(const char *role) const;
+    void computeAccepted() const;
+    void forget() { acceptedValid_ = false; }
     void refilter();
     QVariant sourceValue(int row, const char *role) const;
     bool belongs(int row) const;

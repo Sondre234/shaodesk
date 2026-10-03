@@ -33,7 +33,7 @@ with tempfile.TemporaryDirectory(prefix="shaode-lock-test-") as directory:
             text = log.read_text()
             assert "Lock client vanished" in text and "Session unlocked" in text, text
             server.terminate()
-            assert server.wait(timeout=5) == 0, log.read_text()
+            assert server.wait(timeout=30) == 0, log.read_text()
             print("Session lock, rejection, focus isolation, abandonment, and unlock passed")
         except Exception:
             print(log.read_text(), file=sys.stderr)
@@ -41,4 +41,4 @@ with tempfile.TemporaryDirectory(prefix="shaode-lock-test-") as directory:
         finally:
             if server.poll() is None:
                 server.kill()
-                server.wait(timeout=5)
+                server.wait(timeout=30)

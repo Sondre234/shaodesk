@@ -74,13 +74,16 @@ QVariant TaskModel::data(const QModelIndex &index, int role) const {
         return task.minimized;
     case Maximized:
         return task.maximized;
+    case Urgent:
+        return task.urgent;
     default:
         return {};
     }
 }
 QHash<int, QByteArray> TaskModel::roleNames() const {
     return {{TaskId, "taskId"}, {Title, "title"},         {AppId, "appId"},
-            {Active, "active"}, {Minimized, "minimized"}, {Maximized, "maximized"}};
+            {Active, "active"}, {Minimized, "minimized"}, {Maximized, "maximized"},
+            {Urgent, "urgent"}};
 }
 TaskModel::Task *TaskModel::find(int id) {
     for (auto &task : tasks_)
@@ -138,10 +141,62 @@ void TaskModel::move(int from, int to, int count) {
         std::rotate(tasks_.begin() + to, first, last);
     endMoveRows();
 }
+void TaskModel::setUrgent(const QList<QPair<QString, QString>> &windows) {
+    if (windows == urgent_)
+        return;
+    urgent_ = windows;
+    matchUrgent();
+}
+void TaskModel::matchUrgent(const Task *except) {
+    QList<const Task *> claimed;
+    for (const auto &[appId, title] : urgent_) {
+        for (auto &task : tasks_) {
+            // The compositor cuts a very long title short.
+            const bool sameTitle = task->title == title ||
+                                   (title.toUtf8().size() >= 250 && task->title.startsWith(title));
+            if (task->appId == appId && sameTitle && !claimed.contains(task.get())) {
+                claimed.push_back(task.get());
+                break;
+            }
+        }
+    }
+    for (int i = 0; i < rowCount(); ++i) {
+        auto &task = *tasks_[i];
+        task.urgent = claimed.contains(&task);
+        if (&task == except || task.urgent == task.shownUrgent)
+            continue;
+        task.shownUrgent = task.urgent;
+        Q_EMIT dataChanged(index(i), index(i), {Urgent});
+    }
+}
 void TaskModel::changed(Task *task) {
+    // A window is found by its app id and title, so either changing may mark or unmark it.
+    if (!urgent_.isEmpty() && (task->title != task->shownTitle || task->appId != task->shownAppId))
+        matchUrgent(task);
     for (int i = 0; i < rowCount(); ++i)
         if (tasks_[i].get() == task) {
-            Q_EMIT dataChanged(index(i), index(i));
+            QList<int> roles;
+            if (task->title != task->shownTitle)
+                roles.push_back(Title);
+            if (task->appId != task->shownAppId)
+                roles.push_back(AppId);
+            if (task->active != task->shownActive)
+                roles.push_back(Active);
+            if (task->minimized != task->shownMinimized)
+                roles.push_back(Minimized);
+            if (task->maximized != task->shownMaximized)
+                roles.push_back(Maximized);
+            if (task->urgent != task->shownUrgent)
+                roles.push_back(Urgent);
+            if (roles.isEmpty())
+                return;
+            task->shownTitle = task->title;
+            task->shownAppId = task->appId;
+            task->shownActive = task->active;
+            task->shownMinimized = task->minimized;
+            task->shownMaximized = task->maximized;
+            task->shownUrgent = task->urgent;
+            Q_EMIT dataChanged(index(i), index(i), roles);
             return;
         }
 }
