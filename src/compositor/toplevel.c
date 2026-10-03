@@ -649,40 +649,6 @@ void server_new_xdg_toplevel(struct wl_listener *listener, void *data) {
                  toplevel_request_minimize);
 }
 
-/* The mode is sent with the first configure, or right away once the window has had one. */
-static void decoration_set_mode(struct sh_toplevel *toplevel) {
-    if (toplevel->xdg_toplevel->base->initialized)
-        wlr_xdg_toplevel_decoration_v1_set_mode(toplevel->decoration,
-                                                decoration_mode(toplevel->decoration));
-}
-
-static void decoration_request_mode(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, decoration_mode);
-    decoration_set_mode(toplevel);
-}
-
-static void decoration_destroy(struct wl_listener *listener, void *data) {
-    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, decoration_destroy);
-    wl_list_remove(&toplevel->decoration_mode.link);
-    wl_list_remove(&toplevel->decoration_destroy.link);
-    toplevel->decoration = NULL;
-    refresh_decoration(toplevel);
-}
-
-void server_new_decoration(struct wl_listener *listener, void *data) {
-    struct wlr_xdg_toplevel_decoration_v1 *decoration = data;
-    struct wlr_scene_tree *tree = decoration->toplevel->base->data;
-    struct sh_node *node = tree ? tree->node.data : NULL;
-    if (!node || node->kind != SH_NODE_TOPLEVEL)
-        return;
-    struct sh_toplevel *toplevel = node->owner;
-    toplevel->decoration = decoration;
-    add_listener(&decoration->events.request_mode, &toplevel->decoration_mode,
-                 decoration_request_mode);
-    add_listener(&decoration->events.destroy, &toplevel->decoration_destroy, decoration_destroy);
-    decoration_set_mode(toplevel);
-}
-
 static void xdg_popup_commit(struct wl_listener *listener, void *data) {
     struct sh_popup *popup = wl_container_of(listener, popup, commit);
 

@@ -672,6 +672,7 @@ void refresh_decoration(struct sh_toplevel *toplevel);
 void refresh_tabs(struct sh_toplevel *toplevel);
 void refresh_frame(struct sh_toplevel *toplevel);
 void forget_decoration(struct sh_toplevel *toplevel);
+void server_new_decoration(struct wl_listener *listener, void *data);
 
 /* grab.c */
 void reset_cursor_mode(struct sh_server *server);
@@ -860,7 +861,6 @@ void refit_fullscreen(struct sh_server *server);
 void set_fullscreen(struct sh_toplevel *toplevel, bool fullscreen);
 void set_client_fullscreen(struct sh_toplevel *toplevel, bool fullscreen);
 void server_new_xdg_toplevel(struct wl_listener *listener, void *data);
-void server_new_decoration(struct wl_listener *listener, void *data);
 void create_popup(struct sh_server *server, struct wlr_xdg_popup *xdg_popup,
                   struct wlr_scene_tree *parent_tree);
 void server_new_xdg_popup(struct wl_listener *listener, void *data);
