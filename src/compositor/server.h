@@ -819,7 +819,6 @@ bool output_tiles(struct sh_server *server, struct wlr_output *output);
 bool tiles_for(struct sh_toplevel *toplevel, struct wlr_output *output);
 struct wlr_output *home_output(struct sh_toplevel *toplevel);
 bool wants_tiling(struct sh_toplevel *toplevel, struct wlr_output *output);
-bool toplevel_is_dialog(struct sh_toplevel *toplevel);
 void tile_toplevel_at(struct sh_toplevel *toplevel, struct wlr_output *output,
                       struct sh_toplevel *target, bool has_point, double x, double y);
 void tile_toplevel(struct sh_toplevel *toplevel, struct wlr_output *output,
@@ -869,6 +868,7 @@ void minimize_toplevel(struct sh_toplevel *toplevel);
 struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *output);
 struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel);
 pid_t toplevel_pid(struct sh_toplevel *toplevel);
+bool toplevel_is_dialog(struct sh_toplevel *toplevel);
 
 /* workspace.c */
 int output_slot(struct sh_server *server, const char *name);
