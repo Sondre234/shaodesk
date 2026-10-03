@@ -1,5 +1,8 @@
 # Contributing
 
+[docs/architecture.md](docs/architecture.md) explains how the code is laid out and which
+files a new action, setting, query, protocol or test touches.
+
 ## Branches
 
 shaodesk keeps one long-lived branch, `main`. Each change is made on a short-lived branch

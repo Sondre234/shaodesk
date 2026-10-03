@@ -209,7 +209,7 @@ struct Runtime {
     pid_t shell_pid = -1;
     // The running screenshot script; another request is refused until it exits.
     pid_t screenshot_pid = -1;
-    std::string target; // the output target of the action last resolved
+    std::string target{}; // the output target of the action last resolved
     bool watch = false; // whether saving a configuration file reloads (off in headless tests)
     int watch_fd = -1;
 

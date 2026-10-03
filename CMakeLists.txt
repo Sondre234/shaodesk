@@ -164,6 +164,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/output_moves.c
         src/compositor/overview.c
         src/compositor/placement.c
+        src/compositor/query.c
         src/compositor/scratchpad.c
         src/compositor/session.c
         src/compositor/swallow.c
@@ -182,6 +183,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
         SHAODESK_VERSION="${PROJECT_VERSION}"
         SHAODESK_DEFAULT_CONFIG="${CMAKE_INSTALL_FULL_DATADIR}/shaodesk/init.lua")
     target_compile_options(shaodesk PRIVATE -Wall -Wextra -Wno-unused-parameter)
+    # A compositor function shared between files is declared in src/compositor/server.h; any
+    # other is static. This flags one that is neither.
+    set_source_files_properties(${SHAODESK_COMPOSITOR_SOURCES} PROPERTIES
+        COMPILE_OPTIONS -Wmissing-prototypes)
     target_link_libraries(shaodesk PRIVATE shaodesk_config shaodesk_effects PkgConfig::WLROOTS PkgConfig::WAYLAND m)
     # A standalone session keeps the machine awake through logind while it is on screen.
     pkg_search_module(SDBUS IMPORTED_TARGET libsystemd libelogind basu)

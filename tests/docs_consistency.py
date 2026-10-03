@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The documentation matches the code: every binding action the configuration accepts is
 described in the README or docs/features.md, and every action the example configuration binds
-exists."""
+exists. docs/architecture.md lists every source file of the compositor."""
 from pathlib import Path
 import re
 import sys
@@ -28,4 +28,9 @@ assert not unknown, f"config/init.lua binds actions the code does not have: {unk
 commented = set(re.findall(r'action = "([a-z_0-9]+)"', example))
 unknown = sorted(commented - set(actions) - {"none"})
 assert not unknown, f"config/init.lua mentions actions the code does not have: {unknown}"
+architecture = (root / "docs/architecture.md").read_text()
+sources = sorted(p.name for p in (root / "src/compositor").glob("*.[ch]"))
+unlisted = [name for name in sources if f"`{name}`" not in architecture]
+assert not unlisted, f"docs/architecture.md does not list these compositor files: {unlisted}"
+
 print(f"{len(actions)} actions documented; {len(bound)} bound by default")

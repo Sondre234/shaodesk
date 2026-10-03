@@ -593,6 +593,7 @@ bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, cha
 void run_action(struct sh_server *server, enum sh_action action, int argument);
 
 /* control.c */
+void control_reply(int fd, const char *text);
 void notify_subscribers(struct sh_server *server);
 void send_event(struct sh_server *server, const char *text, size_t length);
 void request_shell(struct sh_server *server, const char *what);
@@ -780,6 +781,9 @@ void unarrange_in_place(struct sh_toplevel *toplevel);
 void move_window(struct sh_server *server, enum sh_action action);
 void resize_window(struct sh_server *server, enum sh_action action, int amount);
 
+/* query.c */
+bool run_query(struct sh_server *server, int fd, const char *request);
+
 /* scratchpad.c */
 bool scratchpad_enabled(struct sh_server *server);
 void center_scratchpad(struct sh_toplevel *toplevel, struct wlr_output *output);
@@ -884,6 +888,9 @@ void set_sticky(struct sh_toplevel *toplevel, bool sticky, bool retile);
 void move_toplevel_to_workspace(struct sh_server *server, struct sh_toplevel *toplevel,
                                 int workspace);
 void move_to_workspace(struct sh_server *server, int workspace);
+void occupied_workspaces(struct sh_server *server, struct wlr_output *output, char *text,
+                         size_t size);
+int focused_workspace(struct sh_server *server);
 
 /* xwayland.c */
 #if WLR_HAS_XWAYLAND
