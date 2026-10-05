@@ -1,10 +1,119 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "tray.hpp"
+#include <QDirIterator>
+#include <QFileInfo>
+#include <QHash>
+#include <QIcon>
+#include <QPainter>
+#include <QRegularExpression>
+#include <QtEndian>
 #include <algorithm>
 
 QString TrayItem::toolTip() const {
     const QString head = !toolTipTitle.isEmpty() ? toolTipTitle : !title.isEmpty() ? title : id;
     return toolTipText.isEmpty() || toolTipText == head ? head : head + '\n' + toolTipText;
+}
+
+QImage trayImageFromArgb32(int width, int height, const QByteArray &data) {
+    if (width < 1 || height < 1 || width > 512 || height > 512 || data.size() < qsizetype(width) * height * 4)
+        return {};
+    QImage image(width, height, QImage::Format_ARGB32);
+    const auto *bytes = reinterpret_cast<const uchar *>(data.constData());
+    for (int y = 0; y < height; ++y) {
+        auto *line = reinterpret_cast<quint32 *>(image.scanLine(y));
+        for (int x = 0; x < width; ++x)
+            line[x] = qFromBigEndian<quint32>(bytes + 4 * (qsizetype(y) * width + x));
+    }
+    return image;
+}
+QImage trayPickPixmap(const QList<QImage> &pixmaps, QSize size) {
+    const QImage *best = nullptr;
+    for (const auto &pixmap : pixmaps) {
+        const bool fits = pixmap.width() >= size.width() && pixmap.height() >= size.height();
+        const bool bestFits = best && best->width() >= size.width() && best->height() >= size.height();
+        if (!best || (fits && (!bestFits || pixmap.width() < best->width())) ||
+            (!fits && !bestFits && pixmap.width() > best->width()))
+            best = &pixmap;
+    }
+    if (!best)
+        return {};
+    return best->size() == size ? *best : best->scaled(size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+}
+QString trayIconFile(const QString &name, const QString &themePath) {
+    if (name.isEmpty() || themePath.isEmpty() || name.contains('/') || name.startsWith('.'))
+        return {};
+    static QHash<QString, QString> found;
+    const QString key = themePath + '\n' + name;
+    if (const auto cached = found.constFind(key); cached != found.constEnd() && QFileInfo(*cached).isFile())
+        return *cached;
+    // The folder and three levels below it, a bounded number of entries: an application could
+    // name its home or the root.
+    static const QRegularExpression sized("/(\\d+)x\\d+(/|$)");
+    QString best;
+    int bestSize = -1, budget = 4000;
+    QList<std::pair<QString, int>> folders{{themePath, 0}};
+    while (!folders.isEmpty() && budget > 0) {
+        const auto [folder, depth] = folders.takeFirst();
+        for (QDirIterator it(folder, QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot); it.hasNext() && budget-- > 0;) {
+            const QFileInfo entry = it.nextFileInfo();
+            if (entry.isDir()) {
+                if (depth < 3 && !entry.isSymLink())
+                    folders.append({entry.filePath(), depth + 1});
+                continue;
+            }
+            const QString suffix = entry.suffix().toLower();
+            if (entry.completeBaseName() != name || !entry.isFile() ||
+                (suffix != "png" && suffix != "svg" && suffix != "xpm"))
+                continue;
+            const auto match = sized.match(folder);
+            const int size = suffix == "svg" ? 100000 : match.hasMatch() ? match.captured(1).toInt() : depth == 0 ? 1000 : 0;
+            if (size > bestSize) {
+                best = entry.filePath();
+                bestSize = size;
+            }
+        }
+    }
+    if (!best.isEmpty())
+        found.insert(key, best);
+    return best;
+}
+
+namespace {
+// An icon by name, else the pixmap nearest in size.
+QImage icon(const QString &name, const QList<QImage> &pixmaps, const QString &themePath, QSize size) {
+    QImage image;
+    if (!name.isEmpty()) {
+        // Ayatana's items may name a file. Only a regular file of a sane size is read: reading a
+        // pipe or a device would never end.
+        const QString file = name.startsWith('/') ? name : trayIconFile(name, themePath);
+        const QFileInfo info(file);
+        if (!file.isEmpty() && info.isFile() && info.size() < 8 * 1024 * 1024)
+            image = QIcon(file).pixmap(size, 1.0).toImage();
+        else if (!name.contains('/') && QIcon::hasThemeIcon(name))
+            image = QIcon::fromTheme(name).pixmap(size, 1.0).toImage();
+    }
+    return image.isNull() ? trayPickPixmap(pixmaps, size) : image;
+}
+} // namespace
+
+QImage TrayModel::picture(int serial, QSize size) const {
+    const TrayItem *item = find(serial);
+    if (!item || size.isEmpty())
+        return {};
+    QImage image;
+    if (item->status == "NeedsAttention")
+        image = icon(item->attentionIconName, item->attentionIcon, item->iconThemePath, size);
+    if (image.isNull())
+        image = icon(item->iconName, item->icon, item->iconThemePath, size);
+    if (image.isNull())
+        return {};
+    const QImage overlay = icon(item->overlayIconName, item->overlayIcon, item->iconThemePath, size / 2);
+    if (!overlay.isNull()) {
+        image = image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        QPainter painter(&image);
+        painter.drawImage(image.width() - overlay.width(), image.height() - overlay.height(), overlay);
+    }
+    return image;
 }
 
 int TrayModel::rowCount(const QModelIndex &parent) const { return parent.isValid() ? 0 : count(); }

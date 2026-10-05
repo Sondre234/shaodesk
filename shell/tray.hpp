@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include <QAbstractListModel>
+#include <QImage>
+#include <QList>
 #include <QString>
 #include <vector>
 
@@ -15,6 +17,8 @@ struct TrayItem {
     // "Passive" (not shown), "Active" or "NeedsAttention".
     QString status = "Active";
     QString iconName, attentionIconName, overlayIconName, iconThemePath;
+    // The pictures sent instead of (or with) names, one per size.
+    QList<QImage> icon, attentionIcon, overlayIcon;
     // The tooltip as plain text.
     QString toolTipTitle, toolTipText;
     // A click opens the menu rather than activating the application.
@@ -26,6 +30,17 @@ struct TrayItem {
     // The title and text a tooltip shows, falling back on the item's title and id.
     QString toolTip() const;
 };
+
+// An IconPixmap entry, `width` x `height` ARGB32 pixels in network byte order; null when the
+// sizes are out of range or `data` is too short.
+QImage trayImageFromArgb32(int width, int height, const QByteArray &data);
+// The pixmap whose size suits `size` best, the smallest at least that large or else the largest,
+// scaled to it.
+QImage trayPickPixmap(const QList<QImage> &pixmaps, QSize size);
+// An icon an application keeps in a folder of its own (IconThemePath): NAME.png, .svg or .xpm
+// there or in a theme laid out under it (hicolor/22x22/apps/NAME.png), the largest found; empty
+// when there is none.
+QString trayIconFile(const QString &name, const QString &themePath);
 
 // The tray's items, in the order they registered. A host (TrayHost, over D-Bus) adds, updates
 // and removes them, and carries out what the panel asks through the *Requested signals; without
@@ -62,6 +77,10 @@ class TrayModel : public QAbstractListModel {
     void changed(const QString &key, bool picture);
     void remove(const QString &key);
     void clear();
+    // What item `serial`'s icon shows at `size`: the attention icon while it needs attention,
+    // a named icon (in its theme path, by absolute path, or in the icon theme) before a pixmap,
+    // and the overlay over the bottom right quarter. Null when it has no icon at all.
+    QImage picture(int serial, QSize size) const;
 
     Q_INVOKABLE bool contains(const QString &key) const;
     // What the panel asks of an item, at a point on the screen.

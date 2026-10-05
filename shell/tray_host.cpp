@@ -53,6 +53,27 @@ void readToolTip(const QVariant &value, QString &title, QString &body) {
     title = plain(title, 200);
     body = plain(body, 1000);
 }
+// IconPixmap and the like, a(iiay): at most 16 of them, those of a sane size.
+QList<QImage> readPixmaps(const QVariant &value) {
+    QList<QImage> pixmaps;
+    if (value.metaType() != QMetaType::fromType<QDBusArgument>())
+        return pixmaps;
+    const auto argument = value.value<QDBusArgument>();
+    if (argument.currentSignature() != "a(iiay)")
+        return pixmaps;
+    argument.beginArray();
+    while (!argument.atEnd() && pixmaps.size() < 16) {
+        int width = 0, height = 0;
+        QByteArray data;
+        argument.beginStructure();
+        argument >> width >> height >> data;
+        argument.endStructure();
+        if (QImage image = trayImageFromArgb32(width, height, data); !image.isNull())
+            pixmaps << image;
+    }
+    argument.endArray();
+    return pixmaps;
+}
 // Menu: an object path; some items send it as a string. "/" and Chromium's "/NO_DBUSMENU" mean
 // none.
 QString menuPath(const QVariant &value) {
@@ -166,13 +187,18 @@ bool TrayItemClient::read(TrayItem &item, const QVariantMap &properties) {
     item.attentionIconName = text(properties, "AttentionIconName", 1024);
     item.overlayIconName = text(properties, "OverlayIconName", 1024);
     item.iconThemePath = text(properties, "IconThemePath", 4096);
+    item.icon = readPixmaps(properties.value("IconPixmap"));
+    item.attentionIcon = readPixmaps(properties.value("AttentionIconPixmap"));
+    item.overlayIcon = readPixmaps(properties.value("OverlayIconPixmap"));
     readToolTip(properties.value("ToolTip"), item.toolTipTitle, item.toolTipText);
     const QVariant isMenu = properties.value("ItemIsMenu");
     item.itemIsMenu = isMenu.metaType().id() == QMetaType::Bool && isMenu.toBool();
     item.menuPath = menuPath(properties.value("Menu"));
     return item.status != before.status || item.iconName != before.iconName ||
            item.attentionIconName != before.attentionIconName ||
-           item.overlayIconName != before.overlayIconName || item.iconThemePath != before.iconThemePath;
+           item.overlayIconName != before.overlayIconName || item.iconThemePath != before.iconThemePath ||
+           item.icon != before.icon || item.attentionIcon != before.attentionIcon ||
+           item.overlayIcon != before.overlayIcon;
 }
 void TrayItemClient::activate(int x, int y) {
     // Plasma's way: an item that cannot be activated shows its menu instead.

@@ -13,6 +13,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <memory>
+#include <sys/stat.h>
 
 using namespace faketray;
 
@@ -311,6 +312,86 @@ class TrayDbusTest : public QObject {
         QTRY_COMPARE(model.find(app->key())->menuPath, QString("/Some/Menu"));
         app->item->change("Menu", QVariant::fromValue(QDBusObjectPath("/NO_DBUSMENU")), "NewMenu");
         QTRY_COMPARE(model.find(app->key())->menuPath, QString());
+        quit(app);
+    }
+    // IconPixmap is ARGB32 in network byte order; the size nearest the panel's is picked, a named
+    // icon wins over pixels, the attention icon shows while the item needs attention, and the
+    // overlay sits in the bottom right corner.
+    void pictures() {
+        auto solid = [](const QColor &color, int size) {
+            QImage image(size, size, QImage::Format_ARGB32);
+            image.fill(color);
+            return image;
+        };
+        QByteArray bytes;
+        for (int i = 0; i < 4; ++i)
+            bytes.append("\x80\x11\x22\x33", 4); // A, R, G, B
+        QCOMPARE(trayImageFromArgb32(2, 2, bytes).pixelColor(1, 1), QColor(0x11, 0x22, 0x33, 0x80));
+        QVERIFY(trayImageFromArgb32(2, 2, bytes.left(15)).isNull());
+        QVERIFY(trayImageFromArgb32(0, 2, bytes).isNull());
+        QVERIFY(trayImageFromArgb32(-1, -1, bytes).isNull());
+        QVERIFY(trayImageFromArgb32(100000, 100000, bytes).isNull());
+        const QList<QImage> sizes{solid(Qt::red, 16), solid(Qt::green, 32), solid(Qt::blue, 64)};
+        QCOMPARE(trayPickPixmap(sizes, {22, 22}).pixelColor(5, 5), QColor(Qt::green));
+        QCOMPARE(trayPickPixmap(sizes, {22, 22}).size(), QSize(22, 22));
+        QCOMPARE(trayPickPixmap(sizes, {16, 16}).pixelColor(5, 5), QColor(Qt::red));
+        QCOMPARE(trayPickPixmap(sizes, {100, 100}).pixelColor(5, 5), QColor(Qt::blue));
+        QCOMPARE(trayPickPixmap(sizes, {8, 8}).pixelColor(1, 1), QColor(Qt::red));
+        QVERIFY(trayPickPixmap({}, {22, 22}).isNull());
+
+        TrayModel model;
+        TrayHost host(model);
+        QVERIFY(host.start(connect()));
+        auto app = start("Pictures", {.registers = false});
+        // Sizes in any order, one of them malformed.
+        app->item->properties["IconName"] = "";
+        app->item->properties["IconPixmap"] = QVariant::fromValue(
+            QList<Pixmap>{square(Qt::blue, 64), {30, 30, "short"}, square(Qt::red, 16), square(Qt::green, 32)});
+        callWatcher(app->bus, "RegisterStatusNotifierItem", {app->service});
+        QTRY_COMPARE(model.count(), 1);
+        const int serial = model.find(app->key())->serial;
+        QCOMPARE(model.find(app->key())->icon.size(), 3);
+        QCOMPARE(model.picture(serial, {22, 22}).pixelColor(11, 11), QColor(Qt::green));
+        QCOMPARE(model.picture(serial, {64, 64}).pixelColor(11, 11), QColor(Qt::blue));
+        app->item->properties["AttentionIconPixmap"] = pixmaps(Qt::yellow, {22});
+        app->item->change("Status", "NeedsAttention", "NewStatus", {"NeedsAttention"});
+        QTRY_COMPARE(model.picture(serial, {22, 22}).pixelColor(11, 11), QColor(Qt::yellow));
+        app->item->change("Status", "Active", "NewStatus", {"Active"});
+        QTRY_COMPARE(model.picture(serial, {22, 22}).pixelColor(11, 11), QColor(Qt::green));
+        app->item->change("OverlayIconPixmap", pixmaps(Qt::white, {11}), "NewOverlayIcon");
+        QTRY_COMPARE(model.picture(serial, {22, 22}).pixelColor(20, 20), QColor(Qt::white));
+        QCOMPARE(model.picture(serial, {22, 22}).pixelColor(2, 2), QColor(Qt::green));
+        app->item->change("OverlayIconPixmap", QVariant(), "NewOverlayIcon");
+        QTRY_COMPARE(model.picture(serial, {22, 22}).pixelColor(20, 20), QColor(Qt::green));
+
+        // A name in the item's own folder, or in a theme laid out in it (the largest), or a file
+        // by absolute path wins over the pixels.
+        QTemporaryDir icons;
+        QVERIFY(solid(Qt::cyan, 22).save(icons.filePath("probe-icon.png")));
+        QVERIFY(QDir(icons.path()).mkpath("hicolor/22x22/apps") && QDir(icons.path()).mkpath("hicolor/48x48/apps"));
+        QVERIFY(solid(Qt::magenta, 22).save(icons.filePath("hicolor/22x22/apps/nested.png")));
+        QVERIFY(solid(Qt::darkMagenta, 48).save(icons.filePath("hicolor/48x48/apps/nested.png")));
+        app->item->properties["IconThemePath"] = icons.path();
+        app->item->change("IconName", "probe-icon", "NewIcon");
+        QTRY_COMPARE(model.picture(serial, {22, 22}).pixelColor(11, 11), QColor(Qt::cyan));
+        app->item->change("IconName", "nested", "NewIcon");
+        QTRY_COMPARE(model.picture(serial, {22, 22}).pixelColor(11, 11), QColor(Qt::darkMagenta));
+        QVERIFY(solid(Qt::darkCyan, 22).save(icons.filePath("absolute.png")));
+        app->item->change("IconName", icons.filePath("absolute.png"), "NewIcon");
+        QTRY_COMPARE(model.picture(serial, {22, 22}).pixelColor(11, 11), QColor(Qt::darkCyan));
+        // A name found nowhere, a relative path or a pipe falls back on the pixels; the pipe is
+        // never read.
+        QCOMPARE(mkfifo(QFile::encodeName(icons.filePath("pipe.png")).constData(), 0600), 0);
+        for (const QString &name : {QString("no-such-icon-anywhere"), QString("../probe-icon"), icons.filePath("pipe.png")}) {
+            app->item->change("IconName", name, "NewIcon");
+            QTRY_COMPARE(model.find(app->key())->iconName, name);
+            QCOMPARE(model.picture(serial, {22, 22}).pixelColor(11, 11), QColor(Qt::green));
+        }
+        QCOMPARE(trayIconFile("probe", "/"), QString()); // a bounded look, even from the root
+        // Without any icon there is no picture: the panel draws a stand-in.
+        app->item->properties.remove("IconPixmap");
+        app->item->change("IconName", "", "NewIcon");
+        QTRY_VERIFY(model.picture(serial, {22, 22}).isNull());
         quit(app);
     }
     // Another program serves the watcher: the host registers with it and follows its items, and
