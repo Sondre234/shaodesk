@@ -81,6 +81,7 @@ struct ShellWidgets {
     bool wallpapers = true; // the wallpaper picker
     bool keyboard_layout = true; // the active keyboard layout, only with two or more
     bool power = true;      // the power menu, only with something in it
+    bool tray = true;       // the system tray, only while applications show icons in it
 };
 
 struct ShellConfig {

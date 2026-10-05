@@ -319,7 +319,7 @@ QVariantMap ShellController::widgets() const {
             {"volume", w.volume},         {"clock", w.clock},     {"calendar", w.calendar},
             {"tiling", w.tiling},         {"profiles", w.profiles},
             {"wallpapers", w.wallpapers}, {"keyboard_layout", w.keyboard_layout},
-            {"power", w.power}};
+            {"power", w.power},           {"tray", w.tray}};
 }
 QStringList ShellController::profiles() const {
     QStringList names;
@@ -392,6 +392,7 @@ void ShellController::reload() {
         osd_.configure(config_.osd);
         power_.setCountdown(config_.power.countdown);
         updateNotificationService();
+        updateTrayHost();
         refreshApps();
         Q_EMIT configChanged();
         Q_EMIT wallpaperChanged();
@@ -755,12 +756,18 @@ void ShellController::updateTrayHost() {
     if (!serveTray_)
         return;
 #if SHAODESK_TRAY
-    if (!trayHost_) {
+    // Off, the shell leaves the names to another tray: applications would otherwise think their
+    // icons are shown.
+    if (!config_.shell.widgets.tray) {
+        delete trayHost_;
+        trayHost_ = nullptr;
+    } else if (!trayHost_) {
         // As for notifications: without an address libdbus would start a bus nobody knows of.
         if (qEnvironmentVariableIsEmpty("DBUS_SESSION_BUS_ADDRESS") &&
             !QFileInfo::exists(qEnvironmentVariable("XDG_RUNTIME_DIR") + "/bus")) {
-            std::cerr << "shaodesk tray: no session bus (DBUS_SESSION_BUS_ADDRESS is unset)\n";
-            serveTray_ = false;
+            if (!trayNoBusReported_)
+                std::cerr << "shaodesk tray: no session bus (DBUS_SESSION_BUS_ADDRESS is unset)\n";
+            trayNoBusReported_ = true;
             return;
         }
         auto *host = new TrayHost(tray_, this);

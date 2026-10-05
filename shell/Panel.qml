@@ -1903,7 +1903,7 @@ Item {
             Row {
                 id: tray
                 objectName: "tray"
-                visible: shell.tray.shown > 0
+                visible: shell.widgets.tray && shell.tray.shown > 0
                 Layout.alignment: Qt.AlignVCenter
                 Repeater {
                     model: shell.tray

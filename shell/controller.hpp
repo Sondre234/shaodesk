@@ -56,7 +56,7 @@ class ShellController : public QObject {
     Q_PROPERTY(bool iconsOnly READ iconsOnly NOTIFY configChanged)
     Q_PROPERTY(bool groupWindows READ groupWindows NOTIFY configChanged)
     // Which panel widgets Lua enables: {workspaces, battery, network, volume, clock, calendar,
-    // tiling, profiles, wallpapers, keyboard_layout, power}.
+    // tiling, profiles, wallpapers, keyboard_layout, power, tray}.
     Q_PROPERTY(QVariantMap widgets READ widgets NOTIFY configChanged)
     // The compositor's active keyboard layout: {number (from 1), count, short ("us"), name}, or
     // empty without a compositor.
@@ -177,8 +177,8 @@ class ShellController : public QObject {
     // in; later configuration reloads follow the setting. Returns whether it is serving.
     bool startNotifications();
     TrayModel *tray() { return &tray_; }
-    // Starts the tray's host on the session bus when QtDBus is built in. Returns whether it is
-    // running.
+    // Starts the tray's host on the session bus when QtDBus is built in and shell.widgets.tray
+    // is on; later configuration reloads follow the setting. Returns whether it is running.
     bool startTray();
     bool tiling() const { return tiling_; }
     bool tilingAvailable() const { return subscribed_; }
@@ -276,7 +276,7 @@ class ShellController : public QObject {
     QObject *notificationService_ = nullptr;
     TrayModel tray_;
     QObject *trayHost_ = nullptr;
-    bool serveTray_ = false;
+    bool serveTray_ = false, trayNoBusReported_ = false;
     void updateTrayHost();
     bool serveNotifications_ = false, noBusReported_ = false;
     int lastVolume_ = -1;
