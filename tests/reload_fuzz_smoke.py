@@ -116,10 +116,9 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-reload-fuzz-test-") as directo
             # Back to a plain configuration: the windows are all still there.
             init.write_text("return { xwayland = false, layout = { workspaces = 4 } }")
             assert run("reload").returncode == 0
-            listed = run("get", "windows")
-            assert listed.returncode == 0
-            live = sum(client.poll() is None for client in clients)
-            assert len(listed.stdout.splitlines()) >= live - 1, (live, listed.stdout)
+            harness.wait_for(lambda: len(run("get", "windows").stdout.splitlines()) ==
+                             sum(client.poll() is None for client in clients), processes,
+                             "every live client's window listed")
             server.send_signal(signal.SIGTERM)
             assert server.wait(timeout=30) == 0, log.read_text()
             print(f"Reload fuzz passed ({steps} steps, seed {seed})")
