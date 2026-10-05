@@ -179,9 +179,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
     target_sources(shaodesk PRIVATE src/overview_scene.c)
     target_include_directories(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_compile_definitions(shaodesk PRIVATE WLR_USE_UNSTABLE)
-    target_compile_definitions(shaodesk PRIVATE
-        SHAODESK_VERSION="${PROJECT_VERSION}"
-        SHAODESK_DEFAULT_CONFIG="${CMAKE_INSTALL_FULL_DATADIR}/shaodesk/init.lua")
+    target_compile_definitions(shaodesk PRIVATE SHAODESK_VERSION="${PROJECT_VERSION}")
     target_compile_options(shaodesk PRIVATE -Wall -Wextra -Wno-unused-parameter)
     # A compositor function shared between files is declared in src/compositor/server.h; any
     # other is static. This flags one that is neither.
@@ -339,6 +337,13 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/auto_reload_smoke.py $<TARGET_FILE:shaodesk>
             ${EXAMPLE_CONFIG})
         set_tests_properties(auto_reload_smoke PROPERTIES TIMEOUT 60)
+        # Without a personal configuration, shaodesk runs the shipped one.
+        set(EMPTY_HOME ${CMAKE_CURRENT_BINARY_DIR}/empty-home)
+        file(MAKE_DIRECTORY ${EMPTY_HOME})
+        add_test(NAME default_config COMMAND shaodesk --check-config)
+        set_tests_properties(default_config PROPERTIES
+            ENVIRONMENT "HOME=${EMPTY_HOME};XDG_CONFIG_HOME=${EMPTY_HOME};SHAODESK_DEFAULT_CONFIG=${EXAMPLE_CONFIG}"
+            PASS_REGULAR_EXPRESSION "Configuration valid: .*example-config/init.lua")
         add_test(NAME workspaces COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/workspace_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>

@@ -1689,11 +1689,12 @@ void include_theme(lua_State *L, const std::filesystem::path &directory) {
     merge(L, -2, -1);
     lua_pop(L, 1);
 }
-// The shipped default configuration: $SHAODESK_DEFAULT_CONFIG, else the installed one.
+} // namespace
 std::filesystem::path default_config_path() {
     const auto *variable = std::getenv("SHAODESK_DEFAULT_CONFIG");
     return variable && *variable ? variable : SHAODESK_DEFAULT_CONFIG;
 }
+namespace {
 // `extends = "default"` layers the configuration, theme included, over the shipped default
 // configuration: every setting it leaves out comes from there, its bindings go first, and the
 // defaults fill in the keys it does not bind. Returns how many bindings are its own.

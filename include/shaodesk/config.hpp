@@ -296,6 +296,8 @@ Config load_config_or_default(const std::filesystem::path &path, std::string &er
 // profile, else the one `profile` names. load_config chooses the saved profile.
 Config parse_config(const std::string &source, const std::string &name = "config",
                     const std::filesystem::path &directory = {}, const std::string &chosen = {});
+// The shipped default configuration: $SHAODESK_DEFAULT_CONFIG, else the installed one.
+std::filesystem::path default_config_path();
 // Where the profile picked from the shell or `shaodesk msg profile` is kept:
 // $XDG_STATE_HOME/shaodesk/profile, else ~/.local/state/shaodesk/profile; empty without either.
 std::filesystem::path profile_state_path();

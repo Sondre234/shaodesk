@@ -565,8 +565,8 @@ std::filesystem::path default_config() {
     auto personal = personal_config();
     if (!personal.empty() && std::filesystem::exists(personal))
         return personal;
-    if (std::filesystem::exists(SHAODESK_DEFAULT_CONFIG))
-        return SHAODESK_DEFAULT_CONFIG;
+    if (auto shipped = shaodesk::default_config_path(); std::filesystem::exists(shipped))
+        return shipped;
     throw std::runtime_error(
         "no configuration found; use --config config/init.lua from the source directory");
 }
