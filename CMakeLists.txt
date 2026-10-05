@@ -23,7 +23,7 @@ if(LUA_VERSION VERSION_LESS 5.4 OR NOT LUA_VERSION VERSION_LESS 5.5)
 endif()
 pkg_check_modules(XKB REQUIRED IMPORTED_TARGET xkbcommon)
 include(GNUInstallDirs)
-option(SHAODESK_INSTALL_SESSION "Install the experimental display-manager session entry" OFF)
+option(SHAODESK_INSTALL_SESSION "Install the display-manager session entry" OFF)
 option(SHAODESK_BUILD_SHELL "Build the Qt Quick desktop shell" ON)
 option(SHAODESK_SHELL_PREVIEW_ONLY "Build only the shell UI preview without LayerShellQt" OFF)
 
@@ -65,6 +65,9 @@ if(BUILD_TESTING)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
     add_test(NAME docs_consistency COMMAND ${Python3_EXECUTABLE}
              ${CMAKE_CURRENT_SOURCE_DIR}/tests/docs_consistency.py ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME session_wrapper COMMAND ${Python3_EXECUTABLE}
+             ${CMAKE_CURRENT_SOURCE_DIR}/tests/session_wrapper_test.py
+             ${CMAKE_CURRENT_SOURCE_DIR}/packaging/shaodesk-session)
     add_executable(layout_tests tests/layout_tests.cpp)
     target_link_libraries(layout_tests PRIVATE shaodesk_config)
     add_test(NAME layout COMMAND layout_tests)
@@ -245,6 +248,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
         target_link_libraries(shaodesk PRIVATE PkgConfig::LIBINPUT)
     endif()
     install(TARGETS shaodesk RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    # Starts a standalone session with a log and, where there is none, a D-Bus session bus.
+    install(PROGRAMS packaging/shaodesk-session DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(FILES config/init.lua DESTINATION ${CMAKE_INSTALL_DATADIR}/shaodesk)
     # docs/ keeps the README's links to them working in the installed copy.
     install(FILES README.md CHANGELOG.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
@@ -417,6 +422,14 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(screenshot_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME launch_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/launch_smoke.py
+            $<TARGET_FILE:shaodesk> ${EXAMPLE_CONFIG})
+        set_tests_properties(launch_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME startup_failure_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/startup_failure_smoke.py
+            $<TARGET_FILE:shaodesk> ${EXAMPLE_CONFIG})
+        set_tests_properties(startup_failure_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME output_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)

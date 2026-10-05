@@ -5,7 +5,6 @@
  * before power off, reboot and log out. */
 #include "server.h"
 
-#include <ctype.h>
 #include <stdarg.h>
 
 /* How long a locker gets to lock the screen before a suspend gives up. */
@@ -57,14 +56,7 @@ static void power_report(struct sh_server *server, const char *format, ...) {
     va_start(arguments, format);
     vsnprintf(text, sizeof(text), format, arguments);
     va_end(arguments);
-    text[0] = (char)toupper((unsigned char)text[0]);
-    for (char *c = text; *c; ++c)
-        if (*c == '\n' || *c == '\r' || *c == '\t')
-            *c = ' ';
-    wlr_log(WLR_ERROR, "%s", text);
-    char line[352];
-    snprintf(line, sizeof(line), "power-error %s\n", text);
-    send_shell_line(server, line);
+    report_failure(server, "power-error", text);
 }
 
 /* Whether power.lock_command can lock the screen; with `start`, starts it too. */

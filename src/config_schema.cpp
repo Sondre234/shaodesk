@@ -36,6 +36,10 @@ const Option options[] = {
      "Reload when this file, or another `.lua` or `.xkb` file in its directory (or the "
      "`keyboard.file` there), is saved. A file with an error loads the default configuration "
      "instead and shows the error on screen."},
+    {"terminal", "list of strings", "unset", "{ \"foot\" }", none, none,
+     "The terminal the `terminal` action (Super + Q) opens, as a program and its arguments. "
+     "Unset, it is `$TERMINAL` when that program is installed, else the first of kitty, foot, "
+     "alacritty, wezterm, ghostty, konsole, gnome-terminal and xterm found on `PATH`."},
 
     {"appearance", "table", "", "", none, none, "Desktop look."},
     {"appearance.background", "color", "\"#19212e\"", "\"#19212e\"", none, none,
@@ -194,7 +198,8 @@ const Option options[] = {
     {"windows.swallow.enabled", "boolean", "false", "true", none, none,
      "Swallow automatically as windows open; `swallow_toggle` works either way."},
     {"windows.swallow.terminals", "list of strings", "kitty, foot, footclient, Alacritty, "
-     "org.wezfurlong.wezterm, com.mitchellh.ghostty, xterm, URxvt, org.kde.konsole",
+     "org.wezfurlong.wezterm, com.mitchellh.ghostty, xterm, URxvt, org.kde.konsole, "
+     "org.gnome.Terminal",
      "{ \"kitty\", \"foot\" }", none, none,
      "The `app_id`s (X11 class) of terminals that can be swallowed, compared without regard to "
      "case; at most 32. A window that is itself one of these never swallows."},

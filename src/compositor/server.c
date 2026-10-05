@@ -133,6 +133,23 @@ static int reap_children(int signal_number, void *data) {
     return 0;
 }
 
+/* Says why no Wayland socket could be made; libwayland only logs each name it tried. */
+static void report_socket_failure(void) {
+    const char *runtime = getenv("XDG_RUNTIME_DIR");
+    struct sockaddr_un address;
+    if (!runtime || !*runtime)
+        wlr_log(WLR_ERROR, "Cannot create a Wayland socket: XDG_RUNTIME_DIR is not set");
+    else if (strlen(runtime) + strlen("/wayland-0") >= sizeof(address.sun_path))
+        wlr_log(WLR_ERROR,
+                "Cannot create a Wayland socket: XDG_RUNTIME_DIR (%s) is too long for a socket "
+                "path, which holds %zu bytes",
+                runtime, sizeof(address.sun_path) - 1);
+    else if (access(runtime, W_OK | X_OK) != 0)
+        wlr_log_errno(WLR_ERROR, "Cannot create a Wayland socket in XDG_RUNTIME_DIR (%s)", runtime);
+    else
+        wlr_log(WLR_ERROR, "Cannot create a Wayland socket in XDG_RUNTIME_DIR (%s)", runtime);
+}
+
 int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     wlr_log_init(WLR_INFO, NULL);
     if (mode == SH_BACKEND_SESSION &&
@@ -378,16 +395,17 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
         wlr_idle_inhibit_v1_create(server.wl_display);
     add_listener(&idle_inhibit->events.new_inhibitor, &server.new_inhibitor, server_new_inhibitor);
 
+    // From here every listener is in place, so a failure undoes the whole start, as quitting
+    // does: wlroots aborts when a backend goes while something still listens to it.
+    int status = 1;
     const char *socket = wl_display_add_socket_auto(server.wl_display);
     if (!socket) {
-        wlr_backend_destroy(server.backend);
-        return 1;
+        report_socket_failure();
+        goto finish;
     }
-
     if (!wlr_backend_start(server.backend)) {
-        wlr_backend_destroy(server.backend);
-        wl_display_destroy(server.wl_display);
-        return 1;
+        wlr_log(WLR_ERROR, "Cannot start the backend (%s)", backends);
+        goto finish;
     }
 
     setenv("WAYLAND_DISPLAY", socket, true);
@@ -426,10 +444,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     wlr_log(WLR_INFO, "Running Wayland compositor on WAYLAND_DISPLAY=%s", socket);
     wl_display_run(server.wl_display);
     server.running = false;
-    wl_event_source_remove(sigint);
-    wl_event_source_remove(sigterm);
-    wl_event_source_remove(sighup);
-    wl_event_source_remove(sigchld);
+    status = 0;
 
 #if WLR_HAS_XWAYLAND
 #if SHAODESK_XWM_WAKER
@@ -443,6 +458,12 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
 #endif
     power_finish(&server);
     close_control_socket(&server);
+
+finish:
+    wl_event_source_remove(sigint);
+    wl_event_source_remove(sigterm);
+    wl_event_source_remove(sighup);
+    wl_event_source_remove(sigchld);
     destroy_headless_keyboards(&server);
     wl_display_destroy_clients(server.wl_display);
 
@@ -511,5 +532,5 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     wl_display_destroy(server.wl_display);
     sh_tiling_destroy(server.tiling);
     xkb_keymap_unref(server.keymap);
-    return 0;
+    return status;
 }

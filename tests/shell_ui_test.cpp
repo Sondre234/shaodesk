@@ -170,7 +170,8 @@ int main(int argc, char **argv) {
                 client->write("ok\nwork\t3\t1700000000\n");
                 client->disconnectFromServer();
             } else if (request.startsWith("output ") || request.startsWith("session ") ||
-                       request == "toggle_tiling\n" || request == "layout_monocle\n") {
+                       request == "toggle_tiling\n" || request == "layout_monocle\n" ||
+                       request == "terminal\n") {
                 if (!request.startsWith("output ")) {
                     requests.push_back(QString::fromUtf8(request).trimmed());
                     client->write("ok\n");
@@ -1213,6 +1214,18 @@ int main(int argc, char **argv) {
             std::cerr << "the layout action was not sent\n";
             return 1;
         }
+        requests.clear();
+        if (!openPalette()) {
+            std::cerr << "the palette did not open a third time\n";
+            return 1;
+        }
+        type(">open terminal");
+        QTest::keyClick(&paletteView, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return requests == QStringList{"terminal"}; })) {
+            std::cerr << "the palette did not open a terminal: " << requests.join("|").toStdString()
+                      << " results " << titlesNow().join("|").toStdString() << '\n';
+            return 1;
+        }
         // A late answer with the saved sessions does not move the selection off the entry the
         // user has reached.
         holdSessions = true;
@@ -1489,6 +1502,13 @@ int main(int argc, char **argv) {
                        "Suspend cancelled: the screen did not lock within 5 seconds";
             })) {
             std::cerr << "a power action cancelled later was not reported\n";
+            return 1;
+        }
+        subscriber->write("spawn-error Cannot launch kitty: No such file or directory\n");
+        if (!QTest::qWaitFor([&] {
+                return controller.error() == "Cannot launch kitty: No such file or directory";
+            })) {
+            std::cerr << "a program that did not start was not reported\n";
             return 1;
         }
         controller.clearError();

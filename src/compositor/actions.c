@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
 /* Actions as key bindings, button bindings and the control socket name them: run_action hands
- * each to the module that carries it out. Also screenshots. */
+ * each to the module that carries it out. Also screenshots, and starting programs. */
 #include "server.h"
 
 /* Hands the output under the pointer or the focused window's box to the configuration side, which
@@ -30,14 +30,29 @@ bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, cha
                                          error, error_size);
 }
 
+/* Starts the program of a spawn or terminal action. One that cannot start is reported in the
+ * log and across the panel, and in `error`. */
+bool launch_program(struct sh_server *server, enum sh_action action, char *error,
+                    size_t error_size) {
+    if (server->callbacks->launch(server->callbacks->userdata, action, error, error_size))
+        return true;
+    report_failure(server, "spawn-error", error);
+    return false;
+}
+
 /* Shared by key bindings and the control socket. */
 void run_action(struct sh_server *server, enum sh_action action, int argument) {
     int count = server_settings(server)->workspaces;
     struct sh_toplevel *current = current_toplevel(server);
     switch (action) {
     case SH_NONE:
-    case SH_HANDLED:
         break;
+    case SH_SPAWN:
+    case SH_TERMINAL: {
+        char error[256] = "";
+        launch_program(server, action, error, sizeof(error));
+        break;
+    }
     case SH_QUIT:
         wl_display_terminate(server->wl_display);
         break;

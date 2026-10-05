@@ -4,6 +4,7 @@
 #include "version.h"
 #include <wlr/version.h>
 
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -32,7 +33,10 @@ bool has_env(const char *name) {
     const char *value = std::getenv(name);
     return value && *value;
 }
-pid_t spawn(const shaodesk::Command &command, const std::vector<std::string> &extra_env = {}) {
+/* Starts `command`, with `extra_env` laid over the environment: its pid, or -1 with `failure`
+ * saying why. */
+pid_t start_program(const shaodesk::Command &command, std::string &failure,
+                    const std::vector<std::string> &extra_env = {}) {
     std::vector<char *> argv;
     for (const auto &arg : command)
         argv.push_back(const_cast<char *>(arg.c_str()));
@@ -56,7 +60,7 @@ pid_t spawn(const shaodesk::Command &command, const std::vector<std::string> &ex
     posix_spawnattr_t attributes;
     int error = posix_spawnattr_init(&attributes);
     if (error) {
-        std::cerr << "Cannot prepare child process: " << std::strerror(error) << '\n';
+        failure = std::string("cannot prepare a child process: ") + std::strerror(error);
         return -1;
     }
     sigset_t mask;
@@ -68,13 +72,23 @@ pid_t spawn(const shaodesk::Command &command, const std::vector<std::string> &ex
         error = posix_spawnp(&pid, argv[0], nullptr, &attributes, argv.data(), env.data());
     posix_spawnattr_destroy(&attributes);
     if (error)
-        std::cerr << "Cannot launch " << command.front() << ": " << std::strerror(error) << '\n';
+        failure = "cannot launch " + command.front() + ": " + std::strerror(error);
     return error ? -1 : pid;
+}
+/* start_program, saying on standard error when it fails. */
+pid_t spawn(const shaodesk::Command &command, const std::vector<std::string> &extra_env = {}) {
+    std::string failure;
+    pid_t pid = start_program(command, failure, extra_env);
+    if (pid < 0)
+        std::cerr << static_cast<char>(std::toupper(static_cast<unsigned char>(failure[0])))
+                  << failure.substr(1) << '\n';
+    return pid;
 }
 /* D-Bus-activated services such as xdg-desktop-portal start with the bus's environment, not
  * ours, so screen sharing and file choosers need to learn about this session. Only a standalone
  * session may do this: a nested one would point the host's portals at itself. */
 void export_activation_environment() {
+    // --systemd tells a systemd user manager too; where there is none it is quietly ignored.
     shaodesk::Command command{"dbus-update-activation-environment", "--systemd"};
     for (const char *name :
          {"WAYLAND_DISPLAY", "DISPLAY", "XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE", "SHAODESK_SOCKET",
@@ -84,8 +98,13 @@ void export_activation_environment() {
     pid_t pid = spawn(command);
     // Wait briefly, so a portal started by the first applications already sees this session.
     for (int tries = 0; pid > 0 && tries < 100; ++tries) {
-        int status;
-        if (waitpid(pid, &status, WNOHANG) != 0)
+        int status = 0;
+        pid_t done = waitpid(pid, &status, WNOHANG);
+        if (done == pid && !(WIFEXITED(status) && WEXITSTATUS(status) == 0))
+            std::cerr << "dbus-update-activation-environment failed: without a D-Bus session bus, "
+                         "notifications, the tray and portals are missing; shaodesk-session "
+                         "starts one\n";
+        if (done != 0)
             return;
         usleep(20000);
     }
@@ -160,6 +179,15 @@ std::filesystem::path find_program(const std::string &name) {
     }
     return {};
 }
+// Whether `program` can be run: a path to an executable, or a name found on PATH.
+bool installed(const std::string &program) {
+    return program.find('/') != std::string::npos ? access(program.c_str(), X_OK) == 0
+                                                   : !find_program(program).empty();
+}
+// The terminals the `terminal` action looks for, in this order, when neither the configuration
+// nor $TERMINAL names one.
+constexpr const char *known_terminals[] = {"kitty",   "foot",    "alacritty",      "wezterm",
+                                           "ghostty", "konsole", "gnome-terminal", "xterm"};
 std::filesystem::path home_directory() {
     const char *home = std::getenv("HOME");
     return home && *home ? home : "/";
@@ -213,6 +241,7 @@ struct Runtime {
     // The running screenshot script; another request is refused until it exits.
     pid_t screenshot_pid = -1;
     std::string target{}; // the output target of the action last resolved
+    shaodesk::Command program{}; // the program of the spawn action last resolved
     bool watch = false; // whether saving a configuration file reloads (off in headless tests)
     int watch_fd = -1;
     // Why power.lock_command cannot lock ("" when it can), worked out once per load.
@@ -277,8 +306,8 @@ struct Runtime {
         auto *binding = self.config.binding(modifiers, keysym);
         if (!binding)
             return SH_NONE;
-        if (binding->action == SH_HANDLED)
-            spawn(binding->command);
+        if (binding->action == SH_SPAWN)
+            self.program = binding->command;
         *argument = binding->action == SH_SCREENSHOT ? binding->screenshot : binding->workspace;
         if (shaodesk::action_takes_amount(binding->action))
             *argument = binding->amount;
@@ -293,8 +322,8 @@ struct Runtime {
         auto *binding = self.config.button_binding(modifiers, button, target, app_id);
         if (!binding)
             return SH_NONE;
-        if (binding->action == SH_HANDLED)
-            spawn(binding->command);
+        if (binding->action == SH_SPAWN)
+            self.program = binding->command;
         *argument = binding->action == SH_SCREENSHOT ? binding->screenshot : binding->workspace;
         if (shaodesk::action_takes_amount(binding->action))
             *argument = binding->amount;
@@ -318,11 +347,10 @@ struct Runtime {
             if (words[0] == "profile")
                 return self.pick_profile(words);
             sh_action action = shaodesk::parse_action(words[0]);
-            if (action == SH_HANDLED) {
+            if (action == SH_SPAWN) {
                 if (words.size() < 2)
                     throw std::runtime_error("spawn needs a program");
-                if (spawn({words.begin() + 1, words.end()}) < 0)
-                    throw std::runtime_error("cannot launch " + words[1]);
+                self.program = {words.begin() + 1, words.end()};
                 return action;
             }
             if (shaodesk::action_takes_workspace(action)) {
@@ -426,6 +454,39 @@ struct Runtime {
     static const char *action_target(void *data) {
         return static_cast<Runtime *>(data)->target.c_str();
     }
+    /* The terminal the `terminal` action opens: `terminal` from the configuration, else
+     * $TERMINAL when that is installed, else the first of known_terminals that is. Empty when
+     * there is none. */
+    shaodesk::Command terminal() const {
+        if (!config.terminal.empty())
+            return config.terminal;
+        if (const char *name = std::getenv("TERMINAL"); name && *name) {
+            if (installed(name))
+                return {name};
+            std::cerr << "$TERMINAL, " << name << ", is not installed; looking for another\n";
+        }
+        for (const char *name : known_terminals)
+            if (installed(name))
+                return {name};
+        return {};
+    }
+    /* Starts the program of the spawn action that key, button, command or hot_corner returned
+     * last, or the terminal. */
+    static bool launch(void *data, sh_action action, char *error, size_t error_size) {
+        auto &self = *static_cast<Runtime *>(data);
+        auto program = action == SH_TERMINAL ? self.terminal() : self.program;
+        std::string failure = "nothing to launch";
+        if (program.empty() && action == SH_TERMINAL) {
+            failure = "no terminal installed: set terminal in the configuration, or install one "
+                      "of";
+            for (const char *name : known_terminals)
+                failure += std::string(name == known_terminals[0] ? " " : ", ") + name;
+        }
+        if (!program.empty() && start_program(program, failure) > 0)
+            return true;
+        std::snprintf(error, error_size, "%s", failure.c_str());
+        return false;
+    }
     static sh_action hot_corner(void *data, int corner, int *argument) {
         auto &self = *static_cast<Runtime *>(data);
         if (corner < 0 || corner >= 4 || self.config.hot_corners[corner].empty())
@@ -500,9 +561,7 @@ struct Runtime {
         if (!self.locker_problem) {
             if (command.empty())
                 self.locker_problem = "power.lock_command is not set";
-            else if (command.front().find('/') != std::string::npos
-                         ? access(command.front().c_str(), X_OK) != 0
-                         : find_program(command.front()).empty())
+            else if (!installed(command.front()))
                 self.locker_problem = command.front() + " is not installed";
             else
                 self.locker_problem = "";
@@ -807,7 +866,7 @@ int main(int argc, char **argv) {
             Runtime::command,   Runtime::reload,   Runtime::startup,      Runtime::child_exited,
             Runtime::opacity,   Runtime::screenshot, Runtime::window_rule,
             Runtime::hot_corner, Runtime::action_target, Runtime::config_watch,
-            Runtime::config_changed, Runtime::lock};
+            Runtime::config_changed, Runtime::lock, Runtime::launch};
         int result = sh_run(&callbacks, mode);
         if (runtime.shell_pid > 0)
             kill(runtime.shell_pid, SIGTERM);

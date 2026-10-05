@@ -526,8 +526,8 @@ static bool handle_button_binding(struct sh_server *server,
     if (action == SH_NONE)
         return false;
     server->bound_buttons |= bit;
-    if (action == SH_HANDLED) {
-        // It spawned a program, whose window opens where the click was.
+    if (action == SH_SPAWN || action == SH_TERMINAL) {
+        // It starts a program, whose window opens where the click was.
         server->spawn_x = server->cursor->x;
         server->spawn_y = server->cursor->y;
         server->spawn_until = now_ms() + 5000;

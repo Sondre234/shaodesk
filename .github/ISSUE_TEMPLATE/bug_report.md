@@ -33,11 +33,11 @@ anything private.
 
 **Log**
 
-shaodesk, the shell and the programs they start log to standard error. From a text console, start
-it with `shaodesk --session 2> ~/shaodesk.log` (nested: `shaodesk 2> ~/shaodesk.log`) and make the
-problem happen. A display manager keeps the output in its own log, such as SDDM's
-`~/.local/share/sddm/wayland-session.log`, or the journal under systemd (`journalctl --user -b`).
-Attach the file, or paste the part around the problem:
+shaodesk, the shell and the programs they start log to standard error. A session started with
+`shaodesk-session`, as the display-manager entry does, keeps it in
+`~/.local/state/shaodesk/session.log` (`session.log.old` is the one before). Nested, start it with
+`shaodesk 2> ~/shaodesk.log` and make the problem happen. Attach the file, or paste the part
+around the problem:
 
 ```
 

@@ -93,16 +93,18 @@ cmake --build build
 sudo cmake --install build
 ```
 
-This installs `shaodesk` and `shaodesk-shell`, the default configuration
-(`share/shaodesk/init.lua`), `shaodesk-portals.conf` for xdg-desktop-portal, the documentation,
-and with `SHAODESK_INSTALL_SESSION` the session entry display managers list. Choose the prefix
+This installs `shaodesk`, `shaodesk-session` (see [First run](#first-run)) and `shaodesk-shell`,
+the default configuration (`share/shaodesk/init.lua`), `shaodesk-portals.conf` for
+xdg-desktop-portal, the documentation, and with `SHAODESK_INSTALL_SESSION` the session entry
+display managers list. Choose the prefix
 when configuring, as above: shaodesk looks for its default configuration under it, so
 `cmake --install --prefix` with another one leaves that unfound. `DESTDIR` stages an install
 for packaging. On Gentoo, `packaging/gentoo` has ebuilds; see [docs/gentoo.md](docs/gentoo.md).
 
 shaodesk runs without any of these, and uses them when they are installed:
 
-- a terminal: Super + Q runs `kitty` ([how to change it](#first-run))
+- a terminal: Super + Q opens the first of kitty, foot, alacritty, wezterm, ghostty, konsole,
+  gnome-terminal and xterm that is installed ([how to choose one](#first-run))
 - `grim` and `slurp` for screenshots, and `wl-clipboard` to copy them
 - `xdg-desktop-portal-wlr`, `xdg-desktop-portal-gtk` and PipeWire for screen sharing and file
   choosers ([Portals](docs/features.md#portals))
@@ -141,31 +143,37 @@ service may also open in the host session instead.
 ### First run
 
 - **From a display manager**, pick shaodesk from its list of sessions. The entry (installed with
-  `SHAODESK_INSTALL_SESSION`, and by the Gentoo ebuild) runs `shaodesk --session`.
-- **From a text console**, log in and run `shaodesk --session`. A seat manager (elogind,
+  `SHAODESK_INSTALL_SESSION`, and by the Gentoo ebuild) runs `shaodesk-session`.
+- **From a text console**, log in and run `shaodesk-session`. A seat manager (elogind,
   systemd-logind or seatd) has to give you the GPU and input devices, as it does for any
-  Wayland desktop. Where nothing else starts a D-Bus session bus, as is usual without systemd,
-  run `dbus-run-session -- shaodesk --session` instead: portals, notifications and the tray need one.
+  Wayland desktop.
 - **To try it first**, run `shaodesk` inside your current Wayland session; it opens in a window.
 
+`shaodesk-session` runs `shaodesk --session`, passing its arguments on. Where nothing has
+started a D-Bus session bus, as is usual without systemd, it starts one with `dbus-run-session`:
+notifications, the tray and portals need one.
+
 Without `~/.config/shaodesk/init.lua`, the installed [config/init.lua](config/init.lua) is
-used. Super + R opens the application menu, Super + Q starts kitty, Super + C closes the
-focused window, and Super + M quits; [Default bindings](#default-bindings) lists the rest. To
-use another terminal, write a configuration that extends the default:
+used. Super + R opens the application menu, Super + Q opens a terminal, Super + C closes the
+focused window, and Super + M quits; [Default bindings](#default-bindings) lists the rest. The
+terminal is `$TERMINAL` when that is set, else the first one installed (kitty, foot, alacritty,
+...). To choose it, write a configuration that extends the default:
 
 ```lua
 return {
     version = 1,
     extends = "default",
-    bindings = {
-        { mods = { "Super" }, key = "q", action = "spawn", command = { "foot" } },
-    },
+    terminal = { "foot" },
 }
 ```
 
-shaodesk, the shell and the programs they start log to standard error. From a console, keep it
-in a file with `shaodesk --session 2> ~/shaodesk.log`; a display manager keeps it in its own
-log, such as SDDM's `~/.local/share/sddm/wayland-session.log`, or the journal under systemd.
+When a binding cannot start its program, because none of those terminals is installed for
+example, the panel says why for a few seconds.
+
+shaodesk, the shell and the programs they start log to standard error, which `shaodesk-session`
+writes to `~/.local/state/shaodesk/session.log` (in `$XDG_STATE_HOME` when that is set); the
+previous session's log is kept as `session.log.old`. Running `shaodesk` yourself, keep it in a
+file with `shaodesk --session 2> ~/shaodesk.log`.
 
 ## Configuration
 
@@ -212,7 +220,7 @@ Edit them in [config/init.lua](config/init.lua).
 | Input | Action |
 | --- | --- |
 | Super + left / right drag | Move / resize a window (on a tile: move it, or move its splits) |
-| Super + Q | Launch kitty |
+| Super + Q | [Open a terminal](docs/features.md#terminal): `terminal`, `$TERMINAL`, or the first one installed |
 | Super + R | Application menu on the monitor under the pointer |
 | Super + P | [Command palette](docs/features.md#command-palette) |
 | Super + C | Close the focused window |

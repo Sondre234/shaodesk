@@ -235,8 +235,9 @@ struct Config {
                          .swallow = false,
                          .swallow_terminals = {"kitty", "foot", "footclient", "Alacritty",
                                                "org.wezfurlong.wezterm", "com.mitchellh.ghostty",
-                                               "xterm", "URxvt", "org.kde.konsole"},
-                         .swallow_terminal_count = 9,
+                                               "xterm", "URxvt", "org.kde.konsole",
+                                               "org.gnome.Terminal"},
+                         .swallow_terminal_count = 10,
                          .swallow_exceptions = {},
                          .swallow_exception_count = 0,
                          .magnet = true,
@@ -256,6 +257,8 @@ struct Config {
     std::array<std::string, 4> hot_corners;
     std::vector<Binding> bindings;
     std::vector<Command> startup;
+    // The terminal the `terminal` action opens; empty: $TERMINAL or the first one installed.
+    Command terminal;
     ShellConfig shell;
     NotificationsConfig notifications;
     OsdConfig osd;

@@ -9,6 +9,7 @@ struct Action {
 };
 // The compositor actions the palette offers, run as `shaodesk msg NAME`.
 constexpr Action actions[] = {
+    {"terminal", "Open a terminal"},
     {"toggle_tiling", "Toggle tiling"},
     {"layout_next", "Next tiling layout"},
     {"layout_dwindle", "Layout: dwindle"},

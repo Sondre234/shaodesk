@@ -4,6 +4,8 @@
  * and events for the shell. */
 #include "server.h"
 
+#include <ctype.h>
+
 /* Control socket: one newline-terminated request per connection, answered with
  * "ok\n" plus any output, or "error: ...\n". Lives in the private runtime dir. */
 struct sh_control_client {
@@ -310,6 +312,17 @@ static void control_handle(struct sh_server *server, int fd, const char *request
         control_reply(fd, reply);
         return;
     }
+    if (action == SH_SPAWN || action == SH_TERMINAL) {
+        // The caller hears why the program did not start, as the panel does.
+        if (!launch_program(server, action, error, sizeof(error))) {
+            char reply[300];
+            snprintf(reply, sizeof(reply), "error: %s\n", error);
+            control_reply(fd, reply);
+            return;
+        }
+        control_reply(fd, "ok\n");
+        return;
+    }
     if (action == SH_SCREENSHOT) {
         // Report why no screenshot started, such as grim missing, to the caller.
         if (!take_screenshot(server, (enum sh_screenshot_mode)argument, error, sizeof(error))) {
@@ -509,6 +522,24 @@ void request_shell(struct sh_server *server, const char *what) {
 
 void send_shell_line(struct sh_server *server, const char *line) {
     send_event(server, line, strlen(line));
+}
+
+/* Tells the user what went wrong with something they no longer wait on: in the log, and across
+ * the panel, which hears "EVENT TEXT" (such as "power-error Suspend failed: ..."). */
+void report_failure(struct sh_server *server, const char *event, const char *text) {
+    char line[384];
+    int start = snprintf(line, sizeof(line), "%s ", event);
+    if (start < 0 || (size_t)start + 2 > sizeof(line))
+        return;
+    snprintf(line + start, sizeof(line) - (size_t)start - 1, "%s", text); // room for "\n"
+    drop_partial_utf8(line);
+    line[start] = (char)toupper((unsigned char)line[start]);
+    for (char *c = line + start; *c; ++c)
+        if (*c == '\n' || *c == '\r' || *c == '\t')
+            *c = ' ';
+    wlr_log(WLR_ERROR, "%s", line + start);
+    strcat(line, "\n");
+    send_shell_line(server, line);
 }
 
 void request_launcher(struct sh_server *server) {

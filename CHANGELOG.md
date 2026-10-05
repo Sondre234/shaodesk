@@ -5,6 +5,22 @@ tagged release yet; everything below is on `main`.
 
 ## Unreleased (2026-10-05)
 
+- `shaodesk-session` starts a standalone session the way a first run needs: under
+  `dbus-run-session` when there is no D-Bus session bus (usual without systemd, and needed by
+  notifications, the tray and portals), with everything the session prints in
+  `~/.local/state/shaodesk/session.log` (`$XDG_STATE_HOME`), the previous session's kept as
+  `session.log.old`. The display-manager entry runs it, and is no longer called experimental.
+- A `terminal` action opens the terminal set by the new `terminal` setting (`terminal = {
+  "foot" }`), else `$TERMINAL`, else the first of kitty, foot, alacritty, wezterm, ghostty,
+  konsole, gnome-terminal and xterm that is installed. When there is none, the panel says so.
+  The default configuration binds it to Super + Q, which ran kitty whether or not it was
+  installed, and the command palette offers it as Open a terminal.
+- A program that a binding, a hot corner, the command palette or `shaodesk msg spawn` cannot
+  start, because it is not installed, now says so across the panel (subscribers hear
+  `spawn-error MESSAGE`), not only in the log.
+- A compositor that cannot create its Wayland socket, because `XDG_RUNTIME_DIR` is unset, not
+  writable, or too long for a socket's path, says which and exits with status 1, instead of
+  aborting on a wlroots assertion.
 - A system tray: the panel shows applications' status icons (StatusNotifierItem, as KDE and Qt
   applications, Electron applications and Ayatana's indicators use) beside the bell on every
   monitor, with their tooltips, attention and overlay icons. Left-click activates an application,
