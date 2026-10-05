@@ -154,7 +154,8 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     if (mode == SH_BACKEND_HEADLESS)
         setenv("WLR_HEADLESS_OUTPUTS", "1", 0); // tests may ask for more
 
-    struct sh_server server = {.callbacks = callbacks, .config_generation = 1};
+    struct sh_server server = {
+        .callbacks = callbacks, .config_generation = 1, .power.sleep_delay = -1};
     wl_list_init(&server.subscribers);
     server.tiling = sh_tiling_create();
     if (!server.tiling)

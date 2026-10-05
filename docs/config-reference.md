@@ -278,7 +278,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | --- | --- | --- | --- | --- |
 | `power` | table | - | - | Power controls: the `lock`, `suspend`, `hibernate`, `reboot`, `poweroff` and `logout` actions. All but `lock` and `logout` go through logind (systemd-logind or elogind). |
 | `power.lock_command` | list of strings | { "swaylock", "-f" } | - | The screen locker `lock` starts, an `ext-session-lock-v1` client, as a program and its arguments; `{}` for none. Locking is offered only while the program is installed. |
-| `power.lock_before_sleep` | boolean | true | - | `suspend` and `hibernate` lock the screen with `lock_command` first, and wait for the lock to hold before the machine sleeps. |
+| `power.lock_before_sleep` | boolean | true | - | Lock the screen with `lock_command` before the machine sleeps, whether `suspend`, `hibernate`, the lid or an idle daemon sends it to sleep, and hold the sleep until the lock holds. |
 
 ## `startup`
 

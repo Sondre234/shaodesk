@@ -215,6 +215,10 @@ struct sh_power {
     char answers[SH_LOGIN1_METHODS][16]; /* logind's Can* answers; "" until it gives one */
     enum sh_power_step step;
     enum sh_action action; /* the one under way, while step is not idle */
+    /* A logind delay inhibitor holding off sleep until the screen is locked (-1 for none), one
+     * being asked for, and whether logind has said the machine is about to sleep. */
+    int sleep_delay;
+    bool inhibiting, before_sleep;
 };
 
 struct sh_server {

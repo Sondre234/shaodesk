@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Power: suspend, hibernate, reboot and power off through logind, and what it allows of them,
  * over a connection that never blocks the compositor (src/login1.c); locking the screen with
- * power.lock_command, before suspend and hibernate too; and logging out. */
+ * power.lock_command, before the machine sleeps too; and logging out. */
 #include "server.h"
 
 #include <ctype.h>
@@ -66,6 +66,38 @@ static void power_report(struct sh_server *server, const char *format, ...) {
     send_shell_line(server, line);
 }
 
+/* Whether power.lock_command can lock the screen; with `start`, starts it too. */
+static bool locker(struct sh_server *server, bool start, char *error, size_t error_size) {
+    const struct sh_callbacks *callbacks = server->callbacks;
+    if (!callbacks->lock) {
+        snprintf(error, error_size, "no screen locker");
+        return false;
+    }
+    return callbacks->lock(callbacks->userdata, start, error, error_size);
+}
+
+/* Starts the screen locker, unless the screen is locked already. */
+static bool power_lock(struct sh_server *server, char *error, size_t error_size) {
+    if (server->locked)
+        return true;
+    if (!locker(server, true, error, error_size))
+        return false;
+    wlr_log(WLR_INFO, "Started the screen locker");
+    return true;
+}
+
+/* Whether the screen locks before the machine sleeps: power.lock_before_sleep, and a locker to
+ * lock it with. */
+static bool lock_wanted(struct sh_server *server) {
+    char ignored[256];
+    return server_settings(server)->lock_before_sleep &&
+           locker(server, false, ignored, sizeof(ignored));
+}
+
+static bool lock_holds(struct sh_server *server) {
+    return server->lock && server->lock->locked_sent;
+}
+
 /* Watches the connection for what sd-bus waits for next. */
 static void power_watch(struct sh_server *server) {
     struct sh_power *power = &server->power;
@@ -78,6 +110,66 @@ static void power_watch(struct sh_server *server) {
     wl_event_source_timer_update(power->bus_timer, timeout < 0 ? 0 : timeout > 0 ? timeout : 1);
 }
 
+/* Lets the machine sleep: closes the delay inhibitor. */
+static void release_sleep(struct sh_server *server) {
+    struct sh_power *power = &server->power;
+    if (power->sleep_delay < 0)
+        return;
+    close(power->sleep_delay);
+    power->sleep_delay = -1;
+}
+
+/* Holds a logind delay inhibitor while the screen has to lock before sleeping, so that a sleep
+ * anything asks for (the lid, an idle daemon, another program) waits for the lock; lets go of
+ * it otherwise. */
+static void hold_sleep(struct sh_server *server) {
+    struct sh_power *power = &server->power;
+    if (!power->login1 || !lock_wanted(server)) {
+        release_sleep(server);
+        return;
+    }
+    if (power->sleep_delay >= 0 || power->inhibiting || power->before_sleep)
+        return;
+    power->inhibiting = sh_login1_inhibit_sleep(power->login1, "Locking the screen first");
+    power_watch(server);
+}
+
+static void inhibited(void *data, int fd, const char *error) {
+    struct sh_server *server = data;
+    struct sh_power *power = &server->power;
+    power->inhibiting = false;
+    if (fd < 0) {
+        wlr_log(WLR_ERROR, "logind will not wait for the screen to lock before sleeping: %s",
+                error);
+        return;
+    }
+    release_sleep(server);
+    power->sleep_delay = fd;
+    // Wanted no longer, or late for a sleep that has begun with the lock holding.
+    if (!lock_wanted(server) || (power->before_sleep && lock_holds(server)))
+        release_sleep(server);
+}
+
+static void prepare_for_sleep(void *data, bool before) {
+    struct sh_server *server = data;
+    struct sh_power *power = &server->power;
+    power->before_sleep = before;
+    if (!before) {
+        wlr_log(WLR_INFO, "The machine woke up");
+        hold_sleep(server);
+        return;
+    }
+    if (power->sleep_delay < 0)
+        return;
+    char error[256];
+    if (lock_holds(server)) {
+        release_sleep(server);
+    } else if (!power_lock(server, error, sizeof(error))) {
+        wlr_log(WLR_ERROR, "Sleeping without locking: %s", error);
+        release_sleep(server);
+    }
+}
+
 static void power_disconnect(struct sh_server *server) {
     struct sh_power *power = &server->power;
     if (!power->login1)
@@ -88,6 +180,8 @@ static void power_disconnect(struct sh_server *server) {
     sh_login1_destroy(power->login1);
     power->login1 = NULL;
     memset(power->answers, 0, sizeof(power->answers));
+    release_sleep(server);
+    power->inhibiting = power->before_sleep = false;
     if (power->step == SH_POWER_CALLING) {
         power->step = SH_POWER_IDLE;
         power_report(server, "%s: lost the connection to logind", action_label(power->action));
@@ -158,7 +252,11 @@ static bool power_connect(struct sh_server *server, char *error, size_t error_si
                  "a headless session uses only the logind on the bus SHAODESK_LOGIN1_BUS names");
         return false;
     }
-    const struct sh_login1_handler handler = {.data = server, .answer = answered, .done = done};
+    const struct sh_login1_handler handler = {.data = server,
+                                              .answer = answered,
+                                              .done = done,
+                                              .inhibited = inhibited,
+                                              .sleep = prepare_for_sleep};
     power->login1 = sh_login1_connect(address, &handler, error, error_size);
     if (!power->login1)
         return false;
@@ -177,6 +275,7 @@ static bool power_connect(struct sh_server *server, char *error, size_t error_si
         return false;
     }
     power_ask(server);
+    hold_sleep(server);
     return true;
 }
 
@@ -201,35 +300,6 @@ static bool power_call(struct sh_server *server, char *error, size_t error_size)
     return true;
 }
 
-/* Whether power.lock_command can lock the screen; with `start`, starts it too. */
-static bool locker(struct sh_server *server, bool start, char *error, size_t error_size) {
-    const struct sh_callbacks *callbacks = server->callbacks;
-    if (!callbacks->lock) {
-        snprintf(error, error_size, "no screen locker");
-        return false;
-    }
-    return callbacks->lock(callbacks->userdata, start, error, error_size);
-}
-
-/* Starts the screen locker, unless the screen is locked already. */
-static bool power_lock(struct sh_server *server, char *error, size_t error_size) {
-    if (server->locked)
-        return true;
-    if (!locker(server, true, error, error_size))
-        return false;
-    wlr_log(WLR_INFO, "Started the screen locker");
-    return true;
-}
-
-/* Whether the screen has to lock before the machine sleeps: power.lock_before_sleep with a
- * locker to lock it, and no lock holding yet. */
-static bool lock_first(struct sh_server *server) {
-    char ignored[256];
-    return server_settings(server)->lock_before_sleep &&
-           locker(server, false, ignored, sizeof(ignored)) &&
-           !(server->lock && server->lock->locked_sent);
-}
-
 /* The step under way ran out of time. */
 static int power_timeout(void *data) {
     struct sh_server *server = data;
@@ -242,9 +312,11 @@ static int power_timeout(void *data) {
     return 0;
 }
 
-/* The lock holds on every output. */
+/* The lock holds on every output: a suspend waiting for it goes ahead, and so does a sleep. */
 void power_locked(struct sh_server *server) {
     struct sh_power *power = &server->power;
+    if (power->before_sleep)
+        release_sleep(server);
     if (power->step != SH_POWER_LOCKING)
         return;
     wl_event_source_timer_update(power->timer, 0);
@@ -285,7 +357,8 @@ bool power_start(struct sh_server *server, enum sh_action action, char *error,
             return false;
     }
     power->action = action;
-    if ((action == SH_SUSPEND || action == SH_HIBERNATE) && lock_first(server)) {
+    if ((action == SH_SUSPEND || action == SH_HIBERNATE) && lock_wanted(server) &&
+        !lock_holds(server)) {
         if (!power_lock(server, error, error_size))
             return false;
         power->step = SH_POWER_LOCKING;
@@ -334,6 +407,7 @@ const char *power_pending(struct sh_server *server, char *text, size_t size) {
 
 void power_reload(struct sh_server *server) {
     power_ask(server);
+    hold_sleep(server);
 }
 
 void power_init(struct sh_server *server) {

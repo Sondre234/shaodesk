@@ -448,8 +448,9 @@ const Option options[] = {
      "The screen locker `lock` starts, an `ext-session-lock-v1` client, as a program and its "
      "arguments; `{}` for none. Locking is offered only while the program is installed."},
     {"power.lock_before_sleep", "boolean", "true", "true", none, none,
-     "`suspend` and `hibernate` lock the screen with `lock_command` first, and wait for the "
-     "lock to hold before the machine sleeps."},
+     "Lock the screen with `lock_command` before the machine sleeps, whether `suspend`, "
+     "`hibernate`, the lid or an idle daemon sends it to sleep, and hold the sleep until the "
+     "lock holds."},
 
     {"startup", "list of commands", "unset", "", none, none,
      "Commands started once when the compositor starts (not on reload), at most 32; each is "

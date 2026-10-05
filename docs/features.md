@@ -883,8 +883,12 @@ names. `logout` ends the session, as `quit` does, and needs no logind.
 
 `suspend` and `hibernate` first lock the screen with `power.lock_command` and ask logind only
 once the lock holds on every monitor, so the machine never wakes up unlocked; a locker that has
-not locked within five seconds cancels the suspend. `power.lock_before_sleep = false` sleeps
-without locking, and so does a session with no locker installed.
+not locked within five seconds cancels the suspend. A sleep something else asks for (closing
+the lid, an idle daemon, `loginctl suspend`) locks the same way: shaodesk holds a logind delay
+inhibitor and lets it go once the lock holds, or when logind stops waiting (its
+`InhibitDelayMaxSec`, five seconds by default). `power.lock_before_sleep = false` sleeps
+without locking, and so does a session with no locker installed; turn it off if an idle daemon
+already locks before sleep (swayidle's `before-sleep`), or two lockers race.
 
 ## Screenshots and screen sharing
 
