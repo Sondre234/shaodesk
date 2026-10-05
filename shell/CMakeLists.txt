@@ -163,7 +163,8 @@ if(BUILD_TESTING)
         target_link_libraries(tray_probe PRIVATE Qt6::Gui Qt6::DBus)
         # Like the notification test, on a bus of its own with the environment's made unusable.
         add_executable(tray_dbus_test ${PROJECT_SOURCE_DIR}/tests/tray_dbus_test.cpp
-            ${PROJECT_SOURCE_DIR}/tests/tray_fake_item.hpp tray_watcher.cpp tray_watcher.hpp)
+            ${PROJECT_SOURCE_DIR}/tests/tray_fake_item.hpp tray.cpp tray.hpp tray_host.cpp tray_host.hpp
+            tray_watcher.cpp tray_watcher.hpp)
         set_target_properties(tray_dbus_test PROPERTIES AUTOMOC ON)
         target_include_directories(tray_dbus_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
         target_compile_definitions(tray_dbus_test PRIVATE QT_NO_KEYWORDS)

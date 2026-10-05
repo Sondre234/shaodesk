@@ -8,6 +8,10 @@
 
 class QDBusServiceWatcher;
 
+// Whether `path` is a D-Bus object path: "/", or elements of letters, digits and underscores, each
+// after a "/".
+bool trayValidPath(const QString &path);
+
 // org.kde.StatusNotifierWatcher, the registry of a session's tray items: applications register
 // their StatusNotifierItem with it and hosts (trays) learn of them from it. An item registers by
 // bus name, its object at /StatusNotifierItem, or by object path, the caller's connection being

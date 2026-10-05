@@ -9,12 +9,12 @@
 namespace {
 constexpr auto serviceName = "org.kde.StatusNotifierWatcher";
 constexpr auto objectPath = "/StatusNotifierWatcher";
-// "/", or elements of letters, digits and underscores, each after a "/".
-bool validPath(const QString &path) {
+} // namespace
+
+bool trayValidPath(const QString &path) {
     static const QRegularExpression pattern("^(/|(/[A-Za-z0-9_]+)+)$");
     return path.size() <= 1024 && pattern.match(path).hasMatch();
 }
-} // namespace
 
 TrayWatcher::TrayWatcher(QObject *parent) : QObject(parent) {}
 TrayWatcher::~TrayWatcher() {
@@ -53,7 +53,7 @@ void TrayWatcher::RegisterStatusNotifierItem(const QString &item) {
         service = message().service();
         path = item;
     }
-    if (service.isEmpty() || service.size() > 255 || !validPath(path)) {
+    if (service.isEmpty() || service.size() > 255 || !trayValidPath(path)) {
         sendErrorReply(QDBusError::InvalidArgs, "not a bus name or an object path: " + item.left(100));
         return;
     }

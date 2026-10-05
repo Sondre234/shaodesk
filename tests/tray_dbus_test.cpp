@@ -3,6 +3,7 @@
 // real one. Fake items (tests/tray_fake_item.hpp), each on a connection of its own, play the
 // applications.
 #include "tray_fake_item.hpp"
+#include "tray_host.hpp"
 #include "tray_watcher.hpp"
 #include <QDBusConnectionInterface>
 #include <QDir>
@@ -14,6 +15,14 @@
 #include <memory>
 
 using namespace faketray;
+
+// How a test application's item behaves.
+struct Options {
+    bool byPath = false; // registers by object path, as Ayatana's library does
+    bool getAll = true;
+    bool activate = true;
+    bool registers = true;
+};
 
 class TrayDbusTest : public QObject {
     Q_OBJECT
@@ -48,6 +57,48 @@ class TrayDbusTest : public QObject {
                    : QVariant();
     }
     QStringList registered() { return watcherProperty("RegisteredStatusNotifierItems").toStringList(); }
+
+    // An application with one item and its menu, on a connection of its own.
+    struct App {
+        QDBusConnection bus{QString()};
+        std::unique_ptr<Item> item;
+        std::unique_ptr<Menu> menu;
+        QString service;
+        QString key() const { return service + item->path(); }
+    };
+    int names_ = 0;
+    std::unique_ptr<App> start(const QString &title, Options options = {}) {
+        auto app = std::make_unique<App>();
+        app->bus = connect();
+        const QString path = options.byPath ? "/org/ayatana/NotificationItem/fake" : "/StatusNotifierItem";
+        app->item = std::make_unique<Item>(app->bus, path);
+        app->menu = std::make_unique<Menu>(app->bus, "/MenuBar");
+        app->item->getAll = options.getAll;
+        app->item->activate = options.activate;
+        app->item->properties = {{"Id", "fake"},
+                                 {"Title", title},
+                                 {"Status", "Active"},
+                                 {"IconName", "fake-icon"},
+                                 {"ToolTip", toolTip(title, "Some <b>bold</b> text")},
+                                 {"ItemIsMenu", false},
+                                 {"Menu", QVariant::fromValue(QDBusObjectPath("/MenuBar"))}};
+        app->bus.registerVirtualObject(path, app->item.get());
+        app->bus.registerVirtualObject("/MenuBar", app->menu.get());
+        app->service = app->bus.baseService();
+        if (!options.byPath) {
+            app->service = QString("org.kde.StatusNotifierItem-%1-%2").arg(QCoreApplication::applicationPid()).arg(++names_);
+            app->bus.registerService(app->service);
+        }
+        if (options.registers)
+            callWatcher(app->bus, "RegisterStatusNotifierItem", {options.byPath ? path : app->service});
+        return app;
+    }
+    void quit(std::unique_ptr<App> &app) {
+        app->bus.unregisterObject(app->item->path());
+        app->bus.unregisterObject(app->menu->path());
+        disconnect(app->bus);
+        app.reset();
+    }
 
   private Q_SLOTS:
     void initTestCase() {
@@ -154,6 +205,139 @@ class TrayDbusTest : public QObject {
         QTRY_VERIFY(!bus.interface()->isServiceRegistered(watcherService));
         TrayWatcher again;
         QVERIFY2(again.start(connect()), qPrintable(again.error()));
+    }
+
+    // The host serves the watcher, reads items registered either way, follows their changes,
+    // passes on clicks and the wheel, and drops items whose application leaves.
+    void host() {
+        TrayModel model;
+        TrayHost host(model);
+        QVERIFY2(host.start(connect()), qPrintable(host.error()));
+        QVERIFY(host.ownsWatcher());
+        QCOMPARE(host.hostName(), QString("org.kde.StatusNotifierHost-%1").arg(QCoreApplication::applicationPid()));
+        QCOMPARE(watcherProperty("IsStatusNotifierHostRegistered").toBool(), true);
+        auto named = start("Named");
+        QTRY_COMPARE(model.count(), 1);
+        const TrayItem *item = model.find(named->key());
+        QVERIFY(item);
+        QCOMPARE(item->title, QString("Named"));
+        QCOMPARE(item->id, QString("fake"));
+        QCOMPARE(item->status, QString("Active"));
+        QCOMPARE(item->iconName, QString("fake-icon"));
+        QCOMPARE(item->toolTipTitle, QString("Named"));
+        QCOMPARE(item->toolTipText, QString("Some bold text"));
+        QCOMPARE(item->menuPath, QString("/MenuBar"));
+        QCOMPARE(item->itemIsMenu, false);
+        QCOMPARE(model.shown(), 1);
+        // Ayatana's way: by path, with neither GetAll nor Activate. It comes after, in the order
+        // of registration.
+        auto ayatana = start("Ayatana", {.byPath = true, .getAll = false, .activate = false});
+        QTRY_COMPARE(model.count(), 2);
+        QCOMPARE(model.items()[1].key, ayatana->key());
+        QCOMPARE(model.items()[1].title, QString("Ayatana"));
+        QCOMPARE(model.items()[0].key, named->key());
+
+        // Changes, announced by their signals.
+        named->item->change("Title", "Renamed", "NewTitle");
+        QTRY_COMPARE(model.find(named->key())->title, QString("Renamed"));
+        const int revision = model.find(named->key())->revision;
+        named->item->change("IconName", "other-icon", "NewIcon");
+        QTRY_COMPARE(model.find(named->key())->iconName, QString("other-icon"));
+        QVERIFY(model.find(named->key())->revision > revision);
+        named->item->change("Status", "Passive", "NewStatus", {"Passive"});
+        QTRY_COMPARE(model.shown(), 1);
+        QCOMPARE(model.count(), 2);
+        named->item->change("Status", "NeedsAttention", "NewStatus", {"NeedsAttention"});
+        QTRY_COMPARE(model.shown(), 2);
+        QCOMPARE(model.find(named->key())->status, QString("NeedsAttention"));
+        named->item->change("ToolTip", toolTip("Tip", "a &amp; b<br>c"), "NewToolTip");
+        QTRY_COMPARE(model.find(named->key())->toolTipText, QString("a & b\nc"));
+        QCOMPARE(model.find(named->key())->toolTip(), QString("Tip\na & b\nc"));
+        named->item->change("IconThemePath", "/nonexistent/icons", "NewIconThemePath", {"/nonexistent/icons"});
+        QTRY_COMPARE(model.find(named->key())->iconThemePath, QString("/nonexistent/icons"));
+        ayatana->item->change("Title", "Ayatana again", "NewTitle"); // read with one Get each
+        QTRY_COMPARE(model.find(ayatana->key())->title, QString("Ayatana again"));
+
+        // What the panel asks reaches the item.
+        model.activate(named->key(), 10, 20);
+        QTRY_COMPARE(named->item->calls.value(0), QString("activate 10 20"));
+        model.secondaryActivate(named->key(), 3, 4);
+        model.contextMenu(named->key(), 5, 6);
+        model.scroll(named->key(), -240, false);
+        model.scroll(named->key(), 120, true);
+        QTRY_COMPARE(named->item->calls.size(), 5);
+        QCOMPARE(named->item->calls, (QStringList{"activate 10 20", "secondary 3 4", "context 5 6",
+                                                  "scroll -240 vertical", "scroll 120 horizontal"}));
+        // An item without Activate asks the panel for its menu instead.
+        QSignalSpy refused(&model, &TrayModel::activationRefused);
+        model.activate(ayatana->key(), 1, 2);
+        QTRY_COMPARE(refused.size(), 1);
+        QCOMPARE(refused[0][0].toString(), ayatana->key());
+
+        // An application quitting, or giving up its name, takes its item away.
+        quit(ayatana);
+        QTRY_COMPARE(model.count(), 1);
+        QCOMPARE(registered(), QStringList{named->key()});
+        named->bus.unregisterService(named->service);
+        QTRY_COMPARE(model.count(), 0);
+        quit(named);
+    }
+    // Properties of the wrong type, or missing, take their defaults.
+    void mistypedProperties() {
+        TrayModel model;
+        TrayHost host(model);
+        QVERIFY(host.start(connect()));
+        auto app = start("Odd", {.registers = false});
+        app->item->properties = {{"Id", 7},
+                                 {"Title", QStringList{"a", "b"}},
+                                 {"Status", "Sleeping"},
+                                 {"IconName", true},
+                                 {"ToolTip", "just a string"},
+                                 {"ItemIsMenu", "yes"},
+                                 {"Menu", 42},
+                                 {"IconPixmap", "not pixels"}};
+        callWatcher(app->bus, "RegisterStatusNotifierItem", {app->service});
+        QTRY_COMPARE(model.count(), 1);
+        const TrayItem *item = model.find(app->key());
+        QCOMPARE(item->id, QString());
+        QCOMPARE(item->title, QString());
+        QCOMPARE(item->status, QString("Active"));
+        QCOMPARE(item->iconName, QString());
+        QCOMPARE(item->toolTip(), QString());
+        QCOMPARE(item->itemIsMenu, false);
+        QCOMPARE(item->menuPath, QString());
+        // A menu given as a string path is taken; Chromium's "no menu" path is none.
+        app->item->change("Menu", "/Some/Menu", "NewMenu");
+        QTRY_COMPARE(model.find(app->key())->menuPath, QString("/Some/Menu"));
+        app->item->change("Menu", QVariant::fromValue(QDBusObjectPath("/NO_DBUSMENU")), "NewMenu");
+        QTRY_COMPARE(model.find(app->key())->menuPath, QString());
+        quit(app);
+    }
+    // Another program serves the watcher: the host registers with it and follows its items, and
+    // serves the name itself once that program goes.
+    void hostOfAnotherWatcher() {
+        auto other = std::make_unique<TrayWatcher>();
+        QVERIFY(other->start(connect()));
+        auto early = start("Early");
+        TrayModel model;
+        TrayHost host(model);
+        QVERIFY(host.start(connect()));
+        QVERIFY(!host.ownsWatcher());
+        QTRY_VERIFY(other->hostRegistered());
+        QTRY_COMPARE(model.count(), 1);
+        auto late = start("Late", {.byPath = true});
+        QTRY_COMPARE(model.count(), 2);
+        quit(late);
+        QTRY_COMPARE(model.count(), 1);
+        other.reset();
+        QTRY_VERIFY(host.ownsWatcher());
+        QCOMPARE(model.count(), 1);
+        // The item registers again with the new watcher, as items do; it is not shown twice.
+        callWatcher(early->bus, "RegisterStatusNotifierItem", {early->service});
+        QCOMPARE(registered(), QStringList{early->key()});
+        QCOMPARE(model.count(), 1);
+        quit(early);
+        QTRY_COMPARE(model.count(), 0);
     }
 };
 QTEST_MAIN(TrayDbusTest)
