@@ -200,10 +200,10 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-notify-test-") as directory:
             event("closed", fourth, 1)
             wait_for(lambda: count("notifications hidden") == 4, "surface gone after hover")
 
-            # Replacing keeps the id; the card is updated, not doubled.
+            # Replacing keeps the id (that the card is updated, not doubled, is
+            # notifications_test's).
             fifth = send("Version one", "--timeout", "0")
             assert send("Version two", "--timeout", "0", "--replaces", str(fifth)) == fifth
-            time.sleep(0.4)
             unrelated = send("Unrelated", "--timeout", "0")
             assert unrelated != fifth
             for number in (fifth, unrelated):
@@ -243,7 +243,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-notify-test-") as directory:
                 except harness.Timeout:
                     pass
             assert count("osd shown") == osd_before + 1
-            quiet = send("Quiet", "--timeout", "0")
+            send("Quiet", "--timeout", "0")
             time.sleep(0.8)
             assert count("notifications shown") == shown_before
             loud = send("Fire", "--urgency", "2")
@@ -255,17 +255,18 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-notify-test-") as directory:
                      "the first display gone")
             msg("dnd", "off")
             wait_for(lambda: count("osd shown") == osd_before + 2, "the display for turning it off")
-            assert quiet > 0
             wait_for(lambda: count("osd hidden") == count("osd shown"), "the display gone")
             msg("dnd", "toggle")
+            wait_for(lambda: count("osd shown") == osd_before + 3, "the display for toggling on")
+            wait_for(lambda: count("osd hidden") == count("osd shown"), "the display gone")
             msg("dnd", "toggle")
+            wait_for(lambda: count("osd shown") == osd_before + 4, "the display for toggling off")
             result = subprocess.run([compositor, "msg", "dnd", "sideways"], env=env,
                                     capture_output=True, text=True, timeout=5)
             assert "usage" in result.stdout + result.stderr, result
 
             # The on-screen display: a pill at the bottom centre that fades away.
-            time.sleep(1.2)
-            assert "osd hidden" in log()
+            wait_for(lambda: count("osd hidden") == count("osd shown"), "the display gone")
             hidden = count("osd hidden")
             shown = count("osd shown")
             msg("osd", "Volume", "40")
