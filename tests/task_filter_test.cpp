@@ -170,17 +170,6 @@ class TaskFilterTest : public QObject {
         source.changed(43, {FakeTasks::Urgent});
         QVERIFY(!app3.urgent());
     }
-    void refilterCostWithManyWindows() {
-        for (int i = 0; i < 40; ++i)
-            source.add(QString("extra%1").arg(i), "x");
-        const int before = source.reads;
-        QElapsedTimer timer;
-        timer.start();
-        for (int i = 0; i < 20; ++i)
-            source.remove(int(source.rows.size()) - 1), source.add("again", "x");
-        std::cerr << "20 window replacements, 100 windows, 8 filters: "
-                  << timer.nsecsElapsed() / 1000 << " us, " << (source.reads - before) << " reads\n";
-    }
 };
 QTEST_GUILESS_MAIN(TaskFilterTest)
 #include "task_filter_test.moc"
