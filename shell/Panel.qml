@@ -10,6 +10,8 @@ Item {
     required property var shellView
     required property string outputName
     property bool launcherOpen: false
+    // The power menu, over the launcher by the power button in its bottom-right corner.
+    property bool powerOpen: false
     // The popups are made when first needed, or a moment after startup so that the first use
     // finds them ready: what the bar shows first does not wait for them.
     property bool warm: false
@@ -60,6 +62,7 @@ Item {
     }
     onLauncherOpenChanged: {
         if (launcherOpen) { taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; trayMenuKey = "" }
+        else powerOpen = false
     }
     function closeMenus() { launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false; trayMenuKey = "" }
     // A stacked button hovered for a moment, or at once while another's list is open, shows its
@@ -108,20 +111,15 @@ Item {
         audioPopup = kind
         launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; trayMenuKey = ""
     }
-    // The power menu, from the power_menu action: by the power button, or at the right end of
-    // the bar when that is switched off.
+    // The power menu, from the power_menu action: the launcher opens with it, and closes with it
+    // when asked again.
     function togglePowerMenu() {
-        if (audioPopup === "power" || shell.power.entries.length === 0) {
-            audioPopup = ""
-            return
+        if (powerOpen) {
+            closeMenus()
+        } else if (shell.power.entries.length > 0) {
+            launcherOpen = true
+            powerOpen = true
         }
-        if (powerButton.visible) {
-            toggleAudioPopup("power", powerButton)
-            return
-        }
-        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; trayMenuKey = ""
-        audioPopupX = width - 126
-        audioPopup = "power"
     }
     // Where a tray item's icon is on the screen, which some applications place a window by: the
     // panel spans its output's width, at its top or bottom edge.
@@ -857,64 +855,6 @@ Item {
         }
     }
 
-    // The power button: lock, suspend and the rest, as far as the compositor says they may run.
-    // Restart, power off and log out ask first (PowerDialog.qml).
-    Loader {
-        id: powerLoader
-        asynchronous: !(root.audioPopup === "power")
-        active: root.audioPopup === "power" || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component {
-            Rectangle {
-                id: powerMenu
-                parent: root
-                objectName: "powerMenu"
-                // The entry Up and Down move to and Enter runs.
-                property int current: 0
-                function run(index) {
-                    var entry = shell.power.entries[index]
-                    // Closing the menu first hands the keyboard back before it runs.
-                    root.audioPopup = ""
-                    if (entry)
-                        shell.power.request(entry.action, outputName)
-                }
-                visible: root.audioPopup === "power"
-                onVisibleChanged: if (visible) { current = 0; forceActiveFocus() }
-                Keys.onUpPressed: current = (current + shell.power.entries.length - 1) % Math.max(1, shell.power.entries.length)
-                Keys.onDownPressed: current = (current + 1) % Math.max(1, shell.power.entries.length)
-                Keys.onReturnPressed: run(current)
-                Keys.onEnterPressed: run(current)
-                width: 220; height: 12 + shell.power.entries.length * 44 + Math.max(0, shell.power.entries.length - 1) * 2
-                x: Math.max(8, Math.min(root.audioPopupX - width / 2, root.width - width - 8))
-                y: root.onTop ? bar.y + bar.height + 8 : bar.y - height - 8
-                color: shell.panelColor; radius: 10
-                border.color: Qt.lighter(shell.panelColor, 1.6)
-                MouseArea { anchors.fill: parent }
-                Column {
-                    anchors.fill: parent; anchors.margins: 6; spacing: 2
-                    Repeater {
-                        model: shell.power.entries
-                        delegate: Button {
-                            id: powerItem
-                            required property var modelData
-                            required property int index
-                            objectName: "powerItem:" + modelData.action
-                            width: parent.width; height: 44
-                            text: modelData.title
-                            focusPolicy: Qt.NoFocus
-                            palette.buttonText: shell.textColor
-                            onClicked: powerMenu.run(index)
-                            onHoveredChanged: if (hovered) powerMenu.current = index
-                            background: Rectangle { color: powerItem.hovered || powerMenu.current === powerItem.index ? Qt.lighter(shell.panelColor, 1.5) : "transparent"; radius: 6 }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     // The wallpaper button: thumbnails of the pictures in shell.wallpapers, by subfolder, with
     // a filter; clicking one shows it at once and keeps the picker open to try another.
     Loader {
@@ -1123,10 +1063,20 @@ Item {
             Rectangle {
                 id: launcher
                 parent: root
+                objectName: "launcher"
                 visible: root.launcherOpen
-                function focusSearch() { search.text = ""; search.forceActiveFocus() }
-                onVisibleChanged: if (visible) focusSearch()
-                Component.onCompleted: if (visible) focusSearch()
+                function opened() { search.text = ""; takeFocus() }
+                // The keyboard goes to the power menu while it is open, else to the search field.
+                function takeFocus() {
+                    if (root.powerOpen) { powerMenu.current = 0; powerMenu.forceActiveFocus() }
+                    else search.forceActiveFocus()
+                }
+                onVisibleChanged: if (visible) opened()
+                Component.onCompleted: if (visible) opened()
+                Connections {
+                    target: root
+                    function onPowerOpenChanged() { if (launcher.visible) launcher.takeFocus() }
+                }
                 width: Math.min(460, root.width - 24)
                 height: root.height - shell.panelExtent - 20
                 anchors.left: parent.left
@@ -1210,11 +1160,87 @@ Item {
                         }
                         Text { anchors.centerIn: parent; visible: applications.count === 0; text: "No matching applications"; color: shell.textColor; font.family: root.uiFont }
                     }
-                    Text {
+                    RowLayout {
+                        id: launcherFooter
                         Layout.fillWidth: true
-                        text: "shaodesk"
-                        color: Qt.darker(shell.textColor, 1.7)
-                        font.pixelSize: 11; font.family: root.uiFont
+                        Text {
+                            Layout.fillWidth: true
+                            text: "shaodesk"
+                            color: Qt.darker(shell.textColor, 1.7)
+                            font.pixelSize: 11; font.family: root.uiFont
+                        }
+                        // Lock, suspend and the rest, as far as the compositor says they may run.
+                        Button {
+                            id: powerButton
+                            objectName: "powerButton"
+                            visible: shell.widgets.power && shell.power.available.length > 0
+                            Layout.preferredWidth: 36; Layout.preferredHeight: 36
+                            onClicked: root.powerOpen = !root.powerOpen
+                            Accessible.name: "Power"
+                            ToolTip.text: "Lock, suspend, power off"
+                            ToolTip.visible: hovered && !root.powerOpen
+                            ToolTip.delay: 500
+                            background: Rectangle {
+                                radius: 7
+                                color: root.powerOpen ? Qt.lighter(shell.panelColor, 1.8) : (powerButton.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
+                            }
+                            contentItem: Item {
+                                Icon { anchors.centerIn: parent; name: "power"; color: root.powerOpen ? shell.accent : shell.textColor }
+                            }
+                        }
+                    }
+                }
+                // While the power menu is open, a press anywhere else in the launcher closes it.
+                MouseArea {
+                    anchors.fill: parent
+                    z: 1
+                    visible: root.powerOpen
+                    onPressed: root.powerOpen = false
+                }
+                // The power menu, above the power button. Restart, power off and log out ask
+                // first (PowerDialog.qml).
+                Rectangle {
+                    id: powerMenu
+                    objectName: "powerMenu"
+                    z: 2
+                    // The entry Up and Down move to and Enter runs.
+                    property int current: 0
+                    function run(index) {
+                        var entry = shell.power.entries[index]
+                        // Closing the launcher first hands the keyboard back before it runs.
+                        root.closeMenus()
+                        if (entry)
+                            shell.power.request(entry.action, outputName)
+                    }
+                    visible: root.powerOpen
+                    Keys.onUpPressed: current = (current + shell.power.entries.length - 1) % Math.max(1, shell.power.entries.length)
+                    Keys.onDownPressed: current = (current + 1) % Math.max(1, shell.power.entries.length)
+                    Keys.onReturnPressed: run(current)
+                    Keys.onEnterPressed: run(current)
+                    width: 220; height: 12 + shell.power.entries.length * 44 + Math.max(0, shell.power.entries.length - 1) * 2
+                    anchors.right: parent.right; anchors.rightMargin: 14
+                    anchors.bottom: parent.bottom; anchors.bottomMargin: 20 + launcherFooter.height + 6
+                    color: Qt.lighter(shell.panelColor, 1.2); radius: 10
+                    border.color: Qt.lighter(shell.panelColor, 1.8)
+                    MouseArea { anchors.fill: parent }
+                    Column {
+                        anchors.fill: parent; anchors.margins: 6; spacing: 2
+                        Repeater {
+                            model: shell.power.entries
+                            delegate: Button {
+                                id: powerItem
+                                required property var modelData
+                                required property int index
+                                objectName: "powerItem:" + modelData.action
+                                width: parent.width; height: 44
+                                text: modelData.title
+                                focusPolicy: Qt.NoFocus
+                                palette.buttonText: shell.textColor
+                                onClicked: powerMenu.run(index)
+                                onHoveredChanged: if (hovered) powerMenu.current = index
+                                background: Rectangle { color: powerItem.hovered || powerMenu.current === powerItem.index ? Qt.lighter(shell.panelColor, 1.6) : "transparent"; radius: 6 }
+                            }
+                        }
                     }
                 }
             }
@@ -1993,22 +2019,6 @@ Item {
                         interval: untilMinute(); running: true; repeat: true
                         onTriggered: { clock.now = new Date(); interval = untilMinute() }
                     }
-                }
-            }
-            Button {
-                id: powerButton
-                objectName: "powerButton"
-                visible: shell.widgets.power && shell.power.available.length > 0
-                Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
-                onClicked: root.toggleAudioPopup("power", powerButton)
-                Accessible.name: "Power"
-                BarTip { owner: powerButton; text: "Lock, suspend, power off" }
-                background: Rectangle {
-                    radius: 7
-                    color: root.audioPopup === "power" ? Qt.lighter(shell.panelColor, 1.8) : (powerButton.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
-                }
-                contentItem: Item {
-                    Icon { anchors.centerIn: parent; name: "power"; color: root.audioPopup === "power" ? shell.accent : shell.textColor }
                 }
             }
             Button {
