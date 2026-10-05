@@ -90,7 +90,8 @@ class Compositor:
         self._started = []  # everything, to end even after a failure
         # Called for wait_for's and stays' failure messages when they are given none.
         self.detail = None
-        self._logs = [self.log]
+        # Printed if the test fails; a test may add files of its own.
+        self.logs = [self.log]
         self._start, self._private_bus = start, bus
 
     def __enter__(self):
@@ -117,7 +118,7 @@ class Compositor:
                 end(process)
             self.clients.clear()
             if failed:
-                for path in self._logs:
+                for path in self.logs:
                     if path.exists():
                         print(f"== {path.name}\n{path.read_text()}", file=sys.stderr)
             self._directory.cleanup()
@@ -193,7 +194,7 @@ class Compositor:
         discarded unless `options` (for subprocess.Popen) say otherwise."""
         if log is not None:
             path = self.root / log
-            self._logs.append(path)
+            self.logs.append(path)
             with path.open("w") as output:
                 options.setdefault("stdout", output)
                 options.setdefault("stderr", subprocess.STDOUT)
