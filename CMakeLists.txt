@@ -232,7 +232,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
     endif()
     install(TARGETS shaodesk RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(FILES config/init.lua DESTINATION ${CMAKE_INSTALL_DATADIR}/shaodesk)
-    install(FILES README.md CHANGELOG.md docs/features.md docs/gentoo.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+    # docs/ keeps the README's links to them working in the installed copy.
+    install(FILES README.md CHANGELOG.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+    install(FILES docs/features.md docs/config-reference.md docs/dotfile-import.md docs/gentoo.md
+        DESTINATION ${CMAKE_INSTALL_DOCDIR}/docs)
     install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/shaodesk)
     install(FILES vendor/tinywl/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/shaodesk
         RENAME TinyWL-LICENSE)
