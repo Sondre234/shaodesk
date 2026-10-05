@@ -450,6 +450,7 @@ Nextcloud, OBS), a physical mouse or touchpad, scaled outputs, and another tray 
 running alongside in a real session. While a panel menu is open, a click made without moving the
 pointer first lands where the pointer was in the smaller surface: the compositor tells a surface
 where the pointer is only when it moves.
+
 ## First run: terminal, session wrapper and startup errors
 
 Added 2026-10-05. `launch_smoke` runs a headless compositor with nothing on `PATH` but stand-in
