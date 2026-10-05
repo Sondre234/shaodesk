@@ -1892,6 +1892,15 @@ int main(int argc, char **argv) {
             std::cerr << "a second right click did not close the tray menu\n";
             return 1;
         }
+        // Escape closes it too.
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(trayButton("menu")));
+        if (!QTest::qWaitFor([&] { return trayMenuShown(); }))
+            return 1;
+        QTest::keyClick(&view, Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !menuOpen(); })) {
+            std::cerr << "Escape did not close the tray menu\n";
+            return 1;
+        }
         // An item that cannot be activated shows its menu after a left click.
         trayModel->find("menu")->itemIsMenu = false;
         trayModel->changed("menu", false);
