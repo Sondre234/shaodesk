@@ -9,6 +9,8 @@
 #include <QDBusConnectionInterface>
 #include <QDir>
 #include <QProcess>
+#include <QRandomGenerator>
+#include <QRegularExpression>
 #include <QSignalSpy>
 #include <QStandardPaths>
 #include <QTemporaryDir>
@@ -512,6 +514,234 @@ class TrayDbusTest : public QObject {
         quit(app);
         QTRY_VERIFY(changed.size() >= 1);
         QVERIFY(model.menu(changed.last()[0].toString(), 0).isEmpty());
+    }
+    // Random, often wrong, applications: mistyped properties, broken pixmaps, malformed layouts
+    // and entry updates, signals with odd arguments, bogus registrations, and applications coming
+    // and going while the panel asks things of them. The host must neither crash nor stop
+    // answering, and keeps to the items that exist.
+    void fuzz() {
+        // A warning from Qt (a message the host could not send, a value it misread) fails too.
+        QTest::failOnWarning(QRegularExpression("."));
+        QRandomGenerator random(20261005);
+        TrayModel model;
+        TrayHost host(model);
+        QVERIFY(host.start(connect()));
+        auto text = [&](int most) {
+            static const QString alphabet = "ab_ _<>&;/\nå世{}#x";
+            QString result;
+            for (int i = random.bounded(most + 1); i > 0; --i)
+                result += alphabet[random.bounded(int(alphabet.size()))];
+            return result;
+        };
+        auto brokenPixmaps = [&] {
+            QList<Pixmap> list;
+            for (int n = random.bounded(4); n > 0; --n) {
+                const int width = random.bounded(-2, 40), height = random.bounded(-2, 40);
+                list << Pixmap{width, height, QByteArray(random.bounded(0, 40 * 40 * 4 + 10), char(random.bounded(256)))};
+            }
+            if (random.bounded(8) == 0)
+                list << Pixmap{100000, 100000, QByteArray(16, 'x')};
+            return QVariant::fromValue(list);
+        };
+        auto value = [&]() -> QVariant {
+            switch (random.bounded(12)) {
+            case 0: return int(random.bounded(1000)) - 500;
+            case 1: return text(30);
+            case 2: return random.bounded(2) == 0;
+            case 3: return QStringList{text(5), text(5)};
+            case 4: return brokenPixmaps();
+            case 5: return pixmaps(QColor::fromRgb(random.generate()), {int(random.bounded(1, 64))});
+            case 6: return toolTip(text(20), text(60));
+            case 7: return QVariant::fromValue(QDBusObjectPath(random.bounded(2) ? "/MenuBar" : "/Nowhere"));
+            case 8: return QVariant::fromValue(ToolTip{text(5), {square(Qt::red, 3)}, text(5), text(5)});
+            case 9: return QVariant::fromValue(Properties{1, {{"x", 1}}}); // a structure of another shape
+            case 10: return QByteArray(random.bounded(50), 'q');
+            default: return double(random.bounded(100)) / 3;
+            }
+        };
+        static const char *const names[] = {"Id", "Title", "Status", "IconName", "IconPixmap", "IconThemePath",
+                                            "AttentionIconName", "AttentionIconPixmap", "OverlayIconName",
+                                            "OverlayIconPixmap", "ToolTip", "ItemIsMenu", "Menu", "Category"};
+        static const char *const statuses[] = {"Active", "Passive", "NeedsAttention", "Bogus"};
+        static const char *const itemSignals[] = {"NewTitle", "NewIcon", "NewAttentionIcon", "NewOverlayIcon",
+                                                  "NewToolTip", "NewStatus", "NewIconThemePath", "NewMenu", "Unknown"};
+        auto properties = [&] {
+            QVariantMap map;
+            for (int n = random.bounded(1, 10); n > 0; --n) {
+                const QString name = names[random.bounded(int(std::size(names)))];
+                map[name] = name == "Status" && random.bounded(2) ? QVariant(statuses[random.bounded(4)]) : value();
+            }
+            return map;
+        };
+        auto entryProperties = [&] {
+            static const char *const keys[] = {"label", "enabled", "visible", "type", "toggle-type", "toggle-state",
+                                               "icon-name", "icon-data", "children-display", "shortcut", "junk"};
+            static const char *const words[] = {"separator", "checkmark", "radio", "submenu", "standard"};
+            QVariantMap map;
+            for (int n = random.bounded(5); n > 0; --n)
+                map[keys[random.bounded(int(std::size(keys)))]] =
+                    random.bounded(3) == 0 ? QVariant(words[random.bounded(int(std::size(words)))]) : value();
+            return map;
+        };
+        // A tree of random entries, sometimes deeper or wider than the host reads, with children
+        // that are no entries.
+        std::function<Layout(int)> randomLayout = [&](int depth) {
+            Layout layout{int(random.bounded(-5, 60)), entryProperties(), {}};
+            const bool wide = depth == 0 && random.bounded(6) == 0;
+            const int children = wide ? 1100 : depth >= 11 ? 0 : random.bounded(depth < 3 ? 4 : 2);
+            for (int c = 0; c < children; ++c) {
+                const int kind = random.bounded(8);
+                if (kind == 0)
+                    layout.children << QDBusVariant(text(5));
+                else if (kind == 1)
+                    layout.children << QDBusVariant(QVariant::fromValue(Pixmap{1, 1, "abcd"}));
+                else
+                    layout.children << QDBusVariant(QVariant::fromValue(wide ? Layout{c, {{"label", "x"}}, {}}
+                                                                              : randomLayout(depth + 1)));
+            }
+            return layout;
+        };
+        auto layoutReply = [&]() -> QVariantList {
+            switch (random.bounded(6)) {
+            case 0: return {1u, QString("junk")};
+            case 1: return {};
+            case 2: return {1u};
+            case 3: return {1u, QVariant::fromValue(Pixmap{1, 1, "x"})};
+            default: return {uint(random.bounded(100)), QVariant::fromValue(randomLayout(0))};
+            }
+        };
+        auto randomTree = [&] {
+            std::map<int, Menu::Entry> tree;
+            for (int n = random.bounded(12); n > 0; --n) {
+                QList<int> children;
+                for (int c = random.bounded(3); c > 0; --c)
+                    children << random.bounded(12);
+                tree[random.bounded(12)] = {entryProperties(), children};
+            }
+            return tree;
+        };
+        auto junk = connect();
+        std::vector<std::unique_ptr<App>> apps;
+        auto anyApp = [&]() -> App * { return apps.empty() ? nullptr : apps[random.bounded(int(apps.size()))].get(); };
+        int mostItems = 0, mostEntries = 0; // that the run did show things
+        for (int i = 0; i < 1500; ++i) {
+            App *app = anyApp();
+            switch (random.bounded(9)) {
+            case 0:
+                if (apps.size() < 6) {
+                    auto fresh = start(text(8), {.byPath = random.bounded(2) == 0, .getAll = random.bounded(3) != 0,
+                                                 .activate = random.bounded(2) == 0, .registers = false});
+                    fresh->item->properties = properties();
+                    // Most have a menu, so that layouts are read.
+                    if (random.bounded(4) != 0)
+                        fresh->item->properties["Menu"] = QVariant::fromValue(QDBusObjectPath("/MenuBar"));
+                    if (random.bounded(3) == 0)
+                        fresh->menu->layoutReply = layoutReply;
+                    callWatcher(fresh->bus, "RegisterStatusNotifierItem",
+                                {fresh->item->path().startsWith("/org") ? fresh->item->path() : fresh->service});
+                    apps.push_back(std::move(fresh));
+                }
+                break;
+            case 1:
+                if (app) {
+                    auto it = std::find_if(apps.begin(), apps.end(), [app](const auto &a) { return a.get() == app; });
+                    quit(*it);
+                    apps.erase(it);
+                }
+                break;
+            case 2:
+                if (app) {
+                    app->item->properties[names[random.bounded(int(std::size(names)))]] = value();
+                    const int extra = random.bounded(3);
+                    app->item->send(itemSignals[random.bounded(int(std::size(itemSignals)))],
+                                    extra == 0 ? QVariantList{} : extra == 1 ? QVariantList{text(10)} : QVariantList{42});
+                }
+                break;
+            case 3:
+                if (app) {
+                    app->menu->entries = randomTree();
+                    app->menu->layoutReply = random.bounded(2) ? std::function<QVariantList()>(layoutReply) : nullptr;
+                    app->menu->layoutUpdated(random.bounded(-2, 20));
+                }
+                break;
+            case 4:
+                if (app) {
+                    QList<Properties> updated;
+                    QList<Removed> removed;
+                    for (int n = random.bounded(4); n > 0; --n)
+                        updated << Properties{int(random.bounded(-3, 15)), entryProperties()};
+                    for (int n = random.bounded(3); n > 0; --n)
+                        removed << Removed{int(random.bounded(-3, 15)), {text(6), "label", "enabled", "type"}};
+                    app->menu->propertiesUpdated(updated, removed);
+                }
+                break;
+            case 5:
+                if (app) {
+                    // The menu's signals with arguments of the wrong types.
+                    auto message = QDBusMessage::createSignal(app->menu->path(), menuInterface,
+                                                              random.bounded(2) ? "ItemsPropertiesUpdated" : "LayoutUpdated");
+                    message.setArguments(random.bounded(2) ? QVariantList{text(5), 5} : QVariantList{});
+                    app->bus.send(message);
+                }
+                break;
+            case 6: {
+                // What the panel asks, of items that exist and some that do not.
+                const QString key = app && random.bounded(4) ? app->key() : text(10);
+                const int id = random.bounded(-3, 15);
+                switch (random.bounded(8)) {
+                case 0: model.activate(key, random.bounded(-5, 5000), random.bounded(-5, 5000)); break;
+                case 1: model.secondaryActivate(key, 1, 2); break;
+                case 2: model.contextMenu(key, 1, 2); break;
+                case 3: model.scroll(key, random.bounded(-500, 500), random.bounded(2) == 0); break;
+                case 4: model.openMenu(key, id); break;
+                case 5: model.clickMenu(key, id); break;
+                case 6: model.closeMenu(key, id); break;
+                default:
+                    for (const auto &entry : model.menu(key, id))
+                        QVERIFY(entry.toMap().contains("label"));
+                }
+                for (const auto &item : model.items()) {
+                    const int size = random.bounded(1, 64);
+                    model.picture(item.serial, {size, size});
+                    model.menuPicture(item.serial, id, {16, 16});
+                    QVERIFY(item.toolTip().size() <= 1201);
+                    QVERIFY(item.icon.size() <= 16);
+                }
+                break;
+            }
+            case 7:
+                callWatcher(junk, "RegisterStatusNotifierItem",
+                            {random.bounded(3) == 0 ? "/" + text(8) : random.bounded(2) ? text(20) : ":1.9999" + text(4)});
+                if (random.bounded(4) == 0)
+                    callWatcher(junk, "RegisterStatusNotifierHost", {text(12)});
+                break;
+            default:
+                // A burst of signals at once.
+                if (app)
+                    for (int n = 0; n < 20; ++n)
+                        app->item->send(itemSignals[random.bounded(int(std::size(itemSignals)))]);
+            }
+            if (i % 10 == 0)
+                QTest::qWait(2);
+            mostItems = std::max(mostItems, model.count());
+            for (const auto &item : model.items())
+                mostEntries = std::max(mostEntries, int(item.menu.size()));
+        }
+        QVERIFY2(mostItems >= 3 && mostEntries >= 5, qPrintable(QString("%1 %2").arg(mostItems).arg(mostEntries)));
+        QTest::qWait(100);
+        // Still answering, still the host, and showing nothing that is gone.
+        QCOMPARE(watcherProperty("IsStatusNotifierHostRegistered").toBool(), true);
+        QCOMPARE(watcherProperty("ProtocolVersion").toInt(), 0);
+        for (const auto &item : model.items())
+            QVERIFY2(std::any_of(apps.begin(), apps.end(), [&](const auto &app) { return app->key() == item.key; }),
+                     qPrintable(item.key));
+        while (!apps.empty()) {
+            quit(apps.back());
+            apps.pop_back();
+        }
+        disconnect(junk);
+        QTRY_COMPARE(model.count(), 0);
+        QTRY_VERIFY(registered().isEmpty());
     }
     // Another program serves the watcher: the host registers with it and follows its items, and
     // serves the name itself once that program goes.
