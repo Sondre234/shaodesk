@@ -311,6 +311,17 @@ static void control_handle(struct sh_server *server, int fd, const char *request
         control_reply(fd, "ok\n");
         return;
     }
+    if (power_action(action)) {
+        // The caller hears why it cannot start, such as logind not allowing it.
+        if (!power_start(server, action, error, sizeof(error))) {
+            char reply[300];
+            snprintf(reply, sizeof(reply), "error: %s\n", error);
+            control_reply(fd, reply);
+            return;
+        }
+        control_reply(fd, "ok\n");
+        return;
+    }
     server->target_output = target;
     run_action(server, action, argument);
     server->target_output = NULL;

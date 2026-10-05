@@ -201,12 +201,18 @@ struct sh_overview {
     bool in_corner;   /* the pointer is in the hot corner: it opens the overview on entering */
 };
 
-/* The power actions and what logind allows of them (power.c). */
+/* The power actions and what logind allows of them (power.c). One runs at a time, in steps. */
+enum sh_power_step {
+    SH_POWER_IDLE,
+    SH_POWER_CALLING, /* logind has been asked and has not answered yet */
+};
 struct sh_power {
     bool system_bus;          /* logind may be reached on the system bus (not --headless) */
     struct sh_login1 *login1; /* NULL while logind is out of reach */
     struct wl_event_source *bus, *bus_timer;
     char answers[SH_LOGIN1_METHODS][16]; /* logind's Can* answers; "" until it gives one */
+    enum sh_power_step step;
+    enum sh_action action; /* the one under way, while step is not idle */
 };
 
 struct sh_server {
@@ -798,6 +804,13 @@ void resize_window(struct sh_server *server, enum sh_action action, int amount);
 /* power.c */
 void power_init(struct sh_server *server);
 void power_finish(struct sh_server *server);
+void power_reload(struct sh_server *server);
+bool power_action(enum sh_action action);
+bool power_start(struct sh_server *server, enum sh_action action, char *error,
+                 size_t error_size);
+void power_run(struct sh_server *server, enum sh_action action);
+const char *power_action_name(enum sh_action action);
+const char *power_pending(struct sh_server *server, char *text, size_t size);
 
 /* query.c */
 bool run_query(struct sh_server *server, int fd, const char *request);

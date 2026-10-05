@@ -106,6 +106,7 @@ void reload_config(struct sh_server *server) {
     // Gaps, borders, and opacity may have changed.
     wl_list_for_each(toplevel, &server->toplevels, link) refresh_frame(toplevel);
     wl_list_for_each(output, &server->outputs, link) reflow_output(server, output->wlr_output);
+    power_reload(server);
 }
 
 static int terminate_signal(int signal_number, void *data) {

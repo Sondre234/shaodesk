@@ -49,8 +49,15 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
         return result.stdout if ok else result.stderr
 
     def power():
-        """What `get power` says of each action."""
+        """What `get power` says of each action, and of the one pending."""
         return dict(line.split("\t") for line in msg("get", "power").splitlines())
+
+    def answers_are(**expected):
+        return lambda: all(power()[name] == value for name, value in expected.items())
+
+    def logged():
+        """What the fake logind recorded, after its "ready"."""
+        return calls.read_text().splitlines()[1:]
 
     def start(output, extra_env):
         server = subprocess.Popen([compositor, "--headless", "--config", str(config)],
@@ -80,19 +87,49 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
         # Headless, and not told of a bus, the compositor leaves logind alone.
         with compositor_log.open("w") as output:
             server = start(output, {})
-            assert set(power().values()) == {"unavailable"}, power()
-            assert "reaches logind only through SHAODESK_LOGIN1_BUS" in compositor_log.read_text()
+            assert power() == {"poweroff": "unavailable", "reboot": "unavailable",
+                               "suspend": "unavailable", "hibernate": "unavailable",
+                               "pending": "-"}, power()
+            assert "SHAODESK_LOGIN1_BUS" in compositor_log.read_text()
+            assert "logind is out of reach" in msg("poweroff", ok=False)
+            assert "takes no argument" in msg("reboot", "now", ok=False)
             stop(server)
+        assert logged() == [], logged()
 
         with compositor_log.open("w") as output:
             server = start(output, {"SHAODESK_LOGIN1_BUS": address})
             # What logind allows arrives soon after startup.
-            wait_for(lambda: power() == {"poweroff": "yes", "reboot": "challenge",
-                                         "suspend": "yes", "hibernate": "na"},
-                     "logind's answers")
+            wait_for(answers_are(poweroff="yes", reboot="challenge", suspend="yes",
+                                 hibernate="na", pending="-"), "logind's answers")
+
+            # Power off and reboot go to logind, which may ask for a password (interactive).
+            msg("poweroff")
+            wait_for(lambda: logged() == ["PowerOff true"], "power off")
+            wait_for(answers_are(pending="-"), "logind's reply to power off")
+            msg("reboot")
+            wait_for(lambda: logged()[1:] == ["Reboot true"], "reboot")
+            wait_for(answers_are(pending="-"), "logind's reply to reboot")
+
+            # What logind refuses is not asked for; a reload asks what it allows afresh.
+            answers.write_text("CanPowerOff na\nCanReboot no\n")
+            msg("reload")
+            wait_for(answers_are(poweroff="na", reboot="no"), "the new answers")
+            assert "logind does not allow power off here (CanPowerOff: na)" in msg(
+                "poweroff", ok=False)
+            assert "logind does not allow reboot here (CanReboot: no)" in msg("reboot", ok=False)
+
+            # A call logind turns down is reported, and leaves nothing pending.
+            answers.write_text("fail Reboot\n")
+            msg("reload")
+            wait_for(answers_are(poweroff="yes", reboot="yes"), "the answers back to yes")
+            msg("reboot")
+            wait_for(lambda: "Reboot failed: Access denied by the fake logind"
+                     in compositor_log.read_text(), "the refusal reported")
+            assert power()["pending"] == "-", power()
             stop(server)
-        assert calls.read_text().splitlines() == ["ready"], calls.read_text()
-        print("The compositor asks only the logind it is given, and reports what it allows")
+        assert logged() == ["PowerOff true", "Reboot true", "Reboot true"], logged()
+        print("The compositor asks only the logind it is given, which powers off and reboots "
+              "when it allows them")
     except Exception:
         print(compositor_log.read_text() if compositor_log.exists() else "", file=sys.stderr)
         raise

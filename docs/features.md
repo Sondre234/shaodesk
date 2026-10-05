@@ -867,6 +867,17 @@ session is on screen it holds a logind sleep inhibitor, so an idle daemon left r
 another desktop on a different VT cannot suspend the machine; switching VTs away releases it.
 This needs sd-bus from libsystemd, libelogind, or basu at build time.
 
+## Power
+
+The `poweroff` and `reboot` actions ask logind (systemd-logind or elogind, on the system bus)
+to power off or restart the machine, letting it ask for a password when its policy wants one.
+An action logind does not allow on this machine (`CanPowerOff` answering `no` or `na`) is
+refused with that reason; one it turns down later, such as a password not given, is reported
+across the panel. `shaodesk msg get power` shows what logind allows. This needs sd-bus from
+libsystemd, libelogind, or basu at build time. A headless compositor (`--headless`, as the
+tests run it) never uses the machine's logind: only one on the bus that `SHAODESK_LOGIN1_BUS`
+names.
+
 ## Screenshots and screen sharing
 
 The `screenshot` action (Print, or `shaodesk msg screenshot region|output|window`) runs
