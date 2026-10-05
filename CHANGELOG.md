@@ -21,7 +21,7 @@ Fixes to the tests, CI and the ebuild; the compositor and the shell behave as in
 
 ## 0.1.0 (2026-10-05)
 
-The first release, for people other than its author to try. Since the last dated section: a
+The first release, and the first version I'm handing to other people to try. Since the last dated section: a
 system tray, power controls, keyboard layouts and keymap files, a terminal action that finds
 an installed terminal, failures to start a program shown on the panel, the `shaodesk-session`
 wrapper for display managers, and Gentoo ebuilds.
