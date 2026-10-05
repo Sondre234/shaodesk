@@ -155,9 +155,6 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-overview-test-") as directory:
             grim = shutil.which("grim")
             def looks_right():
                 shot = harness.grab(grim, env)
-                if os.environ.get("OVERVIEW_DUMP"):
-                    Path(os.environ["OVERVIEW_DUMP"]).write_bytes(
-                        b"P6\n%d %d\n255\n" % (shot.width, shot.height) + shot.pixels)
                 for x, y, w, h, title in overview()[2]:
                     body, band = shot.at(x + w // 2, y + h - 3), shot.at(x + w // 2, y + 1)
                     if not (all(abs(a - b) < 6 for a, b in zip(body, (0x41, 0x7b, 0xc4))) and
@@ -266,9 +263,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-overview-test-") as directory:
 
             # With animation, thumbnails glide: opening passes through partial progress and
             # ends settled, closing shows "closing" until it is done.
-            (root / "slow.lua").write_text(CONFIG.replace("animation = false,",
-                                                          "duration = 500,"))
-            init.write_text((root / "slow.lua").read_text())
+            init.write_text(CONFIG.replace("animation = false,", "duration = 500,"))
             msg("reload")
             msg("toggle_overview")
             seen = set()
