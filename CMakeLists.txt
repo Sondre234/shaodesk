@@ -351,7 +351,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         file(MAKE_DIRECTORY ${EMPTY_HOME})
         add_test(NAME version COMMAND shaodesk --version)
         set_tests_properties(version PROPERTIES
-            PASS_REGULAR_EXPRESSION "^shaodesk ${PROJECT_VERSION}( \\(git [^)]+\\))?\n$")
+            PASS_REGULAR_EXPRESSION "^shaodesk ${PROJECT_VERSION}( \\(git [^)]+\\))?\nbuilt with wlroots 0\\.20\\.[0-9]+\n$")
         add_test(NAME default_config COMMAND shaodesk --check-config)
         set_tests_properties(default_config PROPERTIES
             ENVIRONMENT "HOME=${EMPTY_HOME};XDG_CONFIG_HOME=${EMPTY_HOME};SHAODESK_DEFAULT_CONFIG=${EXAMPLE_CONFIG}"

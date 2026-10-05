@@ -2,6 +2,7 @@
 #include "shaodesk/config.hpp"
 #include "shaodesk/import.hpp"
 #include "version.h"
+#include <wlr/version.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -709,7 +710,8 @@ int main(int argc, char **argv) {
                 return 0;
             }
             if (arg == "--version") {
-                std::cout << "shaodesk " << SHAODESK_VERSION << '\n';
+                std::cout << "shaodesk " SHAODESK_VERSION "\n"
+                             "built with wlroots " WLR_VERSION_STR "\n";
                 return 0;
             }
             if (arg == "--config" && i + 1 < argc)
