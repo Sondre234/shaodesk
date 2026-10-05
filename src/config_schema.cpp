@@ -545,8 +545,9 @@ const Option options[] = {
      "The active keyboard layout's short name, such as `us`; clicking it switches to the next. "
      "Shown only when the keymap has two or more layouts."},
     {"shell.widgets.power", "boolean", "true", "true", none, none,
-     "The power menu: lock, suspend, hibernate, restart, power off and log out, as far as "
-     "`power.lock_command` and logind allow them."},
+     "The power button in the application menu's bottom-right corner: lock, suspend, "
+     "hibernate, restart, power off and log out, as far as `power.lock_command` and logind "
+     "allow them."},
     {"shell.widgets.tray", "boolean", "true", "true", none, none,
      "The system tray: applications' status icons (StatusNotifierItem), shown while there are "
      "any. `false` also leaves the tray's D-Bus names to another program."},

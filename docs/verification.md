@@ -421,7 +421,8 @@ without a locker or an inhibitor; power off closing two probe windows before cal
 probe refusing to close cancelling a reboot after `close_timeout`, `force` going ahead and
 `close_windows = false` not asking; log out closing the windows, waiting for their clients and
 exiting with status 0; and the `power` state line and `power-menu` event subscribers get.
-`shell_ui` drives the panel's power button and menu (only what may run, hidden with nothing),
+`shell_ui` drives the power button in the launcher's corner and its menu (only what may run,
+hidden with nothing, closed by a press beside it),
 suspend and lock from it, refusals and `power-error` shown on the panel, the confirmation
 dialog's countdown running out into a power off, its button, Enter, Escape, Cancel and a click
 beside it, an action that may no longer run dropping its dialog, the command palette's entries,

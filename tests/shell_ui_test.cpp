@@ -1296,14 +1296,20 @@ int main(int argc, char **argv) {
             return 1;
         }
     }
-    // The power menu lists what the compositor says may run, and runs it.
+    // The power menu, from the power button in the launcher's bottom-right corner, lists what
+    // the compositor says may run, and runs it.
     {
         auto *button = find(view.rootObject(), "powerButton");
         auto *menu = find(view.rootObject(), "powerMenu");
         auto item = [&](const QString &action) {
             return find(view.rootObject(), "powerItem:" + action);
         };
-        if (!button || !menu || button->isVisible()) {
+        auto openLauncher = [&] {
+            if (!view.rootObject()->property("launcherOpen").toBool())
+                QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, start);
+            return QTest::qWaitFor([&] { return view.rootObject()->property("launcherOpen").toBool(); });
+        };
+        if (!button || !menu || !openLauncher() || button->isVisible()) {
             std::cerr << "the power button shows before the compositor said what may run\n";
             return 1;
         }
@@ -1312,7 +1318,17 @@ int main(int argc, char **argv) {
             std::cerr << "the power button did not appear\n";
             return 1;
         }
+        // The footer's layout places the button on its next polish.
+        if (!QTest::qWaitFor([&] {
+                auto *launcher = find(view.rootObject(), "launcher");
+                const auto corner = button->mapRectToScene(QRectF(0, 0, button->width(), button->height()));
+                const auto area = launcher->mapRectToScene(QRectF(0, 0, launcher->width(), launcher->height()));
+                return corner.right() >= area.right() - 40 && corner.bottom() >= area.bottom() - 40;
+            }))
+            return fail("the power button is not in the launcher's bottom-right corner");
         auto openMenu = [&] {
+            if (!openLauncher())
+                return false;
             QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(button));
             return QTest::qWaitFor([&] {
                 const auto area = menu->mapRectToScene(QRectF(0, 0, menu->width(), menu->height()));
@@ -1324,9 +1340,24 @@ int main(int argc, char **argv) {
             std::cerr << "the power menu does not list what may run\n";
             return 1;
         }
+        // A press beside the menu closes it and leaves the launcher open; the button toggles it.
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(find(view.rootObject(), "applicationSearch")));
+        if (!QTest::qWaitFor([&] { return !menu->isVisible(); }) ||
+            !view.rootObject()->property("launcherOpen").toBool())
+            return fail("a press beside the power menu did not close only the power menu");
+        if (!openMenu())
+            return fail("the power menu did not open again");
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(button));
+        if (!QTest::qWaitFor([&] { return !menu->isVisible(); }))
+            return fail("the power button did not close its menu");
+        if (!openMenu())
+            return fail("the power menu did not open a third time");
         requests.clear();
         QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(item("suspend")));
-        if (!QTest::qWaitFor([&] { return requests == QStringList{"suspend"} && !menu->isVisible(); })) {
+        if (!QTest::qWaitFor([&] {
+                return requests == QStringList{"suspend"} && !menu->isVisible() &&
+                       !view.rootObject()->property("launcherOpen").toBool();
+            })) {
             std::cerr << "suspending from the power menu failed: " << requests.join("|").toStdString()
                       << '\n';
             return 1;
@@ -1459,8 +1490,8 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
-        // The power_menu action opens the menu with the keyboard in it: the arrows choose, Enter
-        // runs, and asking again closes it.
+        // The power_menu action opens the launcher with the menu up and the keyboard in it: the
+        // arrows choose, Enter runs, and asking again closes both.
         requests.clear();
         subscriber->write(("power-menu " + output + "\n").toUtf8());
         if (!QTest::qWaitFor([&] { return menu->isVisible() && menu->hasActiveFocus(); })) {
@@ -1468,7 +1499,9 @@ int main(int argc, char **argv) {
             return 1;
         }
         subscriber->write(("power-menu " + output + "\n").toUtf8());
-        if (!QTest::qWaitFor([&] { return !menu->isVisible(); })) {
+        if (!QTest::qWaitFor([&] {
+                return !menu->isVisible() && !view.rootObject()->property("launcherOpen").toBool();
+            })) {
             std::cerr << "power_menu again did not close the power menu\n";
             return 1;
         }
@@ -1515,11 +1548,14 @@ int main(int argc, char **argv) {
         }
         controller.clearError();
         // With nothing that may run, the button goes.
+        if (!openLauncher() || !button->isVisible())
+            return fail("the power button was gone before nothing could run");
         subscriber->write("power -\n");
         if (!QTest::qWaitFor([&] { return !button->isVisible(); })) {
             std::cerr << "the power button stayed with nothing to offer\n";
             return 1;
         }
+        view.rootObject()->setProperty("launcherOpen", false);
         subscriber->write("power lock,suspend,reboot,poweroff,logout\n");
     }
     // Notifications: the bell, the cards, their buttons and the history, fed by hand the way the

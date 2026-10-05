@@ -80,7 +80,7 @@ struct ShellWidgets {
     bool profiles = true; // the appearance profile picker, only with two or more profiles
     bool wallpapers = true; // the wallpaper picker
     bool keyboard_layout = true; // the active keyboard layout, only with two or more
-    bool power = true;      // the power menu, only with something in it
+    bool power = true;      // the launcher's power button, only with something in its menu
     bool tray = true;       // the system tray, only while applications show icons in it
 };
 
