@@ -605,7 +605,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         set_tests_properties(dim_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME urgent_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/urgent_smoke.py
-            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(urgent_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME urgent_border_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/urgent_border_smoke.py

@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Windows that ask for attention (xdg-activation) while unfocused: windows.activation decides
 between marking them urgent, focusing them and ignoring the request; `get urgent`, the
-subscription and focus_urgent report and use the marks; focusing clears them; and (with grim) the
-border pulses and holds the urgent color."""
+subscription and focus_urgent report and use the marks; and focusing clears them. The border's
+pulse is urgent_border_smoke's."""
 import os
 from pathlib import Path
 import re
@@ -15,16 +15,13 @@ import time
 import harness
 
 compositor, probe = (str(Path(p).resolve()) for p in sys.argv[1:3])
-grim = sys.argv[3] if len(sys.argv) > 3 else ""
 
 
-def settings(activation, border=0):
+def settings(activation):
     return f"""return {{
     xwayland = false,
     layout = {{ tiling = false }},
-    windows = {{ activation = "{activation}", border_width = {border}, urgent_color = "#ff9e64",
-                 border_color = "#7da8ff", border_inactive_color = "#404a5c" }},
-    bindings = {{ {{ mods = {{ "Alt" }}, key = "u", action = "focus_urgent" }} }},
+    windows = {{ activation = "{activation}" }},
 }}"""
 
 
@@ -88,6 +85,11 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-test-") as directory:
             blocks = self.buffer.split("tiling ")
             return "tiling " + blocks[-1] if len(blocks) > 1 else ""
 
+        def received(self, text):
+            """Whether text has arrived at any point, after reading what is waiting."""
+            self.state()
+            return text in self.buffer
+
     with log.open("w") as output:
         server = subprocess.Popen([compositor, "--headless", "--config", str(config)],
                                   env=env, stdout=output, stderr=output)
@@ -114,8 +116,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-test-") as directory:
                              "the subscription reports the count")
             # The window switcher marks it too.
             msg("switcher")
-            harness.wait_for(lambda: subscriber.state() is not None and "switcher-window" in subscriber.buffer,
-                             processes,
+            harness.wait_for(lambda: subscriber.received("switcher-window"), processes,
                              "the switcher's list")
             listed = {f[0]: f for f in (l[len("switcher-window "):].split("\t")
                                         for l in subscriber.buffer.splitlines()
