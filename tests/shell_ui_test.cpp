@@ -1751,6 +1751,165 @@ int main(int argc, char **argv) {
             std::cerr << "a passive tray item stayed\n";
             return 1;
         }
+        // An item's menu opens on a right press, by the item and inside the grown surface; a
+        // submenu's entries take its place with a way back, and picking an entry closes it.
+        auto menuEntry = [](QVariantMap properties, std::vector<int> children = {}) {
+            TrayMenuEntry entry;
+            entry.properties = std::move(properties);
+            entry.children = std::move(children);
+            entry.read();
+            return entry;
+        };
+        TrayItem withMenu = trayItem("menu", "Active", Qt::cyan);
+        withMenu.menuPath = "/MenuBar";
+        withMenu.menu = {{0, menuEntry({}, {1, 2, 3, 4})},
+                         {1, menuEntry({{"label", "_Open"}})},
+                         {2, menuEntry({{"type", "separator"}})},
+                         {3, menuEntry({{"label", "_More"}}, {31, 32})},
+                         {31, menuEntry({{"label", "_Deep"}, {"toggle-type", "checkmark"}, {"toggle-state", 1}})},
+                         {32, menuEntry({{"label", "Radio"}, {"toggle-type", "radio"}, {"toggle-state", 0}})},
+                         {4, menuEntry({{"label", "Disabled"}, {"enabled", false}})}};
+        trayModel->add(withMenu);
+        auto trayButton = [&](const QString &key) -> QQuickItem * {
+            for (auto *shown : trayButtons())
+                if (shown->property("key").toString() == key)
+                    return shown;
+            return nullptr;
+        };
+        // Laid out after the one already there.
+        if (!QTest::qWaitFor([&] {
+                const auto shown = trayButtons();
+                return shown.size() == 2 && shown[0]->property("key").toString() == "third" &&
+                       shown[1]->property("key").toString() == "menu";
+            })) {
+            std::cerr << "a tray item with a menu did not show after the others\n";
+            return 1;
+        }
+        QSignalSpy opened(trayModel, &TrayModel::menuOpenRequested);
+        QSignalSpy closed(trayModel, &TrayModel::menuCloseRequested);
+        QSignalSpy picked(trayModel, &TrayModel::menuClickRequested);
+        auto *trayMenu = find(view.rootObject(), "trayMenu");
+        auto trayEntries = [&] {
+            QList<QQuickItem *> found;
+            std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
+                for (auto *child : item->childItems()) {
+                    if (child->objectName() == "trayMenuItem" && child->isVisible())
+                        found << child;
+                    walk(child);
+                }
+            };
+            if (trayMenu)
+                walk(trayMenu);
+            std::sort(found.begin(), found.end(), [](QQuickItem *a, QQuickItem *b) {
+                return a->mapToScene({0, 0}).y() < b->mapToScene({0, 0}).y();
+            });
+            return found;
+        };
+        auto trayLabels = [&] {
+            QStringList labels;
+            for (auto *entry : trayEntries())
+                labels << entry->property("text").toString();
+            return labels;
+        };
+        auto trayEntry = [&](const QString &label) -> QQuickItem * {
+            for (auto *entry : trayEntries())
+                if (entry->property("text").toString() == label)
+                    return entry;
+            return nullptr;
+        };
+        auto trayMenuShown = [&] {
+            const QRectF area = trayMenu->mapRectToScene(QRectF(0, 0, trayMenu->width(), trayMenu->height()));
+            return trayMenu->isVisible() && view.height() > controller.panelExtent() && area.top() >= 0 &&
+                   area.bottom() <= view.height();
+        };
+        auto menuOpen = [&] { return view.rootObject()->property("menuOpen").toBool(); };
+        const QPoint menuAt = center(trayButton("menu"));
+        // Held past the long-press time, as with the bar's menus.
+        QTest::mousePress(&view, Qt::RightButton, Qt::NoModifier, menuAt);
+        QTest::qWait(1000);
+        QTest::mouseRelease(&view, Qt::RightButton, Qt::NoModifier, menuAt);
+        if (!trayMenu || !QTest::qWaitFor([&] {
+                return trayMenuShown() && trayLabels() == QStringList{"Open", "More", "Disabled"} &&
+                       opened.size() == 1;
+            }) ||
+            opened[0] != QVariantList{"menu", 0} || context.size() != 1) {
+            std::cerr << "right-clicking a tray item did not open its menu: "
+                      << trayLabels().join("|").toStdString() << '\n';
+            return 1;
+        }
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(trayEntry("Disabled")));
+        QTest::qWait(100);
+        if (!picked.isEmpty() || !trayMenuShown()) {
+            std::cerr << "a disabled tray menu entry could be picked\n";
+            return 1;
+        }
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(trayEntry("More")));
+        if (!QTest::qWaitFor([&] {
+                return trayLabels() == QStringList{"‹ Back", "Deep", "Radio"} && opened.size() == 2 &&
+                       closed.size() == 1;
+            }) ||
+            opened[1] != QVariantList{"menu", 3} || closed[0] != QVariantList{"menu", 0} ||
+            !trayEntry("Deep")->property("modelData").toMap()["checked"].toBool() ||
+            trayEntry("Radio")->property("modelData").toMap()["checked"].toBool()) {
+            std::cerr << "a tray submenu did not open in place: " << trayLabels().join("|").toStdString() << '\n';
+            return 1;
+        }
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(trayEntry("‹ Back")));
+        if (!QTest::qWaitFor([&] { return trayLabels() == QStringList{"Open", "More", "Disabled"} && opened.size() == 3; })) {
+            std::cerr << "going back in a tray menu did not show its top\n";
+            return 1;
+        }
+        // The application changing the menu while it is open shows at once.
+        auto &openEntry = trayModel->find("menu")->menu[1];
+        openEntry.properties["label"] = "_Reopen";
+        openEntry.read();
+        trayModel->menuEdited("menu");
+        if (!QTest::qWaitFor([&] { return trayEntry("Reopen") != nullptr; })) {
+            std::cerr << "a tray menu did not follow its application's change\n";
+            return 1;
+        }
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(trayEntry("Reopen")));
+        if (!QTest::qWaitFor([&] { return picked.size() == 1 && !menuOpen(); }) ||
+            picked[0] != QVariantList{"menu", 1} ||
+            !QTest::qWaitFor([&] { return view.height() == controller.panelExtent() && closed.size() == 3; }) ||
+            closed.last() != QVariantList{"menu", 0}) {
+            std::cerr << "picking a tray menu entry did not reach the item and close the menu\n";
+            return 1;
+        }
+        // An item that is only a menu opens it on a left click; a second press closes it.
+        trayModel->find("menu")->itemIsMenu = true;
+        trayModel->changed("menu", false);
+        QTest::qWait(50);
+        const qsizetype activations = activated.size();
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, menuAt);
+        if (!QTest::qWaitFor([&] { return trayMenuShown(); }) || activated.size() != activations) {
+            std::cerr << "a left click on a tray item that is only a menu did not open it\n";
+            return 1;
+        }
+        // The surface is taller while the menu is open, the bar at its bottom.
+        QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, center(trayButton("menu")));
+        if (!QTest::qWaitFor([&] { return !menuOpen(); })) {
+            std::cerr << "a second right click did not close the tray menu\n";
+            return 1;
+        }
+        // An item that cannot be activated shows its menu after a left click.
+        trayModel->find("menu")->itemIsMenu = false;
+        trayModel->changed("menu", false);
+        QTest::qWait(50);
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, menuAt);
+        if (!QTest::qWaitFor([&] { return activated.size() == activations + 1; }))
+            return 1;
+        Q_EMIT trayModel->activationRefused("menu");
+        if (!QTest::qWaitFor([&] { return trayMenuShown(); })) {
+            std::cerr << "a tray item that refused activation did not show its menu\n";
+            return 1;
+        }
+        // The menu goes with its item.
+        trayModel->remove("menu");
+        if (!QTest::qWaitFor([&] { return !menuOpen() && view.height() == controller.panelExtent(); })) {
+            std::cerr << "a tray menu stayed open after its item went\n";
+            return 1;
+        }
         trayModel->clear();
         if (!QTest::qWaitFor([&] { return !trayRow->isVisible(); })) {
             std::cerr << "the tray stayed with no items\n";

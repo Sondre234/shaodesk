@@ -202,7 +202,9 @@ QVariantList TrayModel::menu(const QString &key, int parent) const {
             continue;
         }
         if (separator)
-            entries << QVariantMap{{"id", -1}, {"separator", true}, {"label", QString()}, {"enabled", false}};
+            entries << QVariantMap{{"id", -1},          {"label", QString()}, {"enabled", false},
+                                   {"separator", true}, {"toggle", QString()}, {"checked", false},
+                                   {"icon", QString()}, {"submenu", false}};
         separator = false;
         const bool hasIcon = !entry.icon.isNull() || !entry.iconName.isEmpty();
         entries << QVariantMap{{"id", id},
