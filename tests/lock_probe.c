@@ -239,7 +239,7 @@ static void append(const char *path, const char *format, ...) {
 
 /* "hold LOG [wait]": locks, appends "locked PID" to LOG, and keeps the lock until SIGTERM; then
  * unlocks and appends "unlocked". With "wait" it first appends "waiting PID" and locks only on
- * SIGUSR1. */
+ * SIGUSR1. It exits when the compositor goes. */
 static int hold(struct probe *probe, const char *log, bool wait) {
     sigset_t signals;
     sigemptyset(&signals);
@@ -247,37 +247,42 @@ static int hold(struct probe *probe, const char *log, bool wait) {
     sigaddset(&signals, SIGINT);
     sigaddset(&signals, SIGUSR1);
     sigprocmask(SIG_BLOCK, &signals, NULL);
-    if (wait) {
-        append(log, "waiting %d", (int)getpid());
-        sigset_t go;
-        sigemptyset(&go);
-        sigaddset(&go, SIGUSR1);
-        int received = 0;
-        if (sigwait(&go, &received) != 0)
-            die("cannot wait for SIGUSR1");
-    }
-    sigdelset(&signals, SIGUSR1);
     int signal_fd = signalfd(-1, &signals, SFD_CLOEXEC);
     if (signal_fd < 0)
         die("cannot watch for signals");
-    struct ext_session_lock_v1 *lock = lock_session(probe);
-    append(log, "locked %d", (int)getpid());
-    for (bool done = false; !done;) {
+    struct ext_session_lock_v1 *lock = NULL;
+    if (wait) {
+        append(log, "waiting %d", (int)getpid());
+    } else {
+        lock = lock_session(probe);
+        append(log, "locked %d", (int)getpid());
+    }
+    for (;;) {
         while (wl_display_prepare_read(probe->display) != 0)
             wl_display_dispatch_pending(probe->display);
         wl_display_flush(probe->display);
         struct pollfd fds[2] = {{wl_display_get_fd(probe->display), POLLIN, 0},
                                 {signal_fd, POLLIN, 0}};
-        if (poll(fds, 2, -1) > 0 && (fds[0].revents & POLLIN)) {
+        if (poll(fds, 2, -1) > 0 && (fds[0].revents & (POLLIN | POLLHUP | POLLERR))) {
             if (wl_display_read_events(probe->display) < 0)
-                die("dispatch failed");
+                die("the compositor went away");
         } else {
             wl_display_cancel_read(probe->display);
         }
         if (wl_display_dispatch_pending(probe->display) < 0)
             die("dispatch failed");
-        done = fds[1].revents & POLLIN;
+        struct signalfd_siginfo info;
+        if (!(fds[1].revents & POLLIN) || read(signal_fd, &info, sizeof(info)) != sizeof(info))
+            continue;
+        if (info.ssi_signo != SIGUSR1)
+            break;
+        if (!lock) {
+            lock = lock_session(probe);
+            append(log, "locked %d", (int)getpid());
+        }
     }
+    if (!lock)
+        return 0;
     ext_session_lock_v1_unlock_and_destroy(lock);
     if (wl_display_roundtrip(probe->display) < 0)
         die("unlock failed");
