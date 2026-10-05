@@ -120,18 +120,20 @@ them in `shell/controller.cpp`.
 - A pure function: a unit test next to the others in `tests/*_tests.c(pp)`, registered with
   `add_executable` and `add_test` in `CMakeLists.txt`.
 - Compositor behavior: a smoke test, `tests/<name>_smoke.py`. Copy a short one such as
-  `sticky_smoke.py`. It starts a headless compositor with the pixman renderer in a temporary
-  `XDG_RUNTIME_DIR`, opens windows with `wayland_probe` (or `x11_probe`), drives it with
-  `shaodesk msg`, and reads the state back with `get` queries. Wait with
-  `harness.wait_for`, never with a fixed sleep; to check that something does not happen,
-  which an animation or a client's commit could do a little later, use `harness.stays`.
-  Register it with `add_test` and a `TIMEOUT`
-  under `SHAODESK_BUILD_COMPOSITOR` in `CMakeLists.txt`. Keep the temporary directory's prefix
-  to 26 characters or fewer: the control socket goes in it, a Unix socket's path is limited to
-  about 107 bytes, and a Gentoo package build runs the tests in a `TMPDIR` of 43 characters or
-  more. Under `--headless`, `shaodesk msg headless_output` and `headless_keyboard` plug in
-  outputs and keyboards (`headless_keyboard key NAME CODE press` types on one; see
-  `keymap_smoke.py`), and `wayland_probe --keymap` prints the keymap an application gets.
+  `sticky_smoke.py`. `with harness.Compositor(compositor, CONFIG) as desktop:` starts a headless
+  compositor with the pixman renderer in a temporary `XDG_RUNTIME_DIR`; open windows with
+  `desktop.spawn([probe, ...])` (`wayland_probe` or `x11_probe`), drive it with `desktop.msg`,
+  and read the state back with `get` queries (`desktop.rows("windows")`). On the way out it ends
+  every client, checks that the compositor exits cleanly, and prints the logs if the test
+  failed. Wait with `desktop.wait_for`, never with a fixed sleep; to check that something does
+  not happen, which an animation or a client's commit could do a little later, use
+  `desktop.stays`. Register it with `add_test` and a `TIMEOUT` under
+  `SHAODESK_BUILD_COMPOSITOR` in `CMakeLists.txt`. A temporary directory's prefix stays at 26
+  characters or fewer: the control socket goes in it, a Unix socket's path is limited to about
+  107 bytes, and a Gentoo package build runs the tests in a `TMPDIR` of 43 characters or more.
+  Under `--headless`, `shaodesk msg headless_output` and `headless_keyboard` plug in outputs and
+  keyboards (`headless_keyboard key NAME CODE press` types on one; see `keymap_smoke.py`), and
+  `wayland_probe --keymap` prints the keymap an application gets.
 
 ## A fast loop
 
