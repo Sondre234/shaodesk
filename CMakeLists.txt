@@ -179,7 +179,13 @@ if(SHAODESK_BUILD_COMPOSITOR)
     target_sources(shaodesk PRIVATE src/overview_scene.c)
     target_include_directories(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_compile_definitions(shaodesk PRIVATE WLR_USE_UNSTABLE)
-    target_compile_definitions(shaodesk PRIVATE SHAODESK_VERSION="${PROJECT_VERSION}")
+    # version.h, for --version: the project version, and `git describe` in a git checkout.
+    add_custom_target(shaodesk_version
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/version.h -DVERSION=${PROJECT_VERSION}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.cmake
+        BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/version.h)
+    add_dependencies(shaodesk shaodesk_version)
     target_compile_options(shaodesk PRIVATE -Wall -Wextra -Wno-unused-parameter)
     # A compositor function shared between files is declared in src/compositor/server.h; any
     # other is static. This flags one that is neither.
@@ -343,6 +349,9 @@ if(SHAODESK_BUILD_COMPOSITOR)
         # Without a personal configuration, shaodesk runs the shipped one.
         set(EMPTY_HOME ${CMAKE_CURRENT_BINARY_DIR}/empty-home)
         file(MAKE_DIRECTORY ${EMPTY_HOME})
+        add_test(NAME version COMMAND shaodesk --version)
+        set_tests_properties(version PROPERTIES
+            PASS_REGULAR_EXPRESSION "^shaodesk ${PROJECT_VERSION}( \\(git [^)]+\\))?\n$")
         add_test(NAME default_config COMMAND shaodesk --check-config)
         set_tests_properties(default_config PROPERTIES
             ENVIRONMENT "HOME=${EMPTY_HOME};XDG_CONFIG_HOME=${EMPTY_HOME};SHAODESK_DEFAULT_CONFIG=${EXAMPLE_CONFIG}"

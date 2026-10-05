@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "shaodesk/config.hpp"
 #include "shaodesk/import.hpp"
+#include "version.h"
 
 #include <cstdio>
 #include <cstdlib>
