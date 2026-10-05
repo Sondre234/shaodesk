@@ -1,14 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Apply outputs.monitors to three headless outputs, then change them on reload."""
-import os
 from pathlib import Path
-import re
 import signal
 import subprocess
 import sys
-import tempfile
 
-from harness import wait_for
+import harness
 
 compositor, probe = (str(Path(p).resolve()) for p in sys.argv[1:3])
 
@@ -40,82 +37,55 @@ THIRD = """return {
                              ["HEADLESS-3"] = { enabled = false } } },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-output-test-") as directory:
-    root = Path(directory)
-    config = root / "init.lua"
-    config.write_text(FIRST)
-    log = root / "compositor.log"
-    env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
-               WLR_HEADLESS_OUTPUTS="3")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
-        env.pop(name, None)
+with harness.Compositor(compositor, FIRST, env={"WLR_HEADLESS_OUTPUTS": "3"}) as desktop:
+    log = desktop.log
 
     def outputs():
-        result = subprocess.run([compositor, "msg", "get", "outputs"], env=env,
-                                capture_output=True, text=True, timeout=30, check=True)
-        rows = [line.split("\t") for line in result.stdout.splitlines()]
         return {row[0]: (row[1] == "1", int(row[2]), int(row[3]), int(row[4]), int(row[5]),
-                         float(row[6]), int(row[7]), row[8]) for row in rows}
+                         float(row[6]), int(row[7]), row[8]) for row in desktop.rows("outputs")}
 
     def advertised():
-        result = subprocess.run([probe, "--globals"], env=env, capture_output=True, text=True,
-                                timeout=30, check=True)
+        result = subprocess.run([probe, "--globals"], env=desktop.env, capture_output=True,
+                                text=True, timeout=30, check=True)
         return result.stdout.split().count("wl_output")
 
     def reload(text, count):
-        config.write_text(text)
-        server.send_signal(signal.SIGHUP)
-        wait_for(lambda: log.read_text().count("Configuration reloaded") == count, [server],
-                 "reload")
+        desktop.config.write_text(text)
+        desktop.server.send_signal(signal.SIGHUP)
+        desktop.wait_for(lambda: log.read_text().count("Configuration reloaded") == count,
+                         "reload")
 
-    with log.open("w") as output:
-        server = subprocess.Popen([compositor, "--headless", "--config", str(config)],
-                                  env=env, stdout=output, stderr=output)
-        try:
-            wait_for(lambda: "Running Wayland compositor" in log.read_text(), [server], "startup")
-            text = log.read_text()
-            env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
-            state = outputs()
-            # 1600x900 at 1.25 is 1280x720 logical; the unpositioned rotated output follows
-            # the rightmost positioned one. The layout shifts right by 1280 so it starts at 0:
-            # X11 windows get no input at negative coordinates.
-            assert state["HEADLESS-1"] == (True, 0, 100, 1280, 720, 1.25, 0,
-                                           "1600x900@60.000"), state
-            assert state["HEADLESS-2"] == (True, 1280, 0, 1920, 1080, 1.0, 0,
-                                           "1920x1080@144.000"), state
-            assert state["HEADLESS-3"] == (True, 3200, 0, 1920, 1080, 1.0, 1,
-                                           "1080x1920@0.000"), state
-            assert advertised() == 3
+    state = outputs()
+    # 1600x900 at 1.25 is 1280x720 logical; the unpositioned rotated output follows
+    # the rightmost positioned one. The layout shifts right by 1280 so it starts at 0:
+    # X11 windows get no input at negative coordinates.
+    assert state["HEADLESS-1"] == (True, 0, 100, 1280, 720, 1.25, 0,
+                                   "1600x900@60.000"), state
+    assert state["HEADLESS-2"] == (True, 1280, 0, 1920, 1080, 1.0, 0,
+                                   "1920x1080@144.000"), state
+    assert state["HEADLESS-3"] == (True, 3200, 0, 1920, 1080, 1.0, 1,
+                                   "1080x1920@0.000"), state
+    assert advertised() == 3
 
-            reload(SECOND, 1)
-            state = outputs()
-            assert state["HEADLESS-2"][0] is False, state
-            # Headless outputs have no modes to fall back to, so HEADLESS-3 keeps its custom
-            # mode; it only loses the rotation.
-            assert state["HEADLESS-3"][:5] == (True, 0, 0, 1080, 1920), state
-            assert state["HEADLESS-1"][:5] == (True, 1080, 0, 1600, 900), state
-            assert state["HEADLESS-1"][5:7] == (1.0, 0), state
-            assert advertised() == 2, "a disabled output is still advertised"
+    reload(SECOND, 1)
+    state = outputs()
+    assert state["HEADLESS-2"][0] is False, state
+    # Headless outputs have no modes to fall back to, so HEADLESS-3 keeps its custom
+    # mode; it only loses the rotation.
+    assert state["HEADLESS-3"][:5] == (True, 0, 0, 1080, 1920), state
+    assert state["HEADLESS-1"][:5] == (True, 1080, 0, 1600, 900), state
+    assert state["HEADLESS-1"][5:7] == (1.0, 0), state
+    assert advertised() == 2, "a disabled output is still advertised"
 
-            reload(THIRD, 2)
-            state = outputs()
-            assert sum(enabled for enabled, *_ in state.values()) == 1, state
-            assert "it is the only output" in log.read_text()
-            assert advertised() == 1
+    reload(THIRD, 2)
+    state = outputs()
+    assert sum(enabled for enabled, *_ in state.values()) == 1, state
+    assert "it is the only output" in log.read_text()
+    assert advertised() == 1
 
-            reload(FIRST, 3)
-            state = outputs()
-            assert all(enabled for enabled, *_ in state.values()), state
-            assert state["HEADLESS-2"][1:3] == (1280, 0), state
-            assert advertised() == 3
-
-            server.send_signal(signal.SIGTERM)
-            assert server.wait(timeout=30) == 0, log.read_text()
-            print("Output modes, scale, transform, positions, and disabling passed")
-        except Exception:
-            print(log.read_text(), file=sys.stderr)
-            raise
-        finally:
-            if server.poll() is None:
-                server.kill()
+    reload(FIRST, 3)
+    state = outputs()
+    assert all(enabled for enabled, *_ in state.values()), state
+    assert state["HEADLESS-2"][1:3] == (1280, 0), state
+    assert advertised() == 3
+print("Output modes, scale, transform, positions, and disabling passed")
