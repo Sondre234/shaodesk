@@ -55,7 +55,7 @@ all. In short:
 | `group.c`, `scratchpad.c`, `swallow.c`, `switcher.c`, `overview.c`, `session.c` | One feature each. |
 | `effects.c` | Dimming, peek, night light, magnifier, hot corners. |
 | `lock.c` | Session lock and idle/sleep inhibitors. |
-| `power.c` | Suspend, hibernate, reboot and power off through logind (`src/login1.c`). |
+| `power.c` | The power actions: suspend, hibernate, reboot and power off through logind (`src/login1.c`), locking first, closing windows first, log out. |
 | `foreign_toplevel.c` | Window lists for taskbars and single-window capture. |
 
 A function used by one file is `static`; one used by several is declared in `server.h` under
