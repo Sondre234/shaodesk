@@ -93,6 +93,13 @@ static struct sh_toplevel *desktop_toplevel_at(struct sh_server *server, double 
     return node && node->kind == SH_NODE_TOPLEVEL ? node->owner : NULL;
 }
 
+/* The window drawn at a point of the layout, or NULL. */
+struct sh_toplevel *toplevel_at(struct sh_server *server, double x, double y) {
+    struct wlr_surface *surface;
+    double sx, sy;
+    return desktop_toplevel_at(server, x, y, &surface, &sx, &sy);
+}
+
 /* Whether a panel (a layer surface above the windows) is under the point. It is no bare
  * desktop: pointing at it or clicking it leaves the focused window focused, so a taskbar on
  * another monitor still sees that window as the active one and a click on it minimizes it. */
