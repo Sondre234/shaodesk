@@ -9,7 +9,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Python syntax check of the test drivers
         run: python3 -m py_compile tests/*.py
       - name: Shellcheck the helper scripts and the session wrapper
@@ -26,7 +26,7 @@ jobs:
             lua wlroots0.20 wayland wayland-protocols libxkbcommon libinput \
             xorg-xwayland libxcb libpulse systemd-libs dbus \
             qt6-base qt6-declarative qt6-wayland layer-shell-qt glib2 grim
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
         run: cmake -S . -B build -G Ninja -DSHAODESK_BUILD_COMPOSITOR=ON -DSHAODESK_INSTALL_SESSION=ON
       - name: Build
