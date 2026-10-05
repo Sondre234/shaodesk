@@ -49,6 +49,11 @@ class FakeAudio : public Audio {
 extern "C" const char *__asan_default_options() { return "detect_leaks=0"; }
 #endif
 
+static int fail(const char *why) {
+    std::cerr << why << '\n';
+    return 1;
+}
+
 int main(int argc, char **argv) {
     // A named screen, as compositor outputs are: the workspace indicator is keyed by it.
     QTemporaryDir screens;
@@ -56,7 +61,7 @@ int main(int argc, char **argv) {
     if (!screens.isValid() || !layout.open(QIODevice::WriteOnly) ||
         layout.write(R"({"screens": [{"name": "TEST-1", "x": 0, "y": 0, "width": 1280,
                          "height": 720, "logicalDpi": 96, "logicalBaseDpi": 96, "dpr": 1}]})") < 0)
-        return 1;
+        return fail("could not write the screens layout");
     layout.close();
     qputenv("QT_QPA_PLATFORM", ("offscreen:configfile=" + layout.fileName()).toLocal8Bit());
     // One installed application, found by its StartupWMClass, and a private pin store. GLib
@@ -66,12 +71,12 @@ int main(int argc, char **argv) {
     if (!desktopFile.open(QIODevice::WriteOnly) ||
         desktopFile.write("[Desktop Entry]\nType=Application\nName=Fake app\nExec=true\n"
                           "StartupWMClass=Fake\n") < 0)
-        return 1;
+        return fail("could not write the fake application");
     desktopFile.close();
     QFile otherFile(screens.filePath("data/applications/shaodesk-test-other.desktop"));
     if (!otherFile.open(QIODevice::WriteOnly) ||
         otherFile.write("[Desktop Entry]\nType=Application\nName=Other app\nExec=true\n") < 0)
-        return 1;
+        return fail("could not write the other application");
     otherFile.close();
     qputenv("XDG_DATA_HOME", screens.filePath("data").toLocal8Bit());
     qputenv("XDG_DATA_DIRS", screens.filePath("none").toLocal8Bit());
@@ -80,10 +85,10 @@ int main(int argc, char **argv) {
     const auto pins = screens.filePath("state/shaodesk/pinned");
     QGuiApplication app(argc, argv);
     if (argc != 2)
-        return 1;
+        return fail("usage: shell_ui_test CMAKE (run by the launcher as CMAKE -E touch FILE)");
     QTemporaryDir directory;
     if (!directory.isValid())
-        return 1;
+        return fail("no temporary directory");
     auto config = directory.filePath("init.lua");
     auto marker = directory.filePath("launched");
     // Two pictures for the wallpaper picker, in two subfolders.
@@ -93,11 +98,11 @@ int main(int argc, char **argv) {
         QImage picture(64, 36, QImage::Format_RGB32);
         picture.fill(Qt::darkCyan);
         if (!picture.save(walls + "/" + name))
-            return 1;
+            return fail("could not save a wallpaper");
     }
     QFile file(config);
     if (!file.open(QIODevice::WriteOnly))
-        return 1;
+        return fail("could not write the configuration");
     // Long Lua strings preserve paths without shell interpolation.
     const auto lua = QString("return {layout={workspace_names={'web','','','mail'}},"
                              "power={countdown=2},"
@@ -187,7 +192,7 @@ int main(int argc, char **argv) {
         });
     });
     if (!compositor.listen(directory.filePath("control.sock")))
-        return 1;
+        return fail("could not listen on the fake control socket");
     qputenv("SHAODESK_SOCKET", compositor.fullServerName().toLocal8Bit());
     ShellController controller(config.toStdString());
     pickProfile = [&controller](const QString &name) {
@@ -209,7 +214,7 @@ int main(int argc, char **argv) {
     }
     view.show();
     if (!QTest::qWaitForWindowExposed(&view))
-        return 1;
+        return fail("the panel never showed");
     // Loader items, Repeater items and the like are found through the item tree rather than as
     // QObject children.
     std::function<QQuickItem *(QQuickItem *, const QString &)> find =
@@ -427,14 +432,14 @@ int main(int argc, char **argv) {
         };
         if (!controller.widgets()["keyboard_layout"].toBool() ||
             !rewrite(QString(lua).replace("shell={", "shell={widgets={keyboard_layout=false},")))
-            return 1;
+            return fail("the keyboard layout widget was off, or the configuration could not be rewritten");
         controller.reload();
         if (!QTest::qWaitFor([&] { return !layout->isVisible(); })) {
             std::cerr << "shell.widgets.keyboard_layout = false did not hide the indicator\n";
             return 1;
         }
         if (!rewrite(lua))
-            return 1;
+            return fail("could not restore the configuration");
         controller.reload();
         if (!QTest::qWaitFor([&] { return layout->isVisible(); })) {
             std::cerr << "the keyboard layout indicator did not come back\n";
@@ -463,7 +468,7 @@ int main(int argc, char **argv) {
             !put("class/power_supply/BAT0/status", "Discharging\n") ||
             !put("class/net/wlan0/device", "") || !put("class/net/wlan0/wireless", "") ||
             !put("class/net/wlan0/operstate", "up\n"))
-            return 1;
+            return fail("could not write the fake sysfs");
         fake.refresh();
         auto *level = find(view.rootObject(), "batteryLevel");
         if (!QTest::qWaitFor([&] { return battery->isVisible() && network->isVisible(); }) ||
@@ -476,7 +481,7 @@ int main(int argc, char **argv) {
         if (!put("class/power_supply/BAT0/capacity", "90\n") ||
             !put("class/power_supply/BAT0/status", "Charging\n") ||
             !put("class/net/wlan0/operstate", "down\n"))
-            return 1;
+            return fail("could not update the fake sysfs");
         fake.refresh();
         if (!QTest::qWaitFor([&] { return level->width() > nearlyEmpty * 5; }) ||
             battery->property("low").toBool() || !network->property("linkDown").toBool()) {
@@ -552,7 +557,7 @@ int main(int argc, char **argv) {
                       QUrl());
     QObject *fakeModel = fakeTasks.create();
     if (!tasks || !fakeModel)
-        return 1;
+        return fail("the task models did not load");
     QQmlEngine::setObjectOwnership(fakeModel, QQmlEngine::CppOwnership);
     view.rootObject()->setProperty("taskSource", QVariant::fromValue(fakeModel));
     // ListModel's methods take JavaScript arguments, so they are reached through the engine.
@@ -573,7 +578,7 @@ int main(int argc, char **argv) {
                    : nullptr;
     };
     if (!(task = listedTask(0)))
-        return 1;
+        return fail("the first task is not listed");
     // A window's title is its own: shown as plain text, never read as markup.
     {
         editTasks("model.append({taskId: 99, title: '<b>bold</b>', appId: 'evil', active: false, "
@@ -674,7 +679,7 @@ int main(int argc, char **argv) {
             return other() && other()->isVisible() &&
                    centre(other()).x() > centre(pinnedTask()).x();
         }))
-        return 1;
+        return fail("the dragged pin did not move past the other task");
     {
         const QPoint from = centre(pinnedTask()), to = centre(other());
         QTest::mousePress(&view, Qt::LeftButton, Qt::NoModifier, from);
@@ -719,7 +724,7 @@ int main(int argc, char **argv) {
     editTasks("model.append({ taskId: 7, title: 'Fake', appId: 'fake', active: false, "
               "minimized: false, urgent: false })");
     if (!(task = listedTask(0)))
-        return 1;
+        return fail("the re-added task is not listed");
     // Empty bar space, right of the only task, opens the bar menu.
     const QPoint empty =
         task->mapToScene(QPointF(task->width() + 40, task->height() / 2)).toPoint();
@@ -903,7 +908,7 @@ int main(int argc, char **argv) {
               "minimized: false, urgent: false })");
     QQuickItem *third = listedTask(2);
     if (!third)
-        return 1;
+        return fail("the third task is not listed");
     auto taskIdAt = [&](int index) {
         QJSValue row;
         QMetaObject::invokeMethod(fakeModel, "get", Q_RETURN_ARG(QJSValue, row),
@@ -1094,7 +1099,7 @@ int main(int argc, char **argv) {
     };
     auto *headset = findNamed(outputs, "audioOutputItem", "Headset");
     if (!headset)
-        return 1;
+        return fail("the headset is not listed among the audio outputs");
     QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(headset));
     if (!QTest::qWaitFor([&] { return !view.rootObject()->property("menuOpen").toBool(); }) ||
         audio.requests != QStringList{"output headset 2"} || audio.output() != "headset") {
@@ -1111,7 +1116,7 @@ int main(int argc, char **argv) {
     QQuickItem *streamSlider = nullptr;
     if (!QTest::qWaitFor(
             [&] { return (streamSlider = findNamed(mixer, "audioStreamSlider", {})); }))
-        return 1;
+        return fail("no stream slider in the mixer");
     // The first application's slider, clicked three quarters along.
     const auto track =
         streamSlider->mapRectToScene(QRectF(0, 0, streamSlider->width(), streamSlider->height()));
@@ -1362,21 +1367,21 @@ int main(int argc, char **argv) {
             return 1;
         }
         if (!ask("reboot") || power->message() != "The computer restarts in 2 seconds.")
-            return 1;
+            return fail("the restart was not asked about");
         QTest::mouseClick(&dialog, Qt::LeftButton, Qt::NoModifier, QPoint(10, 10));
         if (!gaveUp()) {
             std::cerr << "a click beside the dialog did not give up the restart\n";
             return 1;
         }
         if (!ask("logout"))
-            return 1;
+            return fail("the log out was not asked about");
         QTest::mouseClick(&dialog, Qt::LeftButton, Qt::NoModifier, centre(dialogItem("powerCancel")));
         if (!gaveUp()) {
             std::cerr << "Cancel did not give up the log out\n";
             return 1;
         }
         if (!ask("reboot"))
-            return 1;
+            return fail("the restart was not asked about again");
         QTest::mouseClick(&dialog, Qt::LeftButton, Qt::NoModifier, centre(dialogItem("powerConfirm")));
         if (!QTest::qWaitFor([&] { return requests == QStringList{"reboot"}; }) || !gaveUp()) {
             std::cerr << "the restart button did not restart: " << requests.join("|").toStdString()
@@ -1385,7 +1390,7 @@ int main(int argc, char **argv) {
         }
         requests.clear();
         if (!ask("logout"))
-            return 1;
+            return fail("the log out was not asked about again");
         QTest::keyClick(&dialog, Qt::Key_Return);
         if (!QTest::qWaitFor([&] { return requests == QStringList{"logout"}; }) || !gaveUp()) {
             std::cerr << "Enter did not log out\n";
@@ -1393,7 +1398,7 @@ int main(int argc, char **argv) {
         }
         requests.clear();
         if (!ask("poweroff"))
-            return 1;
+            return fail("the power off was not asked about");
         if (!QTest::qWaitFor([&] {
                 return power->countdown() == 1 &&
                        power->message() == "The computer powers off in 1 second.";
@@ -1406,7 +1411,7 @@ int main(int argc, char **argv) {
         }
         // An action that may no longer run is not asked about any more.
         if (!ask("reboot"))
-            return 1;
+            return fail("the restart was not asked about a third time");
         subscriber->write("power lock,suspend,poweroff,logout\n");
         if (!gaveUp() || !requests.contains("poweroff") || requests.size() != 1) {
             std::cerr << "a restart that may no longer run was still asked about\n";
@@ -1423,7 +1428,7 @@ int main(int argc, char **argv) {
                 return found;
             };
             if (!QTest::qWaitFor([&] { return power->available().size() == 5; }))
-                return 1;
+                return fail("the power menu did not list five actions");
             palette->open(output);
             if (!QTest::qWaitFor([&] {
                     return titles().contains("Lock screen") && titles().contains("Suspend") &&
@@ -1469,7 +1474,7 @@ int main(int argc, char **argv) {
         }
         subscriber->write(("power-menu " + output + "\n").toUtf8());
         if (!QTest::qWaitFor([&] { return menu->isVisible() && menu->hasActiveFocus(); }))
-            return 1;
+            return fail("the power menu did not open from the compositor");
         QTest::keyClick(&view, Qt::Key_Down);
         QTest::keyClick(&view, Qt::Key_Down);
         QTest::keyClick(&view, Qt::Key_Up);
@@ -1482,7 +1487,7 @@ int main(int argc, char **argv) {
         // What the compositor refuses, at once or later, shows across the panel.
         powerRefusal = "no screen locker: power.lock_command is not set";
         if (!openMenu())
-            return 1;
+            return fail("the power menu did not open for the refusal");
         QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(item("lock")));
         if (!QTest::qWaitFor([&] {
                 return controller.error() ==
@@ -1922,7 +1927,7 @@ int main(int argc, char **argv) {
         // Escape closes it too.
         QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(trayButton("menu")));
         if (!QTest::qWaitFor([&] { return trayMenuShown(); }))
-            return 1;
+            return fail("the tray menu did not open again");
         QTest::keyClick(&view, Qt::Key_Escape);
         if (!QTest::qWaitFor([&] { return !menuOpen(); })) {
             std::cerr << "Escape did not close the tray menu\n";
@@ -1934,7 +1939,7 @@ int main(int argc, char **argv) {
         QTest::qWait(50);
         QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, menuAt);
         if (!QTest::qWaitFor([&] { return activated.size() == activations + 1; }))
-            return 1;
+            return fail("clicking the tray menu's item did not activate it");
         Q_EMIT trayModel->activationRefused("menu");
         if (!QTest::qWaitFor([&] { return trayMenuShown(); })) {
             std::cerr << "a tray item that refused activation did not show its menu\n";
