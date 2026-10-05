@@ -12,8 +12,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Python syntax check of the test drivers
         run: python3 -m py_compile tests/*.py
-      - name: Shellcheck the helper scripts
-        run: shellcheck -S warning -x tools/*.sh
+      - name: Shellcheck the helper scripts and the session wrapper
+        run: shellcheck -S warning -x tools/*.sh packaging/shaodesk-session
 
   build:
     # wlroots is pinned to the 0.20 series, which Arch ships as its own package.
