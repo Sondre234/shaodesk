@@ -93,10 +93,13 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-border-") as directory:
             subprocess.run([probe, "--activate", "urgent-b"], env=env, check=True, timeout=5,
                            stdout=subprocess.DEVNULL)
             harness.wait_for(lambda: windows()["urgent-b"][1] == "1", processes, "b focused")
-            time.sleep(.4)
-            assert int(windows()["urgent-a"][4]) + 400 < int(windows()["urgent-b"][4]), windows()
-            assert near(edge("urgent-b", False), FOCUSED), edge("urgent-b", False)
-            assert near(edge("urgent-a", False), INACTIVE), edge("urgent-a", False)
+            harness.wait_for(lambda: int(windows()["urgent-a"][4]) + 400 <
+                             int(windows()["urgent-b"][4]) and
+                             near(edge("urgent-b", False), FOCUSED) and
+                             near(edge("urgent-a", False), INACTIVE), processes,
+                             "a left and inactive, b right and focused",
+                             detail=lambda: f"{windows()}, {edge('urgent-a', False)}, "
+                             f"{edge('urgent-b', False)}")
 
             ask(a)
             harness.wait_for(lambda: urgent_count() == 1, processes, "a urgent")
@@ -113,16 +116,16 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-border-") as directory:
             assert all(near(p, URGENT) for p in held), f"urgent color not held: {held}"
             # Focus ends it: the focus color, and the inactive color once focus moves on.
             msg("focus_urgent")
-            time.sleep(.4)
-            assert near(edge("urgent-a", False), FOCUSED), edge("urgent-a", False)
-            assert near(edge("urgent-b", False), INACTIVE), edge("urgent-b", False)
+            harness.wait_for(lambda: near(edge("urgent-a", False), FOCUSED) and
+                             near(edge("urgent-b", False), INACTIVE), processes,
+                             "a focused, b inactive",
+                             detail=lambda: f"{edge('urgent-a', False)}, {edge('urgent-b', False)}")
 
             # Without a border_width the urgent frame sits inside the window's edge, and
             # nothing is drawn once it is over.
             config.write_text(settings(0))
             msg("reload")
             harness.wait_for(lambda: "Configuration reloaded" in log.read_text(), processes, "reload")
-            time.sleep(.3)
             ask(b)
             harness.wait_for(lambda: urgent_count() == 1, processes, "b urgent")
             time.sleep(4.4)
@@ -130,8 +133,8 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-border-") as directory:
             assert near(inside, URGENT), f"inset frame missing: {inside}"
             before = windows()["urgent-b"][4:8]
             msg("focus_urgent")
-            time.sleep(.4)
-            assert not near(edge("urgent-b", True), URGENT), edge("urgent-b", True)
+            harness.wait_for(lambda: not near(edge("urgent-b", True), URGENT), processes,
+                             "the inset frame gone", detail=lambda: edge("urgent-b", True))
             assert windows()["urgent-b"][4:8] == before, "the frame moved the window"
 
             # Animations off: the urgent color at once, no pulse.
@@ -139,10 +142,10 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-border-") as directory:
             msg("reload")
             harness.wait_for(lambda: log.read_text().count("Configuration reloaded") == 2,
                              processes, "second reload")
-            time.sleep(.3)
             ask(a)
             harness.wait_for(lambda: urgent_count() == 1, processes, "a urgent without animations")
-            time.sleep(.2)
+            harness.wait_for(lambda: near(edge("urgent-a", False), URGENT), processes,
+                             "the urgent color", detail=lambda: edge("urgent-a", False))
             for _ in range(5):
                 assert near(edge("urgent-a", False), URGENT), edge("urgent-a", False)
                 time.sleep(.1)
