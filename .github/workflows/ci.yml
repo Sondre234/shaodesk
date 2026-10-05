@@ -25,7 +25,7 @@ jobs:
           pacman -Syu --noconfirm --needed base-devel git cmake ninja pkgconf python \
             lua wlroots0.20 wayland wayland-protocols libxkbcommon libinput \
             xorg-xwayland libxcb libpulse systemd-libs dbus \
-            qt6-base qt6-declarative qt6-wayland layer-shell-qt glib2
+            qt6-base qt6-declarative qt6-wayland layer-shell-qt glib2 grim
       - uses: actions/checkout@v4
       - name: Configure
         run: cmake -S . -B build -G Ninja -DSHAODESK_BUILD_COMPOSITOR=ON -DSHAODESK_INSTALL_SESSION=ON
