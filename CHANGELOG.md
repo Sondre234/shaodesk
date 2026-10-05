@@ -5,6 +5,13 @@ tagged release yet; everything below is on `main`.
 
 ## Unreleased (2026-10-05)
 
+- A system tray: the panel shows applications' status icons (StatusNotifierItem, as KDE and Qt
+  applications, Electron applications and Ayatana's indicators use) beside the bell on every
+  monitor, with their tooltips, attention and overlay icons. Left-click activates an application,
+  right-click opens its menu in the panel's style (submenus, check boxes, radio buttons, icons),
+  and middle-click and the wheel do what the application makes of them. The shell serves the
+  StatusNotifierWatcher, or follows another program's. `shell.widgets.tray = false` hides the tray
+  and leaves the bus names to another program; `-DSHAODESK_TRAY=OFF` builds without it.
 - Power controls. New actions `lock`, `suspend`, `hibernate`, `reboot`, `poweroff`, `logout`
   and `power_menu`, bound to Super + Shift + L (lock) and Super + Escape (the power menu). The
   panel has a power button (`shell.widgets.power`) and the command palette the same entries,

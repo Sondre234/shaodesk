@@ -10,7 +10,7 @@ covers branches, building, testing and committing; [features.md](features.md) de
   questions through a table of callbacks (`struct sh_callbacks` in
   `include/shaodesk/backend.h`). Then it hands over to `sh_run`, the C compositor in
   `src/compositor/`. `shaodesk msg ...` is the same binary acting as a control client.
-- **`shaodesk-shell`** (`shell/`) is the Qt Quick shell: panels, launcher, notifications, OSD,
+- **`shaodesk-shell`** (`shell/`) is the Qt Quick shell: panels, launcher, notifications, tray, OSD,
   and the text of the switcher and overview. It is an ordinary layer-shell client that
   connects to the control socket with `subscribe` and gets state lines and events.
 
