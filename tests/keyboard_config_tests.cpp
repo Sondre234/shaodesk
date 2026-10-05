@@ -33,9 +33,18 @@ static void rules() {
     rejects("return {keyboard={rules='no-such-rules-zz'}}", "keyboard");
 }
 
+// Names XKB has no keymap for are refused with its reason, at the keyboard table.
+static void diagnostics() {
+    rejects("return {\n  layout = { gap = 2 },\n  keyboard = {\n    layout = 'zz-no-such',\n  },\n}",
+            "init.lua:3: XKB has no keymap");
+    rejects("return {keyboard={layout='zz-no-such'}}", "symbols/zz-no-such");
+    rejects("return {keyboard={layout='us',variant='zz-no-such'}}", "zz-no-such");
+}
+
 int main() {
     try {
         rules();
+        diagnostics();
         std::cout << "Keyboard configuration passed\n";
         return 0;
     } catch (const std::exception &error) {

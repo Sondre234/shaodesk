@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -931,6 +932,48 @@ void read_effects(lua_State *L, Config &config) {
     lua_pop(L, 1);
     current_section.clear();
 }
+// Keeps the first error xkbcommon reports, without its message code, in the string that is the
+// context's user data, instead of printing it.
+__attribute__((format(printf, 3, 0))) void keep_xkb_error(xkb_context *context,
+                                                          xkb_log_level level,
+                                                          const char *format, va_list args) {
+    auto *error = static_cast<std::string *>(xkb_context_get_user_data(context));
+    if (!error || !error->empty() || level > XKB_LOG_LEVEL_ERROR)
+        return;
+    char text[512];
+    std::vsnprintf(text, sizeof text, format, args);
+    std::string_view message = text;
+    if (message.starts_with("[XKB-") && message.find("] ") != std::string_view::npos)
+        message.remove_prefix(message.find("] ") + 2);
+    while (!message.empty() && (message.back() == '\n' || message.back() == ' '))
+        message.remove_suffix(1);
+    *error = message;
+}
+// The compositor builds its keymap from these settings, so a configuration it could not build
+// one from is refused here, pointing at the keyboard table.
+void check_keymap(const sh_settings &settings) {
+    current_section = "keyboard";
+    std::string error;
+    std::unique_ptr<xkb_context, decltype(&xkb_context_unref)> context(
+        xkb_context_new(XKB_CONTEXT_NO_FLAGS), xkb_context_unref);
+    if (!context)
+        fail("cannot create XKB context");
+    xkb_context_set_user_data(context.get(), &error);
+    xkb_context_set_log_fn(context.get(), keep_xkb_error);
+    xkb_rule_names names{};
+    names.rules = settings.keyboard_rules;
+    names.layout = settings.keyboard_layout;
+    names.variant = settings.keyboard_variant;
+    names.model = settings.keyboard_model;
+    names.options = settings.keyboard_options;
+    std::unique_ptr<xkb_keymap, decltype(&xkb_keymap_unref)> keymap(
+        xkb_keymap_new_from_names(context.get(), &names, XKB_KEYMAP_COMPILE_NO_FLAGS),
+        xkb_keymap_unref);
+    if (!keymap)
+        fail("XKB has no keymap for this keyboard layout, variant, model, options and rules" +
+             (error.empty() ? "" : ": " + error));
+    current_section.clear();
+}
 void instruction_limit(lua_State *L, lua_Debug *) {
     auto *remaining = static_cast<int *>(lua_getextraspace(L));
     if (--*remaining <= 0)
@@ -1310,21 +1353,7 @@ Config read(lua_State *L, size_t own = SIZE_MAX) {
     current_section.clear();
 
     current_section.clear();
-    std::unique_ptr<xkb_context, decltype(&xkb_context_unref)> context(
-        xkb_context_new(XKB_CONTEXT_NO_FLAGS), xkb_context_unref);
-    if (!context)
-        fail("cannot create XKB context");
-    xkb_rule_names names{};
-    names.rules = config.settings.keyboard_rules;
-    names.layout = config.settings.keyboard_layout;
-    names.variant = config.settings.keyboard_variant;
-    names.model = config.settings.keyboard_model;
-    names.options = config.settings.keyboard_options;
-    std::unique_ptr<xkb_keymap, decltype(&xkb_keymap_unref)> keymap(
-        xkb_keymap_new_from_names(context.get(), &names, XKB_KEYMAP_COMPILE_NO_FLAGS),
-        xkb_keymap_unref);
-    if (!keymap)
-        fail("invalid keyboard layout/options");
+    check_keymap(config.settings);
     return config;
 }
 } // namespace
