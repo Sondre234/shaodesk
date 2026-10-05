@@ -357,3 +357,19 @@ at high scales and with other fonts, a card pointer-hovered on real hardware, an
 timings feel right. Another notification daemon started before the shell keeps the bus name; the
 shell then logs it and hides its bell, which is only checked with a second in-process daemon.
 
+
+## Daily use on Gentoo
+
+Added 2026-10-05. shaodesk is the author's everyday desktop on Gentoo: `--session` started from
+a TTY, installed under a user prefix (`~/.local/shaodesk`) with the shell, running
+`~/.config/shaodesk/init.lua`. The machine is an Intel i9-12900K with an NVIDIA RTX 4090 on the
+proprietary 595.99.02 driver, kernel 6.18, wlroots 0.20.2 and Qt 6.11.2, driving three monitors:
+HDMI-A-1 at 2560×1440 and 144 Hz and DP-3 at 2560×1440 and 200 Hz, both at scale 1.25, and DP-1
+at 1920×1080 and 144 Hz at scale 1 (mixed scales side by side). Problems found in daily use have
+been fixed on `main` as they came up; none are known to be open.
+
+This replaces the earlier note in [gentoo.md](gentoo.md) that the Gentoo build had only run in a
+VM. Daily use is not a targeted test, so the hardware items listed as not checked in the
+sections above stay unconfirmed until someone checks them on purpose: suspend and resume, lid
+close (this machine has none), monitors unplugged or woken through DRM, VT switching on NVIDIA,
+and brightness keys.
