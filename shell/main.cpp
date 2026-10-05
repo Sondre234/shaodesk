@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "controller.hpp"
+#include "version.h"
 #include "view.hpp"
 #include <QCommandLineParser>
 #include <QGuiApplication>
@@ -40,14 +41,22 @@ int main(int argc, char **argv) {
             unsetenv("__GLX_VENDOR_LIBRARY_NAME");
         unsetenv("SHAODESK_GLX_VENDOR");
     }
+    // Answered before Qt connects to a display, so that it works from a text console too.
+    for (int i = 1; i < argc; ++i)
+        if (std::string_view(argv[i]) == "--version" || std::string_view(argv[i]) == "-v") {
+            std::cout << "shaodesk-shell " SHAODESK_VERSION "\n";
+            return 0;
+        }
     QGuiApplication app(argc, argv);
     // Views come and go with outputs (all of them during a VT switch); the shell's lifetime
     // follows the compositor connection instead.
     QGuiApplication::setQuitOnLastWindowClosed(false);
     QCoreApplication::setApplicationName("shaodesk-shell");
+    QCoreApplication::setApplicationVersion(SHAODESK_VERSION);
     QGuiApplication::setDesktopFileName("shaodesk-shell");
     QCommandLineParser parser;
     parser.addHelpOption();
+    parser.addVersionOption();
     parser.addOption({"config", "Lua configuration file", "path"});
     parser.addOption({"preview", "Open a normal window for UI development"});
     parser.addOption({"preview-desktop", "Preview the desktop instead of the taskbar"});
