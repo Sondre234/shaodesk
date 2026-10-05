@@ -27,7 +27,7 @@ static void expect(const std::string &source, const std::string &part) {
 }
 static float red(const float (&color)[4]) { return color[0]; }
 
-int main(int, char **argv) {
+int main() {
     try {
         const std::string profiles = R"(
             shell = { accent = "#111111", panel_height = 40 },
@@ -108,7 +108,6 @@ int main(int, char **argv) {
         require(shaodesk::load_config(extending).profile.empty(),
                 "the default configuration's profile applied to a file with its own profiles");
         std::filesystem::remove_all(directory);
-        (void)argv;
         std::cout << "Profile configuration tests passed\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';
