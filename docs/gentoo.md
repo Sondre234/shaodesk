@@ -1,9 +1,9 @@
 # Running shaodesk on Gentoo
 
-shaodesk is being developed for a personal Gentoo desktop. It currently has a
-working nested compositor and an experimental standalone backend. The physical
-DRM/input session has run on an Arch laptop; the actual Gentoo build has only been
-tested in a VM. There is no dependency on systemd in shaodesk itself.
+shaodesk is developed on, and is the everyday desktop of, a personal Gentoo machine
+(NVIDIA RTX 4090, three monitors; see the
+[daily use checkpoint](verification.md#daily-use-on-gentoo)). It runs nested or as a
+standalone session from a TTY. There is no dependency on systemd in shaodesk itself.
 
 ## Dependencies
 

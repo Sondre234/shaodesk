@@ -16,9 +16,9 @@ taskbar, launcher and notifications, and a Lua configuration that reloads when y
 
 </div>
 
-> **Status:** early development. It runs real applications nested in another Wayland session
-> and, experimentally, as a standalone session from a TTY, but it is not yet a replacement for
-> a full desktop.
+> **Status:** early development. It runs as a standalone session from a TTY, where it is the
+> author's everyday desktop on Gentoo, and nested in another Wayland session. A system tray and
+> power controls are still missing, and it has been used on few machines.
 
 ## Highlights
 
@@ -86,9 +86,10 @@ debug build. Installing honours the usual prefix and `DESTDIR`. Gentoo setup is 
 
 By default shaodesk opens as a window inside the current Wayland session. Other modes:
 
-- `--session` runs it standalone on DRM/libinput from a TTY. This is experimental: it has run
-  on an AMD laptop and on an NVIDIA desktop with three monitors; hotplug is tested only with
-  virtual outputs, and suspend is untested. See [docs/gentoo.md](docs/gentoo.md).
+- `--session` runs it standalone on DRM/libinput from a TTY. It is in daily use on an NVIDIA
+  desktop with three monitors at mixed scales and has run on an AMD laptop; hotplug is tested
+  only with virtual outputs, and suspend is unchecked. See [docs/gentoo.md](docs/gentoo.md) and
+  [docs/verification.md](docs/verification.md).
 - `--headless` runs without any display, for tests.
 
 The shell starts with the compositor unless you pass `--no-shell` or set

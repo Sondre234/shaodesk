@@ -418,7 +418,7 @@ space back to its neighbour.
   change. Holding the keys keeps resizing, at the keyboard's `repeat_delay` and
   `repeat_rate`. `features = { keyboard_resize = false }` turns the actions off.
 
-Not yet: per-workspace on/off, and keeping floating windows above tiles. Windows tiled on a
+Not yet: keeping floating windows above tiles. Windows tiled on a
 monitor that is disabled in the config hands its tiles to the nearest one, where they float if
 that one does not tile. Unplugging a monitor does the same with all its windows (floating ones
 keep their relative place, tiles join the tiling of the nearest monitor, workspace numbers are
