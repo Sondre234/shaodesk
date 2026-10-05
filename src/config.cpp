@@ -989,8 +989,10 @@ void check_keymap(const sh_settings &settings) {
              (error.empty() ? "" : ": " + error));
     if (settings.keyboard_file[0]) {
         const std::string path = settings.keyboard_file;
-        std::unique_ptr<FILE, decltype(&std::fclose)> file(std::fopen(path.c_str(), "rb"),
-                                                           std::fclose);
+        struct Close {
+            void operator()(FILE *file) const { std::fclose(file); }
+        };
+        std::unique_ptr<FILE, Close> file(std::fopen(path.c_str(), "rb"));
         if (!file)
             fail("keyboard.file: cannot read " + path + ": " + std::strerror(errno), "file");
         std::string text;
