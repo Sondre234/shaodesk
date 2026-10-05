@@ -5,6 +5,52 @@ shaodesk is developed on, and is the everyday desktop of, a personal Gentoo mach
 [daily use checkpoint](verification.md#daily-use-on-gentoo)). It runs nested or as a
 standalone session from a TTY. There is no dependency on systemd in shaodesk itself.
 
+It can be installed as a package with the ebuilds in `packaging/gentoo`, or built and
+installed by hand as described after that.
+
+## Installing with the ebuild
+
+`packaging/gentoo` is a small ebuild repository holding `gui-wm/shaodesk`: `shaodesk-9999`
+builds the newest `main` from GitHub, and `shaodesk-0.1.0` the 0.1.0 release. To use it as a
+local repository, as root:
+
+```sh
+cp -r packaging/gentoo /var/db/repos/shaodesk
+mkdir -p /etc/portage/repos.conf
+cat > /etc/portage/repos.conf/shaodesk.conf <<'EOF'
+[shaodesk]
+location = /var/db/repos/shaodesk
+EOF
+echo 'gui-wm/shaodesk LUA_SINGLE_TARGET: lua5-4' >> /etc/portage/package.use/shaodesk
+echo 'gui-wm/shaodesk **' >> /etc/portage/package.accept_keywords/shaodesk
+emerge --ask gui-wm/shaodesk
+```
+
+`**` accepts the live ebuild; accept `~amd64` instead for the release. A release ebuild needs a
+Manifest, which the repository does not carry: create it once with
+`ebuild /var/db/repos/shaodesk/gui-wm/shaodesk/shaodesk-0.1.0.ebuild manifest`, which downloads
+the release. `LUA_SINGLE_TARGET` is needed because the configuration language is Lua 5.4,
+while Gentoo's default Lua target is 5.1.
+
+USE flags:
+
+- `shell` (on by default): `shaodesk-shell`, with Qt 6 and LayerShellQt
+- `notifications` (on): the shell's notification daemon, through Qt's D-Bus module
+- `pulseaudio` (on): the panel's volume control, through libpulse (PipeWire serves it too)
+- `X`: X11 applications through XWayland. shaodesk's X11 support follows wlroots', so this
+  flag sets wlroots' `X` flag to match.
+- `test`: run the test suite (headless, without a GPU) with `FEATURES=test`
+
+The ebuild needs wlroots built with `drm`, `libinput` and `session` (its defaults), installs
+the display-manager session entry, and when it finishes lists the optional programs shaodesk
+uses (a terminal, screenshot tools, portals, a locker, an icon theme). To build with the
+wlroots patches described below, put them in `/etc/portage/patches/gui-libs/wlroots/`,
+re-emerge wlroots, then re-emerge shaodesk so it finds them; for the XWM patch, also turn the
+waker off for shaodesk with a `package.env` file setting
+`MYCMAKEARGS="-DSHAODESK_XWM_WAKER=OFF"`.
+
+The rest of this page describes building by hand.
+
 ## Dependencies
 
 Use the wlroots **0.20** slot, not an arbitrary newer release. Its C API changes
@@ -14,11 +60,14 @@ between release series. Relevant Gentoo packages are:
 - `dev-lang/lua:5.4`
 - `dev-libs/wayland` and `dev-libs/wayland-protocols`
 - `dev-util/wayland-scanner` and `x11-libs/libxkbcommon`
-- `dev-qt/qtbase:6` (with its default `network` USE flag, and `dbus` for the notification
-  daemon), `dev-qt/qtdeclarative:6`, and `dev-qt/qtwayland:6`
+- `dev-qt/qtbase:6` with the `wayland` USE flag (Qt 6.11, the version in the tree, carries
+  the Wayland platform plugin there; older releases had it in `dev-qt/qtwayland:6`), its
+  default `network` flag, and `dbus` for the notification daemon; `dev-qt/qtdeclarative:6`;
+  and `dev-qt/qtsvg:6`, which the icons of most icon themes need
 - `kde-plasma/layer-shell-qt:6` (6.6+) and `dev-libs/glib:2` for the desktop shell
 - Optional: `media-libs/libpulse` for the panel's volume control (PipeWire's
-  `sound-server` USE flag serves it); without it the control is left out
+  `sound-server` USE flag serves it); without it, or with `-DSHAODESK_PULSEAUDIO=OFF`, the
+  control is left out
 - `sys-auth/elogind` (or systemd), whose sd-bus keeps other desktops' idle daemons from
   suspending the machine while shaodesk is on screen
 - `dev-build/cmake`, `dev-build/ninja`, and `virtual/pkgconfig`
@@ -53,14 +102,15 @@ For example, review these with Portage on the Gentoo machine:
 emerge --ask gui-libs/wlroots:0.20 dev-lang/lua:5.4 \
     dev-libs/wayland dev-libs/wayland-protocols dev-util/wayland-scanner \
     x11-libs/libxkbcommon dev-build/cmake dev-build/ninja virtual/pkgconfig \
-    dev-qt/qtbase:6 dev-qt/qtdeclarative:6 dev-qt/qtwayland:6 \
+    dev-qt/qtbase:6 dev-qt/qtdeclarative:6 dev-qt/qtsvg:6 \
     kde-plasma/layer-shell-qt:6 dev-libs/glib:2
 ```
 
 The shell uses Qt Quick Controls' Basic style and Quick Layouts from
 [qtdeclarative](https://packages.gentoo.org/packages/dev-qt/qtdeclarative), the
-[Qt Wayland client platform](https://packages.gentoo.org/packages/dev-qt/qtwayland),
-and [LayerShellQt](https://packages.gentoo.org/packages/kde-plasma/layer-shell-qt).
+Qt Wayland client platform (in [qtbase](https://packages.gentoo.org/packages/dev-qt/qtbase)
+in Qt 6.11, in [qtwayland](https://packages.gentoo.org/packages/dev-qt/qtwayland) in older
+releases), and [LayerShellQt](https://packages.gentoo.org/packages/kde-plasma/layer-shell-qt).
 It does not require running Plasma. Use Qt with OpenGL/Wayland support for normal
 GPU rendering. An installed icon theme supplies application icons; missing icons
 have a built-in fallback. `xdg-open` and a file manager are optional for the Home
@@ -81,9 +131,9 @@ ctest --test-dir build --output-on-failure
 cmake --install build
 ```
 
-Replace `foot` with an installed Wayland terminal. Change the terminal command in
-`config/init.lua` too: the example uses Kitty. The executable uses the installed
-example configuration when no personal config exists. To customize it, create
+Replace `foot` with an installed Wayland terminal. The default configuration starts kitty
+with Super+Q; the README's "First run" shows how to bind another. The executable uses the
+installed example configuration when no personal config exists. To customize it, create
 `~/.config/shaodesk/init.lua` holding `extends = "default"` and your changes (see the
 README); installation never overwrites this personal file. For a custom location use `--config /path/to/init.lua`.
 
