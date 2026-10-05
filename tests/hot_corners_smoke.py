@@ -106,8 +106,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-corner-test-") as directory:
 
             # Reloading without corners turns them off.
             config.write_text("return { xwayland = false, layout = { workspaces = 4 } }")
-            server.send_signal(signal.SIGHUP)
-            time.sleep(0.3)
+            msg("reload")
             move(-5000, -5000)
             move(400, 300)
             move(-5000, -5000)
