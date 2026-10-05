@@ -72,8 +72,6 @@ with harness.Compositor(compositor, CONFIG, bus=True, start=False) as desktop:
     def log():
         return shell_log.read_text()
 
-    desktop.detail = lambda: log()[-800:]
-
     def wait_for(predicate, message, timeout=8):
         desktop.wait_for(predicate, message, timeout=timeout)
 
@@ -116,6 +114,7 @@ with harness.Compositor(compositor, CONFIG, bus=True, start=False) as desktop:
 
     wait_for(outputs, "both outputs")
     panels = desktop.spawn([shell, "--config", str(desktop.config)], log="shell.log")
+    desktop.detail = lambda: log()[-800:]
     wait_for(lambda: "shaodesk tray: serving org.kde.StatusNotifierWatcher" in log(),
              "the shell serving the watcher")
     wait_for(lambda: log().count("shaodesk surface rendered: shaodesk taskbar") >= 2,
