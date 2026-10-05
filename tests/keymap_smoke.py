@@ -25,7 +25,7 @@ KEYMAP = """xkb_keymap {
 """
 # The same with a syntax error on line 5.
 BROKEN = KEYMAP.replace('name[Group1] = "Testish";', "oops")
-SHIFT, CAPS_LOCK, A = 42, 58, 30  # evdev key codes
+SHIFT, CAPS_LOCK = 42, 58  # evdev key codes
 SH_SHIFT, SH_CAPS, SH_ALT = 1, 2, 8  # modifier bits in `get keyboard`
 
 
@@ -179,8 +179,10 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-keymap-test-") as directory:
         assert f"init.lua:3: keyboard.file: {root / 'broken.xkb'}:5:" in log.read_text()
         assert layouts() == [("1", "English (US)")], layouts()
         assert keyboard()[:2] == (["rules"], [("us", "English (US)", True)]), keyboard()
-        key("two", A, "press")
-        key("two", A, "release")
+        key("two", SHIFT, "press")
+        assert keyboard()[2]["two"][3] == SH_SHIFT, keyboard()
+        key("two", SHIFT, "release")
+        assert keyboard()[2]["two"][3] == 0, keyboard()
         stop(server)
 
         # The same at startup.
