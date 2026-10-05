@@ -96,7 +96,7 @@ int main() {
                 windows.push_back({random(1000), random(500), 100 + random(400), 100 + random(300)});
             int w = 100 + random(300), h = 100 + random(250);
             auto spot = place(SH_PLACE_SMART, area, windows, w, h, random(20));
-            require(spot.x >= 0 && spot.y >= 0, "smart left the area");
+            require(inside(spot, area), "smart left the area");
             bool room = false;
             for (int y = 0; y + h <= area.height && !room; y += 4)
                 for (int x = 0; x + w <= area.width && !room; x += 4) {
