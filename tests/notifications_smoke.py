@@ -240,7 +240,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-notify-test-") as directory:
                     wait_for(lambda: count("osd shown") > osd_before, "the do-not-disturb display",
                              timeout=0.5)
                     break
-                except AssertionError:
+                except harness.Timeout:
                     pass
             assert count("osd shown") == osd_before + 1
             quiet = send("Quiet", "--timeout", "0")

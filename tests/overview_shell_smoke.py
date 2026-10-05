@@ -71,7 +71,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-overview-shell-") as directory
                     harness.wait_for(lambda: "shaodesk overview shown" in shell_log.read_text(),
                                      processes, "overlay", timeout=1)
                     return True
-                except AssertionError:
+                except harness.Timeout:
                     msg("overview_cancel")
                     return False
             for _ in range(10):
