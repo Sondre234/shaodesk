@@ -36,3 +36,12 @@ jobs:
         run: ctest --test-dir build --output-on-failure
         env:
           QT_QPA_PLATFORM: offscreen
+      - name: Install
+        # A staged install runs and finds its default configuration.
+        run: |
+          DESTDIR="$PWD/stage" cmake --install build
+          stage/usr/local/bin/shaodesk --version
+          stage/usr/local/bin/shaodesk-shell --version
+          HOME="$(mktemp -d)" XDG_CONFIG_HOME= \
+            SHAODESK_DEFAULT_CONFIG="$PWD/stage/usr/local/share/shaodesk/init.lua" \
+            stage/usr/local/bin/shaodesk --check-config
