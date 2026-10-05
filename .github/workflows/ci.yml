@@ -28,7 +28,7 @@ jobs:
             qt6-base qt6-declarative qt6-wayland layer-shell-qt glib2
       - uses: actions/checkout@v4
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DSHAODESK_BUILD_COMPOSITOR=ON
+        run: cmake -S . -B build -G Ninja -DSHAODESK_BUILD_COMPOSITOR=ON -DSHAODESK_INSTALL_SESSION=ON
       - name: Build
         run: cmake --build build
       - name: Test
@@ -37,7 +37,8 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
       - name: Install
-        # A staged install runs and finds its default configuration.
+        # A staged install runs and finds its default configuration, and its session entry
+        # starts shaodesk (a stand-in here) through shaodesk-session, on a bus of its own.
         run: |
           DESTDIR="$PWD/stage" cmake --install build
           stage/usr/local/bin/shaodesk --version
@@ -45,3 +46,11 @@ jobs:
           HOME="$(mktemp -d)" XDG_CONFIG_HOME= \
             SHAODESK_DEFAULT_CONFIG="$PWD/stage/usr/local/share/shaodesk/init.lua" \
             stage/usr/local/bin/shaodesk --check-config
+          grep -x "Exec=/usr/local/bin/shaodesk-session" \
+            stage/usr/local/share/wayland-sessions/shaodesk.desktop
+          fake="$(mktemp -d)" state="$(mktemp -d)"
+          printf '#!/bin/sh\necho "shaodesk $* bus=$DBUS_SESSION_BUS_ADDRESS"\n' > "$fake/shaodesk"
+          chmod +x "$fake/shaodesk"
+          PATH="$fake:$PATH" XDG_STATE_HOME="$state" DBUS_SESSION_BUS_ADDRESS= \
+            stage/usr/local/bin/shaodesk-session --config init.lua
+          grep "^shaodesk --session --config init.lua bus=unix:" "$state/shaodesk/session.log"
