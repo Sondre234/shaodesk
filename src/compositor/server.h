@@ -17,6 +17,7 @@
 #include "shaodesk/overview_scene.h"
 #include "shaodesk/tabs.h"
 #include "shaodesk/sleep.h"
+#include "shaodesk/login1.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -201,6 +202,35 @@ struct sh_overview {
     bool in_corner;   /* the pointer is in the hot corner: it opens the overview on entering */
 };
 
+/* The power actions and what logind allows of them (power.c). One runs at a time, in steps. */
+enum sh_power_step {
+    SH_POWER_IDLE,
+    SH_POWER_CLOSING, /* windows close before power off, reboot or log out */
+    SH_POWER_LEAVING, /* their applications finish before the session ends */
+    SH_POWER_LOCKING, /* the screen locks before suspend or hibernate */
+    SH_POWER_CALLING, /* logind has been asked and has not answered yet */
+};
+struct sh_power {
+    bool system_bus;          /* logind may be reached on the system bus (not --headless) */
+    struct sh_login1 *login1; /* NULL while logind is out of reach */
+    struct wl_event_source *bus, *bus_timer;
+    struct wl_event_source *timer; /* how long a step may take */
+    char answers[SH_LOGIN1_METHODS][16]; /* logind's Can* answers; "" until it gives one */
+    enum sh_power_step step;
+    enum sh_action action; /* the one under way, while step is not idle */
+    /* A logind delay inhibitor holding off sleep until the screen is locked (-1 for none), one
+     * being asked for, and whether logind has said the machine is about to sleep. */
+    int sleep_delay;
+    bool inhibiting, before_sleep;
+    int64_t locker_started; /* when a locker started for a sleep, until the lock holds (ms) */
+    /* The Wayland clients whose windows closed to log out, until they disconnect. */
+    struct sh_power_client {
+        struct sh_server *server;
+        struct wl_client *client; /* NULL for a free slot */
+        struct wl_listener destroy;
+    } clients[64];
+};
+
 struct sh_server {
     const struct sh_callbacks *callbacks;
     bool running;
@@ -323,6 +353,7 @@ struct sh_server {
     struct wl_listener session_active;
     int sleep_inhibitor; // logind inhibitor fd while this VT is in front, else -1
 #endif
+    struct sh_power power;
     struct wlr_renderer *renderer;
     struct wlr_allocator *allocator;
     struct wlr_scene *scene;
@@ -805,6 +836,22 @@ struct sh_rect floating_area(struct sh_server *server, struct wlr_output *output
 void unarrange_in_place(struct sh_toplevel *toplevel);
 void move_window(struct sh_server *server, enum sh_action action);
 void resize_window(struct sh_server *server, enum sh_action action, int amount);
+
+/* power.c */
+void power_init(struct sh_server *server);
+void power_finish(struct sh_server *server);
+void power_reload(struct sh_server *server);
+void power_locked(struct sh_server *server);
+void power_window_closed(struct sh_server *server);
+bool power_action(enum sh_action action);
+bool power_start(struct sh_server *server, enum sh_action action, char *error,
+                 size_t error_size);
+void power_run(struct sh_server *server, enum sh_action action);
+const char *power_action_name(enum sh_action action);
+bool power_describe(struct sh_server *server, size_t index, const char **name,
+                    const char **status);
+const char *power_pending(struct sh_server *server, char *text, size_t size);
+void power_available(struct sh_server *server, char *list, size_t size);
 
 /* query.c */
 bool run_query(struct sh_server *server, int fd, const char *request);

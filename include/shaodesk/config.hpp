@@ -80,6 +80,7 @@ struct ShellWidgets {
     bool profiles = true; // the appearance profile picker, only with two or more profiles
     bool wallpapers = true; // the wallpaper picker
     bool keyboard_layout = true; // the active keyboard layout, only with two or more
+    bool power = true;      // the power menu, only with something in it
 };
 
 struct ShellConfig {
@@ -106,6 +107,15 @@ struct ScreenshotConfig {
     std::string directory; // absolute or "~/..."; empty: $XDG_PICTURES_DIR/Screenshots
     bool clipboard = true; // also copy the image with wl-copy
     bool notify = true;    // announce the file with notify-send, when it is installed
+};
+
+// Lua `power`.
+struct PowerConfig {
+    // The screen locker the `lock` action starts; empty for none.
+    Command lock_command{"swaylock", "-f"};
+    // Seconds the shell's confirmation of power off, reboot and log out counts down before it
+    // goes ahead; 0 waits for a click.
+    int countdown = 10;
 };
 
 // Where the notification cards and the on-screen display sit on the focused monitor.
@@ -234,7 +244,11 @@ struct Config {
                          .magnet_bypass = SH_SHIFT,
                          .magnet_guide_color = {0.49F * 0.7F, 0.66F * 0.7F, 0.7F, 0.7F},
                          .placement = SH_PLACE_CASCADE,
-                         .drag_strip = 6};
+                         .drag_strip = 6,
+                         .lock_before_sleep = true,
+                         .close_windows = true,
+                         .close_timeout = 5000,
+                         .close_force = false};
     // layout.workspace_names: the label of workspace N is names[N - 1]; "" or past the end: none.
     std::vector<std::string> workspace_names;
     // hot_corners: what each corner runs, as a control request; "" for nothing.
@@ -245,6 +259,7 @@ struct Config {
     NotificationsConfig notifications;
     OsdConfig osd;
     ScreenshotConfig screenshots;
+    PowerConfig power;
     float opacity = 1, inactive_opacity = 1;
     std::vector<WindowRule> window_rules;
     // GTK's button layout for client-decorated windows (Firefox's tab strip); empty: GTK's own.

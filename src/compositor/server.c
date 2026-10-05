@@ -100,6 +100,7 @@ void reload_config(struct sh_server *server) {
     // Gaps, borders, and opacity may have changed.
     wl_list_for_each(toplevel, &server->toplevels, link) refresh_frame(toplevel);
     wl_list_for_each(output, &server->outputs, link) reflow_output(server, output->wlr_output);
+    power_reload(server);
 }
 
 static int terminate_signal(int signal_number, void *data) {
@@ -147,7 +148,8 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     if (mode == SH_BACKEND_HEADLESS)
         setenv("WLR_HEADLESS_OUTPUTS", "1", 0); // tests may ask for more
 
-    struct sh_server server = {.callbacks = callbacks, .config_generation = 1};
+    struct sh_server server = {
+        .callbacks = callbacks, .config_generation = 1, .power.sleep_delay = -1};
     wl_list_init(&server.subscribers);
     server.tiling = sh_tiling_create();
     if (!server.tiling)
@@ -416,6 +418,8 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     (void)compositor;
 #endif
     night_light_update(&server);
+    server.power.system_bus = mode != SH_BACKEND_HEADLESS;
+    power_init(&server);
     server.running = true;
     callbacks->startup(callbacks->userdata);
 
@@ -437,6 +441,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
         wlr_xwayland_destroy(server.xwayland);
     }
 #endif
+    power_finish(&server);
     close_control_socket(&server);
     destroy_headless_keyboards(&server);
     wl_display_destroy_clients(server.wl_display);

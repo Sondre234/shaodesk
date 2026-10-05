@@ -329,6 +329,17 @@ static void control_handle(struct sh_server *server, int fd, const char *request
         control_reply(fd, reply);
         return;
     }
+    if (power_action(action)) {
+        // The caller hears why it cannot start, such as logind not allowing it.
+        if (!power_start(server, action, error, sizeof(error))) {
+            char reply[300];
+            snprintf(reply, sizeof(reply), "error: %s\n", error);
+            control_reply(fd, reply);
+            return;
+        }
+        control_reply(fd, "ok\n");
+        return;
+    }
     server->target_output = target;
     run_action(server, action, argument);
     server->target_output = NULL;
@@ -361,7 +372,7 @@ static void drop_partial_utf8(char *text) {
 /* The state subscribers get: "tiling on|off", "workspace N" and "focused NAME" for the focused
  * output, and "output NAME N USED TILING" for each output, with its current workspace, those
  * holding windows ("1,3", or "-"), and whether it tiles ("on" or "off"); then the urgent
- * windows and the keyboard layout, as described below. */
+ * windows, the keyboard layout, as described below, and the power actions that may run. */
 static void describe_state(struct sh_server *server, char *state, size_t size) {
     struct wlr_output *focused = focused_output(server);
     size_t length = snprintf(state, size, "tiling %s\nworkspace %d\nfocused %s\n",
@@ -439,8 +450,15 @@ static void describe_state(struct sh_server *server, char *state, size_t size) {
         drop_partial_utf8(name);
         for (char *c = name; *c; ++c)
             *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
-        snprintf(state + length, size - length, "keyboard-layout %u %u %s %s\n",
-                 server->keyboard_layout + 1, xkb_keymap_num_layouts(server->keymap), code, name);
+        length += snprintf(state + length, size - length, "keyboard-layout %u %u %s %s\n",
+                           server->keyboard_layout + 1, xkb_keymap_num_layouts(server->keymap), code,
+                           name);
+    }
+    // "power ACTIONS": the power actions that may run, as "lock,suspend,poweroff", or "-".
+    if (length < size) {
+        char actions[128];
+        power_available(server, actions, sizeof(actions));
+        snprintf(state + length, size - length, "power %s\n", actions);
     }
 }
 
@@ -475,8 +493,8 @@ void send_event(struct sh_server *server, const char *text, size_t length) {
     }
 }
 
-/* Asks the shell to open something (`what`: "launcher" or "palette") on the output under the
- * pointer. */
+/* Asks the shell to open something (`what`: "launcher", "palette", "notifications" or
+ * "power-menu") on the output under the pointer. */
 void request_shell(struct sh_server *server, const char *what) {
     struct wlr_output *output =
         wlr_output_layout_output_at(server->output_layout, server->cursor->x, server->cursor->y);

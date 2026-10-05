@@ -392,6 +392,20 @@ static void get_keyboard(struct sh_server *server, int fd, const char *arguments
     }
 }
 
+static void get_power(struct sh_server *server, int fd, const char *arguments) {
+    // Each power action and whether it may run (see power_describe), then "pending" and the
+    // action under way with its step, or "-".
+    control_reply(fd, "ok\n");
+    char line[128], pending[64];
+    const char *name, *status;
+    for (size_t i = 0; power_describe(server, i, &name, &status); ++i) {
+        snprintf(line, sizeof(line), "%s\t%s\n", name, status);
+        control_reply(fd, line);
+    }
+    snprintf(line, sizeof(line), "pending\t%s\n", power_pending(server, pending, sizeof(pending)));
+    control_reply(fd, line);
+}
+
 /* The queries, "get NAME" (or "get NAME ARGUMENTS" for one that takes them), which answer
  * even while the session is locked. A handler gets NULL for no arguments. */
 static const struct {
@@ -420,6 +434,7 @@ static const struct {
     {"overview", get_overview, false},
     {"layers", get_layers, false},
     {"keyboard", get_keyboard, false},
+    {"power", get_power, false},
 };
 
 /* Answers `request` if it is a query; false if it is not one. */

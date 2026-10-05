@@ -380,6 +380,10 @@ static const struct zwlr_layer_surface_v1_listener panel_listener = {.configure 
                                                                      .closed = panel_closed};
 static void surface_configure(void *data, struct xdg_surface *surface, uint32_t serial) {
     struct probe *probe = data;
+    // Closing, the window has unmapped: a configure sent before the compositor saw that (focus
+    // moving to it as other windows close) is no longer one to acknowledge.
+    if (probe->done)
+        return;
     xdg_surface_ack_configure(surface, serial);
     if (probe->width < 1 || probe->height < 1 || probe->width > 8192 || probe->height > 8192)
         die("unexpected configure dimensions");
@@ -409,6 +413,12 @@ static void toplevel_configure(void *data, struct xdg_toplevel *toplevel, int32_
 }
 static void toplevel_close(void *data, struct xdg_toplevel *toplevel) {
     struct probe *probe = data;
+    // SHAODESK_PROBE_REFUSE_CLOSE stays open, as an application asking whether to save would.
+    if (getenv("SHAODESK_PROBE_REFUSE_CLOSE")) {
+        puts("close refused");
+        fflush(stdout);
+        return;
+    }
     if (!probe->external_control && probe->stage != 5)
         die("unexpected close request");
     puts("taskbar minimize, restore, activate, and close passed");

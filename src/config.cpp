@@ -320,7 +320,8 @@ void read_shell(lua_State *L, ShellConfig &shell) {
                                    {"tiling", &shell.widgets.tiling},
                                    {"profiles", &shell.widgets.profiles},
                                    {"wallpapers", &shell.widgets.wallpapers},
-                                   {"keyboard_layout", &shell.widgets.keyboard_layout}})
+                                   {"keyboard_layout", &shell.widgets.keyboard_layout},
+                                   {"power", &shell.widgets.power}})
             boolean(L, key, (std::string("shell.widgets.") + key).c_str(), *target);
     }
     lua_pop(L, 1);
@@ -1271,6 +1272,32 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
     }
     lua_pop(L, 1);
     current_section.clear();
+    if (section(L, "power")) {
+        lua_getfield(L, -1, "lock_command");
+        if (!lua_isnil(L, -1)) {
+            // A program and its arguments, or {} for no locker.
+            auto size = array_size(L, -1, 64);
+            Command locker;
+            for (size_t i = 1; i <= size; ++i) {
+                lua_rawgeti(L, -1, static_cast<lua_Integer>(i));
+                locker.push_back(string(L, -1, "power.lock_command argument"));
+                lua_pop(L, 1);
+            }
+            if (!locker.empty() && locker.front().empty())
+                fail("power.lock_command's program is empty", "lock_command");
+            config.power.lock_command = std::move(locker);
+        }
+        lua_pop(L, 1);
+        boolean(L, "lock_before_sleep", "power.lock_before_sleep",
+                config.settings.lock_before_sleep);
+        boolean(L, "close_windows", "power.close_windows", config.settings.close_windows);
+        config.settings.close_timeout =
+            integer(L, "close_timeout", config.settings.close_timeout, 500, 60000);
+        boolean(L, "force", "power.force", config.settings.close_force);
+        config.power.countdown = integer(L, "countdown", config.power.countdown, 0, 300);
+    }
+    lua_pop(L, 1);
+    current_section.clear();
     lua_getfield(L, -1, "bindings");
     current_section = "bindings";
     if (!lua_isnil(L, -1)) {
@@ -1478,6 +1505,13 @@ constexpr std::pair<std::string_view, sh_action> action_table[] = {
         {"dnd_on", SH_DND_ON},
         {"dnd_off", SH_DND_OFF},
         {"notification_history", SH_NOTIFICATION_HISTORY},
+        {"poweroff", SH_POWER_OFF},
+        {"reboot", SH_REBOOT},
+        {"suspend", SH_SUSPEND},
+        {"hibernate", SH_HIBERNATE},
+        {"logout", SH_LOGOUT},
+        {"lock", SH_LOCK},
+        {"power_menu", SH_POWER_MENU},
         {"scroll_left", SH_SCROLL_LEFT},
         {"scroll_right", SH_SCROLL_RIGHT},
         {"column_widen", SH_COLUMN_WIDEN},

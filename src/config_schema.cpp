@@ -451,6 +451,31 @@ const Option options[] = {
     {"osd.brightness", "boolean", "true", "true", none, none,
      "Show it when a backlight's brightness changes."},
 
+    {"power", "table", "", "", none, none,
+     "Power controls: the `lock`, `suspend`, `hibernate`, `reboot`, `poweroff` and `logout` "
+     "actions. All but `lock` and `logout` go through logind (systemd-logind or elogind)."},
+    {"power.lock_command", "list of strings", "{ \"swaylock\", \"-f\" }", "{ \"gtklock\" }", none,
+     none,
+     "The screen locker `lock` starts, an `ext-session-lock-v1` client, as a program and its "
+     "arguments; `{}` for none. Locking is offered only while the program is installed."},
+    {"power.lock_before_sleep", "boolean", "true", "true", none, none,
+     "Lock the screen with `lock_command` before the machine sleeps, whether `suspend`, "
+     "`hibernate`, the lid or an idle daemon sends it to sleep, and hold the sleep until the "
+     "lock holds."},
+    {"power.close_windows", "boolean", "true", "true", none, none,
+     "`poweroff`, `reboot` and `logout` first ask every window to close, as its close button "
+     "would, and go ahead once all have, so that applications save their state."},
+    {"power.close_timeout", "integer", "5000", "5000", 500, 60000,
+     "Milliseconds the windows get to close. One still open then (an application asking "
+     "whether to save) cancels the power off, unless `force` is set; answering it in time lets "
+     "the power off go on."},
+    {"power.countdown", "integer", "10", "10", 0, 300,
+     "Seconds the shell's confirmation of power off, restart and log out counts down before "
+     "it goes ahead (Escape, Cancel or a click beside it gives up); 0 waits for a click."},
+    {"power.force", "boolean", "false", "false", none, none,
+     "Go ahead with the power off, reboot or log out even when windows are still open after "
+     "`close_timeout`; their applications are then ended without saving."},
+
     {"startup", "list of commands", "unset", "", none, none,
      "Commands started once when the compositor starts (not on reload), at most 32; each is "
      "an argument list, e.g. `{ { \"kitty\" } }`."},
@@ -514,6 +539,9 @@ const Option options[] = {
     {"shell.widgets.keyboard_layout", "boolean", "true", "true", none, none,
      "The active keyboard layout's short name, such as `us`; clicking it switches to the next. "
      "Shown only when the keymap has two or more layouts."},
+    {"shell.widgets.power", "boolean", "true", "true", none, none,
+     "The power menu: lock, suspend, hibernate, restart, power off and log out, as far as "
+     "`power.lock_command` and logind allow them."},
     {"shell.launchers", "list of tables", "unset", "", none, none,
      "Pinned commands for programs without a desktop file, at most 64."},
     {"shell.launchers[].name", "string", "", "", none, none, "Label, 1 to 128 bytes. Required."},

@@ -17,6 +17,7 @@ void send_locked_if_presented(struct sh_server *server) {
     }
     lock->locked_sent = true;
     wlr_session_lock_v1_send_locked(lock->lock);
+    power_locked(server);
 }
 
 void lock_output_presented(struct sh_output *output) {

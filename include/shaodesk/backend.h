@@ -155,6 +155,15 @@ enum sh_action {
     SH_DND_ON,
     SH_DND_OFF,
     SH_NOTIFICATION_HISTORY,
+    /* Power, through logind (systemd-logind or elogind); logout ends the session as quit does. */
+    SH_POWER_OFF,
+    SH_REBOOT,
+    SH_SUSPEND,
+    SH_HIBERNATE,
+    SH_LOGOUT,
+    SH_LOCK, /* starts power.lock_command */
+    /* Asks the shell for its power menu on the output under the pointer. */
+    SH_POWER_MENU,
 };
 
 enum sh_screenshot_mode {
@@ -325,6 +334,15 @@ struct sh_settings {
     /* windows.drag_strip: how many pixels along the top of a window without a title bar move
      * it when dragged. */
     int drag_strip;
+    /* power.lock_before_sleep: the screen locks with power.lock_command before the machine
+     * sleeps. */
+    bool lock_before_sleep;
+    /* power.close_windows: poweroff, reboot and logout ask every window to close first, and go
+     * ahead once all have; after close_timeout milliseconds with some still open they give up,
+     * or with close_force go ahead anyway. */
+    bool close_windows;
+    int close_timeout;
+    bool close_force;
 };
 
 /* What a mouse button was pressed over. */
@@ -387,6 +405,10 @@ struct sh_callbacks {
     /* Reads what is pending on that descriptor; true when a configuration file changed and the
      * configuration should be reloaded. */
     bool (*config_changed)(void *);
+    /* Whether power.lock_command can lock the screen: one is set and its program is installed
+     * (as of the configuration's last load). With `start`, also starts it. False, with the
+     * reason, when it cannot. */
+    bool (*lock)(void *, bool start, char *error, size_t error_size);
 };
 
 enum sh_backend_mode { SH_BACKEND_NESTED, SH_BACKEND_HEADLESS, SH_BACKEND_SESSION };

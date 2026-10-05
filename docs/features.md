@@ -34,8 +34,8 @@ clock, and clicking it switches every keyboard to the next. Clicking the clock o
 month calendar (previous and next month buttons; the title returns to today). Each widget is
 switched off from Lua: `shell = { widgets = { battery = false, calendar = false } }`, with
 `workspaces`, `battery`, `network`, `volume`, `clock`, `calendar` (the clock stays, the
-calendar goes), `tiling`, `profiles` (the appearance profile picker) and `keyboard_layout` all
-on by default. All of them take the panel's `accent`,
+calendar goes), `tiling`, `profiles` (the appearance profile picker), `keyboard_layout` and
+`power` (the [power menu](#power)) all on by default. All of them take the panel's `accent`,
 `panel_color`, `text_color`, `font` and `font_size`. In a nested
 session, applications that reuse an existing process or D-Bus service can open
 in the host session instead.
@@ -298,7 +298,8 @@ it opens and changes.
 `palette` (Super + P, or `shaodesk msg palette`) opens a search box in the shell, on the monitor
 under the pointer, that reaches everything from one place: open windows, installed applications,
 workspaces (switching to one, or moving the focused window there), compositor actions such as
-`layout_monocle` or `group_toggle`, and saved sessions (restore, restore and launch what is
+`layout_monocle` or `group_toggle`, the [power actions](#power) that may run (Restart, Power off
+and Log out asking first, as from the panel), and saved sessions (restore, restore and launch what is
 missing, and save the current arrangement under the name typed). Type to narrow the list; each
 word must match, in any order, as letters in sequence of the title or its small print, favouring
 runs of letters and word starts (`gc` finds Google Chrome, `lay mon` finds Layout: monocle).
@@ -879,6 +880,9 @@ visible, scratchpad (a window hidden there is also minimized), sticky, and its w
 (a number; 0 for none). `shaodesk msg get pid_at X Y` prints the process ID of the window
 drawn at that layout point, or nothing over bare desktop. `shaodesk msg get layers` prints one line per panel or other layer-shell surface:
 namespace, output, layer (0 background to 3 overlay), and whether it is shown.
+`shaodesk msg get power` prints one line per power action logind carries out (`poweroff`,
+`reboot`, `suspend`, `hibernate`) with its answer: `yes`, `no`, `challenge` (after a password),
+`na`, `unknown` until it has answered, or `unavailable` without logind.
 `shaodesk msg get animations` prints the number of running animations and of window trees in
 the scene (closing windows count until their animation ends), and of focus fades, mainly
 for tests. A client
@@ -890,13 +894,18 @@ change, plus `launcher OUTPUT` when the `launcher` action
 (Super + R) asks the panel on that monitor to open or close its application menu; the panel uses this. The window switcher sends `switcher OUTPUT SELECTED COUNT` followed by
 COUNT lines `switcher-window APP_ID TITLE OUTPUT WORKSPACE MINIMIZED URGENT` (tab-separated) when it
 opens or a listed window closes, `switcher-select N` as the selection moves (both counting
-from 0), and `switcher-close`. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
+from 0), and `switcher-close`. The state ends with `power ACTIONS`, the power actions that may
+run (`lock,suspend,reboot,poweroff,logout`, in the order menus list them, or `-`), a power
+action that fails or is cancelled after it was accepted sends `power-error MESSAGE`, and
+`power_menu` sends `power-menu OUTPUT`. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
 refused while the session is locked.
 
 ## Screen locking and idle
 
 Screen locking uses the standard `ext-session-lock-v1` protocol, so lockers such
-as swaylock or gtklock work; bind one with a `spawn` action. The desktop is covered
+as swaylock or gtklock work; the `lock` action starts the one `power.lock_command` names
+(`{ "swaylock", "-f" }` unless set; `{}` for none), and is refused while that program is not
+installed. The desktop is covered
 before the locker draws, only the locker receives input, and if it crashes the
 session stays locked until a new locker takes over. Idle notification and idle
 inhibition (`ext-idle-notify-v1`, `idle-inhibit-unstable-v1`) let swayidle lock
@@ -904,6 +913,54 @@ or blank after inactivity while video players keep the session awake. While a st
 session is on screen it holds a logind sleep inhibitor, so an idle daemon left running by
 another desktop on a different VT cannot suspend the machine; switching VTs away releases it.
 This needs sd-bus from libsystemd, libelogind, or basu at build time.
+
+## Power
+
+The panel's power button opens a menu of what may run now: Lock screen (with a locker
+installed), Suspend, Hibernate, Restart, Power off (as logind allows them) and Log out; the
+button is left out when nothing may. Its entries, and what is refused, come from the
+compositor, which also reports across the panel an action that fails or is cancelled later.
+Restart, Power off and Log out ask first: a dialog in the middle of the monitor counts down
+`power.countdown` seconds (10; 0 waits for a click) and then goes ahead, as do its button and
+Enter, while Escape, Cancel or a click beside it gives up. The actions themselves, bound to keys
+or sent with `shaodesk msg`, do not ask. The `power_menu` action opens the menu on the monitor
+under the pointer with the keyboard in it: Up and Down choose, Enter runs, Escape closes.
+
+The `suspend`, `hibernate`, `poweroff` and `reboot` actions ask logind (systemd-logind or
+elogind, on the system bus) to suspend, hibernate, power off or restart the machine, letting it
+ask for a password when its policy wants one. An action logind does not allow on this machine
+(`CanHibernate` answering `no` or `na`, say, without swap to hibernate to) is
+refused with that reason; one it turns down later, such as a password not given, is reported
+across the panel. `shaodesk msg get power` shows what logind allows. This needs sd-bus from
+libsystemd, libelogind, or basu at build time. A headless compositor (`--headless`, as the
+tests run it) never uses the machine's logind: only one on the bus that `SHAODESK_LOGIN1_BUS`
+names. `logout` ends the session, as `quit` does, and needs no logind.
+
+`poweroff`, `reboot` and `logout` first ask every window to close, as its close button would,
+so that applications save their state, and go ahead once the last has gone (a log out also
+waits for those applications to disconnect, so one saving as it quits is not cut off). A
+window still open after `power.close_timeout` milliseconds (5000), typically an application
+asking whether to save, cancels the action and stays on screen with the reason across the
+panel; answering it in time lets the action go on. `power.force = true` goes ahead after the
+timeout anyway, ending such applications without saving, and `power.close_windows = false`
+skips the closing.
+
+`suspend` and `hibernate` first lock the screen with `power.lock_command` and ask logind only
+once the lock holds on every monitor, so the machine never wakes up unlocked; a locker that has
+not locked within five seconds cancels the suspend. A sleep something else asks for (closing
+the lid, an idle daemon, `loginctl suspend`) locks the same way: shaodesk holds a logind delay
+inhibitor and lets it go once the lock holds, or when logind stops waiting (its
+`InhibitDelayMaxSec`, five seconds by default). `power.lock_before_sleep = false` sleeps
+without locking, and so does a session with no locker installed; turn it off if an idle daemon
+already locks before sleep (swayidle's `before-sleep`), or two lockers race.
+
+```lua
+power = {
+    lock_command = { "swaylock", "-f", "-c", "000000" },
+    close_timeout = 10000, -- ten seconds for applications to close
+    countdown = 5,         -- the confirmation's seconds
+},
+```
 
 ## Screenshots and screen sharing
 

@@ -275,6 +275,18 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `osd.volume` | boolean | true | - | Show it when the default output's volume or mute changes, by keys or from any application. |
 | `osd.brightness` | boolean | true | - | Show it when a backlight's brightness changes. |
 
+## `power`
+
+| Setting | Type | Default | Range | Description |
+| --- | --- | --- | --- | --- |
+| `power` | table | - | - | Power controls: the `lock`, `suspend`, `hibernate`, `reboot`, `poweroff` and `logout` actions. All but `lock` and `logout` go through logind (systemd-logind or elogind). |
+| `power.lock_command` | list of strings | { "swaylock", "-f" } | - | The screen locker `lock` starts, an `ext-session-lock-v1` client, as a program and its arguments; `{}` for none. Locking is offered only while the program is installed. |
+| `power.lock_before_sleep` | boolean | true | - | Lock the screen with `lock_command` before the machine sleeps, whether `suspend`, `hibernate`, the lid or an idle daemon sends it to sleep, and hold the sleep until the lock holds. |
+| `power.close_windows` | boolean | true | - | `poweroff`, `reboot` and `logout` first ask every window to close, as its close button would, and go ahead once all have, so that applications save their state. |
+| `power.close_timeout` | integer | 5000 | 500 to 60000 | Milliseconds the windows get to close. One still open then (an application asking whether to save) cancels the power off, unless `force` is set; answering it in time lets the power off go on. |
+| `power.countdown` | integer | 10 | 0 to 300 | Seconds the shell's confirmation of power off, restart and log out counts down before it goes ahead (Escape, Cancel or a click beside it gives up); 0 waits for a click. |
+| `power.force` | boolean | false | - | Go ahead with the power off, reboot or log out even when windows are still open after `close_timeout`; their applications are then ended without saving. |
+
 ## `startup`
 
 | Setting | Type | Default | Range | Description |
@@ -316,6 +328,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.widgets.profiles` | boolean | true | - | The appearance profile picker: a button that lists `profiles` to switch between; shown only when there are two or more. |
 | `shell.widgets.wallpapers` | boolean | true | - | The wallpaper picker: thumbnails of the images in `shell.wallpapers`; the one picked replaces `shell.wallpaper` for the profile in use until the configured one changes. |
 | `shell.widgets.keyboard_layout` | boolean | true | - | The active keyboard layout's short name, such as `us`; clicking it switches to the next. Shown only when the keymap has two or more layouts. |
+| `shell.widgets.power` | boolean | true | - | The power menu: lock, suspend, hibernate, restart, power off and log out, as far as `power.lock_command` and logind allow them. |
 | `shell.launchers` | list of tables | unset | - | Pinned commands for programs without a desktop file, at most 64. |
 | `shell.launchers[].name` | string | - | - | Label, 1 to 128 bytes. Required. |
 | `shell.launchers[].icon` | string | "application-x-executable" | - | Icon theme name. |
@@ -345,7 +358,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 
 ## Binding actions
 
-`spawn`, `quit`, `close`, `cycle`, `snap_left`, `snap_right`, `maximize`, `restore`, `tile`, `reload`, `fullscreen`, `workspace`, `move_to_workspace`, `workspace_next`, `workspace_prev`, `workspace_back`, `toggle_tiling`, `layout_next`, `layout_prev`, `layout_dwindle`, `layout_master`, `layout_spiral`, `layout_monocle`, `layout_scroll`, `promote`, `focus_next`, `focus_prev`, `swap_next`, `swap_prev`, `master_grow`, `master_shrink`, `master_more`, `master_less`, `peek`, `peek_toggle`, `night_light_toggle`, `night_light_on`, `night_light_off`, `night_light_auto`, `zoom_in`, `zoom_out`, `zoom_reset`, `move_workspace_to_output`, `swap_workspaces`, `swallow_toggle`, `switch_layout`, `dnd_toggle`, `dnd_on`, `dnd_off`, `notification_history`, `scroll_left`, `scroll_right`, `column_widen`, `column_narrow`, `column_cycle_width`, `consume_left`, `consume_right`, `expel`, `center_column`, `toggle_floating`, `launcher`, `focus_left`, `focus_right`, `focus_up`, `focus_down`, `screenshot`, `move_left`, `move_right`, `move_up`, `move_down`, `move_to_scratchpad`, `scratchpad_show`, `toggle_sticky`, `resize_left`, `resize_right`, `resize_up`, `resize_down`, `switcher`, `switcher_prev`, `switcher_confirm`, `switcher_cancel`, `focus_last`, `focus_urgent`, `group_toggle`, `group_next`, `group_prev`, `ungroup`, `group_merge_left`, `group_merge_right`, `group_merge_up`, `group_merge_down`, `palette`, `toggle_overview`, `overview_confirm`, `overview_cancel`
+`spawn`, `quit`, `close`, `cycle`, `snap_left`, `snap_right`, `maximize`, `restore`, `tile`, `reload`, `fullscreen`, `workspace`, `move_to_workspace`, `workspace_next`, `workspace_prev`, `workspace_back`, `toggle_tiling`, `layout_next`, `layout_prev`, `layout_dwindle`, `layout_master`, `layout_spiral`, `layout_monocle`, `layout_scroll`, `promote`, `focus_next`, `focus_prev`, `swap_next`, `swap_prev`, `master_grow`, `master_shrink`, `master_more`, `master_less`, `peek`, `peek_toggle`, `night_light_toggle`, `night_light_on`, `night_light_off`, `night_light_auto`, `zoom_in`, `zoom_out`, `zoom_reset`, `move_workspace_to_output`, `swap_workspaces`, `swallow_toggle`, `switch_layout`, `dnd_toggle`, `dnd_on`, `dnd_off`, `notification_history`, `poweroff`, `reboot`, `suspend`, `hibernate`, `logout`, `lock`, `power_menu`, `scroll_left`, `scroll_right`, `column_widen`, `column_narrow`, `column_cycle_width`, `consume_left`, `consume_right`, `expel`, `center_column`, `toggle_floating`, `launcher`, `focus_left`, `focus_right`, `focus_up`, `focus_down`, `screenshot`, `move_left`, `move_right`, `move_up`, `move_down`, `move_to_scratchpad`, `scratchpad_show`, `toggle_sticky`, `resize_left`, `resize_right`, `resize_up`, `resize_down`, `switcher`, `switcher_prev`, `switcher_confirm`, `switcher_cancel`, `focus_last`, `focus_urgent`, `group_toggle`, `group_next`, `group_prev`, `ungroup`, `group_merge_left`, `group_merge_right`, `group_merge_up`, `group_merge_down`, `palette`, `toggle_overview`, `overview_confirm`, `overview_cancel`
 
 `spawn` needs `command`; `workspace` and `move_to_workspace` need `workspace`; `screenshot` takes `mode`; `resize_*` take `amount`.
 

@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <optional>
 #include <signal.h>
 #include <spawn.h>
 #include <sstream>
@@ -214,6 +215,8 @@ struct Runtime {
     std::string target{}; // the output target of the action last resolved
     bool watch = false; // whether saving a configuration file reloads (off in headless tests)
     int watch_fd = -1;
+    // Why power.lock_command cannot lock ("" when it can), worked out once per load.
+    std::optional<std::string> locker_problem{};
 
     ~Runtime() {
         if (watch_fd >= 0)
@@ -490,12 +493,35 @@ struct Runtime {
             return false;
         }
     }
+    /* power.lock_command: whether it can lock, and with `start` starting it. */
+    static bool lock(void *data, bool start, char *error, size_t error_size) {
+        auto &self = *static_cast<Runtime *>(data);
+        const auto &command = self.config.power.lock_command;
+        if (!self.locker_problem) {
+            if (command.empty())
+                self.locker_problem = "power.lock_command is not set";
+            else if (command.front().find('/') != std::string::npos
+                         ? access(command.front().c_str(), X_OK) != 0
+                         : find_program(command.front()).empty())
+                self.locker_problem = command.front() + " is not installed";
+            else
+                self.locker_problem = "";
+        }
+        if (self.locker_problem->empty() && start && spawn(command) < 0)
+            std::snprintf(error, error_size, "cannot start %s", command.front().c_str());
+        else if (!self.locker_problem->empty())
+            std::snprintf(error, error_size, "no screen locker: %s", self.locker_problem->c_str());
+        else
+            return true;
+        return false;
+    }
     static bool reload(void *data) {
         auto &self = *static_cast<Runtime *>(data);
         try {
             std::string error;
             auto next = shaodesk::load_config_or_default(self.path, error);
             self.config = std::move(next);
+            self.locker_problem.reset();
             // The shell loads the file too, and shows the error.
             if (self.shell_pid > 0)
                 kill(self.shell_pid, SIGHUP);
@@ -781,7 +807,7 @@ int main(int argc, char **argv) {
             Runtime::command,   Runtime::reload,   Runtime::startup,      Runtime::child_exited,
             Runtime::opacity,   Runtime::screenshot, Runtime::window_rule,
             Runtime::hot_corner, Runtime::action_target, Runtime::config_watch,
-            Runtime::config_changed};
+            Runtime::config_changed, Runtime::lock};
         int result = sh_run(&callbacks, mode);
         if (runtime.shell_pid > 0)
             kill(runtime.shell_pid, SIGTERM);

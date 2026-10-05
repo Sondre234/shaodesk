@@ -44,6 +44,8 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
     subscribe();
     notifications_.configure(config_.notifications);
     osd_.configure(config_.osd);
+    power_.setCountdown(config_.power.countdown);
+    connect(&power_, &Power::failed, this, &ShellController::report);
     connect(notifications_.cards(), &NotificationModel::countChanged, this,
             &ShellController::updateCards);
     connect(&notifications_, &NotificationCenter::received, this, &ShellController::updateCards);
@@ -310,7 +312,8 @@ QVariantMap ShellController::widgets() const {
     return {{"workspaces", w.workspaces}, {"battery", w.battery}, {"network", w.network},
             {"volume", w.volume},         {"clock", w.clock},     {"calendar", w.calendar},
             {"tiling", w.tiling},         {"profiles", w.profiles},
-            {"wallpapers", w.wallpapers}, {"keyboard_layout", w.keyboard_layout}};
+            {"wallpapers", w.wallpapers}, {"keyboard_layout", w.keyboard_layout},
+            {"power", w.power}};
 }
 QStringList ShellController::profiles() const {
     QStringList names;
@@ -381,6 +384,7 @@ void ShellController::reload() {
         loadConfig();
         notifications_.configure(config_.notifications);
         osd_.configure(config_.osd);
+        power_.setCountdown(config_.power.countdown);
         updateNotificationService();
         refreshApps();
         Q_EMIT configChanged();
@@ -502,6 +506,16 @@ void ShellController::subscribe() {
             } else if (line.startsWith("notifications ")) {
                 Q_EMIT notificationsRequested(line.sliced(14));
                 continue;
+            } else if (line.startsWith("power ")) {
+                // power ACTIONS: those that may run, as "lock,suspend,logout", or "-".
+                power_.setAvailable(line.sliced(6));
+                continue;
+            } else if (line.startsWith("power-menu ")) {
+                Q_EMIT powerMenuRequested(line.sliced(11));
+                continue;
+            } else if (line.startsWith("power-error ")) {
+                report(line.sliced(12));
+                continue;
             } else if (line.startsWith("launcher ")) {
                 Q_EMIT launcherRequested(line.sliced(9));
                 continue;
@@ -618,6 +632,7 @@ void ShellController::subscribe() {
             keyboardLayout_.clear();
             Q_EMIT keyboardLayoutChanged();
         }
+        power_.setAvailable("-");
         if (urgentCount_ != 0 || !urgentWindows_.isEmpty()) {
             urgentCount_ = 0;
             urgentWindows_.clear();

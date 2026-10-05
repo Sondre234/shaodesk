@@ -100,6 +100,7 @@ int main(int argc, char **argv) {
         return 1;
     // Long Lua strings preserve paths without shell interpolation.
     const auto lua = QString("return {layout={workspace_names={'web','','','mail'}},"
+                             "power={countdown=2},"
                              "profile='dark',profiles={dark={},light={shell={accent='#336699'}}},"
                              "shell={wallpaper='walls/a/one.png',wallpapers=[[%3]],"
                              "launchers={{name='Test app',command={[[%1]],'-E','touch',[[%2]]}}}}}")
@@ -127,6 +128,7 @@ int main(int argc, char **argv) {
     QStringList switches, requests;
     int layoutSwitches = 0; // "switch_layout next" requests, answered with the second layout
     bool holdSessions = false;
+    QString powerRefusal; // what the compositor answers a power action with; "" for ok
     QLocalSocket *pendingSessions = nullptr;
     // What the compositor does with "profile NAME": saves it and reloads the shell.
     std::function<void(const QString &)> pickProfile;
@@ -154,6 +156,12 @@ int main(int argc, char **argv) {
                 client->write("ok\n");
                 client->disconnectFromServer();
                 subscriber->write("keyboard-layout 2 2 no Norwegian\n");
+            } else if (QStringList{"lock", "suspend", "hibernate", "reboot", "poweroff", "logout"}
+                           .contains(QString::fromUtf8(request).trimmed())) {
+                requests.push_back(QString::fromUtf8(request).trimmed());
+                client->write(powerRefusal.isEmpty() ? QByteArray("ok\n")
+                                                     : ("error: " + powerRefusal + "\n").toUtf8());
+                client->disconnectFromServer();
             } else if (request == "session list\n") {
                 if (holdSessions) { // answered later, by the test
                     pendingSessions = client;
@@ -1272,6 +1280,225 @@ int main(int argc, char **argv) {
             std::cerr << "Escape did not close the palette quietly\n";
             return 1;
         }
+    }
+    // The power menu lists what the compositor says may run, and runs it.
+    {
+        auto *button = find(view.rootObject(), "powerButton");
+        auto *menu = find(view.rootObject(), "powerMenu");
+        auto item = [&](const QString &action) {
+            return find(view.rootObject(), "powerItem:" + action);
+        };
+        if (!button || !menu || button->isVisible()) {
+            std::cerr << "the power button shows before the compositor said what may run\n";
+            return 1;
+        }
+        subscriber->write("power lock,suspend,reboot,poweroff,logout\n");
+        if (!QTest::qWaitFor([&] { return button->isVisible(); })) {
+            std::cerr << "the power button did not appear\n";
+            return 1;
+        }
+        auto openMenu = [&] {
+            QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(button));
+            return QTest::qWaitFor([&] {
+                const auto area = menu->mapRectToScene(QRectF(0, 0, menu->width(), menu->height()));
+                return menu->isVisible() && view.height() > controller.panelExtent() &&
+                       area.top() >= 0 && area.bottom() <= view.height();
+            });
+        };
+        if (!openMenu() || !item("lock") || !item("suspend") || item("hibernate")) {
+            std::cerr << "the power menu does not list what may run\n";
+            return 1;
+        }
+        requests.clear();
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(item("suspend")));
+        if (!QTest::qWaitFor([&] { return requests == QStringList{"suspend"} && !menu->isVisible(); })) {
+            std::cerr << "suspending from the power menu failed: " << requests.join("|").toStdString()
+                      << '\n';
+            return 1;
+        }
+        // Restart, power off and log out ask first, on the panel's output: a dialog counts down
+        // and goes ahead when it runs out, on its button or on Enter; Escape, Cancel or a click
+        // beside it gives up.
+        PowerView dialog(controller, app.primaryScreen());
+        if (dialog.status() != QQuickView::Ready) {
+            for (const auto &error : dialog.errors())
+                std::cerr << error.toString().toStdString() << '\n';
+            return 1;
+        }
+        auto *power = controller.power();
+        auto ask = [&](const QString &action) {
+            if (!openMenu() || !item(action))
+                return false;
+            QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(item(action)));
+            return QTest::qWaitFor([&] {
+                return dialog.isVisible() && power->pending() == action && !menu->isVisible();
+            });
+        };
+        auto gaveUp = [&] {
+            return QTest::qWaitFor([&] { return !dialog.isVisible() && power->pending().isEmpty(); });
+        };
+        auto dialogItem = [&](const char *name) { return find(dialog.rootObject(), name); };
+        requests.clear();
+        if (!ask("poweroff") || power->countdown() != 2 || power->output() != output ||
+            power->pendingTitle() != "Power off" ||
+            power->message() != "The computer powers off in 2 seconds." || !requests.isEmpty() ||
+            dialogItem("powerMessage")->property("text") != power->message()) {
+            std::cerr << "power off did not ask first: " << power->message().toStdString() << '\n';
+            return 1;
+        }
+        QTest::keyClick(&dialog, Qt::Key_Escape);
+        if (!gaveUp()) {
+            std::cerr << "Escape did not give up the power off\n";
+            return 1;
+        }
+        if (!ask("reboot") || power->message() != "The computer restarts in 2 seconds.")
+            return 1;
+        QTest::mouseClick(&dialog, Qt::LeftButton, Qt::NoModifier, QPoint(10, 10));
+        if (!gaveUp()) {
+            std::cerr << "a click beside the dialog did not give up the restart\n";
+            return 1;
+        }
+        if (!ask("logout"))
+            return 1;
+        QTest::mouseClick(&dialog, Qt::LeftButton, Qt::NoModifier, center(dialogItem("powerCancel")));
+        if (!gaveUp()) {
+            std::cerr << "Cancel did not give up the log out\n";
+            return 1;
+        }
+        if (!ask("reboot"))
+            return 1;
+        QTest::mouseClick(&dialog, Qt::LeftButton, Qt::NoModifier, center(dialogItem("powerConfirm")));
+        if (!QTest::qWaitFor([&] { return requests == QStringList{"reboot"}; }) || !gaveUp()) {
+            std::cerr << "the restart button did not restart: " << requests.join("|").toStdString()
+                      << '\n';
+            return 1;
+        }
+        requests.clear();
+        if (!ask("logout"))
+            return 1;
+        QTest::keyClick(&dialog, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return requests == QStringList{"logout"}; }) || !gaveUp()) {
+            std::cerr << "Enter did not log out\n";
+            return 1;
+        }
+        requests.clear();
+        if (!ask("poweroff"))
+            return 1;
+        if (!QTest::qWaitFor([&] {
+                return power->countdown() == 1 &&
+                       power->message() == "The computer powers off in 1 second.";
+            }) ||
+            !requests.isEmpty() ||
+            !QTest::qWaitFor([&] { return requests == QStringList{"poweroff"}; }) || !gaveUp()) {
+            std::cerr << "the countdown did not run out into a power off: "
+                      << requests.join("|").toStdString() << '\n';
+            return 1;
+        }
+        // An action that may no longer run is not asked about any more.
+        if (!ask("reboot"))
+            return 1;
+        subscriber->write("power lock,suspend,poweroff,logout\n");
+        if (!gaveUp() || !requests.contains("poweroff") || requests.size() != 1) {
+            std::cerr << "a restart that may no longer run was still asked about\n";
+            return 1;
+        }
+        subscriber->write("power lock,suspend,reboot,poweroff,logout\n");
+        // The command palette offers the same, and asks first the same way.
+        {
+            auto *palette = controller.palette();
+            auto titles = [&] {
+                QStringList found;
+                for (const auto &result : palette->results())
+                    found << result.toMap()["title"].toString();
+                return found;
+            };
+            if (!QTest::qWaitFor([&] { return power->available().size() == 5; }))
+                return 1;
+            palette->open(output);
+            if (!QTest::qWaitFor([&] {
+                    return titles().contains("Lock screen") && titles().contains("Suspend") &&
+                           titles().contains("Restart…") && titles().contains("Power off…") &&
+                           titles().contains("Log out…");
+                }) ||
+                titles().contains("Hibernate")) {
+                std::cerr << "the palette does not offer what may run: "
+                          << titles().join("|").toStdString() << '\n';
+                return 1;
+            }
+            requests.clear();
+            palette->setQuery(">power off");
+            palette->activate(0);
+            if (!QTest::qWaitFor([&] { return dialog.isVisible() && power->pending() == "poweroff"; }) ||
+                !requests.isEmpty()) {
+                std::cerr << "power off from the palette did not ask first\n";
+                return 1;
+            }
+            power->cancel();
+            palette->open(output);
+            palette->setQuery("lock screen");
+            palette->activate(0);
+            if (!QTest::qWaitFor([&] { return requests == QStringList{"lock"}; }) ||
+                !power->pending().isEmpty()) {
+                std::cerr << "locking from the palette failed: " << requests.join("|").toStdString()
+                          << '\n';
+                return 1;
+            }
+        }
+        // The power_menu action opens the menu with the keyboard in it: the arrows choose, Enter
+        // runs, and asking again closes it.
+        requests.clear();
+        subscriber->write(("power-menu " + output + "\n").toUtf8());
+        if (!QTest::qWaitFor([&] { return menu->isVisible() && menu->hasActiveFocus(); })) {
+            std::cerr << "power_menu did not open the power menu with the keyboard\n";
+            return 1;
+        }
+        subscriber->write(("power-menu " + output + "\n").toUtf8());
+        if (!QTest::qWaitFor([&] { return !menu->isVisible(); })) {
+            std::cerr << "power_menu again did not close the power menu\n";
+            return 1;
+        }
+        subscriber->write(("power-menu " + output + "\n").toUtf8());
+        if (!QTest::qWaitFor([&] { return menu->isVisible() && menu->hasActiveFocus(); }))
+            return 1;
+        QTest::keyClick(&view, Qt::Key_Down);
+        QTest::keyClick(&view, Qt::Key_Down);
+        QTest::keyClick(&view, Qt::Key_Up);
+        QTest::keyClick(&view, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return requests == QStringList{"suspend"} && !menu->isVisible(); })) {
+            std::cerr << "the keyboard did not run the chosen power action: "
+                      << requests.join("|").toStdString() << '\n';
+            return 1;
+        }
+        // What the compositor refuses, at once or later, shows across the panel.
+        powerRefusal = "no screen locker: power.lock_command is not set";
+        if (!openMenu())
+            return 1;
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(item("lock")));
+        if (!QTest::qWaitFor([&] {
+                return controller.error() ==
+                       "Lock screen: no screen locker: power.lock_command is not set";
+            })) {
+            std::cerr << "a refused power action was not reported: "
+                      << controller.error().toStdString() << '\n';
+            return 1;
+        }
+        powerRefusal.clear();
+        subscriber->write("power-error Suspend cancelled: the screen did not lock within 5 seconds\n");
+        if (!QTest::qWaitFor([&] {
+                return controller.error() ==
+                       "Suspend cancelled: the screen did not lock within 5 seconds";
+            })) {
+            std::cerr << "a power action cancelled later was not reported\n";
+            return 1;
+        }
+        controller.clearError();
+        // With nothing that may run, the button goes.
+        subscriber->write("power -\n");
+        if (!QTest::qWaitFor([&] { return !button->isVisible(); })) {
+            std::cerr << "the power button stayed with nothing to offer\n";
+            return 1;
+        }
+        subscriber->write("power lock,suspend,reboot,poweroff,logout\n");
     }
     // Notifications: the bell, the cards, their buttons and the history, fed by hand the way the
     // D-Bus service feeds them.

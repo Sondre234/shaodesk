@@ -47,6 +47,10 @@ ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop,
         std::cerr << "shaodesk launcher " << (open ? "opened" : "closed") << " on "
                   << output.toStdString() << '\n';
     });
+    connect(&controller, &ShellController::powerMenuRequested, this, [this](const QString &output) {
+        if (!desktop_ && rootObject() && outputScreen_->name() == output)
+            QMetaObject::invokeMethod(rootObject(), "togglePowerMenu");
+    });
     connect(screen, &QScreen::geometryChanged, this, [this] { resizeForContent(); });
     connect(this, &QWindow::activeChanged, this, [this] {
         if (!isActive() && expanded_ && rootObject())
@@ -131,6 +135,46 @@ void OverviewView::update() {
     } else if (!here && isVisible()) {
         hide();
         std::cerr << "shaodesk overview hidden on " << outputScreen_->name().toStdString() << '\n';
+    }
+}
+PowerView::PowerView(ShellController &controller, QScreen *screen)
+    : QQuickView(controller.engine(), nullptr), controller_(controller), outputScreen_(screen) {
+    setScreen(screen);
+    setTitle("shaodesk power");
+    setColor(Qt::transparent);
+    setResizeMode(QQuickView::SizeRootObjectToView);
+    setFlags(Qt::FramelessWindowHint);
+    resize(screen->geometry().size());
+#if SHAODESK_LAYER_SHELL
+    using W = LayerShellQt::Window;
+    layer_ = W::get(this);
+    layer_->setScreen(screen);
+    layer_->setScope("shaodesk-power");
+    layer_->setLayer(W::LayerOverlay);
+    layer_->setAnchors(W::Anchors(W::AnchorTop | W::AnchorBottom | W::AnchorLeft | W::AnchorRight));
+    layer_->setExclusiveZone(-1);
+    layer_->setKeyboardInteractivity(W::KeyboardInteractivityExclusive);
+    layer_->setActivateOnShow(true);
+#endif
+    setSource(QUrl("qrc:/shell/ShaodeskShell/PowerDialog.qml"));
+    connect(screen, &QScreen::geometryChanged, this,
+            [this] { resize(outputScreen_->geometry().size()); });
+    connect(controller.power(), &Power::pendingChanged, this, &PowerView::update);
+}
+void PowerView::update() {
+    auto *power = controller_.power();
+    const bool mine = !power->pending().isEmpty() && power->output() == outputScreen_->name();
+    if (mine && !isVisible()) {
+        show();
+        requestActivate();
+        if (rootObject())
+            QMetaObject::invokeMethod(rootObject(), "reset");
+        std::cerr << "shaodesk power dialog shown on " << outputScreen_->name().toStdString()
+                  << '\n';
+    } else if (!mine && isVisible()) {
+        hide();
+        std::cerr << "shaodesk power dialog hidden on " << outputScreen_->name().toStdString()
+                  << '\n';
     }
 }
 SwitcherView::SwitcherView(ShellController &controller, QScreen *screen)

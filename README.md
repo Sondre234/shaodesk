@@ -18,8 +18,8 @@ taskbar, launcher and notifications, and a Lua configuration that reloads when y
 </div>
 
 > **Status:** early development. It runs as a standalone session from a TTY, where it is the
-> author's everyday desktop on Gentoo, and nested in another Wayland session. A system tray and
-> power controls are still missing, and it has been used on few machines.
+> author's everyday desktop on Gentoo, and nested in another Wayland session. A system tray is
+> still missing, and it has been used on few machines.
 
 ## Highlights
 
@@ -32,7 +32,10 @@ taskbar, launcher and notifications, and a Lua configuration that reloads when y
 - **A Qt Quick shell** on every monitor: taskbar, application menu, workspace indicator,
   battery, network, volume, keyboard layout, clock and calendar, a notification daemon with history and
   do-not-disturb, an on-screen display, an Alt + Tab switcher, an Exposé-style overview,
-  and a command palette.
+  a command palette, and a power menu.
+- **Power controls** through logind (systemd-logind or elogind): lock, suspend, hibernate,
+  restart, power off and log out, locking before any sleep and closing windows first so that
+  applications can save.
 - **Effects:** interruptible animations with spring curves, dimming of inactive windows, peek,
   night light, a magnifier, and hot corners.
 - **Lua configuration** that is validated with file and line, reloads on save, can extend
@@ -213,6 +216,8 @@ Edit them in [config/init.lua](config/init.lua).
 | Super + P | [Command palette](docs/features.md#command-palette) |
 | Super + C | Close the focused window |
 | Super + M | Exit shaodesk |
+| Super + Shift + L | [Lock the screen](docs/features.md#power) with `power.lock_command` (swaylock) |
+| Super + Escape | [Power menu](docs/features.md#power): lock, suspend, hibernate, restart, power off, log out |
 | Super + V | Float or tile the focused window |
 | Super + F | Fullscreen |
 | Super + T | Arrange the monitor's windows in a grid (floating mode) |
@@ -257,8 +262,8 @@ shaodesk msg get windows
 ```
 
 A client that sends `subscribe` receives a line for every change of workspaces, tiling, the
-switcher, the overview, urgent windows and the keyboard layout. See
-[Control socket](docs/features.md#control-socket) for the queries and events.
+switcher, the overview, urgent windows, the keyboard layout and the power actions that may
+run. See [Control socket](docs/features.md#control-socket) for the queries and events.
 
 ## Development
 
@@ -284,8 +289,8 @@ Work happens on short-lived branches off `main` that are merged back with `--no-
 [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md) for notable changes, and
 [docs/performance.md](docs/performance.md) for measurements.
 
-Not yet done: a system tray, power controls, drag-to-edge snap previews, blur and shadows, and
-Lua extension APIs for custom layouts and shell widgets.
+Not yet done: a system tray, drag-to-edge snap previews, blur and shadows, and Lua extension
+APIs for custom layouts and shell widgets.
 
 ## Reporting bugs
 

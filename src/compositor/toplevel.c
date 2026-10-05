@@ -478,6 +478,7 @@ void unmap_toplevel(struct sh_toplevel *toplevel) {
     if (was_focused)
         focus_previous(toplevel->server);
     notify_subscribers(toplevel->server);
+    power_window_closed(toplevel->server);
 }
 
 static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {

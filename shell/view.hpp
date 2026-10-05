@@ -41,6 +41,21 @@ class PaletteView : public QQuickView {
     void update();
 };
 
+// The confirmation of power off, restart and log out on one output: a dimmed cover with the
+// dialog in its middle, holding the keyboard while it waits.
+class PowerView : public QQuickView {
+    Q_OBJECT
+  public:
+    PowerView(ShellController &controller, QScreen *screen);
+    QScreen *outputScreen() const { return outputScreen_; }
+
+  private:
+    ShellController &controller_;
+    LayerShellQt::Window *layer_ = nullptr;
+    QScreen *outputScreen_;
+    void update();
+};
+
 // The overview's overlay on one output: the text over the compositor's thumbnails (titles,
 // workspace labels, the search box), covering the output while the overview is open there.
 class OverviewView : public QQuickView {
