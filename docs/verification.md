@@ -450,3 +450,25 @@ Nextcloud, OBS), a physical mouse or touchpad, scaled outputs, and another tray 
 running alongside in a real session. While a panel menu is open, a click made without moving the
 pointer first lands where the pointer was in the smaller surface: the compositor tells a surface
 where the pointer is only when it moves.
+## First run: terminal, session wrapper and startup errors
+
+Added 2026-10-05. `launch_smoke` runs a headless compositor with nothing on `PATH` but stand-in
+programs: `spawn` from the control socket starting one and refusing a missing one with the
+reason, both to the caller and as `spawn-error` to a subscriber (the shell), and Super + Q, with
+no terminal installed, reporting what to install; the `terminal` action then opening xterm, foot
+ahead of it, `$TERMINAL` ahead of both once it is installed, and a configured `terminal` with
+its arguments, an uninstalled one being an error. `shell_ui` shows `spawn-error` on the panel
+and opens a terminal from the command palette. `session_wrapper` runs `shaodesk-session` with a
+stand-in `shaodesk` and `dbus-run-session`: the arguments after `--session`, the log and the
+previous one kept, a bus started only without `DBUS_SESSION_BUS_ADDRESS` and
+`$XDG_RUNTIME_DIR/bus`, the `shaodesk` installed beside it found, and an unwritable log
+directory. A staged install with the session entry ran its `shaodesk-session` (with a stand-in
+`shaodesk`) under a real `dbus-run-session`, as CI's Install step does. `startup_failure_smoke`
+starts the compositor with `XDG_RUNTIME_DIR` unset, too long for a socket's path, and not
+writable, and gets the reason and status 1 each time, not an abort.
+
+Not checked: a display manager (SDDM, GDM, LightDM, greetd) starting the session entry, and the
+log and session bus it then has; `shaodesk-session` from a text console on OpenRC; the message a
+standalone session logs without a session bus; real terminals opened by `terminal` and swallowed
+(GNOME Terminal's `org.gnome.Terminal` app ID is taken from its documentation); and the panel's
+error on a real display.
