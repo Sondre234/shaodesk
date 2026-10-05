@@ -20,7 +20,8 @@ if not shutil.which("dbus-daemon"):
 
 CONFIG = """return {{
     xwayland = false,
-    power = {{ lock_command = {locker}, lock_before_sleep = {before} }},
+    power = {{ lock_command = {locker}, lock_before_sleep = {before}, close_windows = {close},
+              close_timeout = 1500, force = {force} }},
 }}"""
 
 with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
@@ -36,7 +37,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
     # order of locking and sleeping shows in one place.
     LOCKER = f'{{ [[{lock_probe}]], "hold", [[{calls}]] }}'
     WAITING = f'{{ [[{lock_probe}]], "hold", [[{calls}]], "wait" }}'  # locks on SIGUSR1
-    config.write_text(CONFIG.format(locker=LOCKER, before="true"))
+    config.write_text(CONFIG.format(locker=LOCKER, before="true", close="true", force="false"))
     answers.write_text("CanReboot challenge\nCanHibernate na\n")
     compositor_log = root / "compositor.log"
     processes = []
@@ -70,9 +71,29 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
         lines = logged()
         return lines.count("Inhibit sleep delay") - lines.count("release sleep delay")
 
-    def reconfigure(locker=None, before="true"):
-        config.write_text(CONFIG.format(locker=locker or LOCKER, before=before))
+    def reconfigure(locker=None, before="true", close="true", force="false"):
+        config.write_text(CONFIG.format(locker=locker or LOCKER, before=before, close=close,
+                                        force=force))
         msg("reload")
+
+    def window(title, refuse=False):
+        """A probe window; one that refuses to close says so in its output file."""
+        extra = {"SHAODESK_PROBE_TITLE": title}
+        if refuse:
+            extra["SHAODESK_PROBE_REFUSE_CLOSE"] = "1"
+        with (root / f"{title}.out").open("w") as out:
+            client = subprocess.Popen([probe, "--external-control"], env={**env, **extra},
+                                      stdout=out)
+        processes.append(client)
+        return client
+
+    def windows():
+        return msg("get", "windows").count("\n")
+
+    def closed(*clients):
+        for client in clients:
+            assert client.wait(timeout=30) == 0
+            processes.remove(client)
 
     def waiting(mark):
         """The pid of a locker started after the first `mark` lines and waiting to lock."""
@@ -131,11 +152,15 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
             assert "SHAODESK_LOGIN1_BUS" in compositor_log.read_text()
             assert "logind is out of reach" in msg("poweroff", ok=False)
             assert "takes no argument" in msg("reboot", "now", ok=False)
-            # Logging out needs no logind: the session ends as with quit.
+            # Logging out needs no logind: the windows close, and the session ends as with quit.
+            last = window("last")
+            wait_for(lambda: windows() == 1, "a window")
             msg("logout")
+            closed(last)
             assert server.wait(timeout=30) == 0, compositor_log.read_text()
             processes.remove(server)
-            assert "Logging out" in compositor_log.read_text()
+            text = compositor_log.read_text()
+            assert text.index("Every window has closed") < text.index("Logging out"), text
         assert logged() == [], logged()
 
         with compositor_log.open("w") as output:
@@ -175,6 +200,49 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
             msg("reboot")
             wait_for(lambda: logged(mark)[1:] == ["Reboot true"], "reboot")
             wait_for(answers_are(pending="-"), "logind's reply to reboot")
+
+            # Power off asks every window to close, and logind only once they have gone.
+            first, second = window("first"), window("second")
+            wait_for(lambda: windows() == 2, "two windows")
+            mark = len(logged())
+            msg("poweroff")
+            closed(first, second)
+            wait_for(lambda: logged(mark) == ["PowerOff true"], "power off once the windows closed")
+            text = compositor_log.read_text()
+            assert text.rindex("Every window has closed") < text.rindex(
+                "Asking logind to power off"), text
+            # A window that stays open (an application asking whether to save) cancels a reboot
+            # once close_timeout has passed, and is left alone; nothing else runs meanwhile.
+            stubborn, other = window("stubborn", refuse=True), window("other")
+            wait_for(lambda: windows() == 2, "two windows")
+            mark = len(logged())
+            msg("reboot")
+            assert power()["pending"] == "reboot closing", power()
+            assert "reboot is already under way" in msg("suspend", ok=False)
+            closed(other)
+            wait_for(lambda: "Reboot cancelled: 1 window is still open (shaodesk-probe)"
+                     in compositor_log.read_text(), "the reboot cancelled")
+            assert power()["pending"] == "-" and logged(mark) == [], (power(), logged(mark))
+            assert stubborn.poll() is None and windows() == 1
+            assert (root / "stubborn.out").read_text() == "close refused\n"
+            # With power.force it goes ahead after close_timeout all the same.
+            reconfigure(force="true")
+            mark = len(logged())
+            msg("reboot")
+            wait_for(lambda: logged(mark) == ["Reboot true"], "the reboot forced")
+            assert "1 window is still open (shaodesk-probe); going ahead" in (
+                compositor_log.read_text())
+            # Without power.close_windows the windows are not asked.
+            reconfigure(close="false")
+            mark = len(logged())
+            msg("poweroff")
+            wait_for(lambda: logged(mark) == ["PowerOff true"], "power off at once")
+            assert (root / "stubborn.out").read_text() == "close refused\n" * 2
+            stubborn.kill()
+            stubborn.wait(timeout=30)
+            processes.remove(stubborn)
+            wait_for(lambda: windows() == 0, "the stubborn window gone")
+            reconfigure()
 
             # Suspend locks the screen, and only once the lock holds asks logind, which sends the
             # machine to sleep (the delay inhibitor let go at once, the lock holding) and wakes

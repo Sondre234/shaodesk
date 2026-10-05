@@ -204,6 +204,8 @@ struct sh_overview {
 /* The power actions and what logind allows of them (power.c). One runs at a time, in steps. */
 enum sh_power_step {
     SH_POWER_IDLE,
+    SH_POWER_CLOSING, /* windows close before power off, reboot or log out */
+    SH_POWER_LEAVING, /* their applications finish before the session ends */
     SH_POWER_LOCKING, /* the screen locks before suspend or hibernate */
     SH_POWER_CALLING, /* logind has been asked and has not answered yet */
 };
@@ -219,6 +221,12 @@ struct sh_power {
      * being asked for, and whether logind has said the machine is about to sleep. */
     int sleep_delay;
     bool inhibiting, before_sleep;
+    /* The Wayland clients whose windows closed to log out, until they disconnect. */
+    struct sh_power_client {
+        struct sh_server *server;
+        struct wl_client *client; /* NULL for a free slot */
+        struct wl_listener destroy;
+    } clients[64];
 };
 
 struct sh_server {
@@ -812,6 +820,7 @@ void power_init(struct sh_server *server);
 void power_finish(struct sh_server *server);
 void power_reload(struct sh_server *server);
 void power_locked(struct sh_server *server);
+void power_window_closed(struct sh_server *server);
 bool power_action(enum sh_action action);
 bool power_start(struct sh_server *server, enum sh_action action, char *error,
                  size_t error_size);

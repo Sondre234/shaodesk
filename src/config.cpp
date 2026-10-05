@@ -1189,6 +1189,10 @@ Config read(lua_State *L, size_t own = SIZE_MAX) {
         lua_pop(L, 1);
         boolean(L, "lock_before_sleep", "power.lock_before_sleep",
                 config.settings.lock_before_sleep);
+        boolean(L, "close_windows", "power.close_windows", config.settings.close_windows);
+        config.settings.close_timeout =
+            integer(L, "close_timeout", config.settings.close_timeout, 500, 60000);
+        boolean(L, "force", "power.force", config.settings.close_force);
     }
     lua_pop(L, 1);
     current_section.clear();

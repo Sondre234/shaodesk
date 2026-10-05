@@ -382,6 +382,12 @@ static void toplevel_configure(void *data, struct xdg_toplevel *toplevel, int32_
 }
 static void toplevel_close(void *data, struct xdg_toplevel *toplevel) {
     struct probe *probe = data;
+    // SHAODESK_PROBE_REFUSE_CLOSE stays open, as an application asking whether to save would.
+    if (getenv("SHAODESK_PROBE_REFUSE_CLOSE")) {
+        puts("close refused");
+        fflush(stdout);
+        return;
+    }
     if (!probe->external_control && probe->stage != 5)
         die("unexpected close request");
     puts("taskbar minimize, restore, activate, and close passed");

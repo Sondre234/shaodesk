@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Power: suspend, hibernate, reboot and power off through logind, and what it allows of them,
  * over a connection that never blocks the compositor (src/login1.c); locking the screen with
- * power.lock_command, before the machine sleeps too; and logging out. */
+ * power.lock_command, before the machine sleeps too; logging out; and closing every window
+ * before power off, reboot and log out. */
 #include "server.h"
 
 #include <ctype.h>
@@ -300,6 +301,82 @@ static bool power_call(struct sh_server *server, char *error, size_t error_size)
     return true;
 }
 
+static bool clients_left(struct sh_server *server) {
+    for (size_t i = 0; i < sizeof(server->power.clients) / sizeof(*server->power.clients); ++i)
+        if (server->power.clients[i].client)
+            return true;
+    return false;
+}
+
+static void forget_clients(struct sh_server *server) {
+    for (size_t i = 0; i < sizeof(server->power.clients) / sizeof(*server->power.clients); ++i) {
+        struct sh_power_client *slot = &server->power.clients[i];
+        if (slot->client)
+            wl_list_remove(&slot->destroy.link);
+        slot->client = NULL;
+    }
+}
+
+/* Everything that had to happen first has: the action goes ahead. */
+static void power_proceed(struct sh_server *server) {
+    wl_event_source_timer_update(server->power.timer, 0);
+    forget_clients(server);
+    char error[300];
+    if (!power_call(server, error, sizeof(error)))
+        power_report(server, "%s", error);
+}
+
+static void client_gone(struct wl_listener *listener, void *data) {
+    struct sh_power_client *slot = wl_container_of(listener, slot, destroy);
+    struct sh_server *server = slot->server;
+    wl_list_remove(&slot->destroy.link);
+    slot->client = NULL;
+    if (server->power.step == SH_POWER_LEAVING && !clients_left(server))
+        power_proceed(server);
+}
+
+/* Follows the clients of the windows asked to close for a log out: an application that saves
+ * as it quits keeps its connection until it is done. X11 windows all belong to Xwayland, which
+ * stays. */
+static void follow_clients(struct sh_server *server) {
+    size_t count = sizeof(server->power.clients) / sizeof(*server->power.clients);
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+#if WLR_HAS_XWAYLAND
+        if (toplevel->xsurface)
+            continue;
+#endif
+        struct wl_client *client = wl_resource_get_client(toplevel->xdg_toplevel->resource);
+        struct sh_power_client *free_slot = NULL;
+        bool known = false;
+        for (size_t i = 0; i < count && !known; ++i) {
+            known = server->power.clients[i].client == client;
+            if (!server->power.clients[i].client && !free_slot)
+                free_slot = &server->power.clients[i];
+        }
+        if (known || !free_slot)
+            continue;
+        free_slot->server = server;
+        free_slot->client = client;
+        free_slot->destroy.notify = client_gone;
+        wl_client_add_destroy_listener(client, &free_slot->destroy);
+    }
+}
+
+/* A window has gone: a power off waiting for the windows to close goes ahead after the last
+ * (a log out once their applications have disconnected too). */
+void power_window_closed(struct sh_server *server) {
+    struct sh_power *power = &server->power;
+    if (power->step != SH_POWER_CLOSING || !wl_list_empty(&server->toplevels))
+        return;
+    wlr_log(WLR_INFO, "Every window has closed");
+    if (power->action == SH_LOGOUT && clients_left(server)) {
+        power->step = SH_POWER_LEAVING; // within what is left of close_timeout
+        return;
+    }
+    power_proceed(server);
+}
+
 /* The step under way ran out of time. */
 static int power_timeout(void *data) {
     struct sh_server *server = data;
@@ -308,6 +385,33 @@ static int power_timeout(void *data) {
         power->step = SH_POWER_IDLE;
         power_report(server, "%s cancelled: the screen did not lock within %d seconds",
                      action_label(power->action), LOCK_TIMEOUT_MS / 1000);
+    } else if (power->step == SH_POWER_CLOSING) {
+        // The windows left, named by their applications.
+        int count = 0;
+        char names[160] = "";
+        size_t used = 0;
+        struct sh_toplevel *toplevel;
+        wl_list_for_each(toplevel, &server->toplevels, link) {
+            const char *app_id = toplevel_app_id(toplevel), *title = toplevel_title(toplevel);
+            const char *name = app_id && *app_id ? app_id : title && *title ? title : "untitled";
+            if (used < sizeof(names) && !strstr(names, name))
+                used += (size_t)snprintf(names + used, sizeof(names) - used, "%s%s",
+                                         used ? ", " : "", name);
+            ++count;
+        }
+        const char *noun = count == 1 ? "window is" : "windows are";
+        if (server_settings(server)->close_force) {
+            wlr_log(WLR_INFO, "%d %s still open (%s); going ahead", count, noun, names);
+            power_proceed(server);
+        } else {
+            power->step = SH_POWER_IDLE;
+            forget_clients(server);
+            power_report(server, "%s cancelled: %d %s still open (%s)",
+                         action_label(power->action), count, noun, names);
+        }
+    } else if (power->step == SH_POWER_LEAVING) {
+        // The windows have closed; an application still running goes with the session.
+        power_proceed(server);
     }
     return 0;
 }
@@ -317,12 +421,8 @@ void power_locked(struct sh_server *server) {
     struct sh_power *power = &server->power;
     if (power->before_sleep)
         release_sleep(server);
-    if (power->step != SH_POWER_LOCKING)
-        return;
-    wl_event_source_timer_update(power->timer, 0);
-    char error[300];
-    if (!power_call(server, error, sizeof(error)))
-        power_report(server, "%s", error);
+    if (power->step == SH_POWER_LOCKING)
+        power_proceed(server);
 }
 
 bool power_start(struct sh_server *server, enum sh_action action, char *error,
@@ -365,6 +465,19 @@ bool power_start(struct sh_server *server, enum sh_action action, char *error,
         wl_event_source_timer_update(power->timer, LOCK_TIMEOUT_MS);
         return true;
     }
+    const struct sh_settings *settings = server_settings(server);
+    if ((action == SH_POWER_OFF || action == SH_REBOOT || action == SH_LOGOUT) &&
+        settings->close_windows && !wl_list_empty(&server->toplevels)) {
+        // Every window is asked to close, as by its close button; the last to go lets it on.
+        wlr_log(WLR_INFO, "Closing every window to %s", action_label(action));
+        struct sh_toplevel *toplevel;
+        wl_list_for_each(toplevel, &server->toplevels, link) toplevel_close(toplevel);
+        if (action == SH_LOGOUT)
+            follow_clients(server);
+        power->step = SH_POWER_CLOSING;
+        wl_event_source_timer_update(power->timer, settings->close_timeout);
+        return true;
+    }
     return power_call(server, error, error_size);
 }
 
@@ -397,7 +510,7 @@ bool power_describe(struct sh_server *server, size_t index, const char **name,
 
 /* What `get power` says of the action under way: its name and step, or "-". */
 const char *power_pending(struct sh_server *server, char *text, size_t size) {
-    static const char *const steps[] = {"idle", "locking", "calling"};
+    static const char *const steps[] = {"idle", "closing", "leaving", "locking", "calling"};
     struct sh_power *power = &server->power;
     if (power->step == SH_POWER_IDLE)
         return "-";
@@ -421,6 +534,7 @@ void power_init(struct sh_server *server) {
 
 void power_finish(struct sh_server *server) {
     server->power.step = SH_POWER_IDLE;
+    forget_clients(server);
     if (server->power.timer)
         wl_event_source_remove(server->power.timer);
     server->power.timer = NULL;

@@ -279,6 +279,9 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `power` | table | - | - | Power controls: the `lock`, `suspend`, `hibernate`, `reboot`, `poweroff` and `logout` actions. All but `lock` and `logout` go through logind (systemd-logind or elogind). |
 | `power.lock_command` | list of strings | { "swaylock", "-f" } | - | The screen locker `lock` starts, an `ext-session-lock-v1` client, as a program and its arguments; `{}` for none. Locking is offered only while the program is installed. |
 | `power.lock_before_sleep` | boolean | true | - | Lock the screen with `lock_command` before the machine sleeps, whether `suspend`, `hibernate`, the lid or an idle daemon sends it to sleep, and hold the sleep until the lock holds. |
+| `power.close_windows` | boolean | true | - | `poweroff`, `reboot` and `logout` first ask every window to close, as its close button would, and go ahead once all have, so that applications save their state. |
+| `power.close_timeout` | integer | 5000 | 500 to 60000 | Milliseconds the windows get to close. One still open then (an application asking whether to save) cancels the power off, unless `force` is set; answering it in time lets the power off go on. |
+| `power.force` | boolean | false | - | Go ahead with the power off, reboot or log out even when windows are still open after `close_timeout`; their applications are then ended without saving. |
 
 ## `startup`
 

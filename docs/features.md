@@ -881,6 +881,15 @@ libsystemd, libelogind, or basu at build time. A headless compositor (`--headles
 tests run it) never uses the machine's logind: only one on the bus that `SHAODESK_LOGIN1_BUS`
 names. `logout` ends the session, as `quit` does, and needs no logind.
 
+`poweroff`, `reboot` and `logout` first ask every window to close, as its close button would,
+so that applications save their state, and go ahead once the last has gone (a log out also
+waits for those applications to disconnect, so one saving as it quits is not cut off). A
+window still open after `power.close_timeout` milliseconds (5000), typically an application
+asking whether to save, cancels the action and stays on screen with the reason across the
+panel; answering it in time lets the action go on. `power.force = true` goes ahead after the
+timeout anyway, ending such applications without saving, and `power.close_windows = false`
+skips the closing.
+
 `suspend` and `hibernate` first lock the screen with `power.lock_command` and ask logind only
 once the lock holds on every monitor, so the machine never wakes up unlocked; a locker that has
 not locked within five seconds cancels the suspend. A sleep something else asks for (closing

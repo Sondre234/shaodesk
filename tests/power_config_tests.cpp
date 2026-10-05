@@ -20,13 +20,18 @@ static void rejects(const std::string &source) {
 int main() {
     try {
         auto defaults = shaodesk::parse_config("return {}");
+        const auto &d = defaults.settings;
         require(defaults.power.lock_command == shaodesk::Command{"swaylock", "-f"} &&
-                    defaults.settings.lock_before_sleep,
+                    d.lock_before_sleep && d.close_windows && d.close_timeout == 5000 &&
+                    !d.close_force,
                 "power defaults");
         auto custom = shaodesk::parse_config(
-            "return {power={lock_command={'gtklock','--daemonize'},lock_before_sleep=false}}");
+            "return {power={lock_command={'gtklock','--daemonize'},lock_before_sleep=false,"
+            "close_windows=false,close_timeout=500,force=true}}");
+        const auto &c = custom.settings;
         require(custom.power.lock_command == shaodesk::Command{"gtklock", "--daemonize"} &&
-                    !custom.settings.lock_before_sleep,
+                    !c.lock_before_sleep && !c.close_windows && c.close_timeout == 500 &&
+                    c.close_force,
                 "power not parsed");
         require(shaodesk::parse_config("return {power={lock_command={}}}").power.lock_command.empty(),
                 "an empty lock_command is not none");
@@ -37,6 +42,11 @@ int main() {
         rejects("return {power={locker={'swaylock'}}}");
         rejects("return {power=true}");
         rejects("return {power={lock_before_sleep='yes'}}");
+        rejects("return {power={close_windows=1}}");
+        rejects("return {power={close_timeout=499}}");
+        rejects("return {power={close_timeout=60001}}");
+        rejects("return {power={close_timeout=1.5}}");
+        rejects("return {power={force='no'}}");
         std::cout << "power configuration passed\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';

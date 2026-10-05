@@ -325,9 +325,15 @@ struct sh_settings {
     /* windows.drag_strip: how many pixels along the top of a window without a title bar move
      * it when dragged. */
     int drag_strip;
-    /* power.lock_before_sleep: suspend and hibernate lock the screen with power.lock_command
-     * first. */
+    /* power.lock_before_sleep: the screen locks with power.lock_command before the machine
+     * sleeps. */
     bool lock_before_sleep;
+    /* power.close_windows: poweroff, reboot and logout ask every window to close first, and go
+     * ahead once all have; after close_timeout milliseconds with some still open they give up,
+     * or with close_force go ahead anyway. */
+    bool close_windows;
+    int close_timeout;
+    bool close_force;
 };
 
 /* What a mouse button was pressed over. */
