@@ -255,8 +255,12 @@ return {
         -- { mods = { mod, "Ctrl" }, key = "bracketright", action = "consume_right" },
         -- { mods = { mod }, key = "e", action = "expel" },
         -- Also available: snap_left, snap_right (half the screen), maximize, restore.
-        -- Lock with any ext-session-lock client, e.g.:
-        -- { mods = { mod, "Shift" }, key = "l", action = "spawn", command = { "swaylock" } },
+        -- Lock with power.lock_command (swaylock -f unless set); the power menu offers lock,
+        -- suspend, hibernate, restart, power off and log out. suspend, hibernate, reboot,
+        -- poweroff and logout bind directly too, without asking, e.g.:
+        -- { mods = { mod, "Ctrl" }, key = "Escape", action = "suspend" },
+        { mods = { mod, "Shift" }, key = "l", action = "lock" },
+        { mods = { mod }, key = "Escape", action = "power_menu" },
         { mods = { mod }, key = "1", action = "workspace", workspace = 1 },
         { mods = { mod }, key = "2", action = "workspace", workspace = 2 },
         { mods = { mod }, key = "3", action = "workspace", workspace = 3 },

@@ -150,6 +150,8 @@ Edit them in [config/init.lua](config/init.lua).
 | Super + P | [Command palette](docs/features.md#command-palette) |
 | Super + C | Close the focused window |
 | Super + M | Exit shaodesk |
+| Super + Shift + L | [Lock the screen](docs/features.md#power) with `power.lock_command` (swaylock) |
+| Super + Escape | [Power menu](docs/features.md#power): lock, suspend, hibernate, restart, power off, log out |
 | Super + V | Float or tile the focused window |
 | Super + F | Fullscreen |
 | Super + T | Arrange the monitor's windows in a grid (floating mode) |
