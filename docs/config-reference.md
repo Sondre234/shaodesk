@@ -16,7 +16,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `profile` | string | unset | - | The appearance profile to start with, a name from `profiles`. One picked from the panel's menu, the command palette or `shaodesk msg profile NAME` replaces it until another is picked; that choice is kept in `$XDG_STATE_HOME/shaodesk/profile`. |
 | `profiles` | table of tables | unset | - | Appearance profiles, keyed by a name of up to 32 letters, digits, `-` and `_` (not `next` or `prev`), at most 32. Each holds `appearance`, `windows` and `shell` settings that replace this file's own (and its theme's and defaults') while the profile is in use, e.g. `light = { shell = { panel_color = "#f2f4f8" } }`. Every profile is checked as the file loads. A file with `extends = "default"` gets the default configuration's profiles only when it has none of its own. |
 | `xwayland` | boolean | true | - | Run X11 applications; Xwayland starts on first use. Restart to change. |
-| `auto_reload` | boolean | true | - | Reload when this file, or another `.lua` file in its directory, is saved. A file with an error loads the default configuration instead and shows the error on screen. |
+| `auto_reload` | boolean | true | - | Reload when this file, or another `.lua` or `.xkb` file in its directory (or the `keyboard.file` there), is saved. A file with an error loads the default configuration instead and shows the error on screen. |
 
 ## `appearance`
 

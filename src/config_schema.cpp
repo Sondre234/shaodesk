@@ -33,8 +33,9 @@ const Option options[] = {
     {"xwayland", "boolean", "true", "true", none, none,
      "Run X11 applications; Xwayland starts on first use. Restart to change."},
     {"auto_reload", "boolean", "true", "false", none, none,
-     "Reload when this file, or another `.lua` file in its directory, is saved. A file with "
-     "an error loads the default configuration instead and shows the error on screen."},
+     "Reload when this file, or another `.lua` or `.xkb` file in its directory (or the "
+     "`keyboard.file` there), is saved. A file with an error loads the default configuration "
+     "instead and shows the error on screen."},
 
     {"appearance", "table", "", "", none, none, "Desktop look."},
     {"appearance.background", "color", "\"#19212e\"", "\"#19212e\"", none, none,

@@ -542,12 +542,19 @@ struct Runtime {
     static bool config_changed(void *data) {
         auto &self = *static_cast<Runtime *>(data);
         bool changed = false;
+        // XKB keymaps count as well: an .xkb file, even while a broken one has the default
+        // configuration standing in, or keyboard.file by any name.
+        const std::filesystem::path file = self.config.settings.keyboard_file;
+        const auto keymap = file.parent_path() == self.path.parent_path().lexically_normal()
+                                ? file.filename()
+                                : std::filesystem::path();
         alignas(inotify_event) char buffer[4096];
         for (ssize_t count; (count = read(self.watch_fd, buffer, sizeof(buffer))) > 0;) {
             for (char *at = buffer; at < buffer + count;) {
                 auto *event = reinterpret_cast<inotify_event *>(at);
                 std::string_view name = event->len ? event->name : "";
-                if (name.ends_with(".lua"))
+                if (name.ends_with(".lua") || name.ends_with(".xkb") ||
+                    (!keymap.empty() && name == keymap.native()))
                     changed = true;
                 at += sizeof(inotify_event) + event->len;
             }

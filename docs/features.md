@@ -676,7 +676,8 @@ keymap.xkb` writes, edited to taste, or a hand-written `xkb_keymap { ... }`. A f
 be read or does not compile is an error like any other, shown with the line of the setting and,
 where xkbcommon knows it, the line of the keymap (`init.lua:4: keyboard.file:
 /home/me/us-custom.xkb:12:5: syntax error`); should it break while the session runs, the
-keyboard falls back to the names.
+keyboard falls back to the names. Saving an `.xkb` file beside the configuration reloads it, as
+saving a `.lua` file there does, so a fixed keymap brings the configuration back.
 
 Pointer devices in a standalone `--session` take `mouse.speed` (-1 to 1),
 `mouse.acceleration` (`"flat"` or `"adaptive"`), and `mouse.natural_scroll`; touchpads also
