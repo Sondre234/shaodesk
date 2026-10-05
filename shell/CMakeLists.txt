@@ -129,7 +129,7 @@ if(BUILD_TESTING)
     target_link_libraries(task_model_test PRIVATE Qt6::Core PkgConfig::SHELL_WAYLAND)
     add_test(NAME shell_tasks COMMAND ${Python3_EXECUTABLE}
         ${PROJECT_SOURCE_DIR}/tests/compositor_smoke.py $<TARGET_FILE:shaodesk>
-        $<TARGET_FILE:wayland_probe> ${PROJECT_SOURCE_DIR}/config/init.lua
+        $<TARGET_FILE:wayland_probe> ${EXAMPLE_CONFIG}
         $<TARGET_FILE:task_model_test>)
     set_tests_properties(shell_tasks PROPERTIES TIMEOUT 60)
     add_executable(notifications_test ${PROJECT_SOURCE_DIR}/tests/notifications_test.cpp
@@ -206,7 +206,7 @@ if(BUILD_TESTING)
     set_tests_properties(shell_system_status PROPERTIES TIMEOUT 90)
     add_test(NAME shell_preview COMMAND ${Python3_EXECUTABLE}
         ${PROJECT_SOURCE_DIR}/tests/shell_preview.py $<TARGET_FILE:shaodesk-shell>
-        ${PROJECT_SOURCE_DIR}/config/init.lua)
+        ${EXAMPLE_CONFIG})
     set_tests_properties(shell_preview PROPERTIES TIMEOUT 90)
     add_test(NAME shell_version COMMAND shaodesk-shell --version)
     set_tests_properties(shell_version PROPERTIES PASS_REGULAR_EXPRESSION "^shaodesk-shell ${PROJECT_VERSION}( \\(git [^)]+\\))?\n$")
@@ -214,7 +214,7 @@ if(BUILD_TESTING)
         add_test(NAME shell_integration COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/shell_integration.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe>
-            ${PROJECT_SOURCE_DIR}/config/init.lua)
+            ${EXAMPLE_CONFIG})
         set_tests_properties(shell_integration PROPERTIES TIMEOUT 90)
         add_test(NAME overview_shell_smoke COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/overview_shell_smoke.py $<TARGET_FILE:shaodesk>
