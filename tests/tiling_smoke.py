@@ -84,7 +84,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-tiling-test-") as directory:
 
             launch()
             wait_for(lambda: len(windows()) == 1, processes, "first window")
-            assert windows()[0][2:] == (False, *windows()[0][3:]), "tiled while tiling is off"
+            assert not windows()[0][2], "tiled while tiling is off"
             floating = boxes()[0]
             assert floating[2:] == (320, 240), floating
 
