@@ -115,17 +115,18 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-animation-test-") as directory
             close(left)
             close(right)
             wait_for(lambda: not windows() and state()[0] == 0, "workspace windows closed")
-            msg("workspace", "1")
             wait_for(lambda: state() == (0, 0), "nothing left behind")
 
             # Fullscreen toggles glide the window, and leaving lands it at its old place.
             floating = launch()
             wait_for(lambda: len(windows()) == 1 and state() == (0, 1), "window for fullscreen")
+            place = windows()[0][4:8]
             msg("fullscreen")
             wait_for(lambda: state()[0] >= 1, "fullscreen glide running")
             wait_for(lambda: state()[0] == 0, "fullscreen glide finished")
             msg("fullscreen")
-            wait_for(lambda: state()[0] == 0, "leaving fullscreen settles")
+            wait_for(lambda: state()[0] >= 1, "glide back running")
+            wait_for(lambda: state()[0] == 0 and windows()[0][4:8] == place, "back at its place")
             close(floating)
             wait_for(lambda: not windows() and state() == (0, 0), "fullscreen window closed")
 
