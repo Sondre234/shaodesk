@@ -72,7 +72,6 @@ void unknown_settings() {
     expect("return {shell={panel_margin={tp=1}}}", "did you mean 'top'?");
     // Nothing close: list what is valid.
     expect("return {shell={zzzzzzzz=1}}", "expected one of: enabled, panel_height");
-    expect("return {shell={zzzzzzzz=1}}", "expected one of:");
     require(error_of("return {shell={zzzzzzzz=1}}").find("did you mean") == std::string::npos,
             "a far-off name got a suggestion");
 }
@@ -100,12 +99,10 @@ void locations() {
     at("return {\n  x = = 1,\n}", "2:");
     at("local a = nil\nreturn { shell = a.b }", "2:");
     // No location is invented for a setting that is not in the file.
-    auto message = error_of("return {shell=(function() return {panel_height=1} end)()}");
-    require(message.find("test.lua:") == std::string::npos ||
+    auto message = error_of("return {shell={['panel_' .. 'height']=1}}");
+    require(message.find("test.lua:") == std::string::npos &&
                 message.find("shell.panel_height") != std::string::npos,
             "unexpected location: " + message);
-    auto plain = shaodesk::parse_config("return {}", "@x.lua");
-    (void)plain;
 }
 void wrong_types() {
     expect("return {shell={panel_height='big'}}", "shell.panel_height must be an integer, not a string");
