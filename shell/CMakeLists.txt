@@ -221,9 +221,12 @@ if(BUILD_TESTING)
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(overview_shell_smoke PROPERTIES TIMEOUT 60)
         find_program(GRIM grim)
+        # A missing grim is an empty argument, which the tests take as leaving out their
+        # pixel checks (GRIM itself would be GRIM-NOTFOUND).
+        set(GRIM_ARGUMENT "$<$<BOOL:${GRIM}>:${GRIM}>")
         add_test(NAME urgent_shell_smoke COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/urgent_shell_smoke.py $<TARGET_FILE:shaodesk>
-            $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe> "${GRIM}")
+            $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")
         set_tests_properties(urgent_shell_smoke PROPERTIES TIMEOUT 90)
         if(SHAODESK_DBUS)
             add_test(NAME notifications_smoke COMMAND ${Python3_EXECUTABLE}

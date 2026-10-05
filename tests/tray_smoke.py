@@ -257,6 +257,9 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-tray-test-") as directory:
                                              "notifications = { enabled = false },\n"
                                              "    shell = { widgets = { tray = false } },"))
             desktop.send_signal(signal.SIGHUP)
+            # Without this wait both reloads could land before the shell turns the tray off.
+            wait_for(lambda: "shaodesk tray: off, its names released" in log(),
+                     "the tray turned off")
             if grim:
                 wait_for(lambda: not icons("HEADLESS-2", CYAN), "the tray hidden")
             config.write_text(CONFIG)

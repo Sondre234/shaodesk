@@ -596,26 +596,29 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(fullscreen_panel_smoke PROPERTIES TIMEOUT 60)
         find_program(GRIM grim)
+        # A missing grim is an empty argument, which the tests take as leaving out their
+        # pixel checks (GRIM itself would be GRIM-NOTFOUND).
+        set(GRIM_ARGUMENT "$<$<BOOL:${GRIM}>:${GRIM}>")
         add_test(NAME dim_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/dim_smoke.py
-            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM}")
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")
         set_tests_properties(dim_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME urgent_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/urgent_smoke.py
-            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM}")
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")
         set_tests_properties(urgent_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME urgent_border_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/urgent_border_smoke.py
-            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM}")
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")
         set_tests_properties(urgent_border_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME peek_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/peek_smoke.py
-            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM}")
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")
         set_tests_properties(peek_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME magnet_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/magnet_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>
-            "${GRIM}")
+            "${GRIM_ARGUMENT}")
         set_tests_properties(magnet_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME night_light_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/night_light_smoke.py
@@ -626,7 +629,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         set_tests_properties(hot_corners_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME zoom_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/zoom_smoke.py
-            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM}")
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")
         set_tests_properties(zoom_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME zoom_output_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/zoom_output_smoke.py $<TARGET_FILE:shaodesk>)
