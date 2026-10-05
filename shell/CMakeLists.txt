@@ -9,16 +9,19 @@ if(SHAODESK_PULSEAUDIO)
         message(STATUS "libpulse not found: the panel's volume control is left out")
     endif()
 endif()
-# The notification daemon speaks D-Bus; without QtDBus the shell builds without it and the panel
-# leaves out the bell.
+# The notification daemon and the system tray speak D-Bus; without QtDBus the shell builds
+# without them and the panel leaves out the bell and the tray.
 option(SHAODESK_NOTIFICATIONS "Serve org.freedesktop.Notifications from the shell (needs Qt6 DBus)" ON)
+option(SHAODESK_TRAY "Show applications' status icons (StatusNotifierItem) in the panel (needs Qt6 DBus)" ON)
 set(SHAODESK_DBUS OFF)
-if(SHAODESK_NOTIFICATIONS)
+set(SHAODESK_TRAY_DBUS OFF)
+if(SHAODESK_NOTIFICATIONS OR SHAODESK_TRAY)
     find_package(Qt6 6.5 QUIET COMPONENTS DBus)
     if(Qt6DBus_FOUND)
-        set(SHAODESK_DBUS ON)
+        set(SHAODESK_DBUS ${SHAODESK_NOTIFICATIONS})
+        set(SHAODESK_TRAY_DBUS ${SHAODESK_TRAY})
     else()
-        message(STATUS "Qt6 DBus not found: the notification daemon is left out")
+        message(STATUS "Qt6 DBus not found: the notification daemon and the tray are left out")
     endif()
 endif()
 if(NOT SHAODESK_SHELL_PREVIEW_ONLY)
@@ -149,6 +152,15 @@ if(BUILD_TESTING)
         add_test(NAME shell_notifications_dbus COMMAND notifications_dbus_test)
         set_tests_properties(shell_notifications_dbus PROPERTIES TIMEOUT 60
             ENVIRONMENT "QT_QPA_PLATFORM=offscreen;DBUS_SESSION_BUS_ADDRESS=disabled:")
+    endif()
+    if(SHAODESK_TRAY_DBUS)
+        # A tray item for the end-to-end tests; tests/tray_fake_item.hpp is its item and menu.
+        add_executable(tray_probe ${PROJECT_SOURCE_DIR}/tests/tray_probe.cpp
+            ${PROJECT_SOURCE_DIR}/tests/tray_fake_item.hpp)
+        set_target_properties(tray_probe PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
+        target_compile_definitions(tray_probe PRIVATE QT_NO_KEYWORDS)
+        target_compile_options(tray_probe PRIVATE -Wall -Wextra -Wpedantic)
+        target_link_libraries(tray_probe PRIVATE Qt6::Gui Qt6::DBus)
     endif()
     add_executable(osd_test ${PROJECT_SOURCE_DIR}/tests/osd_test.cpp
         ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp view.cpp view.hpp task_model.cpp task_model.hpp
