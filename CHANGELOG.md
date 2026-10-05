@@ -4,6 +4,21 @@ Notable changes, newest first. Dates are when the work landed. 0.1.0 is the firs
 release; the dated sections below it record the work that led up to it, and all of it is in
 0.1.0.
 
+## 0.1.1 (2026-10-05)
+
+Fixes to the tests, CI and the ebuild; the compositor and the shell behave as in 0.1.0.
+
+- Where grim is not installed, as in an ebuild's test phase, the pixel tests leave out their
+  pixel checks as they were meant to; they were handed `GRIM-NOTFOUND` to run instead, and five
+  failed.
+- `tray_smoke` waits for the tray to turn off before turning it on again: without grim nothing
+  held the two reloads apart. The shell now logs `shaodesk tray: off, its names released`.
+- `notifications_smoke` checks the on-screen display's pill above its label, which wider fonts
+  reached.
+- CI installs grim, so the pixel checks run there too, and checks out with `actions/checkout`
+  v7 (Node 24).
+- The release ebuild suggests every terminal Super + Q looks for, not only kitty.
+
 ## 0.1.0 (2026-10-05)
 
 The first release, for people other than its author to try. Since the last dated section: a
