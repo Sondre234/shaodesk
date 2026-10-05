@@ -1,12 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """focus_left/right, as sway's focus: with no window that way, focus moves on to the next
 output, so an empty output can be reached from the keyboard and new windows open there."""
-import os
 from pathlib import Path
-import re
-import subprocess
 import sys
-import tempfile
 
 import harness
 
@@ -25,94 +21,51 @@ CONFIG = """return {
     },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-focus-output-") as directory:
-    root = Path(directory)
-    init = root / "init.lua"
-    init.write_text(CONFIG)
-    log = root / "compositor.log"
-    env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
-               WLR_HEADLESS_OUTPUTS="2")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
-        env.pop(name, None)
-
-    def msg(*words):
-        result = subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                                text=True, timeout=30)
-        assert result.returncode == 0, (words, result.stdout, result.stderr)
-        return result.stdout
+with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) as desktop:
+    msg = desktop.msg
 
     def windows():
         """(focused, output) per window, by output (one window per output here)."""
-        rows = [line.split("\t") for line in msg("get", "windows").splitlines()]
-        return sorted(((r[1] == "1", r[10]) for r in rows), key=lambda w: w[1])
+        return sorted(((r[1] == "1", r[10]) for r in desktop.rows("windows")), key=lambda w: w[1])
 
     def focused_output():
-        rows = [line.split("\t") for line in msg("get", "workspaces").splitlines()]
-        return next(r[0] for r in rows if r[2] == "1")
+        return next(r[0] for r in desktop.rows("workspaces") if r[2] == "1")
 
-    def wait_for(predicate, message):
-        harness.wait_for(predicate, processes, message,
-                         detail=lambda: f"windows: {windows()}, output: {focused_output()}")
+    desktop.detail = lambda: f"windows: {windows()}, output: {focused_output()}"
 
     def open_window():
         count = len(windows())
-        processes.append(subprocess.Popen([probe, "--external-control"], env=env,
-                                          stdout=subprocess.DEVNULL))
-        wait_for(lambda: len(windows()) == count + 1, f"window {count + 1} mapped")
+        desktop.spawn([probe, "--external-control"])
+        desktop.wait_for(lambda: len(windows()) == count + 1, f"window {count + 1} mapped")
 
-    with log.open("w") as output:
-        server = subprocess.Popen([compositor, "--headless", "--config", str(init)],
-                                  env=env, stdout=output, stderr=output)
-        processes = [server]
-        try:
-            wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
-            text = log.read_text()
-            env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+    open_window()
+    desktop.wait_for(lambda: windows() == [(True, "HEADLESS-1")], "A focused on HEADLESS-1")
 
-            open_window()
-            wait_for(lambda: windows() == [(True, "HEADLESS-1")], "A focused on HEADLESS-1")
-
-            # No window to the right: focus moves to the empty HEADLESS-2, and the next window
-            # opens there.
-            msg("focus_right")
-            wait_for(lambda: focused_output() == "HEADLESS-2" and not windows()[0][0],
+    # No window to the right: focus moves to the empty HEADLESS-2, and the next window
+    # opens there.
+    msg("focus_right")
+    desktop.wait_for(lambda: focused_output() == "HEADLESS-2" and not windows()[0][0],
                      "empty HEADLESS-2 focused")
-            open_window()
-            wait_for(lambda: windows()[1] == (True, "HEADLESS-2"), "B focused on HEADLESS-2")
+    open_window()
+    desktop.wait_for(lambda: windows()[1] == (True, "HEADLESS-2"), "B focused on HEADLESS-2")
 
-            # Between windows on the two outputs, as before.
-            msg("focus_left")
-            wait_for(lambda: windows() == [(True, "HEADLESS-1"), (False, "HEADLESS-2")],
+    # Between windows on the two outputs, as before.
+    msg("focus_left")
+    desktop.wait_for(lambda: windows() == [(True, "HEADLESS-1"), (False, "HEADLESS-2")],
                      "A focused")
-            msg("focus_right")
-            wait_for(lambda: windows() == [(False, "HEADLESS-1"), (True, "HEADLESS-2")],
+    msg("focus_right")
+    desktop.wait_for(lambda: windows() == [(False, "HEADLESS-1"), (True, "HEADLESS-2")],
                      "B focused")
-            # Past the last output nothing happens.
-            msg("focus_right")
-            assert windows()[1][0] and focused_output() == "HEADLESS-2", windows()
+    # Past the last output nothing happens.
+    msg("focus_right")
+    assert windows()[1][0] and focused_output() == "HEADLESS-2", windows()
 
-            # From an empty output with nothing focused, back to the window on the other.
-            processes.pop().kill()
-            wait_for(lambda: windows() == [(True, "HEADLESS-1")], "B closed")
-            msg("focus_right")
-            wait_for(lambda: focused_output() == "HEADLESS-2" and not windows()[0][0],
+    # From an empty output with nothing focused, back to the window on the other.
+    desktop.clients.pop().kill()
+    desktop.wait_for(lambda: windows() == [(True, "HEADLESS-1")], "B closed")
+    msg("focus_right")
+    desktop.wait_for(lambda: focused_output() == "HEADLESS-2" and not windows()[0][0],
                      "empty HEADLESS-2 focused again")
-            msg("focus_left")
-            wait_for(lambda: windows() == [(True, "HEADLESS-1")], "A focused from empty output")
-
-            for window in processes[1:]:
-                window.kill()
-                window.wait(timeout=30)
-            del processes[1:]
-            server.terminate()
-            assert server.wait(timeout=30) == 0, log.read_text()
-            print("Focus moved between windows and onto an empty output")
-        except Exception:
-            print(log.read_text(), file=sys.stderr)
-            raise
-        finally:
-            for process in reversed(processes):
-                if process.poll() is None:
-                    process.kill()
-                    process.wait(timeout=30)
+    msg("focus_left")
+    desktop.wait_for(lambda: windows() == [(True, "HEADLESS-1")], "A focused from empty output")
+print("Focus moved between windows and onto an empty output")

@@ -1,12 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """focus_left/right/up/down moves keyboard focus between neighbouring tiles, and
 move_left/right/up/down swaps the focused tile with its neighbour, in both axes."""
-import os
 from pathlib import Path
-import re
-import subprocess
 import sys
-import tempfile
 
 import harness
 
@@ -20,42 +16,24 @@ CONFIG = """return {
 
 DIRECTIONS = {"left": (True, -1), "right": (True, 1), "up": (False, -1), "down": (False, 1)}
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-tile-focus-test-") as directory:
-    root = Path(directory)
-    init = root / "init.lua"
-    init.write_text(CONFIG)
-    log = root / "compositor.log"
-    env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
-        env.pop(name, None)
-
-    def msg(*words):
-        result = subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                                text=True, timeout=30)
-        assert result.returncode == 0, (words, result.stdout, result.stderr)
-        return result.stdout
+with harness.Compositor(compositor, CONFIG) as desktop:
+    msg = desktop.msg
 
     def windows():
         """(focused, tiled, x, y, width, height) per window, most recently focused last."""
-        rows = [line.split("\t") for line in msg("get", "windows").splitlines()]
+        rows = desktop.rows("windows")
         return [(r[1] == "1", r[3] == "1", *map(int, r[4:8])) for r in rows]
 
-    def wait_for(predicate, message):
-        harness.wait_for(predicate, processes, message, detail=lambda: f"windows: {windows()}")
+    desktop.detail = lambda: f"windows: {windows()}"
 
     def focused():
         """The focused tile, by its place: the listing is in focus order, so its index
         changes with focus."""
         return next(tuple(w[2:]) for w in windows() if w[0])
 
-    def disjoint(rects):
-        return all(a[0] + a[2] <= b[0] or b[0] + b[2] <= a[0] or
-                   a[1] + a[3] <= b[1] or b[1] + b[3] <= a[1]
-                   for i, a in enumerate(rects) for b in rects[i + 1:])
-
     def settled():
         current = windows()
-        return all(w[1] for w in current) and disjoint([w[2:] for w in current])
+        return all(w[1] for w in current) and harness.disjoint([w[2:] for w in current])
 
     def toward(start, direction):
         """The tile focus_<direction> should pick from the tile at `start`: those level with
@@ -76,62 +54,36 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-tile-focus-test-") as director
                 best = (key, (x, y, w, h))
         return None if best is None else best[1]
 
-    with log.open("w") as output:
-        server = subprocess.Popen([compositor, "--headless", "--config", str(init)],
-                                  env=env, stdout=output, stderr=output)
-        processes = [server]
-        try:
-            wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
-            text = log.read_text()
-            env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
-            for count in (1, 2, 3, 4):
-                processes.append(subprocess.Popen([probe, "--external-control"], env=env,
-                                                  stdout=subprocess.DEVNULL))
-                wait_for(lambda: len(windows()) == count and settled(),
-                         f"window {count} tiled")
+    for count in (1, 2, 3, 4):
+        desktop.spawn([probe, "--external-control"])
+        desktop.wait_for(lambda: len(windows()) == count and settled(), f"window {count} tiled")
 
-            # Four tiles always have neighbours in both axes, so every direction gets used.
-            moved = {True: False, False: False}
-            for direction in ["left", "up", "right", "down", "left", "down", "right", "up"] * 2:
-                start = focused()
-                target = toward(start, direction)
-                msg(f"focus_{direction}")
-                if target is None:
-                    assert focused() == start, (direction, windows())
-                else:
-                    wait_for(lambda: focused() == target, f"focus_{direction} to {target}")
-                    moved[DIRECTIONS[direction][0]] = True
-            assert all(moved.values()), f"focus never crossed an axis: {moved}"
+    # Four tiles always have neighbours in both axes, so every direction gets used.
+    moved = {True: False, False: False}
+    for direction in ["left", "up", "right", "down", "left", "down", "right", "up"] * 2:
+        start = focused()
+        target = toward(start, direction)
+        msg(f"focus_{direction}")
+        if target is None:
+            assert focused() == start, (direction, windows())
+        else:
+            desktop.wait_for(lambda: focused() == target, f"focus_{direction} to {target}")
+            moved[DIRECTIONS[direction][0]] = True
+    assert all(moved.values()), f"focus never crossed an axis: {moved}"
 
-            # move_<direction> trades places with the neighbour: the focused tile ends up on
-            # that side of where it was, still focused, and no tile covers another.
-            swapped = {True: False, False: False}
-            for direction in ["left", "up", "right", "down"] * 2:
-                start = focused()
-                if toward(start, direction) is None:
-                    continue
-                horizontal, sign = DIRECTIONS[direction]
-                axis = 0 if horizontal else 1
-                msg(f"move_{direction}")
-                wait_for(lambda: settled() and len([w for w in windows() if w[0]]) == 1 and
+    # move_<direction> trades places with the neighbour: the focused tile ends up on
+    # that side of where it was, still focused, and no tile covers another.
+    swapped = {True: False, False: False}
+    for direction in ["left", "up", "right", "down"] * 2:
+        start = focused()
+        if toward(start, direction) is None:
+            continue
+        horizontal, sign = DIRECTIONS[direction]
+        axis = 0 if horizontal else 1
+        msg(f"move_{direction}")
+        desktop.wait_for(lambda: settled() and len([w for w in windows() if w[0]]) == 1 and
                          (focused()[axis] - start[axis]) * sign > 0,
                          f"move_{direction} swapped the tile")
-                swapped[horizontal] = True
-            assert all(swapped.values()), f"no swap along an axis: {swapped}"
-
-            for window in processes[1:]:
-                window.kill()
-                window.wait(timeout=30)
-            del processes[1:]
-            server.terminate()
-            assert server.wait(timeout=30) == 0, log.read_text()
-            print("Keyboard focus and swapping between tiles passed")
-        except Exception:
-            print(log.read_text(), file=sys.stderr)
-            raise
-        finally:
-            for process in reversed(processes):
-                if process.poll() is None:
-                    process.kill()
-                    process.wait(timeout=30)
+        swapped[horizontal] = True
+    assert all(swapped.values()), f"no swap along an axis: {swapped}"
+print("Keyboard focus and swapping between tiles passed")

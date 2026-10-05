@@ -2,13 +2,9 @@
 """The overview on a second monitor: it lists only that monitor's windows, in the monitor's own
 coordinates, draws on that monitor (checked on a screenshot), and takes pointer clicks at the
 monitor's place in the layout."""
-import os
 from pathlib import Path
-import re
 import shutil
-import subprocess
 import sys
-import tempfile
 
 import harness
 
@@ -25,25 +21,11 @@ CONFIG = """return {
 }"""
 LAYOUT = (2080, 720)
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-overview-output-") as directory:
-    root = Path(directory)
-    init = root / "init.lua"
-    init.write_text(CONFIG)
-    log = root / "compositor.log"
-    env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
-               WLR_HEADLESS_OUTPUTS="2")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
-        env.pop(name, None)
-
-    def msg(*words):
-        result = subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                                text=True, timeout=30)
-        assert result.returncode == 0, (words, result.stdout, result.stderr)
-        return result.stdout
+with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) as desktop:
+    msg = desktop.msg
 
     def windows():
-        rows = [line.split("\t") for line in msg("get", "windows").splitlines()]
-        return {r[9]: dict(focused=r[1] == "1", output=r[10]) for r in rows}
+        return {r[9]: dict(focused=r[1] == "1", output=r[10]) for r in desktop.rows("windows")}
 
     def focused():
         return next((t for t, w in windows().items() if w["focused"]), None)
@@ -58,79 +40,51 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-overview-output-") as director
         overview.area = tuple(int(n) for n in lines[1].split(" ")[6:10]) if len(lines) > 1 else None
         return lines[0].split()[0], lines[1].split(" ")[1] if len(lines) > 1 else None, thumbs
 
-    def wait_for(predicate, message):
-        harness.wait_for(predicate, processes, message,
-                         detail=lambda: f"windows: {windows()} overview: {overview()}")
+    desktop.detail = lambda: f"windows: {windows()} overview: {overview()}"
+    pointer = desktop.virtual_pointer(pointer_probe, *LAYOUT)
 
-    with log.open("w") as output:
-        server = subprocess.Popen([compositor, "--headless", "--config", str(init)],
-                                  env=env, stdout=output, stderr=output)
-        processes = [server]
-        try:
-            wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
-            text = log.read_text()
-            env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
-            virtual = subprocess.Popen([pointer_probe, str(LAYOUT[0]), str(LAYOUT[1])], env=env,
-                                       stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
-            processes.append(virtual)
-            assert virtual.stdout.readline().strip() == "ready"
+    # A's client also puts a 48 pixel panel on the second monitor: the overview keeps clear of it.
+    for title in ("A", "C", "D"):
+        desktop.spawn([probe, "--external-control" if title == "A" else "--window-only"],
+                      env={"SHAODESK_PROBE_TITLE": title, "SHAODESK_PROBE_APP_ID": "zz"})
+        desktop.wait_for(lambda: title in windows() and focused() == title, f"{title} focused")
+    assert windows()["C"]["output"] == "HEADLESS-2", windows()
 
-            def pointer(*commands):
-                virtual.stdin.write(" ".join(commands) + "\n")
-                virtual.stdin.flush()
-                assert virtual.stdout.readline().strip() == "done"
+    msg("output", "HEADLESS-2", "toggle_overview")
+    state, where, thumbs = overview()
+    assert state == "open" and where == "HEADLESS-2", (state, where)
+    assert sorted(t[4] for t in thumbs) == ["C", "D"], thumbs
+    for x, y, w, h, _ in thumbs:
+        assert 0 <= x and x + w <= 800 and 0 <= y and y + h <= 600, thumbs
 
-            # A's client also puts a 48 pixel panel on the second monitor: the overview keeps clear of it.
-            for title in ("A", "C", "D"):
-                processes.append(subprocess.Popen(
-                    [probe, "--external-control" if title == "A" else "--window-only"], env=dict(env, SHAODESK_PROBE_TITLE=title,
-                                                       SHAODESK_PROBE_APP_ID="zz"),
-                    stdout=subprocess.DEVNULL))
-                wait_for(lambda: title in windows() and focused() == title, f"{title} focused")
-            assert windows()["C"]["output"] == "HEADLESS-2", windows()
+    grim = shutil.which("grim")
+    if grim:
+        def drawn():
+            shot = harness.grab(grim, desktop.env, "HEADLESS-2")
+            return all(all(abs(a - b) < 6 for a, b in
+                           zip(shot.at(x + w // 2, y + h - 3), (0x41, 0x7b, 0xc4)))
+                       for x, y, w, h, _ in overview()[2])
+        desktop.wait_for(drawn, "thumbnails on the second monitor")
+        print("Screenshot checked")
 
-            msg("output", "HEADLESS-2", "toggle_overview")
-            state, where, thumbs = overview()
-            assert state == "open" and where == "HEADLESS-2", (state, where)
-            assert sorted(t[4] for t in thumbs) == ["C", "D"], thumbs
-            for x, y, w, h, _ in thumbs:
-                assert 0 <= x and x + w <= 800 and 0 <= y and y + h <= 600, thumbs
+    # The thumbnails keep clear of the panel, and a click on the panel closes the overview
+    # (and goes on to the panel; the probe panel takes no input to prove that).
+    x, y, w, h = overview.area
+    assert (w, h) == (800, 600 - 48) and y in (0, 48), overview.area
+    assert all(y <= t[1] and t[1] + t[3] <= y + h for t in thumbs), (thumbs, overview.area)
+    panel_y = 600 - 20 if y == 0 else 20
+    pointer("move", str(1280 + 400), str(panel_y), "click", "left")
+    desktop.wait_for(lambda: overview()[0] == "closed", "a click on the panel closes it")
+    msg("output", "HEADLESS-2", "toggle_overview")
 
-            grim = shutil.which("grim")
-            if grim:
-                def drawn():
-                    shot = harness.grab(grim, env, "HEADLESS-2")
-                    return all(all(abs(a - b) < 6 for a, b in
-                                   zip(shot.at(x + w // 2, y + h - 3), (0x41, 0x7b, 0xc4)))
-                               for x, y, w, h, _ in overview()[2])
-                wait_for(drawn, "thumbnails on the second monitor")
-                print("Screenshot checked")
+    # A click at the monitor's place in the layout picks the window there.
+    x, y, w, h, title = thumbs[0]
+    pointer("move", str(1280 + x + w // 2), str(y + h // 2), "click", "left")
+    desktop.wait_for(lambda: focused() == title, f"{title} focused by the click")
+    desktop.wait_for(lambda: overview()[0] == "closed", "closed by the click")
 
-            # The thumbnails keep clear of the panel, and a click on the panel closes the overview
-            # (and goes on to the panel; the probe panel takes no input to prove that).
-            x, y, w, h = overview.area
-            assert (w, h) == (800, 600 - 48) and y in (0, 48), overview.area
-            assert all(y <= t[1] and t[1] + t[3] <= y + h for t in thumbs), (thumbs, overview.area)
-            panel_y = 600 - 20 if y == 0 else 20
-            pointer("move", str(1280 + 400), str(panel_y), "click", "left")
-            wait_for(lambda: overview()[0] == "closed", "a click on the panel closes it")
-            msg("output", "HEADLESS-2", "toggle_overview")
-
-            # A click at the monitor's place in the layout picks the window there.
-            x, y, w, h, title = thumbs[0]
-            pointer("move", str(1280 + x + w // 2), str(y + h // 2), "click", "left")
-            wait_for(lambda: focused() == title, f"{title} focused by the click")
-            wait_for(lambda: overview()[0] == "closed", "closed by the click")
-
-            # The first monitor's overview lists its own window only.
-            msg("output", "HEADLESS-1", "toggle_overview")
-            _, where, thumbs = overview()
-            assert where == "HEADLESS-1" and [t[4] for t in thumbs] == ["A"], (where, thumbs)
-            print("Overview outputs passed")
-        finally:
-            for process in reversed(processes):
-                process.terminate()
-                if process.stdin:
-                    process.stdin.close()
-                process.wait(timeout=30)
+    # The first monitor's overview lists its own window only.
+    msg("output", "HEADLESS-1", "toggle_overview")
+    _, where, thumbs = overview()
+    assert where == "HEADLESS-1" and [t[4] for t in thumbs] == ["A"], (where, thumbs)
+print("Overview outputs passed")

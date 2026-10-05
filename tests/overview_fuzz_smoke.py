@@ -3,13 +3,9 @@
 closing it, filtering, selecting, viewing workspaces, confirming, and switching, moving,
 minimizing and closing windows. The compositor must survive, and end with the overview closed
 and every window still listed."""
-import os
 from pathlib import Path
 import random
-import re
-import subprocess
 import sys
-import tempfile
 
 import harness
 
@@ -26,76 +22,49 @@ CONFIG = """return {
                              ["HEADLESS-2"] = { mode = "800x600" } } },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-overview-fuzz-") as directory:
-    root = Path(directory)
-    init = root / "init.lua"
-    init.write_text(CONFIG)
-    log = root / "compositor.log"
-    env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
-               WLR_HEADLESS_OUTPUTS="2")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
-        env.pop(name, None)
+with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) as desktop:
+    run = desktop.run
+    clients = []
+    rng = random.Random(seed)
+    words = ["a", "b", "term", "zz", "note", "x", "e", ""]
+    counter = 0
 
-    def run(*words):
-        return subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                              text=True, timeout=30)
+    def spawn():
+        global counter
+        counter += 1
+        clients.append(desktop.spawn([probe, "--window-only"],
+                                     env=dict(SHAODESK_PROBE_TITLE=f"win{counter}",
+                                              SHAODESK_PROBE_APP_ID="zz")))
 
-    with log.open("w") as output:
-        server = subprocess.Popen([compositor, "--headless", "--config", str(init)],
-                                  env=env, stdout=output, stderr=output)
-        processes = [server]
-        clients = []
-        try:
-            harness.wait_for(lambda: "Running Wayland compositor" in log.read_text(),
-                             processes, "startup")
-            text = log.read_text()
-            env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
-            rng = random.Random(seed)
-            words = ["a", "b", "term", "zz", "note", "x", "e", ""]
-            counter = 0
-
-            def spawn():
-                global counter
-                counter += 1
-                clients.append(subprocess.Popen(
-                    [probe, "--window-only"], env=dict(env, SHAODESK_PROBE_TITLE=f"win{counter}",
-                                                       SHAODESK_PROBE_APP_ID="zz"),
-                    stdout=subprocess.DEVNULL))
-
-            for _ in range(4):
-                spawn()
-            operations = [
-                lambda: run("toggle_overview"),
-                lambda: run("toggle_overview"),
-                lambda: run("overview", "filter", rng.choice(words) + rng.choice(words)),
-                lambda: run("overview", "select", str(rng.randint(1, 8))),
-                lambda: run("overview", "view", str(rng.randint(1, 4))),
-                lambda: run("overview_confirm", *([str(rng.randint(1, 6))] * rng.randint(0, 1))),
-                lambda: run("overview_cancel"),
-                lambda: run("workspace", str(rng.randint(1, 4))),
-                lambda: run("output", rng.choice(["HEADLESS-1", "HEADLESS-2"]), "toggle_overview"),
-                lambda: run("move_to_workspace", str(rng.randint(1, 4))),
-                lambda: run("close"),
-                lambda: run("toggle_tiling"),
-                lambda: run("get", "overview"),
-                lambda: spawn(),
-                lambda: spawn(),
-            ]
-            for step in range(steps):
-                rng.choice(operations)()
-                assert server.poll() is None, f"the compositor died at step {step}"
-                if len(clients) > 12:
-                    clients.pop(0).terminate()
-            run("overview_cancel")
-            harness.wait_for(lambda: run("get", "overview").stdout.startswith("closed"),
-                             processes, "the overview closed")
-            harness.wait_for(lambda: len(run("get", "windows").stdout.splitlines()) ==
-                             sum(client.poll() is None for client in clients), processes,
-                             "every live client's window listed")
-            print(f"Overview fuzz passed ({steps} steps, seed {seed})")
-        finally:
-            for process in reversed(clients + processes):
-                if process.poll() is None:
-                    process.terminate()
-                    process.wait(timeout=30)
+    for _ in range(4):
+        spawn()
+    operations = [
+        lambda: run("toggle_overview"),
+        lambda: run("toggle_overview"),
+        lambda: run("overview", "filter", rng.choice(words) + rng.choice(words)),
+        lambda: run("overview", "select", str(rng.randint(1, 8))),
+        lambda: run("overview", "view", str(rng.randint(1, 4))),
+        lambda: run("overview_confirm", *([str(rng.randint(1, 6))] * rng.randint(0, 1))),
+        lambda: run("overview_cancel"),
+        lambda: run("workspace", str(rng.randint(1, 4))),
+        lambda: run("output", rng.choice(["HEADLESS-1", "HEADLESS-2"]), "toggle_overview"),
+        lambda: run("move_to_workspace", str(rng.randint(1, 4))),
+        lambda: run("close"),
+        lambda: run("toggle_tiling"),
+        lambda: run("get", "overview"),
+        lambda: spawn(),
+        lambda: spawn(),
+    ]
+    for step in range(steps):
+        rng.choice(operations)()
+        assert desktop.server.poll() is None, f"the compositor died at step {step}"
+        if len(clients) > 12:
+            clients.pop(0).terminate()
+    run("overview_cancel")
+    # The windows come and go, so these waits watch only the compositor.
+    harness.wait_for(lambda: run("get", "overview").stdout.startswith("closed"),
+                     [desktop.server], "the overview closed")
+    harness.wait_for(lambda: len(run("get", "windows").stdout.splitlines()) ==
+                     sum(client.poll() is None for client in clients), [desktop.server],
+                     "every live client's window listed")
+print(f"Overview fuzz passed ({steps} steps, seed {seed})")

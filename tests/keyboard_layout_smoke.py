@@ -3,13 +3,10 @@
 numbered one, from the control socket and from a binding; a keyboard switching by an XKB option
 takes the others along; virtual keyboards keep theirs; and a reload keeps the active layout by
 name, else by place."""
-import os
 from pathlib import Path
 import re
 import socket
-import subprocess
 import sys
-import tempfile
 
 import harness
 
@@ -26,29 +23,13 @@ def config(layout, variant):
 }""" % (layout, variant)
 
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-layout-test-") as directory:
-    root = Path(directory)
-    init = root / "init.lua"
-    init.write_text(config("us,no", ",nodeadkeys"))
-    log = root / "compositor.log"
-    env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
-        env.pop(name, None)
-
-    def run(*words):
-        return subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                              text=True, timeout=30)
-
-    def msg(*words):
-        result = run(*words)
-        assert result.returncode == 0, (words, result.stdout, result.stderr)
-        return result.stdout
+with harness.Compositor(compositor, config("us,no", ",nodeadkeys")) as desktop:
+    msg = desktop.msg
 
     def keyboard():
         """The layouts as (short, name, active), and each keyboard's layout by name."""
         layouts, keyboards = [], {}
-        for line in msg("get", "keyboard").splitlines():
-            fields = line.split("\t")
+        for fields in desktop.rows("keyboard"):
             if fields[0] == "layout":
                 layouts.append((fields[3], fields[4], fields[2] == "1"))
             elif fields[0] == "keyboard":
@@ -69,7 +50,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-layout-test-") as directory:
 
         def __init__(self):
             self.socket = socket.socket(socket.AF_UNIX)
-            self.socket.connect(env["SHAODESK_SOCKET"])
+            self.socket.connect(desktop.env["SHAODESK_SOCKET"])
             self.socket.sendall(b"subscribe\n")
             self.socket.settimeout(0.05)
             self.buffer = ""
@@ -85,119 +66,88 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-layout-test-") as directory:
 
     US, NO = "1 2 us English (US)", "2 2 no Norwegian (no dead keys)"
 
-    with log.open("w") as output:
-        server = subprocess.Popen([compositor, "--headless", "--config", str(init)],
-                                  env=env, stdout=output, stderr=output)
-    processes = [server]
-    try:
-        harness.wait_for(lambda: "Running Wayland compositor" in log.read_text(), processes,
-                         "startup")
-        text = log.read_text()
-        env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-        env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
-        # Subscribers hear the active layout at once, and again whenever it changes.
-        subscriber = Subscriber()
-        harness.wait_for(lambda: subscriber.heard() == [US], processes, "the first state",
-                         detail=subscriber.heard)
-        msg("headless_keyboard", "add", "one")
-        msg("headless_keyboard", "add", "two")
-        assert keyboard() == ([("us", "English (US)", True),
-                               ("no", "Norwegian (no dead keys)", False)],
-                              {"one": 1, "two": 1}), keyboard()
+    # Subscribers hear the active layout at once, and again whenever it changes.
+    subscriber = Subscriber()
+    desktop.wait_for(lambda: subscriber.heard() == [US], "the first state",
+                     detail=subscriber.heard)
+    msg("headless_keyboard", "add", "one")
+    msg("headless_keyboard", "add", "two")
+    assert keyboard() == ([("us", "English (US)", True),
+                           ("no", "Norwegian (no dead keys)", False)],
+                          {"one": 1, "two": 1}), keyboard()
 
-        # From the control socket: next and prev wrap, a number picks one.
-        msg("switch_layout")
-        assert active() == (2, {"one": 2, "two": 2}), active()
-        msg("switch_layout", "next")
-        assert active() == (1, {"one": 1, "two": 1}), active()
-        msg("switch_layout", "prev")
-        assert active() == (2, {"one": 2, "two": 2}), active()
-        msg("switch_layout", "1")
-        assert active() == (1, {"one": 1, "two": 1}), active()
-        msg("switch_layout", "1")
-        assert active() == (1, {"one": 1, "two": 1}), active()
-        for words in (("0",), ("-1",), ("sideways",), ("next", "next")):
-            result = run("switch_layout", *words)
-            assert result.returncode != 0, words
-        result = run("switch_layout", "3")
-        assert "the keymap has 2 layouts" in result.stdout + result.stderr, result
-        assert active() == (1, {"one": 1, "two": 1}), active()
-        assert subscriber.heard() == [US, NO, US, NO, US], subscriber.heard()
+    # From the control socket: next and prev wrap, a number picks one.
+    msg("switch_layout")
+    assert active() == (2, {"one": 2, "two": 2}), active()
+    msg("switch_layout", "next")
+    assert active() == (1, {"one": 1, "two": 1}), active()
+    msg("switch_layout", "prev")
+    assert active() == (2, {"one": 2, "two": 2}), active()
+    msg("switch_layout", "1")
+    assert active() == (1, {"one": 1, "two": 1}), active()
+    msg("switch_layout", "1")
+    assert active() == (1, {"one": 1, "two": 1}), active()
+    for words in (("0",), ("-1",), ("sideways",), ("next", "next")):
+        msg("switch_layout", *words, ok=False)
+    result = desktop.run("switch_layout", "3")
+    assert "the keymap has 2 layouts" in result.stdout + result.stderr, result
+    assert active() == (1, {"one": 1, "two": 1}), active()
+    assert subscriber.heard() == [US, NO, US, NO, US], subscriber.heard()
 
-        # From a binding, typed on one keyboard: both switch.
-        key(LEFTMETA, "press")
-        key(LEFTALT, "press")
-        key(SPACE, "press")
-        key(SPACE, "release")
-        key(LEFTALT, "release")
-        key(LEFTMETA, "release")
-        assert active() == (2, {"one": 2, "two": 2}), active()
+    # From a binding, typed on one keyboard: both switch.
+    key(LEFTMETA, "press")
+    key(LEFTALT, "press")
+    key(SPACE, "press")
+    key(SPACE, "release")
+    key(LEFTALT, "release")
+    key(LEFTMETA, "release")
+    assert active() == (2, {"one": 2, "two": 2}), active()
 
-        # Alt + Shift (grp:alt_shift_toggle) switches the keyboard it is typed on, and the other
-        # follows; from either keyboard.
-        for typed_on, expected in (("one", 1), ("two", 2), ("one", 1)):
-            key(LEFTALT, "press", typed_on)
-            key(LEFTSHIFT, "press", typed_on)
-            key(LEFTSHIFT, "release", typed_on)
-            key(LEFTALT, "release", typed_on)
-            assert active() == (expected, {"one": expected, "two": expected}), (typed_on, active())
-        assert subscriber.heard()[-4:] == [NO, US, NO, US], subscriber.heard()
-        msg("switch_layout", "2")
+    # Alt + Shift (grp:alt_shift_toggle) switches the keyboard it is typed on, and the other
+    # follows; from either keyboard.
+    for typed_on, expected in (("one", 1), ("two", 2), ("one", 1)):
+        key(LEFTALT, "press", typed_on)
+        key(LEFTSHIFT, "press", typed_on)
+        key(LEFTSHIFT, "release", typed_on)
+        key(LEFTALT, "release", typed_on)
+        assert active() == (expected, {"one": expected, "two": expected}), (typed_on, active())
+    assert subscriber.heard()[-4:] == [NO, US, NO, US], subscriber.heard()
+    msg("switch_layout", "2")
 
-        # A virtual keyboard (from the pointer probe) keeps its own keymap and layout.
-        pointer = subprocess.Popen([pointer_probe, "1280", "720"], env=env, text=True,
-                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-        processes.append(pointer)
-        assert pointer.stdout.readline().strip() == "ready"
-        pointer.stdin.write("key alt down\n")
-        pointer.stdin.flush()
-        assert pointer.stdout.readline().strip() == "done"
-        harness.wait_for(lambda: len(active()[1]) == 3, processes, "a virtual keyboard")
-        virtual = next(name for name in active()[1] if name not in ("one", "two"))
-        msg("switch_layout", "next")
-        assert active() == (1, {"one": 1, "two": 1, virtual: 1}), active()
-        msg("switch_layout", "next")
-        assert active() == (2, {"one": 2, "two": 2, virtual: 1}), active()
-        pointer.stdin.close()
-        pointer.wait(timeout=30)
-        processes.remove(pointer)
+    # A virtual keyboard (from the pointer probe) keeps its own keymap and layout.
+    pointer = desktop.virtual_pointer(pointer_probe, 1280, 720)
+    pointer("key", "alt", "down")
+    desktop.wait_for(lambda: len(active()[1]) == 3, "a virtual keyboard")
+    virtual = next(name for name in active()[1] if name not in ("one", "two"))
+    msg("switch_layout", "next")
+    assert active() == (1, {"one": 1, "two": 1, virtual: 1}), active()
+    msg("switch_layout", "next")
+    assert active() == (2, {"one": 2, "two": 2, virtual: 1}), active()
+    pointer.process.stdin.close()
+    desktop.reap(pointer.process)
 
-        # A reload keeps the active layout: with another variant, by place...
-        init.write_text(config("us,no", ","))
-        msg("reload")
-        assert keyboard() == ([("us", "English (US)", False), ("no", "Norwegian", True)],
-                              {"one": 2, "two": 2}), keyboard()
-        # ...and by name when the layouts change places: Norwegian, now first.
-        init.write_text(config("no,us", ","))
-        msg("reload")
-        assert keyboard() == ([("no", "Norwegian", True), ("us", "English (US)", False)],
-                              {"one": 1, "two": 1}), keyboard()
-        # Subscribers hear of new names and places too.
-        assert subscriber.heard()[-2:] == ["2 2 no Norwegian", "1 2 no Norwegian"], \
-            subscriber.heard()
-        # A reload that leaves the keymap as it was leaves the layout too.
-        msg("switch_layout", "2")
-        msg("reload")
-        assert active() == (2, {"one": 2, "two": 2}), active()
-        # And a keyboard plugged in now types in it too.
-        msg("headless_keyboard", "add", "three")
-        assert active() == (2, {"one": 2, "two": 2, "three": 2}), active()
-        # With one layout left, the first.
-        init.write_text(config("us", ""))
-        msg("reload")
-        assert keyboard() == ([("us", "English (US)", True)],
-                              {"one": 1, "two": 1, "three": 1}), keyboard()
-        msg("switch_layout")
-        assert active() == (1, {"one": 1, "two": 1, "three": 1}), active()
-
-        server.terminate()
-        assert server.wait(timeout=30) == 0, log.read_text()
-        print("Switching keyboard layouts, virtual keyboards, and reloads passed")
-    except Exception:
-        print(log.read_text(), file=sys.stderr)
-        raise
-    finally:
-        for process in reversed(processes):
-            if process.poll() is None:
-                process.kill()
-                process.wait(timeout=30)
+    # A reload keeps the active layout: with another variant, by place...
+    desktop.reload(config("us,no", ","))
+    assert keyboard() == ([("us", "English (US)", False), ("no", "Norwegian", True)],
+                          {"one": 2, "two": 2}), keyboard()
+    # ...and by name when the layouts change places: Norwegian, now first.
+    desktop.reload(config("no,us", ","))
+    assert keyboard() == ([("no", "Norwegian", True), ("us", "English (US)", False)],
+                          {"one": 1, "two": 1}), keyboard()
+    # Subscribers hear of new names and places too.
+    assert subscriber.heard()[-2:] == ["2 2 no Norwegian", "1 2 no Norwegian"], \
+        subscriber.heard()
+    # A reload that leaves the keymap as it was leaves the layout too.
+    msg("switch_layout", "2")
+    desktop.reload()
+    assert active() == (2, {"one": 2, "two": 2}), active()
+    # And a keyboard plugged in now types in it too.
+    msg("headless_keyboard", "add", "three")
+    assert active() == (2, {"one": 2, "two": 2, "three": 2}), active()
+    # With one layout left, the first.
+    desktop.reload(config("us", ""))
+    assert keyboard() == ([("us", "English (US)", True)],
+                          {"one": 1, "two": 1, "three": 1}), keyboard()
+    msg("switch_layout")
+    assert active() == (1, {"one": 1, "two": 1, "three": 1}), active()
+print("Switching keyboard layouts, virtual keyboards, and reloads passed")
