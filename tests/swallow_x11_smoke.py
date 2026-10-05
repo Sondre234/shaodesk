@@ -35,11 +35,12 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-swallow-x11-test-") as directo
         return result.stdout
 
     def windows():
-        """app_id -> (tiled, x, y, width, height, visible)."""
+        """app_id -> (tiled, x, y, width, height, visible, focused)."""
         rows = {}
         for line in msg("get", "windows").splitlines():
             f = line.split("\t")
-            rows[f[8]] = (f[3] == "1", int(f[4]), int(f[5]), int(f[6]), int(f[7]), f[11] == "1")
+            rows[f[8]] = (f[3] == "1", int(f[4]), int(f[5]), int(f[6]), int(f[7]), f[11] == "1",
+                       f[1] == "1")
         return rows
 
     with log.open("w") as output:
@@ -65,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-swallow-x11-test-") as directo
             processes.append(other)
             wait_for(lambda: "plain" in windows(), processes, "neighbour mapped")
             msg("focus_last")  # back to the terminal, as if the user had it in front of them
-            wait_for(lambda: msg("get", "windows").count("\t1\t0\t1\t") >= 1, processes, "focus")
+            wait_for(lambda: windows()["swallow-term"][6], processes, "terminal focused")
             slot = windows()["swallow-term"]
 
             terminal.send_signal(10)  # SIGUSR1: start the X11 client from the terminal
