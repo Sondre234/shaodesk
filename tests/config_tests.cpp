@@ -624,6 +624,20 @@ int main(int argc, char **argv) {
                 "features not layered over the defaults");
         rejects("return {extends='default', features={bogus=true}}");
         rejects("return {extends='other'}");
+        // `terminal` names the program the terminal action opens; unset, one is looked for.
+        require(config.terminal.empty() && bare.terminal.empty() &&
+                    shaodesk::parse_config("return {extends='default', terminal={'foot','-s'}}")
+                            .terminal == shaodesk::Command{"foot", "-s"},
+                "terminal not parsed");
+        require(shaodesk::parse_config("return {bindings={{key='t', action='terminal'}}}")
+                        .binding(0, XKB_KEY_t)
+                        ->action == SH_TERMINAL,
+                "terminal action not bound");
+        rejects("return {terminal='foot'}");
+        rejects("return {terminal={}}");
+        rejects("return {terminal={''}}");
+        rejects("return {terminal={'foot', 1}}");
+        rejects("return {bindings={{key='t', action='terminal', command={'foot'}}}}");
         rejects("local b={mods={'Alt'},key='a',action='quit'}; "
                 "return {extends='default', bindings={b,b}}");
         auto buttons = shaodesk::parse_config(

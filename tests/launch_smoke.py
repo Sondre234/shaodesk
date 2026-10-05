@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Starting programs with stand-ins on a PATH the test controls: a program that cannot start is
 reported to the caller and, as `spawn-error`, to the shell, whether a key binding or the control
-socket asked for it."""
+socket asked for it; and the terminal action finds the configured terminal, else $TERMINAL, else
+the first installed of a list."""
 import os
 from pathlib import Path
 import re
@@ -34,8 +35,8 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-launch-") as directory:
     config.write_text(Path(example).read_text().replace("xwayland = true", "xwayland = false"))
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman", PATH=str(tools),
-               TOOL_LOG=str(tool_log))
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET", "TERMINAL"):
+               TOOL_LOG=str(tool_log), TERMINAL="my-terminal")
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
 
     def msg(*words, ok=True):
@@ -103,9 +104,38 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-launch-") as directory:
         assert subscriber.errors()[1] == "Cannot launch kitty: No such file or directory", \
             subscriber.errors()
 
+        # The terminal action, with no terminal installed: the error says what to do.
+        error = msg("terminal", ok=False)
+        assert "error: no terminal installed: set terminal in the configuration, or install one " \
+            "of kitty, foot, alacritty, wezterm, ghostty, konsole, gnome-terminal, xterm" in error
+        wait_for(lambda: len(subscriber.errors()) == 3, "the missing terminal on the panel")
+        assert subscriber.errors()[2].startswith("No terminal installed: "), subscriber.errors()
+        assert "$TERMINAL, my-terminal, is not installed" in log.read_text()
+
+        # The first of the list that is installed, then $TERMINAL once it is.
+        def opens(expected):
+            tool_log.write_text("")
+            msg("terminal")
+            wait_for(lambda: calls() == [expected], f"{expected} opened")
+        stand_in("xterm")
+        opens("xterm ")
+        stand_in("foot")
+        opens("foot ")
+        stand_in("my-terminal")
+        opens("my-terminal ")
+
+        # The configured terminal wins, with its arguments; one not installed is an error rather
+        # than a reason to open another.
+        config.write_text(config.read_text().replace(
+            "    version = 1,\n", '    version = 1,\n    terminal = { "kitty", "-1" },\n', 1))
+        msg("reload")
+        assert "error: cannot launch kitty: No such file or directory" in msg("terminal", ok=False)
+        stand_in("kitty")
+        opens("kitty -1")
+
         server.terminate()
         assert server.wait(timeout=30) == 0, log.read_text()
-        print("Programs start, and those that cannot are reported to the caller and the panel")
+        print("Programs and terminals start, and those that cannot are reported")
     except Exception:
         print(log.read_text(), file=sys.stderr)
         raise

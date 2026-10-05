@@ -311,6 +311,19 @@ draws it, and the compositor's control socket for actions and sessions. On a mac
 entries a keystroke re-ranks them in under a millisecond (an optimized build; see
 `tests/palette_test.cpp`). Super + P used to toggle sticky windows; that moved to Super + Shift + P.
 
+## Terminal
+
+The `terminal` action (`shaodesk msg terminal`) opens a terminal: the program and arguments of
+the `terminal` setting when there is one (`terminal = { "foot" }`), else `$TERMINAL` when it
+names an installed program, else the first of kitty, foot, alacritty, wezterm, ghostty,
+konsole, gnome-terminal and xterm found on `PATH`. A configured terminal that is not installed
+is an error rather than a reason to open another. When no terminal is found, or the one chosen
+cannot start, the panel says why for eight seconds, as it does for any program a binding, a hot
+corner or the command palette cannot start. Each of these terminals is in
+`windows.swallow.terminals` by default, so [swallowing](#window-swallowing) works with whichever
+opens; another terminal needs its app ID added there. `tests/launch_smoke.py` checks the choice
+with stand-in programs.
+
 ## Workspaces
 
 Every monitor has its own workspaces, numbered 1 to `layout.workspaces` (1–10), and all
@@ -934,7 +947,7 @@ opens or a listed window closes, `switcher-select N` as the selection moves (bot
 from 0), and `switcher-close`. The state ends with `power ACTIONS`, the power actions that may
 run (`lock,suspend,reboot,poweroff,logout`, in the order menus list them, or `-`), a power
 action that fails or is cancelled after it was accepted sends `power-error MESSAGE`, a program
-that `spawn` could not start sends `spawn-error MESSAGE` (the panel shows either
+that `spawn` or `terminal` could not start sends `spawn-error MESSAGE` (the panel shows either
 across itself for eight seconds), and `power_menu` sends `power-menu OUTPUT`. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
 refused while the session is locked.
 

@@ -1042,6 +1042,18 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
         fail("unsupported version");
     boolean(L, "xwayland", "xwayland", config.settings.xwayland);
     boolean(L, "auto_reload", "auto_reload", config.auto_reload);
+    lua_getfield(L, -1, "terminal");
+    if (!lua_isnil(L, -1)) {
+        auto size = array_size(L, -1, 64);
+        for (size_t i = 1; i <= size; ++i) {
+            lua_rawgeti(L, -1, static_cast<lua_Integer>(i));
+            config.terminal.push_back(string(L, -1, "terminal argument"));
+            lua_pop(L, 1);
+        }
+        if (config.terminal.empty() || config.terminal.front().empty())
+            fail("terminal needs a program, such as { \"foot\" }", "terminal");
+    }
+    lua_pop(L, 1);
     if (section(L, "appearance")) {
         auto color = field(L, "background");
         if (!is_color(color))
@@ -1457,6 +1469,7 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
 namespace {
 constexpr std::pair<std::string_view, sh_action> action_table[] = {
         {"spawn", SH_SPAWN},
+        {"terminal", SH_TERMINAL},
         {"quit", SH_QUIT},
         {"close", SH_CLOSE},
         {"cycle", SH_CYCLE},

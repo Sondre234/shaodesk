@@ -30,8 +30,8 @@ bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, cha
                                          error, error_size);
 }
 
-/* Starts the program of a spawn action. One that cannot start is reported in the log and
- * across the panel, and in `error`. */
+/* Starts the program of a spawn or terminal action. One that cannot start is reported in the
+ * log and across the panel, and in `error`. */
 bool launch_program(struct sh_server *server, enum sh_action action, char *error,
                     size_t error_size) {
     if (server->callbacks->launch(server->callbacks->userdata, action, error, error_size))
@@ -47,7 +47,8 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
     switch (action) {
     case SH_NONE:
         break;
-    case SH_SPAWN: {
+    case SH_SPAWN:
+    case SH_TERMINAL: {
         char error[256] = "";
         launch_program(server, action, error, sizeof(error));
         break;

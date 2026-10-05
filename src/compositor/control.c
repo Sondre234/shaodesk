@@ -312,7 +312,7 @@ static void control_handle(struct sh_server *server, int fd, const char *request
         control_reply(fd, reply);
         return;
     }
-    if (action == SH_SPAWN) {
+    if (action == SH_SPAWN || action == SH_TERMINAL) {
         // The caller hears why the program did not start, as the panel does.
         if (!launch_program(server, action, error, sizeof(error))) {
             char reply[300];

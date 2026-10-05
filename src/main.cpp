@@ -173,6 +173,15 @@ std::filesystem::path find_program(const std::string &name) {
     }
     return {};
 }
+// Whether `program` can be run: a path to an executable, or a name found on PATH.
+bool installed(const std::string &program) {
+    return program.find('/') != std::string::npos ? access(program.c_str(), X_OK) == 0
+                                                   : !find_program(program).empty();
+}
+// The terminals the `terminal` action looks for, in this order, when neither the configuration
+// nor $TERMINAL names one.
+constexpr const char *known_terminals[] = {"kitty",   "foot",           "alacritty", "wezterm",
+                                           "ghostty", "konsole", "gnome-terminal", "xterm"};
 std::filesystem::path home_directory() {
     const char *home = std::getenv("HOME");
     return home && *home ? home : "/";
@@ -439,13 +448,35 @@ struct Runtime {
     static const char *action_target(void *data) {
         return static_cast<Runtime *>(data)->target.c_str();
     }
+    /* The terminal the `terminal` action opens: `terminal` from the configuration, else
+     * $TERMINAL when that is installed, else the first of known_terminals that is. Empty when
+     * there is none. */
+    shaodesk::Command terminal() const {
+        if (!config.terminal.empty())
+            return config.terminal;
+        if (const char *name = std::getenv("TERMINAL"); name && *name) {
+            if (installed(name))
+                return {name};
+            std::cerr << "$TERMINAL, " << name << ", is not installed; looking for another\n";
+        }
+        for (const char *name : known_terminals)
+            if (installed(name))
+                return {name};
+        return {};
+    }
     /* Starts the program of the spawn action that key, button, command or hot_corner returned
-     * last. */
+     * last, or the terminal. */
     static bool launch(void *data, sh_action action, char *error, size_t error_size) {
         auto &self = *static_cast<Runtime *>(data);
+        auto program = action == SH_TERMINAL ? self.terminal() : self.program;
         std::string failure = "nothing to launch";
-        if (action == SH_SPAWN && !self.program.empty() &&
-            start_program(self.program, failure) > 0)
+        if (program.empty() && action == SH_TERMINAL) {
+            failure = "no terminal installed: set terminal in the configuration, or install one "
+                      "of";
+            for (const char *name : known_terminals)
+                failure += std::string(name == known_terminals[0] ? " " : ", ") + name;
+        }
+        if (!program.empty() && start_program(program, failure) > 0)
             return true;
         std::snprintf(error, error_size, "%s", failure.c_str());
         return false;
@@ -524,9 +555,7 @@ struct Runtime {
         if (!self.locker_problem) {
             if (command.empty())
                 self.locker_problem = "power.lock_command is not set";
-            else if (command.front().find('/') != std::string::npos
-                         ? access(command.front().c_str(), X_OK) != 0
-                         : find_program(command.front()).empty())
+            else if (!installed(command.front()))
                 self.locker_problem = command.front() + " is not installed";
             else
                 self.locker_problem = "";

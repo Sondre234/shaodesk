@@ -256,6 +256,8 @@ struct Config {
     std::array<std::string, 4> hot_corners;
     std::vector<Binding> bindings;
     std::vector<Command> startup;
+    // The terminal the `terminal` action opens; empty: $TERMINAL or the first one installed.
+    Command terminal;
     ShellConfig shell;
     NotificationsConfig notifications;
     OsdConfig osd;

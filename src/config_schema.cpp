@@ -36,6 +36,10 @@ const Option options[] = {
      "Reload when this file, or another `.lua` or `.xkb` file in its directory (or the "
      "`keyboard.file` there), is saved. A file with an error loads the default configuration "
      "instead and shows the error on screen."},
+    {"terminal", "list of strings", "unset", "{ \"foot\" }", none, none,
+     "The terminal the `terminal` action (Super + Q) opens, as a program and its arguments. "
+     "Unset, it is `$TERMINAL` when that program is installed, else the first of kitty, foot, "
+     "alacritty, wezterm, ghostty, konsole, gnome-terminal and xterm found on `PATH`."},
 
     {"appearance", "table", "", "", none, none, "Desktop look."},
     {"appearance.background", "color", "\"#19212e\"", "\"#19212e\"", none, none,
