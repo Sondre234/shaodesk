@@ -287,6 +287,13 @@ Work happens on short-lived branches off `main` that are merged back with `--no-
 Not yet done: a system tray, power controls, drag-to-edge snap previews, blur and shadows, and
 Lua extension APIs for custom layouts and shell widgets.
 
+## Reporting bugs
+
+Open an issue at [github.com/Sondre234/shaodesk/issues](https://github.com/Sondre234/shaodesk/issues).
+The bug report template asks for `shaodesk --version`, the GPU and its driver, the wlroots version,
+whether shaodesk ran nested or with `--session`, your configuration, and the log
+([First run](#first-run) says where it goes).
+
 ## References
 
 - [wlroots API](https://wlroots.pages.freedesktop.org/wlroots/)
