@@ -12,7 +12,8 @@ constexpr auto objectPath = "/StatusNotifierWatcher";
 } // namespace
 
 bool trayValidPath(const QString &path) {
-    static const QRegularExpression pattern("^(/|(/[A-Za-z0-9_]+)+)$");
+    // Anchored at the very end: "$" alone would let a trailing newline through.
+    static const QRegularExpression pattern(QRegularExpression::anchoredPattern("/|(/[A-Za-z0-9_]+)+"));
     return path.size() <= 1024 && pattern.match(path).hasMatch();
 }
 

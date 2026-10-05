@@ -166,6 +166,7 @@ class TrayDbusTest : public QObject {
         auto refused = callWatcher(other, "RegisterStatusNotifierItem", {"org.example.Nobody"});
         QCOMPARE(refused.type(), QDBusMessage::ErrorMessage);
         QCOMPARE(callWatcher(other, "RegisterStatusNotifierItem", {"/bad//path"}).type(), QDBusMessage::ErrorMessage);
+        QCOMPARE(callWatcher(other, "RegisterStatusNotifierItem", {"/path\n"}).type(), QDBusMessage::ErrorMessage);
         QCOMPARE(callWatcher(other, "RegisterStatusNotifierItem", {QString()}).type(), QDBusMessage::ErrorMessage);
         QCOMPARE(callWatcher(other, "RegisterStatusNotifierItem", {"not a name"}).type(), QDBusMessage::ErrorMessage);
         QCOMPARE(registered().size(), 2);
