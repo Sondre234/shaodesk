@@ -34,8 +34,9 @@ int main(int argc, char **argv) {
         require(pinnedCommand.shell.launchers.size() == 1 &&
                     pinnedCommand.shell.launchers.front().command == shaodesk::Command{"xdg-open", "."},
                 "pinned command arguments changed");
-        auto *spawn = config.binding(SH_LOGO, XKB_KEY_q);
-        require(spawn && spawn->command == shaodesk::Command{"kitty"}, "spawn argv mismatch");
+        auto *terminal = config.binding(SH_LOGO, XKB_KEY_q);
+        require(terminal && terminal->action == SH_TERMINAL && terminal->command.empty(),
+                "Super + Q does not open a terminal");
         require(config.binding(SH_LOGO | SH_SHIFT | 2, XKB_KEY_R)->action == SH_RELOAD,
                 "shifted shortcut or CapsLock normalization failed");
         require(!config.binding(SH_LOGO | SH_CTRL, XKB_KEY_q), "extra modifiers matched");

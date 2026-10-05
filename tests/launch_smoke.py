@@ -98,19 +98,16 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-launch-") as directory:
         wait_for(lambda: subscriber.errors() == [f"Cannot launch {missing}"], "the panel's error")
         assert f"Cannot launch {missing}" in log.read_text()
 
-        # A key binding: Super + Q spawns kitty, which this PATH lacks.
+        # The terminal action, with no terminal installed, from Super + Q and the control
+        # socket: the error says what to do.
+        advice = "o terminal installed: set terminal in the configuration, or install one of " \
+            "kitty, foot, alacritty, wezterm, ghostty, konsole, gnome-terminal, xterm"
         press(LEFTMETA, Q)
         wait_for(lambda: len(subscriber.errors()) == 2, "Super + Q's error on the panel")
-        assert subscriber.errors()[1] == "Cannot launch kitty: No such file or directory", \
-            subscriber.errors()
-
-        # The terminal action, with no terminal installed: the error says what to do.
-        error = msg("terminal", ok=False)
-        assert "error: no terminal installed: set terminal in the configuration, or install one " \
-            "of kitty, foot, alacritty, wezterm, ghostty, konsole, gnome-terminal, xterm" in error
-        wait_for(lambda: len(subscriber.errors()) == 3, "the missing terminal on the panel")
-        assert subscriber.errors()[2].startswith("No terminal installed: "), subscriber.errors()
+        assert subscriber.errors()[1] == "N" + advice, subscriber.errors()
         assert "$TERMINAL, my-terminal, is not installed" in log.read_text()
+        assert "error: n" + advice in msg("terminal", ok=False)
+        wait_for(lambda: len(subscriber.errors()) == 3, "the second error on the panel")
 
         # The first of the list that is installed, then $TERMINAL once it is.
         def opens(expected):
@@ -119,6 +116,9 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-launch-") as directory:
             wait_for(lambda: calls() == [expected], f"{expected} opened")
         stand_in("xterm")
         opens("xterm ")
+        tool_log.write_text("")
+        press(LEFTMETA, Q)
+        wait_for(lambda: calls() == ["xterm "], "xterm opened from Super + Q")
         stand_in("foot")
         opens("foot ")
         stand_in("my-terminal")

@@ -102,7 +102,8 @@ for packaging. On Gentoo, `packaging/gentoo` has ebuilds; see [docs/gentoo.md](d
 
 shaodesk runs without any of these, and uses them when they are installed:
 
-- a terminal: Super + Q runs `kitty` ([how to change it](#first-run))
+- a terminal: Super + Q opens the first of kitty, foot, alacritty, wezterm, ghostty, konsole,
+  gnome-terminal and xterm that is installed ([how to choose one](#first-run))
 - `grim` and `slurp` for screenshots, and `wl-clipboard` to copy them
 - `xdg-desktop-portal-wlr`, `xdg-desktop-portal-gtk` and PipeWire for screen sharing and file
   choosers ([Portals](docs/features.md#portals))
@@ -149,19 +150,21 @@ service may also open in the host session instead.
 - **To try it first**, run `shaodesk` inside your current Wayland session; it opens in a window.
 
 Without `~/.config/shaodesk/init.lua`, the installed [config/init.lua](config/init.lua) is
-used. Super + R opens the application menu, Super + Q starts kitty, Super + C closes the
-focused window, and Super + M quits; [Default bindings](#default-bindings) lists the rest. To
-use another terminal, write a configuration that extends the default:
+used. Super + R opens the application menu, Super + Q opens a terminal, Super + C closes the
+focused window, and Super + M quits; [Default bindings](#default-bindings) lists the rest. The
+terminal is `$TERMINAL` when that is set, else the first one installed (kitty, foot, alacritty,
+...). To choose it, write a configuration that extends the default:
 
 ```lua
 return {
     version = 1,
     extends = "default",
-    bindings = {
-        { mods = { "Super" }, key = "q", action = "spawn", command = { "foot" } },
-    },
+    terminal = { "foot" },
 }
 ```
+
+When a binding cannot start its program, because none of those terminals is installed for
+example, the panel says why for a few seconds.
 
 shaodesk, the shell and the programs they start log to standard error. From a console, keep it
 in a file with `shaodesk --session 2> ~/shaodesk.log`; a display manager keeps it in its own
@@ -212,7 +215,7 @@ Edit them in [config/init.lua](config/init.lua).
 | Input | Action |
 | --- | --- |
 | Super + left / right drag | Move / resize a window (on a tile: move it, or move its splits) |
-| Super + Q | Launch kitty |
+| Super + Q | [Open a terminal](docs/features.md#terminal): `terminal`, `$TERMINAL`, or the first one installed |
 | Super + R | Application menu on the monitor under the pointer |
 | Super + P | [Command palette](docs/features.md#command-palette) |
 | Super + C | Close the focused window |

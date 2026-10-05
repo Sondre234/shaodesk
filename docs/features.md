@@ -742,11 +742,10 @@ browsers keep their own back and forward:
 
 ```lua
 { button = "side", app_id = "^(kitty|foot)$", desktop = true, action = "close" },
-{ button = "extra", app_id = "^(kitty|foot)$", desktop = true, action = "spawn",
-  command = { "kitty" } },
+{ button = "extra", app_id = "^(kitty|foot)$", desktop = true, action = "terminal" },
 ```
 
-The first window to open within five seconds of a button binding's `spawn` opens centered on
+The first window to open within five seconds of a button binding's `spawn` or `terminal` opens centered on
 the click, kept inside the area the panels leave free, unless a window rule gives its
 `position` (`tests/spawn_at_pointer_smoke.py`). A tile still goes where the layout puts it.
 

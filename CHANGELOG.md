@@ -8,6 +8,8 @@ tagged release yet; everything below is on `main`.
 - A `terminal` action opens the terminal set by the new `terminal` setting (`terminal = {
   "foot" }`), else `$TERMINAL`, else the first of kitty, foot, alacritty, wezterm, ghostty,
   konsole, gnome-terminal and xterm that is installed. When there is none, the panel says so.
+  The default configuration binds it to Super + Q, which ran kitty whether or not it was
+  installed.
 - A program that a binding, a hot corner, the command palette or `shaodesk msg spawn` cannot
   start, because it is not installed, now says so across the panel (subscribers hear
   `spawn-error MESSAGE`), not only in the log.

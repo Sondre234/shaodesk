@@ -159,6 +159,9 @@ return {
     },
     xwayland = true, -- run X11 applications; Xwayland starts on first use (restart to change)
     auto_reload = true, -- reload when this file (or another .lua file beside it) is saved
+    -- The terminal Super+Q opens. Unset, it is $TERMINAL, else the first installed of kitty,
+    -- foot, alacritty, wezterm, ghostty, konsole, gnome-terminal and xterm.
+    -- terminal = { "foot" },
     shell = {
         enabled = true,
         -- panel_height = 52,
@@ -195,9 +198,8 @@ return {
         -- windows under the pointer, desktop = true to the bare desktop; elsewhere the click
         -- reaches the application, so a browser keeps its own back and forward:
         -- { button = "side", app_id = "^kitty$", desktop = true, action = "close" },
-        -- { button = "extra", app_id = "^kitty$", desktop = true, action = "spawn",
-        --   command = { "kitty" } },
-        { mods = { mod }, key = "q", action = "spawn", command = { "kitty" } },
+        -- { button = "extra", app_id = "^kitty$", desktop = true, action = "terminal" },
+        { mods = { mod }, key = "q", action = "terminal" },
         { mods = { mod }, key = "r", action = "launcher" },
         { mods = { mod }, key = "c", action = "close" },
         { mods = { mod }, key = "m", action = "quit" },
