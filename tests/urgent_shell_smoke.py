@@ -2,12 +2,9 @@
 """The shell marks a window that asks for attention on the taskbar, from the compositor's
 subscription and the foreign-toplevel list, and unmarks it once it has focus: seen as pixels in
 the urgent color in the panel's screenshot band."""
-import os
 from pathlib import Path
-import re
 import subprocess
 import sys
-import tempfile
 
 import harness
 
@@ -25,22 +22,12 @@ CONFIG = """return {
     shell = { panel_height = 52 },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-shell-") as directory:
-    root = Path(directory)
-    config = root / "init.lua"
-    config.write_text(CONFIG)
-    compositor_log, shell_log = root / "compositor.log", root / "shell.log"
-    env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
-               QT_QPA_PLATFORM="wayland", QT_QUICK_BACKEND="software", QT_FORCE_STDERR_LOGGING="1",
-               XDG_DATA_HOME=directory, XDG_DATA_DIRS=directory,
+with harness.Compositor(compositor, CONFIG, start=False) as desktop:
+    root, env, msg = desktop.root, desktop.env, desktop.msg
+    env.update(QT_QPA_PLATFORM="wayland", QT_QUICK_BACKEND="software",
+               QT_FORCE_STDERR_LOGGING="1", XDG_DATA_HOME=str(root), XDG_DATA_DIRS=str(root),
                DBUS_SESSION_BUS_ADDRESS="disabled:")  # the shell must not use the real session bus
-    env.pop("DISPLAY", None)
-    env.pop("WAYLAND_DISPLAY", None)
-    processes = []
-
-    def msg(*words):
-        return subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                              text=True, timeout=5, check=True).stdout
+    shell_log = root / "shell.log"
 
     def is_orange(pixel):
         return pixel[0] > 200 and 120 < pixel[1] < 190 and 60 < pixel[2] < 140
@@ -52,85 +39,53 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-shell-") as directory:
                    for y in range(shot.height - 52, shot.height) for x in range(shot.width))
 
     def wait_for(predicate, message):
-        harness.wait_for(predicate, processes, message, timeout=10,
-                         detail=lambda: shell_log.read_text()[-600:])
+        desktop.wait_for(predicate, message, timeout=10)
 
-    with compositor_log.open("w") as out, shell_log.open("w") as shell_out:
-        try:
-            server = subprocess.Popen([compositor, "--headless", "--config", str(config)],
-                                      env=env, stdout=out, stderr=out)
-            processes.append(server)
-            wait_for(lambda: "Running Wayland compositor" in compositor_log.read_text(),
-                     "compositor startup")
-            env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)",
-                                               compositor_log.read_text())[1]
-            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)",
-                                             compositor_log.read_text())[1]
-            processes.append(subprocess.Popen([shell, "--config", str(config)], env=env,
-                                              stdout=shell_out, stderr=shell_out))
-            wait_for(lambda: "shaodesk surface rendered: shaodesk taskbar" in shell_log.read_text(),
-                     "the panel rendered")
-            clients = {}
-            for name in ("Alpha", "Beta"):
-                client = subprocess.Popen(
-                    [probe, "--commands"], env=dict(env, SHAODESK_PROBE_TITLE=name,
-                                                    SHAODESK_PROBE_APP_ID=name.lower()),
-                    stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, text=True)
-                processes.append(client)
-                clients[name] = client
-                wait_for(lambda: name in msg("get", "windows"), f"{name} mapped")
-            wait_for(lambda: orange() == 0, "a quiet panel has no urgent color")
+    desktop.start()
+    desktop.spawn([shell, "--config", str(desktop.config)], log="shell.log")
+    desktop.detail = lambda: shell_log.read_text()[-600:]
+    wait_for(lambda: "shaodesk surface rendered: shaodesk taskbar" in shell_log.read_text(),
+             "the panel rendered")
+    clients = {}
+    for name in ("Alpha", "Beta"):
+        clients[name] = desktop.spawn(
+            [probe, "--commands"], env=dict(SHAODESK_PROBE_TITLE=name,
+                                            SHAODESK_PROBE_APP_ID=name.lower()),
+            stdin=subprocess.PIPE, text=True)
+        wait_for(lambda: name in msg("get", "windows"), f"{name} mapped")
+    wait_for(lambda: orange() == 0, "a quiet panel has no urgent color")
 
-            clients["Alpha"].stdin.write("activate\n")
-            clients["Alpha"].stdin.flush()
-            wait_for(lambda: "alpha" in msg("get", "urgent"), "the compositor marks Alpha")
-            wait_for(lambda: orange() >= 20, "the taskbar shows the urgent window")
-            marked = orange()
+    clients["Alpha"].stdin.write("activate\n")
+    clients["Alpha"].stdin.flush()
+    wait_for(lambda: "alpha" in msg("get", "urgent"), "the compositor marks Alpha")
+    wait_for(lambda: orange() >= 20, "the taskbar shows the urgent window")
+    marked = orange()
 
-            # The overview frames the thumbnail of the window asking for attention.
-            def rims():
-                """{title: rim pixel} of each thumbnail's top edge, or None while closed."""
-                lines = msg("get", "overview").splitlines()
-                if len(lines) < 3:
-                    return None
-                shot = harness.grab(grim, env)
-                found = {}
-                for line in lines[2:]:
-                    if not line.startswith("overview-window"):
-                        continue
-                    _, x, y, w, h, tail = line.split(" ", 5)
-                    found[tail.split("\t")[1]] = shot.at(int(x) + int(w) // 2, int(y) + 1)
-                return found
+    # The overview frames the thumbnail of the window asking for attention.
+    def rims():
+        """{title: rim pixel} of each thumbnail's top edge, or None while closed."""
+        lines = msg("get", "overview").splitlines()
+        if len(lines) < 3:
+            return None
+        shot = harness.grab(grim, env)
+        found = {}
+        for line in lines[2:]:
+            if not line.startswith("overview-window"):
+                continue
+            _, x, y, w, h, tail = line.split(" ", 5)
+            found[tail.split("\t")[1]] = shot.at(int(x) + int(w) // 2, int(y) + 1)
+        return found
 
-            msg("toggle_overview")
-            harness.wait_for(lambda: "shaodesk overview shown" in shell_log.read_text(),
-                             processes, "the overview's text", timeout=5)
-            harness.wait_for(lambda: len(rims() or {}) == 2, processes, "two thumbnails")
-            wait_for(lambda: (r := rims()) and is_orange(r["Alpha"]) and not is_orange(r["Beta"]),
-                     "the overview frames only Alpha's thumbnail")
-            msg("overview_cancel")
+    msg("toggle_overview")
+    desktop.wait_for(lambda: "shaodesk overview shown" in shell_log.read_text(),
+                     "the overview's text", timeout=5)
+    desktop.wait_for(lambda: len(rims() or {}) == 2, "two thumbnails")
+    wait_for(lambda: (r := rims()) and is_orange(r["Alpha"]) and not is_orange(r["Beta"]),
+             "the overview frames only Alpha's thumbnail")
+    msg("overview_cancel")
 
-            msg("focus_urgent")
-            wait_for(lambda: msg("get", "urgent") == "", "focus clears the mark")
-            wait_for(lambda: orange() == 0, "the taskbar's marker goes with it")
-
-            for client in clients.values():
-                client.stdin.close()
-            for process in processes[2:]:
-                process.terminate()
-                process.wait(timeout=5)
-            processes[1].terminate()
-            processes[1].wait(timeout=5)
-            server.terminate()
-            assert server.wait(timeout=5) == 0, compositor_log.read_text()
-            print(f"The taskbar marks a window asking for attention ({marked} pixels of the urgent "
-                  "color) and unmarks it on focus")
-        except Exception:
-            print(compositor_log.read_text(), file=sys.stderr)
-            print(shell_log.read_text()[-2000:], file=sys.stderr)
-            raise
-        finally:
-            for process in reversed(processes):
-                if process.poll() is None:
-                    process.kill()
-                    process.wait(timeout=5)
+    msg("focus_urgent")
+    wait_for(lambda: msg("get", "urgent") == "", "focus clears the mark")
+    wait_for(lambda: orange() == 0, "the taskbar's marker goes with it")
+print(f"The taskbar marks a window asking for attention ({marked} pixels of the urgent "
+      "color) and unmarks it on focus")
