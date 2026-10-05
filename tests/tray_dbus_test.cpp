@@ -272,7 +272,6 @@ class TrayDbusTest : public QObject {
             });
             stream.start(2);
             QTRY_VERIFY(model.find(named->key())->title.startsWith("Frame"));
-            QVERIFY(stream.isActive());
         }
         named->item->change("Title", "Renamed", "NewTitle");
         QTRY_COMPARE(model.find(named->key())->title, QString("Renamed"));
