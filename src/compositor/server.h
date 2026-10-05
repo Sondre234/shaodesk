@@ -42,6 +42,7 @@
 #include <wlr/backend/headless.h>
 #include <wlr/backend/multi.h>
 #include <wlr/backend/wayland.h>
+#include <wlr/interfaces/wlr_keyboard.h>
 #include <wlr/config.h>
 #if WLR_HAS_LIBINPUT_BACKEND
 #include <libinput.h>
@@ -357,6 +358,7 @@ struct sh_server {
     struct wlr_pointer_constraint_v1 *active_constraint; // on the keyboard-focused surface
     struct wl_listener new_constraint, keyboard_focus_change;
     struct wl_list keyboards;
+    struct wl_list headless_keyboards; // added by tests with "headless_keyboard add"
     struct wl_list pointers; /* struct sh_pointer */
     enum sh_cursor_mode cursor_mode;
     struct sh_toplevel *grabbed_toplevel;
@@ -598,6 +600,7 @@ void run_action(struct sh_server *server, enum sh_action action, int argument);
 
 /* control.c */
 void control_reply(int fd, const char *text);
+struct wlr_backend *headless_backend(struct sh_server *server);
 void notify_subscribers(struct sh_server *server);
 void send_event(struct sh_server *server, const char *text, size_t length);
 void request_shell(struct sh_server *server, const char *what);
@@ -703,6 +706,8 @@ void group_merge(struct sh_server *server, enum sh_action action);
 void dissolve_groups(struct sh_server *server);
 
 /* input.c */
+void control_headless_keyboard(struct sh_server *server, int fd, const char *arguments);
+void destroy_headless_keyboards(struct sh_server *server);
 void configure_pointer(struct sh_server *server, struct wlr_input_device *device);
 void server_new_input(struct wl_listener *listener, void *data);
 void server_new_virtual_keyboard(struct wl_listener *listener, void *data);

@@ -117,15 +117,21 @@ static void find_headless(struct wlr_backend *backend, void *data) {
         *found = backend;
 }
 
-/* "headless_output add [NAME] [WIDTHxHEIGHT]" plugs in a virtual output, and "headless_output
- * remove NAME" unplugs one, so tests can exercise hotplug without a display. Only under
- * --headless. */
-static void control_headless_output(struct sh_server *server, int fd, const char *args) {
+/* The headless backend, where tests plug in outputs and keyboards; NULL without --headless. */
+struct wlr_backend *headless_backend(struct sh_server *server) {
     struct wlr_backend *headless = NULL;
     if (wlr_backend_is_headless(server->backend))
         headless = server->backend;
     else if (wlr_backend_is_multi(server->backend))
         wlr_multi_for_each_backend(server->backend, find_headless, &headless);
+    return headless;
+}
+
+/* "headless_output add [NAME] [WIDTHxHEIGHT]" plugs in a virtual output, and "headless_output
+ * remove NAME" unplugs one, so tests can exercise hotplug without a display. Only under
+ * --headless. */
+static void control_headless_output(struct sh_server *server, int fd, const char *args) {
+    struct wlr_backend *headless = headless_backend(server);
     if (!headless) {
         control_reply(fd, "error: headless_output needs --headless\n");
         return;
@@ -226,6 +232,10 @@ static void control_handle(struct sh_server *server, int fd, const char *request
     }
     if (!strncmp(request, "headless_output", 15) && (!request[15] || request[15] == ' ')) {
         control_headless_output(server, fd, request + (request[15] ? 16 : 15));
+        return;
+    }
+    if (!strncmp(request, "headless_keyboard", 17) && (!request[17] || request[17] == ' ')) {
+        control_headless_keyboard(server, fd, request + (request[17] ? 18 : 17));
         return;
     }
     if (!strncmp(request, "session", 7) && (!request[7] || request[7] == ' ')) {
