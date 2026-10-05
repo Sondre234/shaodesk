@@ -5,12 +5,14 @@
 #include "server.h"
 
 /* keyboard.file when it is set and compiles (the configuration checked it, but it may have
- * changed since), else the XKB names, else xkbcommon's defaults: never no keymap at all. */
-static struct xkb_keymap *compile_keymap(const struct sh_settings *settings) {
+ * changed since), else the XKB names, else xkbcommon's defaults: never no keymap at all.
+ * `from_file` says which. */
+static struct xkb_keymap *compile_keymap(const struct sh_settings *settings, bool *from_file) {
     struct xkb_context *context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
     if (!context)
         return NULL;
     struct xkb_keymap *keymap = NULL;
+    *from_file = false;
     if (settings->keyboard_file[0]) {
         FILE *file = fopen(settings->keyboard_file, "r");
         if (file) {
@@ -21,6 +23,7 @@ static struct xkb_keymap *compile_keymap(const struct sh_settings *settings) {
         if (!keymap)
             wlr_log(WLR_ERROR, "Cannot compile the keymap %s; using keyboard.layout instead",
                     settings->keyboard_file);
+        *from_file = keymap != NULL;
     }
     struct xkb_rule_names names = {.rules = settings->keyboard_rules,
                                    .layout = settings->keyboard_layout,
@@ -95,8 +98,11 @@ bool configure_keyboard(struct sh_server *server, struct wlr_keyboard *keyboard)
  * the keymap as it was leaves the keyboards alone, but for the repeat settings. */
 void update_keymap(struct sh_server *server) {
     const struct sh_settings *settings = server_settings(server);
-    struct xkb_keymap *keymap = compile_keymap(settings);
+    bool from_file;
+    struct xkb_keymap *keymap = compile_keymap(settings, &from_file);
     struct sh_keyboard *keyboard;
+    if (keymap)
+        server->keymap_from_file = from_file;
     if (!keymap) {
         wlr_log(WLR_ERROR, "Cannot compile any keymap; keeping the one in use");
     } else if (server->keymap && wlr_keyboard_keymaps_match(server->keymap, keymap)) {
@@ -124,4 +130,37 @@ void update_keymap(struct sh_server *server) {
             wlr_keyboard_set_repeat_info(keyboard->wlr_keyboard, settings->repeat_rate,
                                          settings->repeat_delay);
     }
+}
+
+/* What the panel shows for `layout` (from 0): its code in keyboard.layout ("us"), or for a
+ * keymap file, which has no codes, the first two letters of its name ("Norwegian": "no"); its
+ * number when neither gives one. Only letters, digits, '-' and '_'. */
+void layout_short_name(struct sh_server *server, xkb_layout_index_t layout, char *name,
+                       size_t size) {
+    const char *source = NULL;
+    size_t length = 0;
+    if (!server->keymap_from_file) {
+        source = server_settings(server)->keyboard_layout;
+        for (xkb_layout_index_t i = 0; i < layout && source; ++i) {
+            source = strchr(source, ',');
+            source = source ? source + 1 : NULL;
+        }
+        if (source)
+            length = strcspn(source, ",(");
+    }
+    if (!length && server->keymap && layout < xkb_keymap_num_layouts(server->keymap)) {
+        source = xkb_keymap_layout_get_name(server->keymap, layout);
+        length = source ? strnlen(source, 2) : 0;
+    }
+    size_t used = 0;
+    for (size_t i = 0; i < length && used + 1 < size; ++i) {
+        char c = source[i];
+        if (c >= 'A' && c <= 'Z')
+            c = (char)(c - 'A' + 'a');
+        if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_')
+            name[used++] = c;
+    }
+    name[used] = '\0';
+    if (!used)
+        snprintf(name, size, "%u", layout + 1);
 }

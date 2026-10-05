@@ -362,6 +362,7 @@ struct sh_server {
      * the layout active on all of them (from 0). keymap.c sets `syncing_keyboards` while it
      * changes keyboards' state itself, and tells the seat afterwards. */
     struct xkb_keymap *keymap;
+    bool keymap_from_file; // keyboard.file, rather than the names
     xkb_layout_index_t keyboard_layout;
     bool syncing_keyboards;
     struct wl_list headless_keyboards; // added by tests with "headless_keyboard add"
@@ -729,6 +730,8 @@ void seat_keyboard_focus_change(struct wl_listener *listener, void *data);
 /* keymap.c */
 bool configure_keyboard(struct sh_server *server, struct wlr_keyboard *keyboard);
 void update_keymap(struct sh_server *server);
+void layout_short_name(struct sh_server *server, xkb_layout_index_t layout, char *name,
+                       size_t size);
 
 /* layer_shell.c */
 void arrange_layers(struct sh_server *server);
