@@ -129,11 +129,15 @@ shaodesk before it can be imported, **won't** = deliberately not carried over.
 
 | Setting | Source | shaodesk setting | Status | Importer |
 | --- | --- | --- | --- | --- |
-| Keyboard layout, options | `input:kb_layout`, `kb_options` | `keyboard.layout`, `options` | done | yes |
-| Keyboard variant, keymap file | `input:kb_variant`, `kb_file` | — | missing | no |
+| Keyboard layout, variant, model, options, rules | `input:kb_layout`, `kb_variant`, `kb_model`, `kb_options`, `kb_rules` | `keyboard.layout`, `variant`, `model`, `options`, `rules` | done | yes |
+| Keymap file | `input:kb_file` (relative to `hyprland.conf`; one outside DIR is skipped) | `keyboard.file`, as an absolute path | done | yes |
+| Switching layouts | `switchxkblayout` binds | `switch_layout` action (key bindings are not imported) | done | — |
 | Repeat rate / delay | `input:repeat_rate`, `repeat_delay` | `keyboard.repeat_rate`, `repeat_delay` | done | yes |
 | Pointer speed, acceleration | `input:sensitivity`, `accel_profile` | `mouse.speed`, `mouse.acceleration` | done (untested on hardware) | yes |
 | Natural scroll, tap-to-click | `input:natural_scroll`, `touchpad:natural_scroll`, `touchpad:tap-to-click`, `touchpad:disable_while_typing` | `mouse.natural_scroll`, `touchpad.*` | done (untested on hardware) | yes |
+
+xkbcommon checks the keyboard settings, keymap file included, as they are imported; when it
+rejects them, none of the keyboard's are imported, and the report says why.
 
 ### Out of scope
 

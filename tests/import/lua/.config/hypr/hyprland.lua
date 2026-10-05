@@ -27,7 +27,8 @@ hl.config({
     },
 })
 hl.config({ decoration = { inactive_opacity = 0.9 }, animations = { enabled = false },
-            input = { kb_layout = "us", touchpad = { ["tap-to-click"] = false } } })
+            input = { kb_layout = "us", kb_variant = "intl", kb_file = "/etc/hostname",
+                      touchpad = { ["tap-to-click"] = false } } })
 hl.window_rule({ name = "kitty", match = { class = "^kitty$" }, opacity = "0.9 0.8" })
 local zen = hl.window_rule({ match = { class = "^zen$" }, opacity = 0.5 })
 zen:set_enabled(false)

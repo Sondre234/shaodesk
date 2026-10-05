@@ -4,7 +4,9 @@
 #include "shaodesk/import.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -42,9 +44,14 @@ void hyprlang(const fs::path &root) {
     require(near(config.opacity, 0.95F), "active_opacity not imported");
     require(!s.animations, "animations:enabled not imported");
     require(s.activation == SH_ACTIVATION_FOCUS, "misc:focus_on_activate not imported");
-    require(std::string(s.keyboard_layout) == "us" &&
+    require(std::string(s.keyboard_layout) == "us,no" &&
+                std::string(s.keyboard_variant) == ",nodeadkeys" &&
+                std::string(s.keyboard_model) == "pc105" &&
+                std::string(s.keyboard_rules) == "evdev" &&
                 std::string(s.keyboard_options) == "caps:escape" && s.repeat_rate == 30,
             "keyboard settings not imported");
+    require(fs::path(s.keyboard_file) == fs::canonical(root / "conf/.config/hypr/keymap.xkb"),
+            std::string("kb_file not imported from beside hyprland.conf: ") + s.keyboard_file);
     require(s.pointer_speed_set && near(static_cast<float>(s.pointer_speed), -0.25F) &&
                 s.pointer_accel == 0,
             "pointer settings not imported");
@@ -111,6 +118,8 @@ void lua(const fs::path &root) {
     require(near(config.inactive_opacity, 0.9F), "inactive_opacity not imported");
     require(!s.animations, "animations.enabled not imported from hl.config");
     require(s.touchpad_tap == 0, "[\"tap-to-click\"] not imported");
+    require(std::string(s.keyboard_variant) == "intl" && !s.keyboard_file[0],
+            "kb_variant not imported, or a kb_file outside the directory was");
     require(config.window_rules.size() == 1 && near(config.window_opacity("kitty", false), 0.8F),
             "hl.window_rule not imported, or the disabled rule was");
     require(config.shell.panel_color == "#1c0d18cc" && config.shell.panel_radius == 16,
@@ -124,7 +133,8 @@ void lua(const fs::path &root) {
             "HyDE wallpaper link not followed");
     const auto &report = result.report;
     for (const char *expected :
-         {"hyprland.lua:39: boom", "uses 'hyde'", "window rule is disabled", "event handlers (1)"})
+         {"hyprland.lua:40: boom", "uses 'hyde'", "window rule is disabled", "event handlers (1)",
+          "input:kb_file = /etc/hostname: no such file in"})
         require(contains(report, expected), std::string("report lacks: ") + expected);
 }
 
@@ -161,6 +171,34 @@ void merge(const fs::path &root) {
     require(empty, "a directory without dotfiles should be an error");
 }
 
+// A keymap file xkbcommon cannot compile leaves the keyboard to init.lua, and says why.
+void broken_keymap() {
+    auto pattern = (fs::temp_directory_path() / "shaodesk-import-XXXXXX").string();
+    if (!mkdtemp(pattern.data()))
+        throw std::runtime_error("cannot make a temporary directory");
+    fs::path root = pattern;
+    fs::create_directories(root / ".config/hypr");
+    std::ofstream(root / ".config/hypr/hyprland.conf")
+        << "general {\n    gaps_out = 7\n}\ninput {\n    kb_layout = no\n    kb_file = broken.xkb\n}\n";
+    std::ofstream(root / ".config/hypr/broken.xkb") << "xkb_keymap { oops };\n";
+    try {
+        auto result = shaodesk::import_dotfiles(root / ".config");
+        auto config = shaodesk::parse_config(result.theme, "theme.lua");
+        require(config.settings.gap_outer == 7, "the rest of the theme was not imported");
+        require(!config.settings.keyboard_file[0] &&
+                    std::string(config.settings.keyboard_layout) == "us" &&
+                    !contains(result.theme, "keyboard"),
+                "a keymap file xkbcommon rejects was imported");
+        require(contains(result.report, "keyboard layout and keymap: xkbcommon rejected them") &&
+                    contains(result.report, "broken.xkb:1:"),
+                "the report does not say why the keyboard was not imported: " + result.report);
+    } catch (...) {
+        fs::remove_all(root);
+        throw;
+    }
+    fs::remove_all(root);
+}
+
 int main(int argc, char **argv) {
     try {
         require(argc == 2, "fixture directory required");
@@ -168,6 +206,7 @@ int main(int argc, char **argv) {
         hyprlang(root);
         lua(root);
         merge(root);
+        broken_keymap();
         std::cout << "import tests passed\n";
         return 0;
     } catch (const std::exception &error) {

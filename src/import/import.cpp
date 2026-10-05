@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <iterator>
 #include <regex>
 #include <set>
 #include <stdexcept>
@@ -251,15 +252,20 @@ class Translator {
         }
 
         text("input:kb_layout", {"keyboard", "layout"});
+        text("input:kb_variant", {"keyboard", "variant"});
+        text("input:kb_model", {"keyboard", "model"});
         text("input:kb_options", {"keyboard", "options"});
-        for (auto [name, why] :
-             {std::pair{"input:kb_variant", "keyboard variants are not supported yet"},
-              {"input:kb_model", "keyboard models are not supported yet"},
-              {"input:kb_rules", "XKB rules are not supported"},
-              {"input:kb_file", "keymap files are not supported yet"}})
-            if (auto *value = option(name); value && !value->text.empty())
+        text("input:kb_rules", {"keyboard", "rules"});
+        // Hyprland reads a keymap file relative to its own configuration file.
+        if (auto *value = option("input:kb_file"); value && !value->text.empty()) {
+            auto path = files_.resolve(value->text, hypr.file.parent_path());
+            if (path && fs::is_regular_file(*path))
+                theme_.set({"keyboard", "file"}, quote(path->string()), value->origin);
+            else
                 report_.skip(files_, value->origin,
-                             std::string(name) + " = " + value->text + ": " + why);
+                             "input:kb_file = " + value->text + ": no such file in " +
+                                 files_.show({files_.source(), 0}));
+        }
         whole("input:repeat_rate", {"keyboard", "repeat_rate"}, 0, 100);
         whole("input:repeat_delay", {"keyboard", "repeat_delay"}, 0, 5000);
         fraction("input:sensitivity", {"mouse", "speed"}, -1, 1);
@@ -683,12 +689,17 @@ ImportResult import_dotfiles(const std::filesystem::path &directory) {
     try {
         (void)parse_config(result.theme, "theme.lua");
     } catch (const std::exception &error) {
-        // Keyboard layouts are the one setting only xkbcommon can check.
-        if (!theme.has({"keyboard", "layout"}) && !theme.has({"keyboard", "options"}))
+        // The keyboard's names and keymap file are the settings only xkbcommon can check.
+        static const char *const keyboard[] = {"layout", "variant", "model", "options", "rules",
+                                               "file"};
+        if (std::none_of(std::begin(keyboard), std::end(keyboard),
+                         [&](const char *key) { return theme.has({"keyboard", key}); }))
             throw std::runtime_error(std::string("generated an invalid theme: ") + error.what());
-        report.skipped.push_back("keyboard layout/options: xkbcommon rejected them; not imported");
-        theme.erase({"keyboard", "layout"});
-        theme.erase({"keyboard", "options"});
+        report.skipped.push_back(std::string("keyboard layout and keymap: xkbcommon rejected "
+                                             "them; not imported (") +
+                                 error.what() + ")");
+        for (const char *key : keyboard)
+            theme.erase({"keyboard", key});
         result.theme = render(theme, files);
         (void)parse_config(result.theme, "theme.lua");
     }
