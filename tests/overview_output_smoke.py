@@ -25,7 +25,7 @@ CONFIG = """return {
 }"""
 LAYOUT = (2080, 720)
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-overview-output-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-overview-output-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(CONFIG)

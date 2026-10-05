@@ -20,7 +20,7 @@ CONFIG = """return {
     features = { workspace_back_and_forth = %s },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-workspace-back-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-workspace-back-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(CONFIG % "false")

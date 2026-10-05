@@ -22,7 +22,7 @@ CONFIG = """return {
     outputs = { monitors = { ["HEADLESS-1"] = { mode = "1280x720" } } },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-overview-shell-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-overview-shell-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(CONFIG)

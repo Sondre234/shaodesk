@@ -14,7 +14,7 @@ compositor, probe, pointer_probe = (str(Path(p).resolve()) for p in sys.argv[1:4
 
 SCREEN = (1280, 720)
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-spawn-at-pointer-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-spawn-at-pointer-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     log = root / "compositor.log"

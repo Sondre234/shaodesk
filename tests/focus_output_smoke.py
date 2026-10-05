@@ -25,7 +25,7 @@ CONFIG = """return {
     },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-focus-output-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-focus-output-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(CONFIG)

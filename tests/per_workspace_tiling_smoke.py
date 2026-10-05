@@ -22,7 +22,7 @@ def config(per_workspace=True):
 }}"""
 
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-per-workspace-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-per-workspace-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(config())

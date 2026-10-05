@@ -25,7 +25,7 @@ CONFIG = """return {
     shell = { panel_height = 52 },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-shell-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-shell-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(CONFIG)
