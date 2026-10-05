@@ -964,6 +964,7 @@ Config read(lua_State *L, size_t own = SIZE_MAX) {
         text_field(L, "variant", config.settings.keyboard_variant);
         text_field(L, "model", config.settings.keyboard_model);
         text_field(L, "options", config.settings.keyboard_options);
+        text_field(L, "rules", config.settings.keyboard_rules);
         config.settings.repeat_rate = integer(L, "repeat_rate", 25, 0, 100);
         config.settings.repeat_delay = integer(L, "repeat_delay", 600, 0, 5000);
     }
@@ -1314,6 +1315,7 @@ Config read(lua_State *L, size_t own = SIZE_MAX) {
     if (!context)
         fail("cannot create XKB context");
     xkb_rule_names names{};
+    names.rules = config.settings.keyboard_rules;
     names.layout = config.settings.keyboard_layout;
     names.variant = config.settings.keyboard_variant;
     names.model = config.settings.keyboard_model;

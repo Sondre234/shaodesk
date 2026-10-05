@@ -48,6 +48,8 @@ const Option options[] = {
     {"keyboard.model", "string", "\"\"", "\"pc105\"", none, none, "XKB keyboard model."},
     {"keyboard.options", "string", "\"\"", "\"caps:escape\"", none, none,
      "XKB options, e.g. `\"caps:escape\"`."},
+    {"keyboard.rules", "string", "\"\"", "\"evdev\"", none, none,
+     "XKB rules the other names are looked up in; `\"\"` uses xkbcommon's default, `evdev`."},
     {"keyboard.repeat_rate", "integer", "25", "25", 0, 100, "Key repeats per second."},
     {"keyboard.repeat_delay", "integer", "600", "600", 0, 5000,
      "Milliseconds a key is held before it repeats."},

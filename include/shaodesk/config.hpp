@@ -136,6 +136,7 @@ struct Config {
                          .keyboard_variant = "",
                          .keyboard_model = "",
                          .keyboard_options = "",
+                         .keyboard_rules = "",
                          .xwayland = true,
                          .tiling = false,
                          .tiling_per_workspace = false,

@@ -34,6 +34,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `keyboard.variant` | string | "" | - | XKB layout variant, e.g. `"intl"`. |
 | `keyboard.model` | string | "" | - | XKB keyboard model. |
 | `keyboard.options` | string | "" | - | XKB options, e.g. `"caps:escape"`. |
+| `keyboard.rules` | string | "" | - | XKB rules the other names are looked up in; `""` uses xkbcommon's default, `evdev`. |
 | `keyboard.repeat_rate` | integer | 25 | 0 to 100 | Key repeats per second. |
 | `keyboard.repeat_delay` | integer | 600 | 0 to 5000 | Milliseconds a key is held before it repeats. |
 

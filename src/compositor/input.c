@@ -99,7 +99,8 @@ bool configure_keyboard(struct sh_server *server, struct wlr_keyboard *keyboard)
     struct xkb_context *context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
     if (!context)
         return false;
-    struct xkb_rule_names names = {.layout = settings->keyboard_layout,
+    struct xkb_rule_names names = {.rules = settings->keyboard_rules,
+                                   .layout = settings->keyboard_layout,
                                    .variant = settings->keyboard_variant,
                                    .model = settings->keyboard_model,
                                    .options = settings->keyboard_options};

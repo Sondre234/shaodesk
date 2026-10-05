@@ -222,6 +222,7 @@ struct sh_settings {
     char keyboard_variant[128];
     char keyboard_model[128];
     char keyboard_options[128];
+    char keyboard_rules[64]; /* "" for xkbcommon's default, "evdev" */
     bool xwayland; /* read at startup; changing it needs a restart */
     bool tiling;   /* automatic tiling on outputs without their own; toggled per output */
     bool tiling_per_workspace; /* toggling tiling turns it on or off for one workspace */

@@ -665,7 +665,7 @@ cannot be turned off.
 
 ## Input
 
-The `keyboard` table sets the XKB `layout`, `variant`, `model` and `options` (for example
+The `keyboard` table sets the XKB `layout`, `variant`, `model`, `options` and `rules` (for example
 `{ layout = "us,no", variant = ",", options = "grp:alt_shift_toggle" }`), and the `repeat_rate` and
 `repeat_delay` clients see. An unknown combination is rejected with the rest of the file.
 
