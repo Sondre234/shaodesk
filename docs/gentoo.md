@@ -42,7 +42,7 @@ USE flags:
 - `test`: run the test suite (headless, without a GPU) with `FEATURES=test`
 
 The ebuild needs wlroots built with `drm`, `libinput` and `session` (its defaults), installs
-the display-manager session entry, and when it finishes lists the optional programs shaodesk
+the display-manager session entry (which runs `shaodesk-session`), and when it finishes lists the optional programs shaodesk
 uses (a terminal, screenshot tools, portals, a locker, an icon theme). To build with the
 wlroots patches described below, put them in `/etc/portage/patches/gui-libs/wlroots/`,
 re-emerge wlroots, then re-emerge shaodesk so it finds them; for the XWM patch, also turn the
@@ -78,8 +78,8 @@ between release series. Relevant Gentoo packages are:
 - For screen sharing (Discord, browsers, OBS) and file choosers:
   `gui-libs/xdg-desktop-portal-wlr`, `sys-apps/xdg-desktop-portal-gtk`,
   `media-video/pipewire` running in the user session, and `gui-apps/slurp` for choosing
-  a monitor. Without systemd, start the session under `dbus-run-session` as shown below so
-  portals can be activated.
+  a monitor. Without systemd, start the session with `shaodesk-session` as shown below, which
+  starts a D-Bus session bus so that portals can be activated.
 
 Standalone operation requires wlroots built with `drm`, `libinput`, and `session`
 USE flags. X11 applications additionally need wlroots with the `X` USE flag and
@@ -163,8 +163,13 @@ From a text login outside any existing graphical session, run as your normal
 user:
 
 ```sh
-dbus-run-session -- "$HOME/.local/bin/shaodesk" --session
+"$HOME/.local/bin/shaodesk-session"
 ```
+
+OpenRC has no user services, so nothing else starts a D-Bus session bus: `shaodesk-session`
+runs `shaodesk --session` under `dbus-run-session` when there is none, and keeps what the
+session prints in `~/.local/state/shaodesk/session.log` (the previous session's in
+`session.log.old`). Arguments are passed on, such as `--config PATH`.
 
 `--session` selects DRM and libinput explicitly. The default stays nested;
 `--headless` is for tests. Starting `--session` from an environment with `DISPLAY`

@@ -93,9 +93,10 @@ cmake --build build
 sudo cmake --install build
 ```
 
-This installs `shaodesk` and `shaodesk-shell`, the default configuration
-(`share/shaodesk/init.lua`), `shaodesk-portals.conf` for xdg-desktop-portal, the documentation,
-and with `SHAODESK_INSTALL_SESSION` the session entry display managers list. Choose the prefix
+This installs `shaodesk`, `shaodesk-session` (see [First run](#first-run)) and `shaodesk-shell`,
+the default configuration (`share/shaodesk/init.lua`), `shaodesk-portals.conf` for
+xdg-desktop-portal, the documentation, and with `SHAODESK_INSTALL_SESSION` the session entry
+display managers list. Choose the prefix
 when configuring, as above: shaodesk looks for its default configuration under it, so
 `cmake --install --prefix` with another one leaves that unfound. `DESTDIR` stages an install
 for packaging. On Gentoo, `packaging/gentoo` has ebuilds; see [docs/gentoo.md](docs/gentoo.md).
@@ -142,12 +143,15 @@ service may also open in the host session instead.
 ### First run
 
 - **From a display manager**, pick shaodesk from its list of sessions. The entry (installed with
-  `SHAODESK_INSTALL_SESSION`, and by the Gentoo ebuild) runs `shaodesk --session`.
-- **From a text console**, log in and run `shaodesk --session`. A seat manager (elogind,
+  `SHAODESK_INSTALL_SESSION`, and by the Gentoo ebuild) runs `shaodesk-session`.
+- **From a text console**, log in and run `shaodesk-session`. A seat manager (elogind,
   systemd-logind or seatd) has to give you the GPU and input devices, as it does for any
-  Wayland desktop. Where nothing else starts a D-Bus session bus, as is usual without systemd,
-  run `dbus-run-session -- shaodesk --session` instead: portals, notifications and the tray need one.
+  Wayland desktop.
 - **To try it first**, run `shaodesk` inside your current Wayland session; it opens in a window.
+
+`shaodesk-session` runs `shaodesk --session`, passing its arguments on. Where nothing has
+started a D-Bus session bus, as is usual without systemd, it starts one with `dbus-run-session`:
+notifications, the tray and portals need one.
 
 Without `~/.config/shaodesk/init.lua`, the installed [config/init.lua](config/init.lua) is
 used. Super + R opens the application menu, Super + Q opens a terminal, Super + C closes the
@@ -166,9 +170,10 @@ return {
 When a binding cannot start its program, because none of those terminals is installed for
 example, the panel says why for a few seconds.
 
-shaodesk, the shell and the programs they start log to standard error. From a console, keep it
-in a file with `shaodesk --session 2> ~/shaodesk.log`; a display manager keeps it in its own
-log, such as SDDM's `~/.local/share/sddm/wayland-session.log`, or the journal under systemd.
+shaodesk, the shell and the programs they start log to standard error, which `shaodesk-session`
+writes to `~/.local/state/shaodesk/session.log` (in `$XDG_STATE_HOME` when that is set); the
+previous session's log is kept as `session.log.old`. Running `shaodesk` yourself, keep it in a
+file with `shaodesk --session 2> ~/shaodesk.log`.
 
 ## Configuration
 
