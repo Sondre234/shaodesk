@@ -1554,7 +1554,7 @@ int main(int argc, char **argv) {
             return daemon->notify(n);
         };
         auto card = [&]() { return find(cards.rootObject(), "notificationCard"); };
-        uint id = make("Hello", true);
+        make("Hello", true);
         if (!QTest::qWaitFor([&] { return cards.isVisible() && card() && card()->height() > 20; }) ||
             controller.cardsOutput() != output) {
             std::cerr << "a notification did not raise a card on its output\n";
@@ -1593,9 +1593,11 @@ int main(int argc, char **argv) {
         // A click on the card runs its default action.
         invoked.clear();
         closed.clear();
-        id = make("Again", true);
-        if (!QTest::qWaitFor([&] { return cards.isVisible() && card() && card()->height() > 20; }))
+        make("Again", true);
+        if (!QTest::qWaitFor([&] { return cards.isVisible() && card() && card()->height() > 20; })) {
+            std::cerr << "another notification did not raise a card\n";
             return 1;
+        }
         QTest::qWait(300); // the slide in
         QTest::mouseClick(&cards, Qt::LeftButton, Qt::NoModifier,
                           card()->mapToScene(QPointF(card()->width() - 60, 12)).toPoint());
@@ -1604,13 +1606,18 @@ int main(int argc, char **argv) {
             std::cerr << "clicking a card did not run its default action\n";
             return 1;
         }
-        QTest::qWaitFor([&] { return !cards.isVisible(); }, 3000);
+        if (!QTest::qWaitFor([&] { return !cards.isVisible(); }, 3000)) {
+            std::cerr << "the clicked card stayed\n";
+            return 1;
+        }
         // The close button dismisses without running anything.
         invoked.clear();
         closed.clear();
         make("Quiet", false);
-        if (!QTest::qWaitFor([&] { return cards.isVisible() && card() && card()->height() > 20; }))
+        if (!QTest::qWaitFor([&] { return cards.isVisible() && card() && card()->height() > 20; })) {
+            std::cerr << "a second notification did not raise a card\n";
             return 1;
+        }
         QTest::qWait(300);
         auto *close = find(cards.rootObject(), "notificationClose");
         QTest::mouseClick(&cards, Qt::LeftButton, Qt::NoModifier, centre(close));
@@ -1618,7 +1625,10 @@ int main(int argc, char **argv) {
             std::cerr << "the close button did not dismiss the card\n";
             return 1;
         }
-        QTest::qWaitFor([&] { return !cards.isVisible(); }, 3000);
+        if (!QTest::qWaitFor([&] { return !cards.isVisible(); }, 3000)) {
+            std::cerr << "the dismissed card stayed\n";
+            return 1;
+        }
         // The history opens from the bell, marks what it shows as seen, and clears.
         auto *history = find(view.rootObject(), "notificationHistory");
         if (!history || history->isVisible()) {
