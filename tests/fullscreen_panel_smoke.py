@@ -8,7 +8,6 @@ import signal
 import subprocess
 import sys
 import tempfile
-import time
 
 import harness
 
@@ -49,10 +48,8 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-fullscreen-panel-") as directo
 
     def stays(predicate, message):
         # Bars are updated as each frame is drawn; give a few frames the chance to undo it.
-        deadline = time.monotonic() + .3
-        while time.monotonic() < deadline:
-            assert predicate(), f"{message}; windows: {windows()}, panels: {panels()}"
-            time.sleep(.02)
+        harness.stays(predicate, processes, message,
+                      detail=lambda: f"windows: {windows()}, panels: {panels()}")
 
     def shown():
         found = panels()
