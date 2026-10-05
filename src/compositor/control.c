@@ -321,6 +321,14 @@ static void control_handle(struct sh_server *server, int fd, const char *request
         control_reply(fd, "ok\n");
         return;
     }
+    xkb_layout_index_t layouts = server->keymap ? xkb_keymap_num_layouts(server->keymap) : 0;
+    if (action == SH_SWITCH_LAYOUT && argument > 0 && (xkb_layout_index_t)argument > layouts) {
+        char reply[96];
+        snprintf(reply, sizeof(reply), "error: the keymap has %u layout%s\n", layouts,
+                 layouts == 1 ? "" : "s");
+        control_reply(fd, reply);
+        return;
+    }
     server->target_output = target;
     run_action(server, action, argument);
     server->target_output = NULL;

@@ -44,6 +44,8 @@ return {
         },
     },
     -- keyboard = { layout = "us", variant = "", model = "", options = "", repeat_rate = 25, repeat_delay = 600 },
+    -- Several layouts: layout = "us,no", variant = ",nodeadkeys"; or file = "keymap.xkb", a
+    -- whole XKB keymap beside this file.
     mouse = {
         modifier = mod, -- modifier + left drag moves; right drag resizes
         -- focus_follows = true, -- hovering a window focuses it (without raising it)
@@ -234,6 +236,9 @@ return {
         -- number of windows in the master column.
         { mods = { mod }, key = "space", action = "layout_next" },
         { mods = { mod, "Shift" }, key = "space", action = "layout_prev" },
+        -- With several keyboard layouts (keyboard.layout = "us,no"), switch_layout moves every
+        -- keyboard to the next one; layout = "prev", or a layout's number, picks another.
+        -- { mods = { mod, "Alt" }, key = "space", action = "switch_layout" },
         { mods = { mod }, key = "Return", action = "promote" },
         { mods = { mod }, key = "j", action = "focus_next" },
         { mods = { mod }, key = "k", action = "focus_prev" },

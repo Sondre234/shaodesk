@@ -665,21 +665,49 @@ cannot be turned off.
 
 ## Input
 
-The `keyboard` table sets the XKB `layout`, `variant`, `model`, `options` and `rules` (for example
-`{ layout = "us,no", variant = ",", options = "grp:alt_shift_toggle" }`), and the `repeat_rate` and
-`repeat_delay` clients see. An unknown combination is rejected with the rest of the file.
-`keyboard.file` names an XKB keymap to use instead, absolute, under `~/`, or relative to the
-configuration: what `xkbcli compile-keymap --layout us,no > keymap.xkb` writes, edited to
-taste, or a hand-written `xkb_keymap { ... }`. A file that cannot be read or does not compile is an error
-like any other, shown with the line of the setting and, where xkbcommon knows it, the line of
-the keymap (`init.lua:4: keyboard.file: /home/me/us-custom.xkb:12:5: syntax error`); should it
-break while the session runs, the keyboard falls back to the names.
+The `keyboard` table sets the XKB `layout`, `variant`, `model`, `options` and `rules`, and the
+`repeat_rate` and `repeat_delay` clients see. An unknown combination is rejected with the rest of
+the file, with xkbcommon's reason. `keyboard.file` names an XKB keymap to use instead, absolute,
+under `~/`, or relative to the configuration: what `xkbcli compile-keymap --layout us,no >
+keymap.xkb` writes, edited to taste, or a hand-written `xkb_keymap { ... }`. A file that cannot
+be read or does not compile is an error like any other, shown with the line of the setting and,
+where xkbcommon knows it, the line of the keymap (`init.lua:4: keyboard.file:
+/home/me/us-custom.xkb:12:5: syntax error`); should it break while the session runs, the
+keyboard falls back to the names.
 
 Pointer devices in a standalone `--session` take `mouse.speed` (-1 to 1),
 `mouse.acceleration` (`"flat"` or `"adaptive"`), and `mouse.natural_scroll`; touchpads also
 take `touchpad.natural_scroll`, `tap_to_click`, and `disable_while_typing`. Unset settings
 keep each device's defaults, and a reload applies changes. Nested sessions get their pointer
 from the host, so these do nothing there.
+
+### Keyboard layouts
+
+Several layouts are a comma-separated list, with variants in the same places:
+
+```lua
+keyboard = { layout = "us,no", variant = ",nodeadkeys", options = "grp:alt_shift_toggle" },
+```
+
+Every keyboard types in the same layout. The `switch_layout` action moves them all to the next
+one, wrapping; a binding's `layout = "prev"` goes back instead, and `layout = 2` picks the second
+(`shaodesk msg switch_layout`, `switch_layout prev`, `switch_layout 2`; a number past the last
+layout is refused). An XKB option such as `grp:alt_shift_toggle` switches from the keyboard
+itself, and the other keyboards follow it. Virtual keyboards (wtype, on-screen keyboards) keep
+the keymap and layout they bring. Unbound by default:
+
+```lua
+{ mods = { "Super", "Alt" }, key = "space", action = "switch_layout" },
+```
+
+A reload that changes the keymap gives it to every keyboard at once, keeping the keys held and
+the locks such as Caps Lock, and the active layout where the new keymap has it (by name, else
+by place); one that leaves the keymap as it was leaves the keyboards alone.
+`shaodesk msg get keyboard` prints where the keymap comes from (`source rules`, or `source file
+PATH`), a line per layout (`layout`, its number, 1 for the active one, the short name the panel
+shows, such as `us` or `no`, and its name), and a line per keyboard (`keyboard`, the layout it
+types in, how many its keymap has, 1 for a virtual one, the modifiers it holds and has locked as
+bits: Shift 1, Caps Lock 2, Ctrl 4, Alt 8, Num Lock 16, Super 64, and its name), tab-separated.
 
 ### Mouse button bindings
 

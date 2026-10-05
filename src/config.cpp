@@ -1369,6 +1369,18 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
                 binding.screenshot = parse_screenshot_mode(string(L, -1, "mode"));
             }
             lua_pop(L, 1);
+            lua_getfield(L, -1, "layout");
+            bool has_layout = !lua_isnil(L, -1), numbered = lua_type(L, -1) == LUA_TNUMBER;
+            if (has_layout && !numbered && lua_type(L, -1) != LUA_TSTRING)
+                wrong_type(L, "layout", "\"next\", \"prev\" or a number");
+            auto choice = has_layout && !numbered ? string(L, -1, "layout") : "";
+            lua_pop(L, 1);
+            if (has_layout && binding.action != SH_SWITCH_LAYOUT)
+                fail("layout is only valid with switch_layout");
+            if (numbered)
+                binding.layout = integer(L, "layout", 0, 1, max_layouts);
+            else if (has_layout)
+                binding.layout = parse_layout_choice(choice);
             lua_getfield(L, -1, "amount");
             bool has_amount = !lua_isnil(L, -1);
             lua_pop(L, 1);
@@ -1458,6 +1470,7 @@ constexpr std::pair<std::string_view, sh_action> action_table[] = {
         {"move_workspace_to_output", SH_MOVE_WORKSPACE_TO_OUTPUT},
         {"swap_workspaces", SH_SWAP_WORKSPACES},
         {"swallow_toggle", SH_SWALLOW_TOGGLE},
+        {"switch_layout", SH_SWITCH_LAYOUT},
         {"dnd_toggle", SH_DND_TOGGLE},
         {"dnd_on", SH_DND_ON},
         {"dnd_off", SH_DND_OFF},
@@ -1568,6 +1581,24 @@ bool valid_output_target(const std::string &target) {
 bool action_takes_amount(sh_action action) {
     return action == SH_RESIZE_LEFT || action == SH_RESIZE_RIGHT || action == SH_RESIZE_UP ||
            action == SH_RESIZE_DOWN;
+}
+
+int parse_layout_choice(const std::string &word) {
+    if (word == "next")
+        return 0;
+    if (word == "prev")
+        return -1;
+    std::size_t used = 0;
+    int number = 0;
+    try {
+        number = std::stoi(word, &used);
+    } catch (const std::logic_error &) {
+    }
+    if (used != word.size() || number < 1 || number > max_layouts)
+        fail("switch_layout takes \"next\", \"prev\", or a layout's number from 1 to " +
+                 std::to_string(max_layouts) + ", not '" + word + "'",
+             "layout");
+    return number;
 }
 
 sh_screenshot_mode parse_screenshot_mode(const std::string &name) {

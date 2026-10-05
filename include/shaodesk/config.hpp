@@ -14,6 +14,8 @@ using Command = std::vector<std::string>;
 // Pixels a resize_* action moves an edge by, unless its binding or request gives `amount`.
 constexpr int default_resize_amount = 40;
 constexpr int max_resize_amount = 4000;
+// The most layouts a keymap has (xkbcommon's limit), for switch_layout's number.
+constexpr int max_layouts = 32;
 
 struct Binding {
     uint32_t modifiers;
@@ -30,6 +32,7 @@ struct Binding {
     int workspace = 0; // for workspace and move_to_workspace, from 1
     sh_screenshot_mode screenshot = SH_SCREENSHOT_REGION; // for screenshot
     int amount = default_resize_amount; // for resize_*, in pixels
+    int layout = 0; // for switch_layout: 0 the next layout, -1 the previous, N the Nth from 1
     std::string output; // for move_workspace_to_output and swap_workspaces: the target
 };
 
@@ -282,6 +285,8 @@ bool action_takes_output(sh_action action);
 bool valid_output_target(const std::string &target);
 // "region", "output", or "window"; throws for other names.
 sh_screenshot_mode parse_screenshot_mode(const std::string &name);
+// switch_layout's "next" (0), "prev" (-1), or a layout's number from 1; throws for others.
+int parse_layout_choice(const std::string &word);
 
 // Parse into a fresh value; callers replace the active configuration only on success.
 // A configuration's `theme = "FILE"` (relative to `directory`) supplies every setting it omits.

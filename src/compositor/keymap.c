@@ -132,6 +132,40 @@ void update_keymap(struct sh_server *server) {
     }
 }
 
+/* Makes `layout` (from 0) the one every keyboard but the virtual ones types in. `source` is a
+ * keyboard that switched to it itself and has told the seat, or NULL. */
+static void set_keyboard_layout(struct sh_server *server, xkb_layout_index_t layout,
+                                struct sh_keyboard *source) {
+    server->keyboard_layout = layout;
+    server->syncing_keyboards = true;
+    struct sh_keyboard *keyboard;
+    wl_list_for_each(keyboard, &server->keyboards, link) {
+        struct wlr_keyboard *wlr_keyboard = keyboard->wlr_keyboard;
+        if (keyboard == source || keyboard->is_virtual || !wlr_keyboard->xkb_state)
+            continue;
+        wlr_keyboard_notify_modifiers(wlr_keyboard, wlr_keyboard->modifiers.depressed,
+                                      wlr_keyboard->modifiers.latched,
+                                      wlr_keyboard->modifiers.locked, layout);
+    }
+    server->syncing_keyboards = false;
+    struct wlr_keyboard *seat_keyboard = wlr_seat_get_keyboard(server->seat);
+    if (!source && seat_keyboard && seat_keyboard->keymap == server->keymap)
+        wlr_seat_keyboard_notify_modifiers(server->seat, &seat_keyboard->modifiers);
+}
+
+/* switch_layout: `choice` 0 is the next layout and -1 the previous, both wrapping, and N > 0
+ * the Nth; one past the last does nothing. */
+void switch_keyboard_layout(struct sh_server *server, int choice) {
+    xkb_layout_index_t count = server->keymap ? xkb_keymap_num_layouts(server->keymap) : 0;
+    if (!count || (choice > 0 && (xkb_layout_index_t)choice > count))
+        return;
+    xkb_layout_index_t step = choice < 0 ? count - 1 : 1;
+    set_keyboard_layout(server,
+                        choice > 0 ? (xkb_layout_index_t)choice - 1
+                                   : (server->keyboard_layout + step) % count,
+                        NULL);
+}
+
 /* What the panel shows for `layout` (from 0): its code in keyboard.layout ("us"), or for a
  * keymap file, which has no codes, the first two letters of its name ("Norwegian": "no"); its
  * number when neither gives one. Only letters, digits, '-' and '_'. */

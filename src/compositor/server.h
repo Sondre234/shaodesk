@@ -730,6 +730,7 @@ void seat_keyboard_focus_change(struct wl_listener *listener, void *data);
 /* keymap.c */
 bool configure_keyboard(struct sh_server *server, struct wlr_keyboard *keyboard);
 void update_keymap(struct sh_server *server);
+void switch_keyboard_layout(struct sh_server *server, int choice);
 void layout_short_name(struct sh_server *server, xkb_layout_index_t layout, char *name,
                        size_t size);
 

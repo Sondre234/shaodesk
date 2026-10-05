@@ -164,11 +164,50 @@ static void keymap_files() {
             "the fallback's error lacks the file and line: " + error);
 }
 
+// switch_layout's binding field: "next" (the default), "prev", or a number from 1.
+static void switch_layout() {
+    auto layout_of = [](const std::string &field) {
+        auto config = shaodesk::parse_config(
+            "return {bindings={{mods={'Super','Alt'},key='space',action='switch_layout'" + field +
+            "}}}");
+        require(config.bindings.size() == 1 && config.bindings[0].action == SH_SWITCH_LAYOUT,
+                "switch_layout binding not parsed");
+        return config.bindings[0].layout;
+    };
+    require(layout_of("") == 0, "switch_layout does not default to the next layout");
+    require(layout_of(",layout='next'") == 0 && layout_of(",layout='prev'") == -1,
+            "next and prev not parsed");
+    require(layout_of(",layout=2") == 2 && layout_of(",layout='3'") == 3,
+            "a layout's number not parsed");
+    rejects("return {bindings={{key='a',action='switch_layout',layout='sideways'}}}",
+            "switch_layout takes \"next\", \"prev\", or a layout's number");
+    rejects("return {bindings={{key='a',action='switch_layout',layout=0}}}",
+            "between 1 and 32");
+    rejects("return {bindings={{key='a',action='switch_layout',layout=33}}}",
+            "between 1 and 32");
+    rejects("return {bindings={{key='a',action='switch_layout',layout=true}}}",
+            "layout must be \"next\", \"prev\" or a number, not a boolean");
+    rejects("return {bindings={{key='a',action='close',layout=2}}}",
+            "layout is only valid with switch_layout");
+    require(shaodesk::parse_layout_choice("next") == 0 && shaodesk::parse_layout_choice("2") == 2,
+            "control requests are not parsed as bindings are");
+    for (const char *bad : {"", "0", "-1", "2x", "33", "first"}) {
+        try {
+            (void)shaodesk::parse_layout_choice(bad);
+            throw std::runtime_error(std::string("accepted switch_layout ") + bad);
+        } catch (const std::runtime_error &error) {
+            require(std::string(error.what()).find("switch_layout takes") != std::string::npos,
+                    std::string("switch_layout ") + bad + ": " + error.what());
+        }
+    }
+}
+
 int main() {
     try {
         rules();
         diagnostics();
         keymap_files();
+        switch_layout();
         std::cout << "Keyboard configuration passed\n";
         return 0;
     } catch (const std::exception &error) {

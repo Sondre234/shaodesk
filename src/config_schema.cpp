@@ -410,6 +410,9 @@ const Option options[] = {
      "With `screenshot` only: `\"region\"`, `\"output\"`, or `\"window\"`."},
     {"bindings[].amount", "integer", "40", "", 1, 4000,
      "With `resize_*` only: pixels moved per press."},
+    {"bindings[].layout", "string or integer", "\"next\"", "", none, none,
+     "With `switch_layout` only: `\"next\"` or `\"prev\"` (wrapping), or a layout's number "
+     "from 1, in the order of `keyboard.layout`."},
 
     {"notifications", "table", "", "", none, none,
      "Notifications: the shell serves `org.freedesktop.Notifications` on the session bus and shows "

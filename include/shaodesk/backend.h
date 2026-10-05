@@ -139,6 +139,9 @@ enum sh_action {
      * from and hides it, or, when it already swallowed one, gives the terminal a place beside
      * it again. */
     SH_SWALLOW_TOGGLE,
+    /* The keyboard layout every keyboard but the virtual ones types in: with argument 0 the
+     * next one of the keymap, -1 the previous (both wrapping), N > 0 the Nth. */
+    SH_SWITCH_LAYOUT,
     /* Workspaces between outputs. The target (see sh_callbacks.action_target) is "left" or
      * "right" (the next output that way), "next" or "prev" (in order, wrapping), a connector
      * name, or "desc:" and the start of a description. move_workspace_to_output sends the
