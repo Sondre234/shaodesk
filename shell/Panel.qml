@@ -32,7 +32,16 @@ Item {
     property var statusSource: shell.status
     property string audioPopup: ""
     property real audioPopupX: 0
-    property bool menuOpen: launcherOpen || taskMenuId >= 0 || pinMenuApp !== null || barMenuOpen || audioPopup !== ""
+    // A tray item's menu: the item it belongs to ("" while closed), the entry whose children it
+    // lists (0 for the top), and the entries passed through to get there, to go back to.
+    property string trayMenuKey: ""
+    property int trayMenuParent: 0
+    property var trayMenuTrail: []
+    property real trayMenuX: 0
+    // Bumped when the open menu's item changes its entries, so they are read again.
+    property int trayMenuRevision: 0
+    property bool menuOpen: launcherOpen || taskMenuId >= 0 || pinMenuApp !== null || barMenuOpen || audioPopup !== "" ||
+                            trayMenuKey !== ""
     // Hovering an application's stacked button lists its windows above it: those of the pinned
     // application groupSlot, or with the app id groupWindowApp outside the pinned slots.
     property bool groupOpen: false
@@ -50,9 +59,9 @@ Item {
         shellView.setExpanded(expanded, menuOpen)
     }
     onLauncherOpenChanged: {
-        if (launcherOpen) { taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = "" }
+        if (launcherOpen) { taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; trayMenuKey = "" }
     }
-    function closeMenus() { launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false }
+    function closeMenus() { launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false; trayMenuKey = "" }
     // A stacked button hovered for a moment, or at once while another's list is open, shows its
     // windows; leaving both it and the list hides them again.
     function hoverGroup(button, hovered) {
@@ -90,14 +99,14 @@ Item {
         else if (app) { pinMenuApp = app; taskMenuId = -1; barMenuOpen = false }
         else { barMenuOpen = true; taskMenuId = -1; pinMenuApp = null }
         profileMenu = false
-        launcherOpen = false; audioPopup = ""
+        launcherOpen = false; audioPopup = ""; trayMenuKey = ""
     }
     // Opens (or, when it is already open, closes) one of the volume control's popups.
     function toggleAudioPopup(kind, item) {
         if (audioPopup === kind) { audioPopup = ""; return }
         audioPopupX = item.mapToItem(root, item.width / 2, 0).x
         audioPopup = kind
-        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false
+        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; trayMenuKey = ""
     }
     // The power menu, from the power_menu action: by the power button, or at the right end of
     // the bar when that is switched off.
@@ -110,9 +119,108 @@ Item {
             toggleAudioPopup("power", powerButton)
             return
         }
-        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false
+        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; trayMenuKey = ""
         audioPopupX = width - 126
         audioPopup = "power"
+    }
+    // Where a tray item's icon is on the screen, which some applications place a window by: the
+    // panel spans its output's width, at its top or bottom edge.
+    function trayPoint(item) {
+        var p = item.mapToItem(root, item.width / 2, item.height / 2)
+        return Qt.point(Math.round(Screen.virtualX + p.x),
+                        Math.round(Screen.virtualY + (onTop ? p.y : Screen.height - height + p.y)))
+    }
+    // An item that is only a menu opens it; one that cannot be activated opens it after all.
+    property Item trayActivating: null
+    function trayActivate(button) {
+        if (button.itemIsMenu) {
+            trayMenu(button)
+            return
+        }
+        closeMenus()
+        var p = trayPoint(button)
+        trayActivating = button
+        shell.tray.activate(button.key, p.x, p.y)
+    }
+    function traySecondary(button) {
+        closeMenus()
+        var p = trayPoint(button)
+        shell.tray.secondaryActivate(button.key, p.x, p.y)
+    }
+    // Opens the item's menu by it, as the bar's own menus open: on press, the new menu before
+    // the old one closes. A second press closes it. An item without a menu (to the panel) is
+    // asked to show its own.
+    function trayMenu(button) {
+        if (!button.hasMenu) {
+            closeMenus()
+            var p = trayPoint(button)
+            shell.tray.contextMenu(button.key, p.x, p.y)
+            return
+        }
+        if (trayMenuKey === button.key) {
+            closeMenus()
+            return
+        }
+        trayMenuX = button.mapToItem(root, button.width / 2, 0).x
+        trayMenuTrail = []
+        trayMenuParent = 0
+        trayMenuKey = button.key
+        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false
+    }
+    // An entry picked: a submenu shows its entries in place, "Back" returns, anything else is
+    // the application's to carry out, and the menu closes.
+    function trayMenuPick(entry) {
+        if (entry.back) {
+            var trail = trayMenuTrail.slice()
+            trayMenuParent = trail.pop()
+            trayMenuTrail = trail
+        } else if (entry.submenu) {
+            trayMenuTrail = trayMenuTrail.concat([trayMenuParent])
+            trayMenuParent = entry.id
+        } else {
+            shell.tray.clickMenu(trayMenuKey, entry.id)
+            trayMenuKey = ""
+        }
+    }
+    // The entries shown; `revision` only makes the binding read them again when it changes.
+    function trayEntries(key, parent, trail, revision) {
+        var entries = key === "" ? [] : shell.tray.menu(key, parent)
+        return trail.length > 0 ? [{ id: -2, back: true, label: "\u2039 Back", enabled: true, separator: false,
+                                     toggle: "", checked: false, icon: "", submenu: false }].concat(entries)
+                                : entries
+    }
+    // The application is told which level of its menu is on screen (AboutToShow and "opened")
+    // and when it no longer is ("closed"), once a change has settled.
+    property string trayShownKey: ""
+    property int trayShownParent: 0
+    function syncTrayMenu() {
+        if (trayShownKey === trayMenuKey && trayShownParent === trayMenuParent)
+            return
+        if (trayShownKey !== "")
+            shell.tray.closeMenu(trayShownKey, trayShownParent)
+        trayShownKey = trayMenuKey
+        trayShownParent = trayMenuParent
+        if (trayMenuKey !== "")
+            shell.tray.openMenu(trayMenuKey, trayMenuParent)
+    }
+    onTrayMenuKeyChanged: Qt.callLater(syncTrayMenu)
+    onTrayMenuParentChanged: Qt.callLater(syncTrayMenu)
+    Connections {
+        target: shell.tray
+        function onActivationRefused(key) {
+            var button = root.trayActivating
+            root.trayActivating = null
+            if (button && button.key === key)
+                root.trayMenu(button)
+        }
+        function onMenuChanged(key) {
+            if (key !== root.trayMenuKey)
+                return
+            if (shell.tray.contains(key))
+                root.trayMenuRevision++
+            else
+                root.trayMenuKey = ""
+        }
     }
     function pinAction(appId) {
         // Reading shell.pinned re-evaluates the menu when pins change. Pinning waits until
@@ -251,6 +359,78 @@ Item {
             }
             onClicked: (mouse) => {
                 if (mouse.button === Qt.MiddleButton) { task.panel.closeMenus(); shell.tasks.close(task.taskId) }
+            }
+        }
+    }
+
+    // An application's status icon in the tray (a StatusNotifierItem), its attention icon while
+    // it needs attention. Left-click activates the application (or opens the menu of an item that
+    // is only a menu), middle-click is its secondary action, right-click opens its menu, and the
+    // wheel scrolls it.
+    component TrayButton: Button {
+        id: trayButton
+        required property string key
+        required property string title
+        required property string status
+        required property string image
+        required property string toolTip
+        required property bool itemIsMenu
+        required property bool hasMenu
+        // Inline components do not see this file's ids, so each use passes the panel in.
+        required property Item panel
+        objectName: "trayItem"
+        visible: status !== "Passive"
+        width: 32; height: shell.panelHeight - 10
+        hoverEnabled: true
+        Accessible.name: title
+        onClicked: panel.trayActivate(trayButton)
+        ToolTip {
+            id: trayTip
+            visible: trayButton.hovered && !trayButton.panel.menuOpen && !trayButton.pressed && text.length > 0
+            delay: 500
+            text: trayButton.toolTip
+            width: Math.min(implicitWidth, 420)
+            // An application's text, shown as it is rather than read as markup.
+            contentItem: Text { text: trayTip.text; textFormat: Text.PlainText; font: trayTip.font; wrapMode: Text.Wrap; color: trayTip.palette.toolTipText }
+            y: trayButton.panel.onTop ? trayButton.height + 6 : -implicitHeight - 6
+            Component.onCompleted: if ("popupType" in trayTip) trayTip.popupType = Popup.Window
+        }
+        background: Rectangle {
+            radius: 7
+            color: trayButton.panel.trayMenuKey === trayButton.key ? Qt.lighter(shell.panelColor, 1.8)
+                   : trayButton.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent"
+        }
+        contentItem: Item {
+            Image {
+                objectName: "trayIcon"
+                readonly property int size: Math.max(12, Math.min(20, shell.panelHeight - 30))
+                anchors.centerIn: parent
+                width: size; height: size
+                source: trayButton.image; sourceSize: Qt.size(size, size)
+            }
+        }
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.RightButton | Qt.MiddleButton
+            onPressed: (mouse) => {
+                if (mouse.button === Qt.RightButton)
+                    trayButton.panel.trayMenu(trayButton)
+            }
+            onClicked: (mouse) => {
+                if (mouse.button === Qt.MiddleButton)
+                    trayButton.panel.traySecondary(trayButton)
+            }
+        }
+        // A notch at a time, in Qt's units (120 a notch), as KDE's tray sends it.
+        WheelHandler {
+            property real travel: 0
+            onWheel: (event) => {
+                var horizontal = event.angleDelta.y === 0
+                travel += horizontal ? event.angleDelta.x : event.angleDelta.y
+                var steps = travel > 0 ? Math.floor(travel / 120) : Math.ceil(travel / 120)
+                travel -= steps * 120
+                if (steps !== 0)
+                    shell.tray.scroll(trayButton.key, steps * 120, horizontal)
             }
         }
     }
@@ -1110,6 +1290,128 @@ Item {
         }
     }
 
+    // A tray item's menu, in the style of the bar's own: a submenu's entries take the place of
+    // the menu's, with a way back, as the bar menu's appearance entry does. A long one scrolls.
+    Loader {
+        id: trayMenuLoader
+        asynchronous: root.trayMenuKey === ""
+        active: root.trayMenuKey !== "" || root.warm || used
+        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+        property bool used: false
+        onLoaded: used = true
+        sourceComponent: Component {
+            Rectangle {
+                id: trayMenu
+                parent: root
+                objectName: "trayMenu"
+                readonly property int rowHeight: 34
+                readonly property var entries: root.trayEntries(root.trayMenuKey, root.trayMenuParent,
+                                                                root.trayMenuTrail, root.trayMenuRevision)
+                readonly property real widest: {
+                    var widest = 0
+                    for (var i = 0; i < entries.length; ++i)
+                        widest = Math.max(widest, menuFont.advanceWidth(entries[i].label))
+                    return widest
+                }
+                readonly property real listHeight: {
+                    var sum = 0
+                    for (var i = 0; i < entries.length; ++i)
+                        sum += entries[i].separator ? 9 : rowHeight
+                    return Math.max(rowHeight, sum)
+                }
+                FontMetrics { id: menuFont; font.pixelSize: shell.fontSize; font.family: root.uiFont }
+                visible: root.trayMenuKey !== ""
+                width: Math.min(root.width - 16, Math.max(180, widest + 80))
+                height: Math.min(root.height - shell.panelExtent - 20, 12 + listHeight)
+                x: Math.max(8, Math.min(root.trayMenuX - width / 2, root.width - width - 8))
+                y: root.onTop ? bar.y + bar.height + 8 : bar.y - height - 8
+                color: shell.panelColor; radius: 10
+                border.color: Qt.lighter(shell.panelColor, 1.6)
+                MouseArea { anchors.fill: parent }
+                ListView {
+                    id: trayEntryList
+                    anchors.fill: parent; anchors.margins: 6
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    model: trayMenu.entries
+                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                    delegate: Button {
+                        id: trayEntry
+                        required property var modelData
+                        objectName: modelData.separator ? "trayMenuSeparator" : "trayMenuItem"
+                        width: ListView.view.width
+                        height: modelData.separator ? 9 : trayMenu.rowHeight
+                        text: modelData.label
+                        enabled: !modelData.separator && modelData.enabled
+                        leftPadding: 4; rightPadding: 6
+                        Accessible.name: modelData.label + (modelData.toggle !== "" ? (modelData.checked ? ", checked" : ", not checked") : "")
+                        onClicked: root.trayMenuPick(modelData)
+                        background: Rectangle {
+                            radius: 6
+                            color: trayEntry.hovered && trayEntry.enabled ? Qt.lighter(shell.panelColor, 1.5) : "transparent"
+                            Rectangle {
+                                visible: trayEntry.modelData.separator
+                                anchors.verticalCenter: parent.verticalCenter
+                                x: 8; width: parent.width - 16; height: 1
+                                color: Qt.lighter(shell.panelColor, 1.8)
+                            }
+                        }
+                        contentItem: RowLayout {
+                            visible: !trayEntry.modelData.separator
+                            spacing: 8
+                            opacity: trayEntry.enabled ? 1 : 0.4
+                            // A check box, a radio button's dot, or the entry's icon.
+                            Item {
+                                Layout.preferredWidth: 16; Layout.preferredHeight: 16
+                                Rectangle {
+                                    visible: trayEntry.modelData.toggle === "radio"
+                                    anchors.centerIn: parent
+                                    width: 10; height: 10; radius: 5
+                                    color: trayEntry.modelData.checked ? shell.accent : "transparent"
+                                    border.color: trayEntry.modelData.checked ? shell.accent : Qt.lighter(shell.panelColor, 2.2)
+                                }
+                                Rectangle {
+                                    visible: trayEntry.modelData.toggle === "checkmark"
+                                    anchors.centerIn: parent
+                                    width: 13; height: 13; radius: 3
+                                    color: trayEntry.modelData.checked ? shell.accent : "transparent"
+                                    border.color: trayEntry.modelData.checked ? shell.accent : Qt.lighter(shell.panelColor, 2.2)
+                                    Text {
+                                        visible: trayEntry.modelData.checked
+                                        anchors.centerIn: parent
+                                        text: "\u2713"; color: shell.panelColor; font.pixelSize: 10; font.bold: true
+                                    }
+                                }
+                                Image {
+                                    visible: trayEntry.modelData.toggle === "" && trayEntry.modelData.icon !== ""
+                                    anchors.centerIn: parent
+                                    width: 16; height: 16
+                                    source: visible ? trayEntry.modelData.icon : ""
+                                    sourceSize: Qt.size(16, 16)
+                                }
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                text: trayEntry.modelData.label; textFormat: Text.PlainText; elide: Text.ElideRight
+                                color: shell.textColor; font.pixelSize: shell.fontSize; font.family: root.uiFont
+                            }
+                            Text {
+                                visible: trayEntry.modelData.submenu
+                                text: "\u203a"; color: shell.textColor; font.pixelSize: shell.fontSize + 4
+                            }
+                        }
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        visible: trayMenu.entries.length === 0
+                        text: "No entries"
+                        color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize - 1; font.family: root.uiFont
+                    }
+                }
+            }
+        }
+    }
+
     // The windows of the hovered stacked button: clicking one focuses it (or minimizes it when
     // focused already), the cross or a middle click closes it, and a right click opens its menu.
     Loader {
@@ -1594,6 +1896,18 @@ Item {
                         name: root.tiling ? "layout-panel-left" : "copy"
                         color: root.tiling ? shell.accent : shell.textColor
                     }
+                }
+            }
+            // The system tray: the status icons of applications, in the order they appeared.
+            // Passive ones stay hidden, and so does the tray when none is left.
+            Row {
+                id: tray
+                objectName: "tray"
+                visible: shell.widgets.tray && shell.tray.shown > 0
+                Layout.alignment: Qt.AlignVCenter
+                Repeater {
+                    model: shell.tray
+                    delegate: TrayButton { panel: root }
                 }
             }
             NotificationBell { panel: root; barHeight: bar.height }

@@ -2,6 +2,7 @@
 #include "controller.hpp"
 #include "icons.hpp"
 #include "notification_images.hpp"
+#include "tray_images.hpp"
 #include "wallpapers.hpp"
 #include <QQmlContext>
 #include <QQmlEngine>
@@ -22,6 +23,9 @@
 #include <memory>
 #if SHAODESK_DBUS
 #include "notification_service.hpp"
+#endif
+#if SHAODESK_TRAY
+#include "tray_host.hpp"
 #endif
 
 ShellController::ShellController(std::filesystem::path path, QObject *parent)
@@ -57,6 +61,7 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
 }
 ShellController::~ShellController() {
     delete engine_; // Before the objects its context refers to go away.
+    delete trayHost_; // Before the model it fills.
     clearApps();
 }
 QQmlEngine *ShellController::engine() {
@@ -64,6 +69,7 @@ QQmlEngine *ShellController::engine() {
         engine_ = new QQmlEngine(this);
         engine_->addImageProvider("icons", new Icons);
         engine_->addImageProvider("notify", new NotificationImages(notifications_));
+        engine_->addImageProvider("tray", new TrayImages(tray_));
         engine_->addImageProvider("thumbs", new Thumbnails);
         engine_->rootContext()->setContextProperty("shell", this);
     }
@@ -313,7 +319,7 @@ QVariantMap ShellController::widgets() const {
             {"volume", w.volume},         {"clock", w.clock},     {"calendar", w.calendar},
             {"tiling", w.tiling},         {"profiles", w.profiles},
             {"wallpapers", w.wallpapers}, {"keyboard_layout", w.keyboard_layout},
-            {"power", w.power}};
+            {"power", w.power},           {"tray", w.tray}};
 }
 QStringList ShellController::profiles() const {
     QStringList names;
@@ -386,6 +392,7 @@ void ShellController::reload() {
         osd_.configure(config_.osd);
         power_.setCountdown(config_.power.countdown);
         updateNotificationService();
+        updateTrayHost();
         refreshApps();
         Q_EMIT configChanged();
         Q_EMIT wallpaperChanged();
@@ -737,6 +744,43 @@ void ShellController::updateNotificationService() {
         delete notificationService_;
         notificationService_ = nullptr;
         notifications_.setServing(false);
+    }
+#endif
+}
+bool ShellController::startTray() {
+    serveTray_ = true;
+    updateTrayHost();
+    return trayHost_ != nullptr;
+}
+void ShellController::updateTrayHost() {
+    if (!serveTray_)
+        return;
+#if SHAODESK_TRAY
+    // Off, the shell leaves the names to another tray: applications would otherwise think their
+    // icons are shown.
+    if (!config_.shell.widgets.tray) {
+        delete trayHost_;
+        trayHost_ = nullptr;
+    } else if (!trayHost_) {
+        // As for notifications: without an address libdbus would start a bus nobody knows of.
+        if (qEnvironmentVariableIsEmpty("DBUS_SESSION_BUS_ADDRESS") &&
+            !QFileInfo::exists(qEnvironmentVariable("XDG_RUNTIME_DIR") + "/bus")) {
+            if (!trayNoBusReported_)
+                std::cerr << "shaodesk tray: no session bus (DBUS_SESSION_BUS_ADDRESS is unset)\n";
+            trayNoBusReported_ = true;
+            return;
+        }
+        auto *host = new TrayHost(tray_, this);
+        if (host->start()) {
+            trayHost_ = host;
+            std::cerr << "shaodesk tray: "
+                      << (host->ownsWatcher() ? "serving org.kde.StatusNotifierWatcher"
+                                              : "showing the items of another StatusNotifierWatcher")
+                      << '\n';
+        } else {
+            std::cerr << "shaodesk tray: " << host->error().toStdString() << '\n';
+            delete host;
+        }
     }
 #endif
 }

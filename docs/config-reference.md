@@ -329,6 +329,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.widgets.wallpapers` | boolean | true | - | The wallpaper picker: thumbnails of the images in `shell.wallpapers`; the one picked replaces `shell.wallpaper` for the profile in use until the configured one changes. |
 | `shell.widgets.keyboard_layout` | boolean | true | - | The active keyboard layout's short name, such as `us`; clicking it switches to the next. Shown only when the keymap has two or more layouts. |
 | `shell.widgets.power` | boolean | true | - | The power menu: lock, suspend, hibernate, restart, power off and log out, as far as `power.lock_command` and logind allow them. |
+| `shell.widgets.tray` | boolean | true | - | The system tray: applications' status icons (StatusNotifierItem), shown while there are any. `false` also leaves the tray's D-Bus names to another program. |
 | `shell.launchers` | list of tables | unset | - | Pinned commands for programs without a desktop file, at most 64. |
 | `shell.launchers[].name` | string | - | - | Label, 1 to 128 bytes. Required. |
 | `shell.launchers[].icon` | string | "application-x-executable" | - | Icon theme name. |

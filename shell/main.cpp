@@ -195,8 +195,10 @@ int main(int argc, char **argv) {
             throw std::runtime_error("no output available");
         // The daemon answers once the surfaces to show its cards exist. A preview stays off the
         // session bus unless asked to.
-        if (!preview || qEnvironmentVariableIsSet("SHAODESK_PREVIEW_DBUS"))
+        if (!preview || qEnvironmentVariableIsSet("SHAODESK_PREVIEW_DBUS")) {
             controller.startNotifications();
+            controller.startTray();
+        }
         QObject::connect(&app, &QGuiApplication::screenAdded, &app, [&](QScreen *screen) {
             if (preview)
                 return;

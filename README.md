@@ -18,8 +18,8 @@ taskbar, launcher and notifications, and a Lua configuration that reloads when y
 </div>
 
 > **Status:** early development. It runs as a standalone session from a TTY, where it is the
-> author's everyday desktop on Gentoo, and nested in another Wayland session. A system tray is
-> still missing, and it has been used on few machines.
+> author's everyday desktop on Gentoo, and nested in another Wayland session. It has been
+> used on few machines.
 
 ## Highlights
 
@@ -30,9 +30,9 @@ taskbar, launcher and notifications, and a Lua configuration that reloads when y
 - **Per-monitor workspaces**, a scratchpad, sticky windows, tab groups, window rules,
   terminal swallowing, and saved sessions you can restore.
 - **A Qt Quick shell** on every monitor: taskbar, application menu, workspace indicator,
-  battery, network, volume, keyboard layout, clock and calendar, a notification daemon with history and
-  do-not-disturb, an on-screen display, an Alt + Tab switcher, an Exposé-style overview,
-  a command palette, and a power menu.
+  battery, network, volume, keyboard layout, clock and calendar, a system tray, a notification
+  daemon with history and do-not-disturb, an on-screen display, an Alt + Tab switcher, an
+  Exposé-style overview, a command palette, and a power menu.
 - **Power controls** through logind (systemd-logind or elogind): lock, suspend, hibernate,
   restart, power off and log out, locking before any sleep and closing windows first so that
   applications can save.
@@ -58,8 +58,8 @@ Requirements:
 - wlroots **0.20.x** (its API changes between release series), wayland-server,
   wayland-protocols, wayland-scanner
 - For the shell: Qt 6.5+ (Core, Gui, Network, Qml, Quick, Quick Controls Basic, Quick Layouts,
-  the Wayland platform plugin, and DBus for notifications), LayerShellQt 6.6+, GLib/GIO,
-  wayland-client
+  the Wayland platform plugin, and DBus for notifications and the tray), LayerShellQt 6.6+,
+  GLib/GIO, wayland-client
 - libinput and xcb (with xcb-xfixes) when wlroots is built with its libinput backend or with
   XWayland; optionally sd-bus (libsystemd, libelogind or basu) for the
   [sleep inhibitor](docs/features.md#screen-locking-and-idle) and libpulse for the volume control
@@ -81,6 +81,7 @@ debug build.
 | `SHAODESK_SHELL_PREVIEW_ONLY` | `OFF` | Build only a shell UI preview, without LayerShellQt (see [Development](#development)) |
 | `SHAODESK_NOTIFICATIONS` | `ON` | Build the shell's notification daemon (needs Qt DBus) |
 | `SHAODESK_PULSEAUDIO` | `ON` | Build the panel's volume control (needs libpulse, which PipeWire also serves) |
+| `SHAODESK_TRAY` | `ON` | Build the panel's system tray (needs Qt DBus) |
 | `SHAODESK_INSTALL_SESSION` | `OFF` | Install the display-manager session entry |
 | `SHAODESK_XWM_WAKER` | `ON` | Work around lost X11 windows; turn off with wlroots patched by `packaging/patches/wlroots-xwm-drain.patch` |
 
@@ -144,7 +145,7 @@ service may also open in the host session instead.
 - **From a text console**, log in and run `shaodesk --session`. A seat manager (elogind,
   systemd-logind or seatd) has to give you the GPU and input devices, as it does for any
   Wayland desktop. Where nothing else starts a D-Bus session bus, as is usual without systemd,
-  run `dbus-run-session -- shaodesk --session` instead: portals and notifications need one.
+  run `dbus-run-session -- shaodesk --session` instead: portals, notifications and the tray need one.
 - **To try it first**, run `shaodesk` inside your current Wayland session; it opens in a window.
 
 Without `~/.config/shaodesk/init.lua`, the installed [config/init.lua](config/init.lua) is
@@ -269,8 +270,8 @@ run. See [Control socket](docs/features.md#control-socket) for the queries and e
 
 The test suite needs no display: it covers configuration validation, the layouts, and a
 headless compositor with real xdg-shell and X11 clients, the shell rendered offscreen, and the
-notification daemon on a private D-Bus. `tools/check-all.sh` runs it again under ASan and
-UBSan. [docs/verification.md](docs/verification.md) records what has been tested, on which
+notification daemon and the system tray on a private D-Bus. `tools/check-all.sh` runs it again
+under ASan and UBSan. [docs/verification.md](docs/verification.md) records what has been tested, on which
 hardware, and what has not.
 
 To work on the shell UI without LayerShellQt, build the preview:
@@ -289,8 +290,8 @@ Work happens on short-lived branches off `main` that are merged back with `--no-
 [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md) for notable changes, and
 [docs/performance.md](docs/performance.md) for measurements.
 
-Not yet done: a system tray, drag-to-edge snap previews, blur and shadows, and Lua extension
-APIs for custom layouts and shell widgets.
+Not yet done: drag-to-edge snap previews, blur and shadows, and Lua extension APIs for custom
+layouts and shell widgets.
 
 ## Reporting bugs
 

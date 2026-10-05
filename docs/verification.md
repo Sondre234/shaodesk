@@ -434,3 +434,19 @@ machine to sleep with swaylock locking first, and systemd-logind; logging out of
 display manager started; real applications asked to close (only probe clients were) and how
 long they take; and the dialog and the menu on a real display, at other scales, and with a real
 keyboard.
+
+## System tray
+
+Added 2026-10-05. `tray_dbus_test` drives the watcher and the host on a private bus with fake items:
+registration by bus name and by object path, hosts, owners leaving, another watcher already
+serving, the change signals, items without GetAll or Activate, pixel byte order and size choice,
+icons from an item's own folder, menus (the layout, AboutToShow, the events, LayoutUpdated and
+ItemsPropertiesUpdated), and a seeded fuzz of malformed properties, pixmaps, layouts and signals
+that fails on any Qt warning. `shell_ui` clicks, scrolls and opens menus on the panel offscreen;
+`tray_smoke` runs a headless compositor with two outputs, the shell and two `tray_probe` items,
+checking icons with screenshots and clicks with a virtual pointer. Not checked: real applications
+(Discord and other Electron applications, Steam, nm-applet, blueman, KDE Connect, Telegram,
+Nextcloud, OBS), a physical mouse or touchpad, scaled outputs, and another tray such as Waybar
+running alongside in a real session. While a panel menu is open, a click made without moving the
+pointer first lands where the pointer was in the smaller surface: the compositor tells a surface
+where the pointer is only when it moves.

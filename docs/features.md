@@ -12,7 +12,7 @@ is focused already, as on Windows, from any monitor's bar) and a right-click win
 minimize, pin to taskbar, close), middle-click to close a window, a right-click menu on empty bar space (tiling,
 applications, show desktop), an application
 search menu, a tiling on/off button for its monitor, a workspace indicator, battery and network status,
-the default output's volume, a clock, and a show-desktop button. Buttons show a tooltip
+the default output's volume, a clock, a [system tray](#system-tray), and a show-desktop button. Buttons show a tooltip
 on hover. Installed applications are read
 from desktop entries through GIO. Lua configures the panel's height, top or
 bottom placement (`panel_position`), margins that make it float (`panel_margin`, one
@@ -34,8 +34,9 @@ clock, and clicking it switches every keyboard to the next. Clicking the clock o
 month calendar (previous and next month buttons; the title returns to today). Each widget is
 switched off from Lua: `shell = { widgets = { battery = false, calendar = false } }`, with
 `workspaces`, `battery`, `network`, `volume`, `clock`, `calendar` (the clock stays, the
-calendar goes), `tiling`, `profiles` (the appearance profile picker), `keyboard_layout` and
-`power` (the [power menu](#power)) all on by default. All of them take the panel's `accent`,
+calendar goes), `tiling`, `profiles` (the appearance profile picker), `keyboard_layout`,
+`power` (the [power menu](#power)) and `tray` (the [system tray](#system-tray)) all on by
+default. All of them take the panel's `accent`,
 `panel_color`, `text_color`, `font` and `font_size`. In a nested
 session, applications that reuse an existing process or D-Bus service can open
 in the host session instead.
@@ -839,6 +840,42 @@ The tests start a dbus-daemon of their own on a private address and never touch 
 `notifications_test` (the model, timers and markup), `notifications_dbus_test` (the interface on
 that bus), `notifications_smoke` (a headless compositor and shell: cards, a click, expiry, hover,
 do-not-disturb, the display and the history), and the configuration tests.
+
+## System tray
+
+The panel shows the status icons applications put in a system tray, beside the bell on every
+monitor, in the order they appeared. These are StatusNotifierItems, the kind KDE and Qt
+applications, Electron applications and Ayatana's indicator library show; the older X11 tray
+icons (XEmbed) are not shown. An icon is the item's named icon, looked up first in the folder the
+item names and then in the icon theme, or else the pictures it sends, at the size nearest the
+panel's. While the item needs attention it shows its attention icon, and an overlay icon sits in
+its bottom right corner. Items that say they are passive stay hidden, and so does the tray when
+none is left. Hovering an icon shows its tooltip.
+
+- Left-click activates the application, which usually shows or hides its window. An item that is
+  only a menu opens its menu instead, and so does one that cannot be activated, as Ayatana's
+  (nm-applet's, for one) cannot.
+- Right-click opens the item's menu above the icon (below it on a top panel), in the style of the
+  panel's own menus: separators, check boxes, radio buttons, icons, greyed-out entries, and
+  submenus, whose entries take the menu's place with a "‹ Back" entry first. Clicking an entry runs
+  it and closes the menu; so do a click elsewhere, Escape, and another right-click on the icon. An
+  item without a menu is asked to show its own.
+- Middle-click is the item's secondary action, and the wheel scrolls it a notch at a time, which
+  some applications use for the volume or to switch between things.
+
+The shell serves `org.kde.StatusNotifierWatcher`, the registry applications register their items
+with, on the session bus, and registers as a tray (`org.kde.StatusNotifierHost-PID`). When another
+program serves the watcher already, such as another panel running alongside, the shell shows that
+watcher's items instead, and takes the name over if that program quits; applications register
+again by themselves. `shell = { widgets = { tray = false } }` hides the tray and gives up both
+names, so that applications do not think their icons are shown; a reload follows the setting. The
+tray needs Qt's D-Bus module at build time; without it (or with `-DSHAODESK_TRAY=OFF`) the shell
+builds without a tray.
+
+The tests use a bus of their own and `tray_probe`, an item with a menu of every kind of entry:
+`tray_dbus_test` (the watcher, the host, the icons, menus, and a seeded fuzz of malformed items and
+menus), `shell_ui` (clicks, the wheel and the menu in the panel) and `tray_smoke` (a headless
+compositor with two monitors and the shell, checked with screenshots).
 
 ## Sessions
 

@@ -9,6 +9,7 @@
 #include "shaodesk/config.hpp"
 #include "system_status.hpp"
 #include "task_model.hpp"
+#include "tray.hpp"
 #include <QColor>
 #include <QLocalSocket>
 #include <QMap>
@@ -55,7 +56,7 @@ class ShellController : public QObject {
     Q_PROPERTY(bool iconsOnly READ iconsOnly NOTIFY configChanged)
     Q_PROPERTY(bool groupWindows READ groupWindows NOTIFY configChanged)
     // Which panel widgets Lua enables: {workspaces, battery, network, volume, clock, calendar,
-    // tiling, profiles, wallpapers, keyboard_layout, power}.
+    // tiling, profiles, wallpapers, keyboard_layout, power, tray}.
     Q_PROPERTY(QVariantMap widgets READ widgets NOTIFY configChanged)
     // The compositor's active keyboard layout: {number (from 1), count, short ("us"), name}, or
     // empty without a compositor.
@@ -72,6 +73,8 @@ class ShellController : public QObject {
     // The notification daemon (cards, history, do-not-disturb) and the on-screen display.
     Q_PROPERTY(NotificationCenter *notifications READ notifications CONSTANT)
     Q_PROPERTY(Osd *osd READ osd CONSTANT)
+    // The system tray's items, empty until startTray().
+    Q_PROPERTY(TrayModel *tray READ tray CONSTANT)
     // The output the compositor says has the focus, and the one showing the notification cards
     // now: chosen when the first card appears and kept until the last is gone.
     Q_PROPERTY(QString focusedOutput READ focusedOutput NOTIFY focusedOutputChanged)
@@ -173,6 +176,10 @@ class ShellController : public QObject {
     // Starts answering on the session bus when notifications are enabled and QtDBus is built
     // in; later configuration reloads follow the setting. Returns whether it is serving.
     bool startNotifications();
+    TrayModel *tray() { return &tray_; }
+    // Starts the tray's host on the session bus when QtDBus is built in and shell.widgets.tray
+    // is on; later configuration reloads follow the setting. Returns whether it is running.
+    bool startTray();
     bool tiling() const { return tiling_; }
     bool tilingAvailable() const { return subscribed_; }
     int workspaceCount() const { return config_.settings.workspaces; }
@@ -267,6 +274,10 @@ class ShellController : public QObject {
     QString focusedOutput_, cardsOutput_;
     QVariantMap keyboardLayout_;
     QObject *notificationService_ = nullptr;
+    TrayModel tray_;
+    QObject *trayHost_ = nullptr;
+    bool serveTray_ = false, trayNoBusReported_ = false;
+    void updateTrayHost();
     bool serveNotifications_ = false, noBusReported_ = false;
     int lastVolume_ = -1;
     bool lastMuted_ = false;

@@ -569,8 +569,10 @@ int main(int argc, char **argv) {
                     !widgets.shell.widgets.workspaces && widgets.shell.widgets.network &&
                     widgets.shell.widgets.volume && widgets.shell.widgets.clock &&
                     widgets.shell.widgets.tiling && widgets.shell.widgets.profiles &&
+                    widgets.shell.widgets.tray &&
                     !shaodesk::parse_config("return {shell={widgets={profiles=false}}}")
-                         .shell.widgets.profiles,
+                         .shell.widgets.profiles &&
+                    !shaodesk::parse_config("return {shell={widgets={tray=false}}}").shell.widgets.tray,
                 "shell widgets not parsed");
         require(shaodesk::parse_config("return {shell={}}").shell.widgets.battery,
                 "widgets not on by default");

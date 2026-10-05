@@ -9,16 +9,19 @@ if(SHAODESK_PULSEAUDIO)
         message(STATUS "libpulse not found: the panel's volume control is left out")
     endif()
 endif()
-# The notification daemon speaks D-Bus; without QtDBus the shell builds without it and the panel
-# leaves out the bell.
+# The notification daemon and the system tray speak D-Bus; without QtDBus the shell builds
+# without them and the panel leaves out the bell and the tray.
 option(SHAODESK_NOTIFICATIONS "Serve org.freedesktop.Notifications from the shell (needs Qt6 DBus)" ON)
+option(SHAODESK_TRAY "Show applications' status icons (StatusNotifierItem) in the panel (needs Qt6 DBus)" ON)
 set(SHAODESK_DBUS OFF)
-if(SHAODESK_NOTIFICATIONS)
+set(SHAODESK_TRAY_DBUS OFF)
+if(SHAODESK_NOTIFICATIONS OR SHAODESK_TRAY)
     find_package(Qt6 6.5 QUIET COMPONENTS DBus)
     if(Qt6DBus_FOUND)
-        set(SHAODESK_DBUS ON)
+        set(SHAODESK_DBUS ${SHAODESK_NOTIFICATIONS})
+        set(SHAODESK_TRAY_DBUS ${SHAODESK_TRAY})
     else()
-        message(STATUS "Qt6 DBus not found: the notification daemon is left out")
+        message(STATUS "Qt6 DBus not found: the notification daemon and the tray are left out")
     endif()
 endif()
 if(NOT SHAODESK_SHELL_PREVIEW_ONLY)
@@ -29,7 +32,8 @@ if(NOT SHAODESK_SHELL_PREVIEW_ONLY)
 endif()
 
 set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_images.cpp
-    notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp)
+    notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp tray.cpp tray.hpp
+    tray_images.cpp tray_images.hpp)
 # The QML is compiled ahead of time into the binary (qmlcachegen), so starting the shell parses
 # and compiles none of it. It lives at qrc:/shell/ShaodeskShell/*.qml.
 qt_add_library(shaodesk_shell_qml STATIC)
@@ -54,6 +58,11 @@ if(SHAODESK_DBUS)
     target_sources(shaodesk-shell PRIVATE notification_service.cpp notification_service.hpp)
     target_link_libraries(shaodesk-shell PRIVATE Qt6::DBus)
     target_compile_definitions(shaodesk-shell PRIVATE SHAODESK_DBUS=1)
+endif()
+if(SHAODESK_TRAY_DBUS)
+    target_sources(shaodesk-shell PRIVATE tray_host.cpp tray_host.hpp tray_watcher.cpp tray_watcher.hpp)
+    target_link_libraries(shaodesk-shell PRIVATE Qt6::DBus)
+    target_compile_definitions(shaodesk-shell PRIVATE SHAODESK_TRAY=1)
 endif()
 if(SHAODESK_PULSEAUDIO AND PULSE_FOUND)
     target_sources(shaodesk-shell PRIVATE pulse_audio.cpp)
@@ -150,6 +159,27 @@ if(BUILD_TESTING)
         set_tests_properties(shell_notifications_dbus PROPERTIES TIMEOUT 60
             ENVIRONMENT "QT_QPA_PLATFORM=offscreen;DBUS_SESSION_BUS_ADDRESS=disabled:")
     endif()
+    if(SHAODESK_TRAY_DBUS)
+        # A tray item for the end-to-end tests; tests/tray_fake_item.hpp is its item and menu.
+        add_executable(tray_probe ${PROJECT_SOURCE_DIR}/tests/tray_probe.cpp
+            ${PROJECT_SOURCE_DIR}/tests/tray_fake_item.hpp)
+        set_target_properties(tray_probe PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
+        target_compile_definitions(tray_probe PRIVATE QT_NO_KEYWORDS)
+        target_compile_options(tray_probe PRIVATE -Wall -Wextra -Wpedantic)
+        target_link_libraries(tray_probe PRIVATE Qt6::Gui Qt6::DBus)
+        # Like the notification test, on a bus of its own with the environment's made unusable.
+        add_executable(tray_dbus_test ${PROJECT_SOURCE_DIR}/tests/tray_dbus_test.cpp
+            ${PROJECT_SOURCE_DIR}/tests/tray_fake_item.hpp tray.cpp tray.hpp tray_host.cpp tray_host.hpp
+            tray_watcher.cpp tray_watcher.hpp)
+        set_target_properties(tray_dbus_test PROPERTIES AUTOMOC ON)
+        target_include_directories(tray_dbus_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+        target_compile_definitions(tray_dbus_test PRIVATE QT_NO_KEYWORDS)
+        target_compile_options(tray_dbus_test PRIVATE -Wall -Wextra -Wpedantic)
+        target_link_libraries(tray_dbus_test PRIVATE Qt6::Gui Qt6::DBus Qt6::Test)
+        add_test(NAME shell_tray_dbus COMMAND tray_dbus_test)
+        set_tests_properties(shell_tray_dbus PROPERTIES TIMEOUT 90
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen;DBUS_SESSION_BUS_ADDRESS=disabled:")
+    endif()
     add_executable(osd_test ${PROJECT_SOURCE_DIR}/tests/osd_test.cpp
         ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp view.cpp view.hpp task_model.cpp task_model.hpp
         task_filter.cpp task_filter.hpp icons.cpp icons.hpp wallpapers.cpp wallpapers.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
@@ -200,6 +230,12 @@ if(BUILD_TESTING)
                 ${PROJECT_SOURCE_DIR}/tests/notifications_smoke.py $<TARGET_FILE:shaodesk>
                 $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:notify_probe> $<TARGET_FILE:pointer_probe>)
             set_tests_properties(notifications_smoke PROPERTIES TIMEOUT 90)
+        endif()
+        if(SHAODESK_TRAY_DBUS)
+            add_test(NAME tray_smoke COMMAND ${Python3_EXECUTABLE}
+                ${PROJECT_SOURCE_DIR}/tests/tray_smoke.py $<TARGET_FILE:shaodesk>
+                $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:tray_probe> $<TARGET_FILE:pointer_probe>)
+            set_tests_properties(tray_smoke PROPERTIES TIMEOUT 90)
         endif()
     endif()
 endif()

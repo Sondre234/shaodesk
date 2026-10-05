@@ -542,6 +542,9 @@ const Option options[] = {
     {"shell.widgets.power", "boolean", "true", "true", none, none,
      "The power menu: lock, suspend, hibernate, restart, power off and log out, as far as "
      "`power.lock_command` and logind allow them."},
+    {"shell.widgets.tray", "boolean", "true", "true", none, none,
+     "The system tray: applications' status icons (StatusNotifierItem), shown while there are "
+     "any. `false` also leaves the tray's D-Bus names to another program."},
     {"shell.launchers", "list of tables", "unset", "", none, none,
      "Pinned commands for programs without a desktop file, at most 64."},
     {"shell.launchers[].name", "string", "", "", none, none, "Label, 1 to 128 bytes. Required."},
