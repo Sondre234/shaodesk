@@ -3,6 +3,21 @@
 Notable changes, newest first. Dates are when the work landed. The project has not made a
 tagged release yet; everything below is on `main`.
 
+## Unreleased (2026-10-05)
+
+- Power controls. New actions `lock`, `suspend`, `hibernate`, `reboot`, `poweroff`, `logout`
+  and `power_menu`, bound to Super + Shift + L (lock) and Super + Escape (the power menu). The
+  panel has a power button (`shell.widgets.power`) and the command palette the same entries,
+  listing only what logind (systemd-logind or elogind) allows; restart, power off and log out
+  ask first with a dialog that counts down `power.countdown` seconds. `lock` starts
+  `power.lock_command` (`swaylock -f` unless set), and with `power.lock_before_sleep` the screen
+  locks before any sleep, whether shaodesk, the lid or an idle daemon asks for it. Power off,
+  reboot and log out first ask every window to close and give up, with the reason on the panel,
+  when one is still open after `power.close_timeout` (an application asking whether to save),
+  unless `power.force` is set. `shaodesk msg get power` shows what may run. A headless
+  compositor uses only the logind on the bus `SHAODESK_LOGIN1_BUS` names, which the tests point
+  at a fake one, so they can never power off the machine running them.
+
 ## Unreleased (2026-10-03)
 
 - `layout.tiling_per_workspace = true` makes tiling a setting of each workspace rather than

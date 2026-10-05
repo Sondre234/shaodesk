@@ -373,3 +373,39 @@ VM. Daily use is not a targeted test, so the hardware items listed as not checke
 sections above stay unconfirmed until someone checks them on purpose: suspend and resume, lid
 close (this machine has none), monitors unplugged or woken through DRM, VT switching on NVIDIA,
 and brightness keys.
+
+## Power controls
+
+Added 2026-10-05. Everything runs headless against `fake_login1`, a stand-in for logind's
+Manager on a dbus-daemon the test starts (and kills by process) on a private address; the
+compositor reaches it through `SHAODESK_LOGIN1_BUS` and, headless, never uses the system bus, so
+no test can power off, reboot or suspend the machine. `power_smoke` checks that a headless
+compositor without the variable reports logind unavailable and refuses the logind actions;
+`get power` against the fake's `CanPowerOff`, `CanReboot`, `CanSuspend` and `CanHibernate`
+answers, refusal of `na` and `no`, reload asking again, and a call the fake turns down reported
+as `power-error`; `PowerOff`, `Reboot`, `Suspend` and `Hibernate` arriving with
+`interactive = true`; `lock` starting the configured locker (a probe holding an
+`ext-session-lock-v1` lock), refused without one or with one not installed; suspend and
+hibernate starting the locker and calling logind only once the lock holds (a locker that waits
+to be told to lock shows logind is not asked before), and cancelling after five seconds with a
+locker that never locks; the sleep delay inhibitor taken at startup, released on
+`PrepareForSleep` once the lock holds, for a suspend the fake starts on its own (as the lid or
+an idle daemon would) too, and taken again after waking; `lock_before_sleep = false` sleeping
+without a locker or an inhibitor; power off closing two probe windows before calling logind; a
+probe refusing to close cancelling a reboot after `close_timeout`, `force` going ahead and
+`close_windows = false` not asking; log out closing the windows, waiting for their clients and
+exiting with status 0; and the `power` state line and `power-menu` event subscribers get.
+`shell_ui` drives the panel's power button and menu (only what may run, hidden with nothing),
+suspend and lock from it, refusals and `power-error` shown on the panel, the confirmation
+dialog's countdown running out into a power off, its button, Enter, Escape, Cancel and a click
+beside it, an action that may no longer run dropping its dialog, the command palette's entries,
+and the keyboard in the menu `power_menu` opens. `power_config` covers the settings.
+
+Not checked: a real logind (only its read-only `CanPowerOff` and the like were asked, on
+elogind 255, which answers as the fake does), and so a real suspend, hibernate, reboot or power
+off, a polkit password prompt for a `challenge` answer, the lid or an idle daemon sending the
+machine to sleep with swaylock locking first, and systemd-logind; logging out of a session a
+display manager started; real applications asked to close (only probe clients were) and how
+long they take; and the dialog and the menu on a real display, at other scales, and with a real
+keyboard.
+
