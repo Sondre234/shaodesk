@@ -5,6 +5,11 @@ tagged release yet; everything below is on `main`.
 
 ## Unreleased (2026-10-05)
 
+- `shaodesk-session` starts a standalone session the way a first run needs: under
+  `dbus-run-session` when there is no D-Bus session bus (usual without systemd, and needed by
+  notifications, the tray and portals), with everything the session prints in
+  `~/.local/state/shaodesk/session.log` (`$XDG_STATE_HOME`), the previous session's kept as
+  `session.log.old`. The display-manager entry runs it, and is no longer called experimental.
 - A `terminal` action opens the terminal set by the new `terminal` setting (`terminal = {
   "foot" }`), else `$TERMINAL`, else the first of kitty, foot, alacritty, wezterm, ghostty,
   konsole, gnome-terminal and xterm that is installed. When there is none, the panel says so.
