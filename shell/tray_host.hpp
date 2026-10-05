@@ -9,6 +9,7 @@
 #include <map>
 #include <memory>
 
+class QDBusArgument;
 class QDBusMessage;
 class QDBusServiceWatcher;
 class TrayWatcher;
@@ -27,12 +28,20 @@ class TrayItemClient : public QObject {
     void secondaryActivate(int x, int y);
     void contextMenu(int x, int y);
     void scroll(int delta, const QString &orientation);
+    // The menu: about to show the entries under `id`, no longer showing them, entry `id` picked.
+    void openMenu(int id);
+    void closeMenu(int id);
+    void clickMenu(int id);
     // Reads an item's properties, as GetAll gives them, into `item`; what is missing or of the
     // wrong type takes its default. Returns whether what its icon shows changed.
     static bool read(TrayItem &item, const QVariantMap &properties);
+    // Reads a GetLayout answer's layout, (ia{sv}av), into `menu`: at most 1000 entries, 8 deep.
+    // Returns false when it is no layout.
+    static bool readLayout(const QDBusArgument &layout, std::map<int, TrayMenuEntry> &menu);
 
   private Q_SLOTS:
     void itemSignal(const QDBusMessage &message);
+    void menuSignal(const QDBusMessage &message);
 
   private:
     TrayModel &model_;
@@ -44,6 +53,14 @@ class TrayItemClient : public QObject {
     void refresh();
     void readEach();
     void apply(const QVariantMap &properties);
+    // The menu at menuPath_, fetched whole, and again when its layout changes.
+    QString menuPath_;
+    QTimer relayout_;
+    bool fetching_ = false, fetchAgain_ = false;
+    void setMenuPath(const QString &path);
+    void fetchLayout();
+    void updateEntries(const QDBusMessage &message);
+    QDBusPendingCall callMenu(const QString &method, const QVariantList &arguments);
     QDBusPendingCall call(const QString &interface, const QString &method, const QVariantList &arguments);
 };
 

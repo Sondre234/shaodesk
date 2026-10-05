@@ -19,6 +19,7 @@ constexpr auto watcherService = "org.kde.StatusNotifierWatcher";
 constexpr auto watcherPath = "/StatusNotifierWatcher";
 constexpr auto itemInterface = "org.kde.StatusNotifierItem";
 constexpr auto propertiesInterface = "org.freedesktop.DBus.Properties";
+constexpr auto menuInterface = "com.canonical.dbusmenu";
 // An application that does not answer within this long is left alone.
 constexpr int callTimeout = 5000;
 
@@ -95,6 +96,9 @@ TrayItemClient::TrayItemClient(TrayModel &model, const QDBusConnection &bus, con
     refresh_.setSingleShot(true);
     refresh_.setInterval(10);
     connect(&refresh_, &QTimer::timeout, this, &TrayItemClient::refresh);
+    relayout_.setSingleShot(true);
+    relayout_.setInterval(10);
+    connect(&relayout_, &QTimer::timeout, this, &TrayItemClient::fetchLayout);
     refresh();
 }
 TrayItemClient::~TrayItemClient() { model_.remove(key_); }
@@ -171,6 +175,7 @@ void TrayItemClient::apply(const QVariantMap &properties) {
             read(fresh, properties);
             model_.add(std::move(fresh));
         }
+        setMenuPath(model_.find(key_)->menuPath);
     }
     if (again_) {
         again_ = false;
@@ -217,6 +222,150 @@ void TrayItemClient::scroll(int delta, const QString &orientation) {
     call(itemInterface, "Scroll", {delta, orientation});
 }
 
+QDBusPendingCall TrayItemClient::callMenu(const QString &method, const QVariantList &arguments) {
+    auto message = QDBusMessage::createMethodCall(service_, menuPath_, menuInterface, method);
+    message.setArguments(arguments);
+    return bus_.asyncCall(message, callTimeout);
+}
+void TrayItemClient::setMenuPath(const QString &path) {
+    if (path == menuPath_)
+        return;
+    for (const char *signal : {"LayoutUpdated", "ItemsPropertiesUpdated"}) {
+        if (!menuPath_.isEmpty())
+            bus_.disconnect(service_, menuPath_, menuInterface, signal, this, SLOT(menuSignal(QDBusMessage)));
+        if (!path.isEmpty())
+            bus_.connect(service_, path, menuInterface, signal, this, SLOT(menuSignal(QDBusMessage)));
+    }
+    menuPath_ = path;
+    if (TrayItem *item = model_.find(key_); item && !item->menu.empty()) {
+        item->menu.clear();
+        model_.menuEdited(key_);
+    }
+    if (!menuPath_.isEmpty())
+        fetchLayout();
+}
+void TrayItemClient::fetchLayout() {
+    if (fetching_) {
+        fetchAgain_ = true;
+        return;
+    }
+    if (menuPath_.isEmpty())
+        return;
+    fetching_ = true;
+    auto *watch = new QDBusPendingCallWatcher(callMenu("GetLayout", {0, -1, QStringList()}), this);
+    connect(watch, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *watch) {
+        watch->deleteLater();
+        fetching_ = false;
+        const QDBusMessage reply = watch->reply();
+        std::map<int, TrayMenuEntry> menu;
+        TrayItem *item = model_.find(key_);
+        if (item && reply.type() == QDBusMessage::ReplyMessage && reply.signature() == "u(ia{sv}av)" &&
+            readLayout(reply.arguments().at(1).value<QDBusArgument>(), menu)) {
+            item->menu = std::move(menu);
+            model_.menuEdited(key_);
+        }
+        if (fetchAgain_) {
+            fetchAgain_ = false;
+            fetchLayout();
+        }
+    });
+}
+namespace {
+bool readEntry(const QDBusArgument &layout, std::map<int, TrayMenuEntry> &menu, int depth, int &budget, int &id) {
+    if (budget <= 0 || layout.currentSignature() != "(ia{sv}av)")
+        return false;
+    --budget;
+    TrayMenuEntry entry;
+    layout.beginStructure();
+    layout >> id >> entry.properties;
+    layout.beginArray();
+    while (!layout.atEnd()) {
+        QDBusVariant child;
+        layout >> child;
+        const QVariant value = child.variant();
+        int childId = 0;
+        if (depth < 8 && value.metaType() == QMetaType::fromType<QDBusArgument>() &&
+            readEntry(value.value<QDBusArgument>(), menu, depth + 1, budget, childId) && childId != id &&
+            std::find(entry.children.begin(), entry.children.end(), childId) == entry.children.end())
+            entry.children.push_back(childId);
+    }
+    layout.endArray();
+    layout.endStructure();
+    entry.read();
+    menu[id] = std::move(entry);
+    return true;
+}
+} // namespace
+bool TrayItemClient::readLayout(const QDBusArgument &layout, std::map<int, TrayMenuEntry> &menu) {
+    int budget = 1000, id = 0;
+    return readEntry(layout, menu, 0, budget, id);
+}
+void TrayItemClient::menuSignal(const QDBusMessage &message) {
+    if (message.member() == "LayoutUpdated")
+        relayout_.start();
+    else if (message.member() == "ItemsPropertiesUpdated" && message.signature() == "a(ia{sv})a(ias)")
+        updateEntries(message);
+}
+// ItemsPropertiesUpdated: the properties changed, (ia{sv}), and removed, (ias), entry by entry.
+void TrayItemClient::updateEntries(const QDBusMessage &message) {
+    TrayItem *item = model_.find(key_);
+    if (!item)
+        return;
+    const auto updated = message.arguments().at(0).value<QDBusArgument>();
+    updated.beginArray();
+    while (!updated.atEnd()) {
+        int id = 0;
+        QVariantMap properties;
+        updated.beginStructure();
+        updated >> id >> properties;
+        updated.endStructure();
+        if (auto entry = item->menu.find(id); entry != item->menu.end()) {
+            for (auto it = properties.constBegin(); it != properties.constEnd(); ++it)
+                entry->second.properties[it.key()] = it.value();
+            entry->second.read();
+        }
+    }
+    updated.endArray();
+    const auto removed = message.arguments().at(1).value<QDBusArgument>();
+    removed.beginArray();
+    while (!removed.atEnd()) {
+        int id = 0;
+        QStringList names;
+        removed.beginStructure();
+        removed >> id >> names;
+        removed.endStructure();
+        if (auto entry = item->menu.find(id); entry != item->menu.end()) {
+            for (const auto &name : names)
+                entry->second.properties.remove(name);
+            entry->second.read();
+        }
+    }
+    removed.endArray();
+    model_.menuEdited(key_);
+}
+void TrayItemClient::openMenu(int id) {
+    if (menuPath_.isEmpty())
+        return;
+    // AboutToShow lets the application fill the entries in; it says whether they changed.
+    auto *watch = new QDBusPendingCallWatcher(callMenu("AboutToShow", {id}), this);
+    connect(watch, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *watch) {
+        watch->deleteLater();
+        const QDBusMessage reply = watch->reply();
+        if (reply.type() == QDBusMessage::ReplyMessage && reply.signature() == "b" &&
+            reply.arguments().at(0).toBool())
+            fetchLayout();
+    });
+    callMenu("Event", {id, QString("opened"), QVariant::fromValue(QDBusVariant(0)), 0u});
+}
+void TrayItemClient::closeMenu(int id) {
+    if (!menuPath_.isEmpty())
+        callMenu("Event", {id, QString("closed"), QVariant::fromValue(QDBusVariant(0)), 0u});
+}
+void TrayItemClient::clickMenu(int id) {
+    if (!menuPath_.isEmpty())
+        callMenu("Event", {id, QString("clicked"), QVariant::fromValue(QDBusVariant(0)), 0u});
+}
+
 TrayHost::TrayHost(TrayModel &model, QObject *parent) : QObject(parent), model_(model) {
     auto forward = [this](void (TrayItemClient::*method)(int, int)) {
         return [this, method](const QString &key, int x, int y) {
@@ -232,6 +381,15 @@ TrayHost::TrayHost(TrayModel &model, QObject *parent) : QObject(parent), model_(
                 if (auto *item = client(key))
                     item->scroll(delta, orientation);
             });
+    auto forwardMenu = [this](void (TrayItemClient::*method)(int)) {
+        return [this, method](const QString &key, int id) {
+            if (auto *item = client(key))
+                (item->*method)(id);
+        };
+    };
+    connect(&model_, &TrayModel::menuOpenRequested, this, forwardMenu(&TrayItemClient::openMenu));
+    connect(&model_, &TrayModel::menuCloseRequested, this, forwardMenu(&TrayItemClient::closeMenu));
+    connect(&model_, &TrayModel::menuClickRequested, this, forwardMenu(&TrayItemClient::clickMenu));
 }
 TrayHost::~TrayHost() {
     items_.clear();

@@ -5,6 +5,7 @@
 #include "tray_fake_item.hpp"
 #include "tray_host.hpp"
 #include "tray_watcher.hpp"
+#include <QBuffer>
 #include <QDBusConnectionInterface>
 #include <QDir>
 #include <QProcess>
@@ -393,6 +394,123 @@ class TrayDbusTest : public QObject {
         app->item->change("IconName", "", "NewIcon");
         QTRY_VERIFY(model.picture(serial, {22, 22}).isNull());
         quit(app);
+    }
+    // com.canonical.dbusmenu: the layout with its kinds of entries, AboutToShow and the events,
+    // and the two ways an application changes the menu.
+    void menus() {
+        QCOMPARE(trayMenuLabel("_File"), QString("File"));
+        QCOMPARE(trayMenuLabel("Save __as_"), QString("Save _as"));
+        QCOMPARE(trayMenuLabel("a___b"), QString("a_b"));
+        TrayModel model;
+        TrayHost host(model);
+        QVERIFY(host.start(connect()));
+        QSignalSpy changed(&model, &TrayModel::menuChanged);
+        auto app = start("Menu");
+        QTRY_VERIFY(!model.menu(app->key(), 0).isEmpty());
+        auto labels = [&](int parent) {
+            QStringList list;
+            for (const auto &entry : model.menu(app->key(), parent))
+                list << (entry.toMap()["separator"].toBool() ? "-" : entry.toMap()["label"].toString());
+            return list;
+        };
+        auto entry = [&](int parent, int index) { return model.menu(app->key(), parent).value(index).toMap(); };
+        // The hidden entry is left out.
+        QCOMPARE(labels(0), (QStringList{"Open probe", "-", "Options", "Disabled", "Quit"}));
+        QCOMPARE(entry(0, 2)["submenu"].toBool(), true);
+        QCOMPARE(entry(0, 2)["id"].toInt(), 3);
+        QCOMPARE(entry(0, 3)["enabled"].toBool(), false);
+        QCOMPARE(entry(0, 0)["enabled"].toBool(), true);
+        QVERIFY(entry(0, 4)["icon"].toString().startsWith("image://tray/"));
+        QVERIFY(entry(0, 0)["icon"].toString().isEmpty());
+        QCOMPARE(labels(3), (QStringList{"Show _hidden", "Radio A", "Radio B"}));
+        QCOMPARE(entry(3, 0)["toggle"].toString(), QString("checkmark"));
+        QCOMPARE(entry(3, 0)["checked"].toBool(), true);
+        QCOMPARE(entry(3, 1)["toggle"].toString(), QString("radio"));
+        QCOMPARE(entry(3, 1)["checked"].toBool(), true);
+        QCOMPARE(entry(3, 2)["checked"].toBool(), false);
+        QVERIFY(model.menu(app->key(), 99).isEmpty());
+        QVERIFY(model.menu("no such item", 0).isEmpty());
+
+        // Opening asks AboutToShow and says so; picking an entry and closing are events.
+        app->menu->calls.clear();
+        model.openMenu(app->key(), 0);
+        model.openMenu(app->key(), 3);
+        model.clickMenu(app->key(), 31);
+        model.closeMenu(app->key(), 3);
+        QTRY_COMPARE(app->menu->calls.size(), 6);
+        QCOMPARE(app->menu->calls, (QStringList{"abouttoshow 0", "event 0 opened", "abouttoshow 3",
+                                                "event 3 opened", "event 31 clicked", "event 3 closed"}));
+        // AboutToShow saying the entries changed fetches them again.
+        app->menu->needUpdate = true;
+        app->menu->entries[1].properties["label"] = "Updated on opening";
+        model.openMenu(app->key(), 0);
+        QTRY_COMPARE(labels(0).value(0), QString("Updated on opening"));
+        app->menu->needUpdate = false;
+
+        // LayoutUpdated: the layout is fetched again.
+        changed.clear();
+        app->menu->entries[7] = {{{"label", "Added"}}, {}};
+        app->menu->entries[0].children << 7;
+        app->menu->layoutUpdated();
+        QTRY_COMPARE(labels(0).value(5), QString("Added"));
+        QVERIFY(changed.size() >= 1);
+        QCOMPARE(changed.last()[0].toString(), app->key());
+        // ItemsPropertiesUpdated: entries change in place, and removed properties take their
+        // defaults.
+        app->menu->propertiesUpdated({{1, {{"label", "_Changed"}}}, {7, {{"toggle-type", "checkmark"}, {"toggle-state", 1}}}},
+                                     {{4, {"enabled"}}, {99, {"label"}}});
+        QTRY_COMPARE(labels(0).value(0), QString("Changed"));
+        QCOMPARE(entry(0, 3)["enabled"].toBool(), true);
+        QCOMPARE(entry(0, 5)["checked"].toBool(), true);
+
+        // Separators only between entries, never two together.
+        app->menu->entries = {{0, {{}, {1, 2, 3, 4, 5, 6, 7}}},
+                              {1, {{{"type", "separator"}}, {}}},
+                              {2, {{{"label", "A"}}, {}}},
+                              {3, {{{"type", "separator"}}, {}}},
+                              {4, {{{"type", "separator"}}, {}}},
+                              {5, {{{"label", "B"}}, {}}},
+                              {6, {{{"label", "Gone"}, {"visible", false}}, {}}},
+                              {7, {{{"type", "separator"}}, {}}}};
+        app->menu->layoutUpdated();
+        QTRY_COMPARE(labels(0), (QStringList{"A", "-", "B"}));
+
+        // icon-data, a PNG, is the entry's icon.
+        QImage red(16, 16, QImage::Format_ARGB32);
+        red.fill(Qt::red);
+        QByteArray png;
+        QBuffer buffer(&png);
+        QVERIFY(buffer.open(QIODevice::WriteOnly) && red.save(&buffer, "PNG"));
+        app->menu->propertiesUpdated({{2, {{"icon-data", png}}}}, {});
+        QTRY_VERIFY(!entry(0, 0)["icon"].toString().isEmpty());
+        const int serial = model.find(app->key())->serial;
+        QCOMPARE(model.menuPicture(serial, 2, {16, 16}).pixelColor(8, 8), QColor(Qt::red));
+        QVERIFY(model.menuPicture(serial, 5, {16, 16}).isNull());
+
+        // A layout that is not one, or none at all, leaves the menu as it was.
+        app->menu->layoutReply = [] { return QVariantList{1u, QString("not a layout")}; };
+        app->menu->layoutUpdated();
+        QTRY_VERIFY(app->menu->calls.last().startsWith("layout"));
+        QTest::qWait(50);
+        QCOMPARE(labels(0), (QStringList{"A", "-", "B"}));
+        app->menu->layoutReply = {};
+        // Another menu path (NewMenu): its menu replaces the old; none takes it away.
+        app->menu->entries = Menu::sample();
+        app->item->change("Menu", QVariant::fromValue(QDBusObjectPath("/Other")), "NewMenu");
+        QTRY_VERIFY(model.menu(app->key(), 0).isEmpty());
+        app->bus.unregisterObject("/MenuBar");
+        app->bus.registerVirtualObject("/Other", app->menu.get());
+        app->item->change("Menu", QVariant::fromValue(QDBusObjectPath("/MenuBar")), "NewMenu");
+        QTRY_VERIFY(model.find(app->key())->menuPath == "/MenuBar");
+        app->item->change("Menu", QVariant::fromValue(QDBusObjectPath("/Other")), "NewMenu");
+        QTRY_COMPARE(labels(0).value(0), QString("Open probe"));
+        app->bus.unregisterObject("/Other");
+        app->bus.registerVirtualObject("/MenuBar", app->menu.get());
+        // The menu goes with its item.
+        changed.clear();
+        quit(app);
+        QTRY_VERIFY(changed.size() >= 1);
+        QVERIFY(model.menu(changed.last()[0].toString(), 0).isEmpty());
     }
     // Another program serves the watcher: the host registers with it and follows its items, and
     // serves the name itself once that program goes.

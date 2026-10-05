@@ -4,7 +4,28 @@
 #include <QImage>
 #include <QList>
 #include <QString>
+#include <QVariantMap>
+#include <map>
 #include <vector>
+
+// An entry of a tray item's menu (com.canonical.dbusmenu).
+struct TrayMenuEntry {
+    // The properties as the application sent them; read() derives the fields below from them.
+    QVariantMap properties;
+    // The label without its mnemonic marks.
+    QString label;
+    bool enabled = true, visible = true, separator = false;
+    // "checkmark", "radio" or empty, and its state: 1 on, 0 off, -1 neither.
+    QString toggleType;
+    int toggleState = -1;
+    QString iconName;
+    // icon-data, a PNG.
+    QImage icon;
+    // Opening it shows `children` in its place.
+    bool submenu = false;
+    std::vector<int> children;
+    void read();
+};
 
 // A status icon an application shows in the system tray (a StatusNotifierItem), as the panel
 // draws it.
@@ -27,6 +48,9 @@ struct TrayItem {
     QString menuPath;
     // Bumped whenever what the icon shows changes, so that the panel loads it again.
     int revision = 0;
+    // The menu's entries by id; 0 is the top, whose children the menu lists first.
+    std::map<int, TrayMenuEntry> menu;
+    int menuRevision = 0;
     // The title and text a tooltip shows, falling back on the item's title and id.
     QString toolTip() const;
 };
@@ -41,6 +65,9 @@ QImage trayPickPixmap(const QList<QImage> &pixmaps, QSize size);
 // there or in a theme laid out under it (hicolor/22x22/apps/NAME.png), the largest found; empty
 // when there is none.
 QString trayIconFile(const QString &name, const QString &themePath);
+
+// A menu label without the underscores that mark mnemonics; "__" is an underscore.
+QString trayMenuLabel(const QString &label);
 
 // The tray's items, in the order they registered. A host (TrayHost, over D-Bus) adds, updates
 // and removes them, and carries out what the panel asks through the *Requested signals; without
@@ -81,6 +108,10 @@ class TrayModel : public QAbstractListModel {
     // a named icon (in its theme path, by absolute path, or in the icon theme) before a pixmap,
     // and the overlay over the bottom right quarter. Null when it has no icon at all.
     QImage picture(int serial, QSize size) const;
+    // Tells open menus that find()'s item's menu changed.
+    void menuEdited(const QString &key);
+    // A menu entry's icon: its icon-data, else its icon-name. Null when it has neither.
+    QImage menuPicture(int serial, int id, QSize size) const;
 
     Q_INVOKABLE bool contains(const QString &key) const;
     // What the panel asks of an item, at a point on the screen.
@@ -93,6 +124,14 @@ class TrayModel : public QAbstractListModel {
     Q_INVOKABLE void scroll(const QString &key, int delta, bool horizontal) {
         Q_EMIT scrollRequested(key, delta, horizontal ? "horizontal" : "vertical");
     }
+    // The visible entries under `parent` (0 for the top) of item `key`'s menu, as {id, label,
+    // enabled, separator, toggle, checked, icon, submenu}; separators only between entries.
+    Q_INVOKABLE QVariantList menu(const QString &key, int parent) const;
+    // The panel shows the entries under `id` (the application may bring them up to date first),
+    // stops showing them, or picks entry `id`.
+    Q_INVOKABLE void openMenu(const QString &key, int id) { Q_EMIT menuOpenRequested(key, id); }
+    Q_INVOKABLE void closeMenu(const QString &key, int id) { Q_EMIT menuCloseRequested(key, id); }
+    Q_INVOKABLE void clickMenu(const QString &key, int id) { Q_EMIT menuClickRequested(key, id); }
 
   Q_SIGNALS:
     void countChanged();
@@ -104,6 +143,11 @@ class TrayModel : public QAbstractListModel {
     // The item could not be activated (Ayatana's items have no Activate): the panel that asked
     // shows its menu instead.
     void activationRefused(const QString &key);
+    void menuOpenRequested(const QString &key, int id);
+    void menuCloseRequested(const QString &key, int id);
+    void menuClickRequested(const QString &key, int id);
+    // Item `key`'s menu changed, or the item went.
+    void menuChanged(const QString &key);
 
   private:
     std::vector<TrayItem> items_;
