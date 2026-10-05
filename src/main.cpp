@@ -186,7 +186,7 @@ bool installed(const std::string &program) {
 }
 // The terminals the `terminal` action looks for, in this order, when neither the configuration
 // nor $TERMINAL names one.
-constexpr const char *known_terminals[] = {"kitty",   "foot",           "alacritty", "wezterm",
+constexpr const char *known_terminals[] = {"kitty",   "foot",    "alacritty",      "wezterm",
                                            "ghostty", "konsole", "gnome-terminal", "xterm"};
 std::filesystem::path home_directory() {
     const char *home = std::getenv("HOME");
