@@ -119,7 +119,7 @@ Item {
             toggleAudioPopup("power", powerButton)
             return
         }
-        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false
+        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; trayMenuKey = ""
         audioPopupX = width - 126
         audioPopup = "power"
     }
