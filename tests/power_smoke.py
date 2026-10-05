@@ -334,7 +334,6 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
             assert "Suspend true" not in logged(mark), logged(mark)
             # and one locker, not a second for the second reason to lock
             assert len([line for line in logged(mark) if line.startswith("waiting ")]) == 1
-            reconfigure()
 
             # Without power.lock_before_sleep it just sleeps, whoever asks.
             reconfigure(before="false")

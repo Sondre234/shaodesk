@@ -141,7 +141,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-overview-pointer-") as directo
             # Pointing selects; a click picks.
             pointer("move", "640", "360", "move", "0", "0")
             wait_for(lambda: overview()[0] == "open", "reopened from the corner")
-            _, info, thumbs, cells = overview()
+            _, _, thumbs, cells = overview()
             pointer("move", *center(thumbs[1]))
             wait_for(lambda: overview()[1]["selected"] == 1, "pointing selects")
             pointer("click", "left")
@@ -166,7 +166,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-overview-pointer-") as directo
 
             # Dragging a thumbnail onto a workspace in the strip moves the window there.
             msg("toggle_overview")
-            _, info, thumbs, cells = overview()
+            _, _, thumbs, cells = overview()
             names = titles()
             dragged = names[0]
             pointer("move", *center(thumbs[0]), "press", "left")

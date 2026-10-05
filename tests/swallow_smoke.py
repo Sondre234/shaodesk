@@ -93,7 +93,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-swallow-test-") as directory:
                 wait_for(lambda: app_id not in windows(), processes, f"{app_id} closes")
 
             # An unrelated window, then a terminal that starts its window through a shell.
-            other = open_window("plain")
+            open_window("plain")
             term = open_window("swallow-term", SHAODESK_PROBE_SPAWN_APP_ID="swallow-child",
                                SHAODESK_PROBE_SPAWN_SHELL="1")
             rows = windows()

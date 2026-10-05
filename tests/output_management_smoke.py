@@ -79,7 +79,6 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-randr-test-") as directory:
             assert sum(enabled for enabled, *_ in outputs().values()) == 1
 
             # A reload restores what the configuration says.
-            config.write_text("return { xwayland = false }")
             server.send_signal(signal.SIGHUP)
             wait_for(lambda: "Configuration reloaded" in log.read_text(), [server], "reload")
             state = outputs()

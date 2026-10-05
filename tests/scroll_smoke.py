@@ -97,7 +97,6 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-scroll-test-") as directory:
             assert focused()[0] == 0 and columns() == [0, 640, 1280], windows()
             act("scroll_right", lambda: focused()[0] == 640 and columns() == [0, 640, 1280],
                 "scroll_right")
-            middle = focused()
 
             # Cycling the width goes to the next preset, wrapping.
             act("column_cycle_width", lambda: focused()[2] == SCREEN_WIDTH,
