@@ -27,7 +27,7 @@ option(SHAODESK_INSTALL_SESSION "Install the experimental display-manager sessio
 option(SHAODESK_BUILD_SHELL "Build the Qt Quick desktop shell" ON)
 option(SHAODESK_SHELL_PREVIEW_ONLY "Build only the shell UI preview without LayerShellQt" OFF)
 
-add_library(shaodesk_config src/curve.c src/session.c src/tabs.c src/config.cpp src/config_schema.cpp src/layout.cpp src/tiling.cpp
+add_library(shaodesk_config STATIC src/curve.c src/session.c src/tabs.c src/config.cpp src/config_schema.cpp src/layout.cpp src/tiling.cpp
     src/overview_layout.cpp src/window_placement.cpp
     src/import/common.cpp src/import/hyprland.cpp src/import/waybar.cpp src/import/import.cpp)
 target_include_directories(shaodesk_config PUBLIC include)
