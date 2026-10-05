@@ -597,9 +597,6 @@ int main(int argc, char **argv) {
         }
         editTasks("model.remove(1)");
     }
-    auto center = [](QQuickItem *item) {
-        return item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint();
-    };
     auto *menu = find(view.rootObject(), "contextMenu");
     // Repeater delegates are visual children only, so walk the item tree.
     std::function<QQuickItem *(QQuickItem *, const QString &)> findMenuItem =
@@ -619,11 +616,11 @@ int main(int argc, char **argv) {
         return menu->isVisible() && view.height() > controller.panelExtent() && area.top() >= 0 &&
                area.bottom() <= view.height();
     };
-    const QPoint entry = center(task);
+    const QPoint entry = centre(task);
     // Held past the long-press time, which once swallowed the right click.
     QTest::mousePress(&view, Qt::RightButton, Qt::NoModifier, entry);
     QTest::qWait(1000);
-    QTest::mouseRelease(&view, Qt::RightButton, Qt::NoModifier, center(task));
+    QTest::mouseRelease(&view, Qt::RightButton, Qt::NoModifier, centre(task));
     if (!QTest::qWaitFor([&] {
             return view.rootObject()->property("taskMenuId").toInt() == 7 && menuShown();
         }) ||
@@ -631,7 +628,7 @@ int main(int argc, char **argv) {
         std::cerr << "right-clicking a task did not show its menu\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(menuItem("Minimize")));
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(menuItem("Minimize")));
     if (!QTest::qWaitFor([&] { return !view.rootObject()->property("menuOpen").toBool(); }) ||
         !QTest::qWaitFor([&] { return view.height() == controller.panelExtent(); })) {
         std::cerr << "choosing a task menu item did not close the menu\n";
@@ -647,12 +644,12 @@ int main(int argc, char **argv) {
     };
     auto pinned = [&] { return find(view.rootObject(), "pinned:shaodesk-test-app.desktop"); };
     auto pinnedTask = [&] { return find(view.rootObject(), "pinnedTask:shaodesk-test-app.desktop"); };
-    QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, center(task));
+    QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, centre(task));
     if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Pin to taskbar"); })) {
         std::cerr << "a task's menu did not offer to pin its application\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(menuItem("Pin to taskbar")));
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(menuItem("Pin to taskbar")));
     if (!QTest::qWaitFor([&] { return pinned() != nullptr; }) ||
         !controller.isPinned("shaodesk-test-app.desktop") ||
         readPins() != "shaodesk-test-app.desktop\n") {
@@ -675,11 +672,11 @@ int main(int argc, char **argv) {
     auto other = [&] { return find(view.rootObject(), "pinned:shaodesk-test-other.desktop"); };
     if (!QTest::qWaitFor([&] {
             return other() && other()->isVisible() &&
-                   center(other()).x() > center(pinnedTask()).x();
+                   centre(other()).x() > centre(pinnedTask()).x();
         }))
         return 1;
     {
-        const QPoint from = center(pinnedTask()), to = center(other());
+        const QPoint from = centre(pinnedTask()), to = centre(other());
         QTest::mousePress(&view, Qt::LeftButton, Qt::NoModifier, from);
         for (int step = 1; step <= 10; ++step) {
             QTest::mouseMove(&view, from + (to - from) * step / 10);
@@ -702,14 +699,14 @@ int main(int argc, char **argv) {
         std::cerr << "a pinned slot did not show its launcher again once its window closed\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, center(pinned()));
+    QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, centre(pinned()));
     if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Unpin from taskbar"); }) ||
         !menuItem("Open Fake app")) {
         std::cerr << "a pinned application's menu did not offer to unpin it\n";
         return 1;
     }
     QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier,
-                      center(menuItem("Unpin from taskbar")));
+                      centre(menuItem("Unpin from taskbar")));
     if (!QTest::qWaitFor([&] { return pinned() == nullptr; }) || !readPins().isEmpty() ||
         controller.isPinned("shaodesk-test-app.desktop")) {
         std::cerr << "unpinning did not remove and forget the taskbar button\n";
@@ -733,7 +730,7 @@ int main(int argc, char **argv) {
         std::cerr << "right-clicking empty bar space did not show the bar menu\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(menuItem("Turn tiling off")));
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(menuItem("Turn tiling off")));
     if (!QTest::qWaitFor([&] { return !toggled && !panelTiling(); }) ||
         view.rootObject()->property("menuOpen").toBool()) {
         std::cerr << "the bar menu did not toggle tiling off\n";
@@ -745,14 +742,14 @@ int main(int argc, char **argv) {
         std::cerr << "the bar menu lacks the appearance profiles\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(menuItem("Appearance: dark …")));
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(menuItem("Appearance: dark …")));
     if (!QTest::qWaitFor([&] {
             return menuShown() && menuItem("‹ Back") && menuItem("✓ dark") && menuItem("light");
         }) || menuItem("Applications")) {
         std::cerr << "the appearance entry did not list the profiles\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(menuItem("light")));
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(menuItem("light")));
     if (!QTest::qWaitFor([&] {
             return requests == QStringList{"profile light"} && controller.profile() == "light" &&
                    controller.accent() == QColor("#336699") &&
@@ -769,7 +766,7 @@ int main(int argc, char **argv) {
         std::cerr << "the bar menu did not open on its own entries with the new profile\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(menuItem("Show desktop")));
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(menuItem("Show desktop")));
     // The profile button on the bar lists the profiles, the one in use marked, and switches.
     auto *profilesButton = find(view.rootObject(), "profilesButton");
     if (!QTest::qWaitFor([&] { return !view.rootObject()->property("menuOpen").toBool(); }) ||
@@ -777,7 +774,7 @@ int main(int argc, char **argv) {
         std::cerr << "the bar lacks the profile button\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(profilesButton));
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(profilesButton));
     std::function<QQuickItem *(QQuickItem *, const QString &)> findProfile =
         [&](QQuickItem *parent, const QString &name) -> QQuickItem * {
         for (auto *item : parent->childItems()) {
@@ -801,7 +798,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier,
-                      center(findProfile(profileList, "dark")));
+                      centre(findProfile(profileList, "dark")));
     if (!QTest::qWaitFor([&] {
             return requests == QStringList{"profile dark"} && controller.profile() == "dark" &&
                    !profileList->isVisible();
@@ -817,7 +814,7 @@ int main(int argc, char **argv) {
         std::cerr << "the bar lacks the wallpaper button\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(wallpapersButton));
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(wallpapersButton));
     std::function<void(QQuickItem *, QList<QQuickItem *> &)> wallpaperItems =
         [&](QQuickItem *parent, QList<QQuickItem *> &found) {
             for (auto *item : parent->childItems()) {
@@ -848,7 +845,7 @@ int main(int argc, char **argv) {
                   << " " << (picker ? picker->height() : 0) << " " << view.height() << '\n';
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(wallpaperItem("two")));
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(wallpaperItem("two")));
     const auto picked = screens.filePath("state/shaodesk/wallpapers");
     auto pickedText = [&picked] {
         QFile f(picked);
@@ -874,7 +871,7 @@ int main(int argc, char **argv) {
         std::cerr << "clearing the picked wallpaper did not go back to the configured one\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(wallpapersButton));
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(wallpapersButton));
     if (!QTest::qWaitFor([&] { return !picker->isVisible(); })) {
         std::cerr << "the wallpaper button did not close the picker\n";
         return 1;
@@ -913,7 +910,7 @@ int main(int argc, char **argv) {
                                   Q_ARG(int, index));
         return row.property("taskId").toInt();
     };
-    const QPoint from = center(task), to = center(third) + QPoint(third->width() / 4, 0);
+    const QPoint from = centre(task), to = centre(third) + QPoint(third->width() / 4, 0);
     QTest::mousePress(&view, Qt::LeftButton, Qt::NoModifier, from);
     for (int step = 1; step <= 10; ++step) {
         QTest::mouseMove(&view, from + (to - from) * step / 10);
@@ -955,7 +952,7 @@ int main(int argc, char **argv) {
         count(groupList);
         return rows;
     };
-    QTest::mouseMove(&view, center(stack));
+    QTest::mouseMove(&view, centre(stack));
     if (!groupList || !QTest::qWaitFor([&] {
             auto box =
                 groupList->mapRectToScene(QRectF(0, 0, groupList->width(), groupList->height()));
@@ -980,9 +977,9 @@ int main(int argc, char **argv) {
         }
         return nullptr;
     };
-    const QPoint row = center(firstRow(groupList));
+    const QPoint row = centre(firstRow(groupList));
     for (int step = 1; step <= 5; ++step) {
-        QTest::mouseMove(&view, center(stack) + (row - center(stack)) * step / 5);
+        QTest::mouseMove(&view, centre(stack) + (row - centre(stack)) * step / 5);
         QTest::qWait(10);
     }
     QTest::qWait(600);
@@ -997,7 +994,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     // Hovered again, the list goes once the pointer leaves.
-    QTest::mouseMove(&view, center(stack));
+    QTest::mouseMove(&view, centre(stack));
     if (!QTest::qWaitFor([&] { return groupList->isVisible(); })) {
         std::cerr << "hovering a stacked task again did not list its windows\n";
         return 1;
@@ -1010,7 +1007,7 @@ int main(int argc, char **argv) {
     }
     // Dragging the stack moves all its windows together.
     {
-        const QPoint from = center(stack), to = center(listedTask(0)) - QPoint(8, 0);
+        const QPoint from = centre(stack), to = centre(listedTask(0)) - QPoint(8, 0);
         QTest::mousePress(&view, Qt::LeftButton, Qt::NoModifier, from);
         for (int step = 1; step <= 10; ++step) {
             QTest::mouseMove(&view, from + (to - from) * step / 10);
@@ -1056,7 +1053,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     auto wheel = [&](int delta) {
-        QWheelEvent event(center(volume), view.mapToGlobal(center(volume)), {}, {0, delta},
+        QWheelEvent event(centre(volume), view.mapToGlobal(centre(volume)), {}, {0, delta},
                           Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
         QGuiApplication::sendEvent(&view, &event);
     };
@@ -1079,7 +1076,7 @@ int main(int argc, char **argv) {
     };
     auto *outputs = find(view.rootObject(), "audioOutputs");
     auto *mixer = find(view.rootObject(), "audioMixer");
-    QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, center(volume));
+    QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, centre(volume));
     if (!outputs || !QTest::qWaitFor([&] { return above(outputs); }) ||
         !view.rootObject()->property("menuOpen").toBool()) {
         std::cerr << "right-clicking the volume control did not show the outputs above it\n";
@@ -1098,7 +1095,7 @@ int main(int argc, char **argv) {
     auto *headset = findNamed(outputs, "audioOutputItem", "Headset");
     if (!headset)
         return 1;
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(headset));
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(headset));
     if (!QTest::qWaitFor([&] { return !view.rootObject()->property("menuOpen").toBool(); }) ||
         audio.requests != QStringList{"output headset 2"} || audio.output() != "headset") {
         std::cerr << "choosing an output did not switch to it: "
@@ -1106,7 +1103,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     audio.requests.clear();
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(volume));
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(volume));
     if (!mixer || !QTest::qWaitFor([&] { return above(mixer); })) {
         std::cerr << "clicking the volume control did not show the mixer above it\n";
         return 1;
@@ -1311,7 +1308,7 @@ int main(int argc, char **argv) {
             return 1;
         }
         auto openMenu = [&] {
-            QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(button));
+            QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(button));
             return QTest::qWaitFor([&] {
                 const auto area = menu->mapRectToScene(QRectF(0, 0, menu->width(), menu->height()));
                 return menu->isVisible() && view.height() > controller.panelExtent() &&
@@ -1323,7 +1320,7 @@ int main(int argc, char **argv) {
             return 1;
         }
         requests.clear();
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(item("suspend")));
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(item("suspend")));
         if (!QTest::qWaitFor([&] { return requests == QStringList{"suspend"} && !menu->isVisible(); })) {
             std::cerr << "suspending from the power menu failed: " << requests.join("|").toStdString()
                       << '\n';
@@ -1342,7 +1339,7 @@ int main(int argc, char **argv) {
         auto ask = [&](const QString &action) {
             if (!openMenu() || !item(action))
                 return false;
-            QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(item(action)));
+            QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(item(action)));
             return QTest::qWaitFor([&] {
                 return dialog.isVisible() && power->pending() == action && !menu->isVisible();
             });
@@ -1373,14 +1370,14 @@ int main(int argc, char **argv) {
         }
         if (!ask("logout"))
             return 1;
-        QTest::mouseClick(&dialog, Qt::LeftButton, Qt::NoModifier, center(dialogItem("powerCancel")));
+        QTest::mouseClick(&dialog, Qt::LeftButton, Qt::NoModifier, centre(dialogItem("powerCancel")));
         if (!gaveUp()) {
             std::cerr << "Cancel did not give up the log out\n";
             return 1;
         }
         if (!ask("reboot"))
             return 1;
-        QTest::mouseClick(&dialog, Qt::LeftButton, Qt::NoModifier, center(dialogItem("powerConfirm")));
+        QTest::mouseClick(&dialog, Qt::LeftButton, Qt::NoModifier, centre(dialogItem("powerConfirm")));
         if (!QTest::qWaitFor([&] { return requests == QStringList{"reboot"}; }) || !gaveUp()) {
             std::cerr << "the restart button did not restart: " << requests.join("|").toStdString()
                       << '\n';
@@ -1486,7 +1483,7 @@ int main(int argc, char **argv) {
         powerRefusal = "no screen locker: power.lock_command is not set";
         if (!openMenu())
             return 1;
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(item("lock")));
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(item("lock")));
         if (!QTest::qWaitFor([&] {
                 return controller.error() ==
                        "Lock screen: no screen locker: power.lock_command is not set";
@@ -1582,7 +1579,7 @@ int main(int argc, char **argv) {
             std::cerr << "the card has no button for its action (and none for the default one)\n";
             return 1;
         }
-        QTest::mouseClick(&cards, Qt::LeftButton, Qt::NoModifier, center(button));
+        QTest::mouseClick(&cards, Qt::LeftButton, Qt::NoModifier, centre(button));
         if (!QTest::qWaitFor([&] { return invoked.count() == 1; }) ||
             invoked.at(0).at(1).toString() != "yes" || closed.count() != 1 ||
             closed.at(0).at(1).toUInt() != NotificationCenter::Dismissed) {
@@ -1616,7 +1613,7 @@ int main(int argc, char **argv) {
             return 1;
         QTest::qWait(300);
         auto *close = find(cards.rootObject(), "notificationClose");
-        QTest::mouseClick(&cards, Qt::LeftButton, Qt::NoModifier, center(close));
+        QTest::mouseClick(&cards, Qt::LeftButton, Qt::NoModifier, centre(close));
         if (!QTest::qWaitFor([&] { return closed.count() == 1; }) || invoked.count() != 0) {
             std::cerr << "the close button did not dismiss the card\n";
             return 1;
@@ -1630,7 +1627,7 @@ int main(int argc, char **argv) {
         }
         make("Kept one", false);
         make("Kept two", false);
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(bell));
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(bell));
         if (!QTest::qWaitFor([&] { return history->isVisible(); }) || daemon->unread() != 0) {
             std::cerr << "clicking the bell did not open the history and mark it read\n";
             return 1;
@@ -1642,22 +1639,22 @@ int main(int argc, char **argv) {
         }
         auto *dndSwitch = find(view.rootObject(), "dndSwitch");
         QTest::qWait(300);
-        QTest::mouseMove(&view, center(dndSwitch));
+        QTest::mouseMove(&view, centre(dndSwitch));
         QTest::qWait(50);
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(dndSwitch), 80);
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(dndSwitch), 80);
         if (!QTest::qWaitFor([&] { return daemon->dnd(); })) {
             std::cerr << "the do-not-disturb switch did nothing\n";
             return 1;
         }
         daemon->setDnd(false);
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(find(view.rootObject(), "clearNotifications")));
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(find(view.rootObject(), "clearNotifications")));
         if (!QTest::qWaitFor([&] { return daemon->history()->count() == 0; })) {
             std::cerr << "Clear did not empty the history\n";
             return 1;
         }
         // Right-clicking the bell toggles do-not-disturb.
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(bell)); // close the popup
-        QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, center(bell));
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(bell)); // close the popup
+        QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, centre(bell));
         if (!QTest::qWaitFor([&] { return daemon->dnd(); })) {
             std::cerr << "right-clicking the bell did not turn do-not-disturb on\n";
             return 1;
@@ -1712,7 +1709,7 @@ int main(int argc, char **argv) {
         // The icon comes from the model's pixels.
         auto iconColor = [&](QQuickItem *button) {
             const QImage frame = view.grabWindow();
-            return frame.pixelColor(center(button));
+            return frame.pixelColor(centre(button));
         };
         if (!QTest::qWaitFor([&] { return iconColor(trayButtons()[0]) == QColor(Qt::green); }) ||
             iconColor(trayButtons()[1]) != QColor(Qt::blue)) {
@@ -1725,7 +1722,7 @@ int main(int argc, char **argv) {
         QSignalSpy scrolled(trayModel, &TrayModel::scrollRequested);
         QQuickItem *button = trayButtons()[0];
         // The point is on the screen: this panel is at the bottom of a 720 pixel high output.
-        const QPoint at = center(button);
+        const QPoint at = centre(button);
         const QVariantList point{"first", at.x(), 720 - view.height() + at.y()};
         QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, at);
         if (!QTest::qWaitFor([&] { return activated.size() == 1; }) || activated[0] != point) {
@@ -1843,7 +1840,7 @@ int main(int argc, char **argv) {
                    area.bottom() <= view.height();
         };
         auto menuOpen = [&] { return view.rootObject()->property("menuOpen").toBool(); };
-        const QPoint menuAt = center(trayButton("menu"));
+        const QPoint menuAt = centre(trayButton("menu"));
         // Held past the long-press time, as with the bar's menus.
         QTest::mousePress(&view, Qt::RightButton, Qt::NoModifier, menuAt);
         QTest::qWait(1000);
@@ -1857,13 +1854,13 @@ int main(int argc, char **argv) {
                       << trayLabels().join("|").toStdString() << '\n';
             return 1;
         }
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(trayEntry("Disabled")));
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(trayEntry("Disabled")));
         QTest::qWait(100);
         if (!picked.isEmpty() || !trayMenuShown()) {
             std::cerr << "a disabled tray menu entry could be picked\n";
             return 1;
         }
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(trayEntry("More")));
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(trayEntry("More")));
         if (!QTest::qWaitFor([&] {
                 return trayLabels() == QStringList{"‹ Back", "Deep", "Radio"} && opened.size() == 2 &&
                        closed.size() == 1;
@@ -1874,7 +1871,7 @@ int main(int argc, char **argv) {
             std::cerr << "a tray submenu did not open in place: " << trayLabels().join("|").toStdString() << '\n';
             return 1;
         }
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(trayEntry("‹ Back")));
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(trayEntry("‹ Back")));
         if (!QTest::qWaitFor([&] { return trayLabels() == QStringList{"Open", "More", "Disabled"} && opened.size() == 3; })) {
             std::cerr << "going back in a tray menu did not show its top\n";
             return 1;
@@ -1888,7 +1885,7 @@ int main(int argc, char **argv) {
             std::cerr << "a tray menu did not follow its application's change\n";
             return 1;
         }
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(trayEntry("Reopen")));
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(trayEntry("Reopen")));
         if (!QTest::qWaitFor([&] { return picked.size() == 1 && !menuOpen(); }) ||
             picked[0] != QVariantList{"menu", 1} ||
             !QTest::qWaitFor([&] { return view.height() == controller.panelExtent() && closed.size() == 3; }) ||
@@ -1907,13 +1904,13 @@ int main(int argc, char **argv) {
             return 1;
         }
         // The surface is taller while the menu is open, the bar at its bottom.
-        QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, center(trayButton("menu")));
+        QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, centre(trayButton("menu")));
         if (!QTest::qWaitFor([&] { return !menuOpen(); })) {
             std::cerr << "a second right click did not close the tray menu\n";
             return 1;
         }
         // Escape closes it too.
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(trayButton("menu")));
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(trayButton("menu")));
         if (!QTest::qWaitFor([&] { return trayMenuShown(); }))
             return 1;
         QTest::keyClick(&view, Qt::Key_Escape);
