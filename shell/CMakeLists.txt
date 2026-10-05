@@ -161,6 +161,17 @@ if(BUILD_TESTING)
         target_compile_definitions(tray_probe PRIVATE QT_NO_KEYWORDS)
         target_compile_options(tray_probe PRIVATE -Wall -Wextra -Wpedantic)
         target_link_libraries(tray_probe PRIVATE Qt6::Gui Qt6::DBus)
+        # Like the notification test, on a bus of its own with the environment's made unusable.
+        add_executable(tray_dbus_test ${PROJECT_SOURCE_DIR}/tests/tray_dbus_test.cpp
+            ${PROJECT_SOURCE_DIR}/tests/tray_fake_item.hpp tray_watcher.cpp tray_watcher.hpp)
+        set_target_properties(tray_dbus_test PROPERTIES AUTOMOC ON)
+        target_include_directories(tray_dbus_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+        target_compile_definitions(tray_dbus_test PRIVATE QT_NO_KEYWORDS)
+        target_compile_options(tray_dbus_test PRIVATE -Wall -Wextra -Wpedantic)
+        target_link_libraries(tray_dbus_test PRIVATE Qt6::Gui Qt6::DBus Qt6::Test)
+        add_test(NAME shell_tray_dbus COMMAND tray_dbus_test)
+        set_tests_properties(shell_tray_dbus PROPERTIES TIMEOUT 90
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen;DBUS_SESSION_BUS_ADDRESS=disabled:")
     endif()
     add_executable(osd_test ${PROJECT_SOURCE_DIR}/tests/osd_test.cpp
         ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp view.cpp view.hpp task_model.cpp task_model.hpp
