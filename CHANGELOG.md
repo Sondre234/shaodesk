@@ -1,9 +1,15 @@
 # Changelog
 
-Notable changes, newest first. Dates are when the work landed. The project has not made a
-tagged release yet; everything below is on `main`.
+Notable changes, newest first. Dates are when the work landed. 0.1.0 is the first tagged
+release; the dated sections below it record the work that led up to it, and all of it is in
+0.1.0.
 
-## Unreleased (2026-10-05)
+## 0.1.0 (2026-10-05)
+
+The first release, for people other than its author to try. Since the last dated section: a
+system tray, power controls, keyboard layouts and keymap files, a terminal action that finds
+an installed terminal, failures to start a program shown on the panel, the `shaodesk-session`
+wrapper for display managers, and Gentoo ebuilds.
 
 - `shaodesk-session` starts a standalone session the way a first run needs: under
   `dbus-run-session` when there is no D-Bus session bus (usual without systemd, and needed by
@@ -83,7 +89,7 @@ tagged release yet; everything below is on `main`.
 - CI runs on pushes to `main` (it waited for a `master` branch), runs `shell_preview` again, and
   checks that a staged install runs.
 
-## Unreleased (2026-10-03)
+## 2026-10-03
 
 - `layout.tiling_per_workspace = true` makes tiling a setting of each workspace rather than
   each monitor: Super + S, the panel button and `toggle_tiling` then switch only the current
@@ -102,7 +108,7 @@ tagged release yet; everything below is on `main`.
   `~/.local/state/shaode` to the new names, update launch scripts and key bindings that run
   `shaode`, and configure a fresh build directory.
 
-## Unreleased (2026-09-28)
+## 2026-09-28
 
 - The configuration reloads when it is saved, as in Hyprland: the compositor watches the `.lua`
   files in its directory (`auto_reload = false` turns this off). A file with an error, on a save
