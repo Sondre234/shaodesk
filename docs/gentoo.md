@@ -1,9 +1,9 @@
 # Running shaodesk on Gentoo
 
-shaodesk is developed on, and is the everyday desktop of, a personal Gentoo machine
-(NVIDIA RTX 4090, three monitors; see the
-[daily use checkpoint](verification.md#daily-use-on-gentoo)). It runs nested or as a
-standalone session from a TTY. There is no dependency on systemd in shaodesk itself.
+I develop shaodesk on my own Gentoo machine, and it is my everyday desktop there (NVIDIA
+RTX 4090, three monitors; see the [daily use checkpoint](verification.md#daily-use-on-gentoo)).
+It runs nested or as a standalone session from a TTY. There is no dependency on systemd in
+shaodesk itself.
 
 It can be installed as a package with the ebuilds in `packaging/gentoo`, or built and
 installed by hand as described after that.

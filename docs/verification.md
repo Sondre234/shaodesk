@@ -100,7 +100,7 @@ The lower-level compositor protocols are tested separately as described above.
 
 On 2026-09-24 `--session` ran from tty3 on an Arch laptop (AMD Vega 8 through
 amdgpu, 1920×1080 eDP panel, touchpad; an NVIDIA GTX 1650 was present but
-unused). libseat opened the seat through logind. The user checked rendering,
+unused). libseat opened the seat through logind. I checked rendering,
 touchpad and keyboard input, launching and moving/resizing windows, the shell's
 panel and launcher, and an XWayland application (Discord).
 
@@ -115,7 +115,7 @@ The same day it ran on an Arch desktop: NVIDIA RTX 4090 with the proprietary
 610.57 driver (`nvidia_drm.modeset=1`), wlroots 0.20.2 on the GLES2 renderer,
 and three monitors (HDMI-A-1 and DP-3 at 2560×1440, DP-1 at 1920×1080). No
 NVIDIA workaround variables were needed. All three screens lit at native
-resolution; the user checked the cursor crossing between them, keyboard input,
+resolution; I checked the cursor crossing between them, keyboard input,
 launching and moving windows, and the panel and taskbar on each screen. The
 session was started from tty3, since SDDM's Xorg holds tty2 there, and Xwayland
 fell back from the `:0` socket SDDM owns.
@@ -127,7 +127,7 @@ The test found three problems, now fixed:
   (200/144/144 Hz on this machine), falling back if the driver rejects it.
 - `wlr_output_layout_add_auto` placed monitors in connector order, not their
   physical order. The Lua `outputs.order` and `outputs.primary` settings now set
-  it; the user confirmed the layout.
+  it; I confirmed the layout.
 - The taskbar's window menu always opened over the first task button.
 
 These runs were launched over SSH into the tty3 login (`XDG_SESSION_ID`), which
@@ -360,7 +360,7 @@ shell then logs it and hides its bell, which is only checked with a second in-pr
 
 ## Daily use on Gentoo
 
-Added 2026-10-05. shaodesk is the author's everyday desktop on Gentoo: `--session` started from
+Added 2026-10-05. shaodesk is my everyday desktop on Gentoo: `--session` started from
 a TTY, installed under a user prefix (`~/.local/shaodesk`) with the shell, running
 `~/.config/shaodesk/init.lua`. The machine is an Intel i9-12900K with an NVIDIA RTX 4090 on the
 proprietary 595.99.02 driver, kernel 6.18, wlroots 0.20.2 and Qt 6.11.2, driving three monitors:

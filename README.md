@@ -17,7 +17,7 @@ taskbar, launcher and notifications, and a Lua configuration that reloads when y
 
 </div>
 
-> **Status:** beta; the latest release is 0.1.1. It is the author's everyday desktop on Gentoo,
+> **Status:** beta; the latest release is 0.1.1. It is my everyday desktop on Gentoo,
 > as a session started from a display manager or a TTY, and it also runs nested in another
 > Wayland session. It has been used on few machines so far, so expect rough edges on hardware
 > it has not met: [docs/verification.md](docs/verification.md) records what has been checked,
