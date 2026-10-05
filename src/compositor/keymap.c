@@ -153,6 +153,19 @@ static void set_keyboard_layout(struct sh_server *server, xkb_layout_index_t lay
         wlr_seat_keyboard_notify_modifiers(server->seat, &seat_keyboard->modifiers);
 }
 
+/* After a keyboard's modifiers changed: when it switched layout itself, by an XKB option such
+ * as grp:alt_shift_toggle, the other keyboards follow. A layout held only while a key is
+ * (grp:switch) is not a switch. */
+void follow_keyboard_layout(struct sh_server *server, struct sh_keyboard *keyboard) {
+    struct wlr_keyboard *wlr_keyboard = keyboard->wlr_keyboard;
+    if (keyboard->is_virtual || !wlr_keyboard->xkb_state || wlr_keyboard->keymap != server->keymap)
+        return;
+    xkb_layout_index_t layout =
+        xkb_state_serialize_layout(wlr_keyboard->xkb_state, XKB_STATE_LAYOUT_LOCKED);
+    if (layout != server->keyboard_layout)
+        set_keyboard_layout(server, layout, keyboard);
+}
+
 /* switch_layout: `choice` 0 is the next layout and -1 the previous, both wrapping, and N > 0
  * the Nth; one past the last does nothing. */
 void switch_keyboard_layout(struct sh_server *server, int choice) {

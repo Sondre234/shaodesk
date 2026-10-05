@@ -16,6 +16,7 @@ static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) 
 
     wlr_seat_keyboard_notify_modifiers(keyboard->server->seat, &keyboard->wlr_keyboard->modifiers);
     struct sh_server *server = keyboard->server;
+    follow_keyboard_layout(server, keyboard);
     uint32_t held = server->switcher.modifiers;
     if (server->switcher.open && held &&
         (wlr_keyboard_get_modifiers(keyboard->wlr_keyboard) & held) != held)

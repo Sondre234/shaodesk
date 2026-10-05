@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Several keyboard layouts: switch_layout moves every keyboard to the next, the previous or a
-numbered one, from the control socket and from a binding; virtual keyboards keep theirs; and a
-reload keeps the active layout by name, else by place."""
+numbered one, from the control socket and from a binding; a keyboard switching by an XKB option
+takes the others along; virtual keyboards keep theirs; and a reload keeps the active layout by
+name, else by place."""
 import os
 from pathlib import Path
 import re
@@ -13,13 +14,13 @@ import harness
 
 compositor, pointer_probe = (str(Path(p).resolve()) for p in sys.argv[1:3])
 
-LEFTMETA, LEFTALT, SPACE = 125, 56, 57  # evdev key codes
+LEFTMETA, LEFTALT, LEFTSHIFT, SPACE = 125, 56, 42, 57  # evdev key codes
 
 
 def config(layout, variant):
     return """return {
     xwayland = false,
-    keyboard = { layout = "%s", variant = "%s" },
+    keyboard = { layout = "%s", variant = "%s", options = "grp:alt_shift_toggle" },
     bindings = { { mods = { "Super", "Alt" }, key = "space", action = "switch_layout" } },
 }""" % (layout, variant)
 
@@ -58,8 +59,8 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-layout-test-") as directory:
         layouts, keyboards = keyboard()
         return next(i + 1 for i, layout in enumerate(layouts) if layout[2]), keyboards
 
-    def key(code, state):
-        msg("headless_keyboard", "key", "one", str(code), state)
+    def key(code, state, keyboard="one"):
+        msg("headless_keyboard", "key", keyboard, str(code), state)
 
     with log.open("w") as output:
         server = subprocess.Popen([compositor, "--headless", "--config", str(init)],
@@ -103,6 +104,16 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-layout-test-") as directory:
         key(LEFTALT, "release")
         key(LEFTMETA, "release")
         assert active() == (2, {"one": 2, "two": 2}), active()
+
+        # Alt + Shift (grp:alt_shift_toggle) switches the keyboard it is typed on, and the other
+        # follows; from either keyboard.
+        for typed_on, expected in (("one", 1), ("two", 2), ("one", 1)):
+            key(LEFTALT, "press", typed_on)
+            key(LEFTSHIFT, "press", typed_on)
+            key(LEFTSHIFT, "release", typed_on)
+            key(LEFTALT, "release", typed_on)
+            assert active() == (expected, {"one": expected, "two": expected}), (typed_on, active())
+        msg("switch_layout", "2")
 
         # A virtual keyboard (from the pointer probe) keeps its own keymap and layout.
         pointer = subprocess.Popen([pointer_probe, "1280", "720"], env=env, text=True,
