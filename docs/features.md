@@ -299,7 +299,7 @@ it opens and changes.
 `palette` (Super + P, or `shaodesk msg palette`) opens a search box in the shell, on the monitor
 under the pointer, that reaches everything from one place: open windows, installed applications,
 workspaces (switching to one, or moving the focused window there), compositor actions such as
-`layout_monocle` or `group_toggle`, the [power actions](#power) that may run (Restart, Power off
+Open a terminal (`terminal`), `layout_monocle` or `group_toggle`, the [power actions](#power) that may run (Restart, Power off
 and Log out asking first, as from the panel), and saved sessions (restore, restore and launch what is
 missing, and save the current arrangement under the name typed). Type to narrow the list; each
 word must match, in any order, as letters in sequence of the title or its small print, favouring
