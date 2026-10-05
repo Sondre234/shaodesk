@@ -16,7 +16,8 @@ tagged release yet; everything below is on `main`.
 - `keyboard.file` uses an XKB keymap file instead of the layout names, and `keyboard.rules`
   sets the XKB rules. A keymap file that cannot be read or compiled is a configuration error,
   shown with its line in the configuration and, where xkbcommon knows it, in the keymap; names
-  XKB does not know are now refused with its reason.
+  XKB does not know are now refused with its reason. Saving an `.xkb` file beside the
+  configuration reloads it, as saving a `.lua` file does.
 - A reload no longer resets the keyboards: keys held stay down, Caps Lock stays on, and the
   active layout stays (found by name in a changed keymap); a reload that leaves the keymap as it
   was leaves the keyboards alone.
