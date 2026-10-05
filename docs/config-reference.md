@@ -315,6 +315,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.widgets.tiling` | boolean | true | - | The tiling on/off button. |
 | `shell.widgets.profiles` | boolean | true | - | The appearance profile picker: a button that lists `profiles` to switch between; shown only when there are two or more. |
 | `shell.widgets.wallpapers` | boolean | true | - | The wallpaper picker: thumbnails of the images in `shell.wallpapers`; the one picked replaces `shell.wallpaper` for the profile in use until the configured one changes. |
+| `shell.widgets.keyboard_layout` | boolean | true | - | The active keyboard layout's short name, such as `us`; clicking it switches to the next. Shown only when the keymap has two or more layouts. |
 | `shell.launchers` | list of tables | unset | - | Pinned commands for programs without a desktop file, at most 64. |
 | `shell.launchers[].name` | string | - | - | Label, 1 to 128 bytes. Required. |
 | `shell.launchers[].icon` | string | "application-x-executable" | - | Icon theme name. |

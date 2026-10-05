@@ -1575,6 +1575,7 @@ Item {
                     }
                 }
             }
+            KeyboardLayout { panel: root; barHeight: bar.height }
             // The time and date. Clicking it opens the month calendar.
             Button {
                 id: clockButton

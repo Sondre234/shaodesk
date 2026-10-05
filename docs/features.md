@@ -28,11 +28,14 @@ through them). The battery shows the charge of the first battery in `/sys/class/
 (red when nearly empty, accent-coloured while charging) and is left out on machines without
 one; the network icon shows Wi-Fi, a wired link, or a dimmed struck-through icon when the
 interface is down, read from `/sys/class/net` (physical interfaces only, wired preferred), and
-is left out without any interface. Both refresh every five seconds. Clicking the clock opens a
+is left out without any interface. Both refresh every five seconds. With two or more
+[keyboard layouts](#keyboard-layouts), the active one's short name (`us`, `no`) sits beside the
+clock, and clicking it switches every keyboard to the next. Clicking the clock opens a
 month calendar (previous and next month buttons; the title returns to today). Each widget is
 switched off from Lua: `shell = { widgets = { battery = false, calendar = false } }`, with
 `workspaces`, `battery`, `network`, `volume`, `clock`, `calendar` (the clock stays, the
-calendar goes), `tiling`, and `profiles` (the appearance profile picker) all on by default. All of them take the panel's `accent`,
+calendar goes), `tiling`, `profiles` (the appearance profile picker) and `keyboard_layout` all
+on by default. All of them take the panel's `accent`,
 `panel_color`, `text_color`, `font` and `font_size`. In a nested
 session, applications that reuse an existing process or D-Bus service can open
 in the host session instead.

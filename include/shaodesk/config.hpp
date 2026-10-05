@@ -79,6 +79,7 @@ struct ShellWidgets {
     bool tiling = true;   // the tiling on/off button
     bool profiles = true; // the appearance profile picker, only with two or more profiles
     bool wallpapers = true; // the wallpaper picker
+    bool keyboard_layout = true; // the active keyboard layout, only with two or more
 };
 
 struct ShellConfig {

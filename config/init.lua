@@ -172,7 +172,8 @@ return {
         -- group_windows = true, -- one button per application, its windows listed on hover;
         --                          false gives every window its own button
         -- widgets = { workspaces = true, battery = true, network = true, volume = true,
-        --             clock = true, calendar = true, tiling = true, wallpapers = true }, -- false hides one
+        --             clock = true, calendar = true, tiling = true, wallpapers = true,
+        --             keyboard_layout = true }, -- false hides one
         -- accent = "#7da8ff",
         -- panel_color = "#151e2c", -- #RRGGBBAA makes it translucent
         -- text_color = "#edf2fa",

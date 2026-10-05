@@ -510,6 +510,9 @@ const Option options[] = {
     {"shell.widgets.wallpapers", "boolean", "true", "true", none, none,
      "The wallpaper picker: thumbnails of the images in `shell.wallpapers`; the one picked "
      "replaces `shell.wallpaper` for the profile in use until the configured one changes."},
+    {"shell.widgets.keyboard_layout", "boolean", "true", "true", none, none,
+     "The active keyboard layout's short name, such as `us`; clicking it switches to the next. "
+     "Shown only when the keymap has two or more layouts."},
     {"shell.launchers", "list of tables", "unset", "", none, none,
      "Pinned commands for programs without a desktop file, at most 64."},
     {"shell.launchers[].name", "string", "", "", none, none, "Label, 1 to 128 bytes. Required."},

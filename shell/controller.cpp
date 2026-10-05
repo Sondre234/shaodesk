@@ -310,7 +310,7 @@ QVariantMap ShellController::widgets() const {
     return {{"workspaces", w.workspaces}, {"battery", w.battery}, {"network", w.network},
             {"volume", w.volume},         {"clock", w.clock},     {"calendar", w.calendar},
             {"tiling", w.tiling},         {"profiles", w.profiles},
-            {"wallpapers", w.wallpapers}};
+            {"wallpapers", w.wallpapers}, {"keyboard_layout", w.keyboard_layout}};
 }
 QStringList ShellController::profiles() const {
     QStringList names;
@@ -471,6 +471,20 @@ void ShellController::subscribe() {
                     Q_EMIT focusedOutputChanged();
                 }
                 continue;
+            } else if (line.startsWith("keyboard-layout ")) {
+                // keyboard-layout N COUNT SHORT NAME
+                const auto words = line.split(' ');
+                if (words.size() < 4)
+                    continue;
+                const QVariantMap layout{{"number", words[1].toInt()},
+                                         {"count", words[2].toInt()},
+                                         {"short", words[3]},
+                                         {"name", QStringList(words.mid(4)).join(' ')}};
+                if (layout != keyboardLayout_) {
+                    keyboardLayout_ = layout;
+                    Q_EMIT keyboardLayoutChanged();
+                }
+                continue;
             } else if (line.startsWith("dnd ")) {
                 handleDnd(line.sliced(4));
                 continue;
@@ -600,6 +614,10 @@ void ShellController::subscribe() {
     });
     connect(state_, &QLocalSocket::disconnected, this, [this] {
         subscribed_ = false;
+        if (!keyboardLayout_.isEmpty()) {
+            keyboardLayout_.clear();
+            Q_EMIT keyboardLayoutChanged();
+        }
         if (urgentCount_ != 0 || !urgentWindows_.isEmpty()) {
             urgentCount_ = 0;
             urgentWindows_.clear();
