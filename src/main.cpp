@@ -685,6 +685,7 @@ void usage() {
            "Config: $XDG_CONFIG_HOME/shaodesk/init.lua or ~/.config/shaodesk/init.lua\n"
            "Falls back to the installed default; use --config config/init.lua in the source tree.\n"
            "--no-shell disables automatic shell startup; headless mode never starts it.\n"
+           "--version prints the version, and the wlroots version shaodesk was built with.\n"
            "SIGHUP reloads configuration; SIGINT/SIGTERM exits.\n"
            "shaodesk msg [output NAME] ACTION [ARGUMENT] runs an action in the running session;\n"
            "shaodesk msg get workspace|workspaces|tiling|windows|outputs|animations prints its state.\n"
