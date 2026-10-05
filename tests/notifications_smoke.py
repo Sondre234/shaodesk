@@ -271,7 +271,8 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-notify-test-") as directory:
             msg("osd", "Volume", "40")
             wait_for(lambda: count("osd shown") == shown + 1, "the display shown")
             time.sleep(0.3)
-            close_to(PANEL, (600, 636), "the display's pill")
+            # Above the label and the level: how far the label reaches depends on the fonts.
+            close_to(PANEL, (600, 612), "the display's pill")
             wait_for(lambda: count("osd hidden") == hidden + 1, "the display faded out", timeout=4)
             bare = subprocess.run([compositor, "msg", "osd"], env=env, capture_output=True,
                                   text=True, timeout=5)
