@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Drive workspaces through the control socket and the taskbar protocol."""
+"""Drive workspaces through the control socket; taskbar switching is workspace_back_smoke's."""
 import os
 from pathlib import Path
 import re
@@ -63,12 +63,6 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-workspace-test-") as directory
             msg("workspace_prev")
             assert msg("get", "workspace") == "1\n"
 
-            # Activating a window from the taskbar switches to its workspace.
-            subprocess.run([probe, "--activate", "shaodesk-probe"], env=env, check=True,
-                           timeout=30, stdout=subprocess.DEVNULL)
-            wait_for(lambda: msg("get", "workspace") == "2\n", processes, "taskbar switch")
-            assert windows()["shaodesk-probe"] == (2, True)
-
             # Keyboard window actions target only the current workspace.
             msg("workspace", "1")
             msg("close")
@@ -82,7 +76,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-workspace-test-") as directory
             server.terminate()
             assert server.wait(timeout=30) == 0, log.read_text()
             assert not Path(env["SHAODESK_SOCKET"]).exists(), "control socket left behind"
-            print("Workspaces, control socket, taskbar switching, and scoped actions passed")
+            print("Workspaces, control socket, and scoped actions passed")
         except Exception:
             print(log.read_text(), file=sys.stderr)
             raise
