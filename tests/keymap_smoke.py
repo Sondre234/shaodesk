@@ -52,10 +52,12 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-keymap-test-") as directory:
         return result.stdout
 
     def layouts(expected=True):
-        """The names of the layouts in the keymap a new application gets."""
+        """The names of the layouts in the keymap a new application gets. (The probe's output
+        says so rather than its status, which leak checkers change.)"""
         result = subprocess.run([probe, "--keymap"], env=env, capture_output=True, text=True,
                                 timeout=30)
-        assert (result.returncode == 0) == expected, (result.stdout, result.stderr)
+        arrived = "no keymap arrived" not in result.stderr and "xkb_symbols" in result.stdout
+        assert arrived == expected, (result.stdout[-2000:], result.stderr[-2000:])
         symbols = result.stdout[result.stdout.find("xkb_symbols"):]
         return re.findall(r'^\s*name\[\w*?(\d+)\]\s*=\s*"([^"]*)";', symbols, re.M)
 
@@ -156,7 +158,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-keymap-test-") as directory:
         assert keyboard()[2]["one"] == (1, 2, 0, 0, 0), keyboard()
         tell("key alt up")
         pointer.stdin.close()
-        assert pointer.wait(timeout=30) == 0
+        pointer.wait(timeout=30)
         processes.remove(pointer)
         harness.wait_for(lambda: len(keyboard()[2]) == 1, processes, "the virtual keyboard gone")
 

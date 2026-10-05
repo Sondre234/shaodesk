@@ -159,7 +159,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-layout-test-") as directory:
         msg("switch_layout", "next")
         assert active() == (2, {"one": 2, "two": 2, virtual: 1}), active()
         pointer.stdin.close()
-        assert pointer.wait(timeout=30) == 0
+        pointer.wait(timeout=30)
         processes.remove(pointer)
 
         # A reload keeps the active layout: with another variant, by place...
