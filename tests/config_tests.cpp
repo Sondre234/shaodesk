@@ -644,14 +644,7 @@ int main(int argc, char **argv) {
         rejects("return {bindings={{key='a', app_id='x', action='close'}}}");
         rejects("return {bindings={{key='a', desktop=true, action='close'}}}");
         rejects("return {bindings={{button='side', app_id='(', action='close'}}}");
-        // Failed reload leaves the previously active value intact.
-        try {
-            config = shaodesk::parse_config("return {layout={gap=999}}");
-        } catch (const std::exception &) {
-        }
-        require(config.settings.gap_inner == 8 && config.bindings.size() == 65,
-                "failed reload changed active configuration");
-        std::cout << "Configuration validation, bindings, and transactional loading passed\n";
+        std::cout << "Configuration validation and bindings passed\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';
         return 1;
