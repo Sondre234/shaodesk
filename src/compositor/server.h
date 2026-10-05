@@ -17,6 +17,7 @@
 #include "shaodesk/overview_scene.h"
 #include "shaodesk/tabs.h"
 #include "shaodesk/sleep.h"
+#include "shaodesk/login1.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -200,6 +201,14 @@ struct sh_overview {
     bool in_corner;   /* the pointer is in the hot corner: it opens the overview on entering */
 };
 
+/* The power actions and what logind allows of them (power.c). */
+struct sh_power {
+    bool system_bus;          /* logind may be reached on the system bus (not --headless) */
+    struct sh_login1 *login1; /* NULL while logind is out of reach */
+    struct wl_event_source *bus, *bus_timer;
+    char answers[SH_LOGIN1_METHODS][16]; /* logind's Can* answers; "" until it gives one */
+};
+
 struct sh_server {
     const struct sh_callbacks *callbacks;
     bool running;
@@ -322,6 +331,7 @@ struct sh_server {
     struct wl_listener session_active;
     int sleep_inhibitor; // logind inhibitor fd while this VT is in front, else -1
 #endif
+    struct sh_power power;
     struct wlr_renderer *renderer;
     struct wlr_allocator *allocator;
     struct wlr_scene *scene;
@@ -784,6 +794,10 @@ struct sh_rect floating_area(struct sh_server *server, struct wlr_output *output
 void unarrange_in_place(struct sh_toplevel *toplevel);
 void move_window(struct sh_server *server, enum sh_action action);
 void resize_window(struct sh_server *server, enum sh_action action, int amount);
+
+/* power.c */
+void power_init(struct sh_server *server);
+void power_finish(struct sh_server *server);
 
 /* query.c */
 bool run_query(struct sh_server *server, int fd, const char *request);

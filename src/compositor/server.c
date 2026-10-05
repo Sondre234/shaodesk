@@ -420,6 +420,8 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     (void)compositor;
 #endif
     night_light_update(&server);
+    server.power.system_bus = mode != SH_BACKEND_HEADLESS;
+    power_init(&server);
     server.running = true;
     callbacks->startup(callbacks->userdata);
 
@@ -441,6 +443,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
         wlr_xwayland_destroy(server.xwayland);
     }
 #endif
+    power_finish(&server);
     close_control_socket(&server);
     wl_display_destroy_clients(server.wl_display);
 

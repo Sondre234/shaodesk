@@ -164,6 +164,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/output_moves.c
         src/compositor/overview.c
         src/compositor/placement.c
+        src/compositor/power.c
         src/compositor/query.c
         src/compositor/scratchpad.c
         src/compositor/session.c
@@ -174,7 +175,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/workspace.c
         src/compositor/xwayland.c
     )
-    add_executable(shaodesk src/main.cpp ${SHAODESK_COMPOSITOR_SOURCES} src/decoration.c src/animation.c src/effects_scene.c src/sleep.c
+    add_executable(shaodesk src/main.cpp ${SHAODESK_COMPOSITOR_SOURCES} src/decoration.c src/animation.c src/effects_scene.c src/sleep.c src/login1.c
         ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.h ${WLR_PROTOCOL_HEADERS})
     target_sources(shaodesk PRIVATE src/overview_scene.c)
     target_include_directories(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
@@ -605,6 +606,18 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:lock_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(session_lock PROPERTIES TIMEOUT 60)
+        if(SDBUS_FOUND)
+            # A stand-in for logind on a private bus, so that no power test reaches the real one.
+            add_executable(fake_login1 tests/fake_login1.c)
+            target_compile_definitions(fake_login1 PRIVATE SHAODESK_SDBUS_${SHAODESK_SDBUS}=1)
+            target_link_libraries(fake_login1 PRIVATE PkgConfig::SDBUS)
+            target_compile_options(fake_login1 PRIVATE -Wall -Wextra -Wno-unused-parameter)
+            add_test(NAME power_smoke COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/power_smoke.py
+                $<TARGET_FILE:shaodesk> $<TARGET_FILE:fake_login1> $<TARGET_FILE:wayland_probe>
+                $<TARGET_FILE:lock_probe>)
+            set_tests_properties(power_smoke PROPERTIES TIMEOUT 90)
+        endif()
         # The compositor benchmark (tools/bench/bench.py); see docs/performance.md.
         add_executable(shaodesk-bench-client tools/bench/bench_client.c
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client-protocol.h

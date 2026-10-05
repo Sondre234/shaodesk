@@ -318,6 +318,23 @@ static void get_layers(struct sh_server *server, int fd, const char *arguments) 
     control_describe_layers(server, fd);
 }
 
+static void get_power(struct sh_server *server, int fd, const char *arguments) {
+    // Each power action logind carries out and whether it allows it: its answer ("yes", "no",
+    // "challenge" for after authenticating, "na"), "unknown" until it gives one, or
+    // "unavailable" without logind.
+    static const char *const names[SH_LOGIN1_METHODS] = {"poweroff", "reboot", "suspend",
+                                                         "hibernate"};
+    control_reply(fd, "ok\n");
+    for (int i = 0; i < SH_LOGIN1_METHODS; ++i) {
+        const char *answer = !server->power.login1      ? "unavailable"
+                             : server->power.answers[i][0] ? server->power.answers[i]
+                                                         : "unknown";
+        char line[64];
+        snprintf(line, sizeof(line), "%s\t%s\n", names[i], answer);
+        control_reply(fd, line);
+    }
+}
+
 /* The queries, "get NAME" (or "get NAME ARGUMENTS" for one that takes them), which answer
  * even while the session is locked. A handler gets NULL for no arguments. */
 static const struct {
@@ -344,6 +361,7 @@ static const struct {
     {"night_light", get_night_light, false},
     {"overview", get_overview, false},
     {"layers", get_layers, false},
+    {"power", get_power, false},
 };
 
 /* Answers `request` if it is a query; false if it is not one. */
