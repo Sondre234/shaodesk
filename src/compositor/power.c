@@ -508,6 +508,19 @@ bool power_describe(struct sh_server *server, size_t index, const char **name,
     return true;
 }
 
+/* The actions that may run (logind allows them, possibly after a password), comma-separated
+ * in menu order, or "-" for none. */
+void power_available(struct sh_server *server, char *list, size_t size) {
+    size_t used = 0;
+    const char *name, *status;
+    list[0] = '\0';
+    for (size_t i = 0; power_describe(server, i, &name, &status); ++i)
+        if ((!strcmp(status, "yes") || !strcmp(status, "challenge")) && used < size)
+            used += (size_t)snprintf(list + used, size - used, "%s%s", used ? "," : "", name);
+    if (!used)
+        snprintf(list, size, "-");
+}
+
 /* What `get power` says of the action under way: its name and step, or "-". */
 const char *power_pending(struct sh_server *server, char *text, size_t size) {
     static const char *const steps[] = {"idle", "closing", "leaving", "locking", "calling"};

@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -133,6 +134,28 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
         server.terminate()
         assert server.wait(timeout=30) == 0, compositor_log.read_text()
 
+    class Subscriber:
+        """The control socket's stream, as the shell reads it."""
+
+        def __init__(self):
+            self.socket = socket.socket(socket.AF_UNIX)
+            self.socket.connect(env["SHAODESK_SOCKET"])
+            self.socket.sendall(b"subscribe\n")
+            self.socket.settimeout(0.05)
+            self.buffer = ""
+
+        def lines(self, prefix):
+            try:
+                while data := self.socket.recv(8192):
+                    self.buffer += data.decode()
+            except socket.timeout:
+                pass
+            return [line for line in self.buffer.splitlines() if line.startswith(prefix)]
+
+        def last(self, prefix):
+            found = self.lines(prefix)
+            return found[-1] if found else None
+
     try:
         bus = subprocess.Popen(["dbus-daemon", f"--config-file={root / 'bus.conf'}", "--nofork",
                                 "--print-address=1"], stdout=subprocess.PIPE, text=True)
@@ -150,6 +173,10 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
                                "suspend": "unavailable", "hibernate": "unavailable",
                                "logout": "yes", "pending": "-"}, power()
             assert "SHAODESK_LOGIN1_BUS" in compositor_log.read_text()
+            # Subscribers (the shell) hear which actions may run.
+            listener = Subscriber()
+            wait_for(lambda: listener.last("power ") == "power lock,logout",
+                     "the actions subscribers hear")
             assert "logind is out of reach" in msg("poweroff", ok=False)
             assert "takes no argument" in msg("reboot", "now", ok=False)
             # Logging out needs no logind: the windows close, and the session ends as with quit.
@@ -170,6 +197,9 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
             wait_for(answers_are(poweroff="yes", reboot="challenge", suspend="yes",
                                  hibernate="na", pending="-"), "logind's answers")
             wait_for(lambda: inhibitors() == 1, "the delay inhibitor")
+            subscriber = Subscriber()
+            wait_for(lambda: subscriber.last("power ")
+                     == "power lock,suspend,reboot,poweroff,logout", "the actions subscribers hear")
 
             # The locker locks the session; while it is locked, only queries answer.
             assert power()["lock"] == "yes", power()
@@ -302,6 +332,8 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
             answers.write_text("CanPowerOff na\nCanReboot no\n")
             msg("reload")
             wait_for(answers_are(poweroff="na", reboot="no", hibernate="yes"), "the new answers")
+            wait_for(lambda: subscriber.last("power ") == "power lock,suspend,hibernate,logout",
+                     "subscribers told of the new answers")
             assert "logind does not allow power off here (CanPowerOff: na)" in msg(
                 "poweroff", ok=False)
             assert "logind does not allow reboot here (CanReboot: no)" in msg("reboot", ok=False)
@@ -321,6 +353,12 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
                      in compositor_log.read_text(), "the refusal reported")
             assert logged(mark) == ["Reboot true"], logged(mark)
             assert power()["pending"] == "-", power()
+            # The shell hears what went wrong, and why each cancelled action was cancelled.
+            reported = [line[len("power-error "):] for line in subscriber.lines("power-error ")]
+            assert reported == [
+                "Reboot cancelled: 1 window is still open (shaodesk-probe)",
+                "Suspend cancelled: the screen did not lock within 5 seconds",
+                "Reboot failed: Access denied by the fake logind"], reported
             stop(server)
             wait_for(lambda: inhibitors() == 0, "the delay inhibitor released on exit")
         print("The compositor locks with its locker, and asks only the logind it is given, which "

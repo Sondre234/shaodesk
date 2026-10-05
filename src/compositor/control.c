@@ -353,7 +353,8 @@ static void drop_partial_utf8(char *text) {
 
 /* The state subscribers get: "tiling on|off", "workspace N" and "focused NAME" for the focused
  * output, and "output NAME N USED TILING" for each output, with its current workspace, those
- * holding windows ("1,3", or "-"), and whether it tiles ("on" or "off"). */
+ * holding windows ("1,3", or "-"), and whether it tiles ("on" or "off"); then the urgent windows
+ * and the power actions that may run. */
 static void describe_state(struct sh_server *server, char *state, size_t size) {
     struct wlr_output *focused = focused_output(server);
     size_t length = snprintf(state, size, "tiling %s\nworkspace %d\nfocused %s\n",
@@ -420,6 +421,12 @@ static void describe_state(struct sh_server *server, char *state, size_t size) {
             *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
         length += snprintf(state + length, size - length, "urgent-window %s\t%d\t%s\t%s\n",
                            next->output, next->workspace + 1, app_id, title);
+    }
+    // "power ACTIONS": the power actions that may run, as "lock,suspend,poweroff", or "-".
+    if (length < size) {
+        char actions[128];
+        power_available(server, actions, sizeof(actions));
+        snprintf(state + length, size - length, "power %s\n", actions);
     }
 }
 

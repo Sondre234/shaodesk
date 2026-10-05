@@ -852,7 +852,9 @@ that sends `subscribe` keeps its connection and receives `tiling on|off` and
 (Super + R) asks the panel on that monitor to open or close its application menu; the panel uses this. The window switcher sends `switcher OUTPUT SELECTED COUNT` followed by
 COUNT lines `switcher-window APP_ID TITLE OUTPUT WORKSPACE MINIMIZED URGENT` (tab-separated) when it
 opens or a listed window closes, `switcher-select N` as the selection moves (both counting
-from 0), and `switcher-close`. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
+from 0), and `switcher-close`. The state ends with `power ACTIONS`, the power actions that may
+run (`lock,suspend,reboot,poweroff,logout`, in the order menus list them, or `-`), and a power
+action that fails or is cancelled after it was accepted sends `power-error MESSAGE`. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
 refused while the session is locked.
 
 ## Screen locking and idle
