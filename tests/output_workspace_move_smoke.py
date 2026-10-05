@@ -128,9 +128,9 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-workspace-move-") as directory
 
             # A target that is not there, or no target, changes nothing.
             msg("output", "HEADLESS-1", "move_workspace_to_output", "right")  # H1 is rightmost
+            msg("output", "HEADLESS-1", "move_workspace_to_output", "HEADLESS-9")
             assert [place(t) for t in "ABCD"] == [(1, "HEADLESS-1"), (1, "HEADLESS-1"),
                                                   (2, "HEADLESS-1"), (1, "HEADLESS-2")]
-            msg("output", "HEADLESS-1", "move_workspace_to_output", "HEADLESS-9")
             assert run("move_workspace_to_output").returncode != 0
             assert run("move_workspace_to_output", "left", "right").returncode == 0  # a description
 
