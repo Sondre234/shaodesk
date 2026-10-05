@@ -88,6 +88,7 @@ pid_t spawn(const shaodesk::Command &command, const std::vector<std::string> &ex
  * ours, so screen sharing and file choosers need to learn about this session. Only a standalone
  * session may do this: a nested one would point the host's portals at itself. */
 void export_activation_environment() {
+    // --systemd tells a systemd user manager too; where there is none it is quietly ignored.
     shaodesk::Command command{"dbus-update-activation-environment", "--systemd"};
     for (const char *name :
          {"WAYLAND_DISPLAY", "DISPLAY", "XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE", "SHAODESK_SOCKET",
@@ -97,8 +98,13 @@ void export_activation_environment() {
     pid_t pid = spawn(command);
     // Wait briefly, so a portal started by the first applications already sees this session.
     for (int tries = 0; pid > 0 && tries < 100; ++tries) {
-        int status;
-        if (waitpid(pid, &status, WNOHANG) != 0)
+        int status = 0;
+        pid_t done = waitpid(pid, &status, WNOHANG);
+        if (done == pid && !(WIFEXITED(status) && WEXITSTATUS(status) == 0))
+            std::cerr << "dbus-update-activation-environment failed: without a D-Bus session bus, "
+                         "notifications, the tray and portals are missing; shaodesk-session "
+                         "starts one\n";
+        if (done != 0)
             return;
         usleep(20000);
     }
