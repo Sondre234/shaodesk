@@ -277,7 +277,7 @@ struct Runtime {
         auto *binding = self.config.binding(modifiers, keysym);
         if (!binding)
             return SH_NONE;
-        if (binding->action == SH_HANDLED)
+        if (binding->action == SH_SPAWN)
             spawn(binding->command);
         *argument = binding->action == SH_SCREENSHOT ? binding->screenshot : binding->workspace;
         if (shaodesk::action_takes_amount(binding->action))
@@ -293,7 +293,7 @@ struct Runtime {
         auto *binding = self.config.button_binding(modifiers, button, target, app_id);
         if (!binding)
             return SH_NONE;
-        if (binding->action == SH_HANDLED)
+        if (binding->action == SH_SPAWN)
             spawn(binding->command);
         *argument = binding->action == SH_SCREENSHOT ? binding->screenshot : binding->workspace;
         if (shaodesk::action_takes_amount(binding->action))
@@ -318,7 +318,7 @@ struct Runtime {
             if (words[0] == "profile")
                 return self.pick_profile(words);
             sh_action action = shaodesk::parse_action(words[0]);
-            if (action == SH_HANDLED) {
+            if (action == SH_SPAWN) {
                 if (words.size() < 2)
                     throw std::runtime_error("spawn needs a program");
                 if (spawn({words.begin() + 1, words.end()}) < 0)

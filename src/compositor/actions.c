@@ -36,7 +36,7 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
     struct sh_toplevel *current = current_toplevel(server);
     switch (action) {
     case SH_NONE:
-    case SH_HANDLED:
+    case SH_SPAWN:
         break;
     case SH_QUIT:
         wl_display_terminate(server->wl_display);

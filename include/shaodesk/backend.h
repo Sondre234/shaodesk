@@ -14,7 +14,7 @@ extern "C" {
 /* No wlroots types cross this boundary. C++ owns configuration and policy. */
 enum sh_action {
     SH_NONE,
-    SH_HANDLED,
+    SH_SPAWN, /* starts a program; the configuration side starts it as it returns this */
     SH_QUIT,
     SH_CLOSE,
     SH_CYCLE,
