@@ -21,10 +21,7 @@ assert not missing, f"actions the README and docs/features.md never mention: {mi
 example = (root / "config/init.lua").read_text()
 active = [line for line in example.splitlines() if not line.lstrip().startswith("--")]
 bound = set(re.findall(r'action = "([a-z_0-9]+)"', "\n".join(active)))
-unknown = sorted(bound - set(actions) - {"none"})
-assert not unknown, f"config/init.lua binds actions the code does not have: {unknown}"
-
-# An action that only exists in a comment of the example is still an action.
+# Bound or only in a comment, an action named in the example must exist.
 commented = set(re.findall(r'action = "([a-z_0-9]+)"', example))
 unknown = sorted(commented - set(actions) - {"none"})
 assert not unknown, f"config/init.lua mentions actions the code does not have: {unknown}"
