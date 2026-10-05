@@ -213,7 +213,7 @@ void robustness() {
         throw std::runtime_error("a missing file was accepted");
     } catch (const std::runtime_error &error) {
         require(std::string(error.what()).find("cannot open") != std::string::npos,
-                "missing file message");
+                std::string("missing file: ") + error.what());
     }
     // After any failure the next parse works: no state survives a rejected configuration.
     require(shaodesk::parse_config("return {layout={gap=3}}").settings.gap_inner == 3,
