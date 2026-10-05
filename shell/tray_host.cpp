@@ -3,10 +3,8 @@
 #include "tray_watcher.hpp"
 #include <QCoreApplication>
 #include <QDBusArgument>
-#include <QDBusConnectionInterface>
 #include <QDBusError>
 #include <QDBusMessage>
-#include <QDBusMetaType>
 #include <QDBusObjectPath>
 #include <QDBusPendingCallWatcher>
 #include <QDBusServiceWatcher>
@@ -108,7 +106,12 @@ QDBusPendingCall TrayItemClient::call(const QString &interface, const QString &m
     message.setArguments(arguments);
     return bus_.asyncCall(message, callTimeout);
 }
-void TrayItemClient::itemSignal(const QDBusMessage &) { refresh_.start(); }
+// The first signal of a burst starts the wait; the rest join it rather than put it off, so that
+// an item announcing changes all the time is still read every few milliseconds.
+void TrayItemClient::itemSignal(const QDBusMessage &) {
+    if (!refresh_.isActive())
+        refresh_.start();
+}
 void TrayItemClient::refresh() {
     if (reading_) {
         again_ = true;
@@ -301,10 +304,13 @@ bool TrayItemClient::readLayout(const QDBusArgument &layout, std::map<int, TrayM
     return readEntry(layout, menu, 0, budget, id);
 }
 void TrayItemClient::menuSignal(const QDBusMessage &message) {
-    if (message.member() == "LayoutUpdated")
-        relayout_.start();
-    else if (message.member() == "ItemsPropertiesUpdated" && message.signature() == "a(ia{sv})a(ias)")
+    if (message.member() == "LayoutUpdated") {
+        if (!relayout_.isActive())
+            relayout_.start();
+    }
+    else if (message.member() == "ItemsPropertiesUpdated" && message.signature() == "a(ia{sv})a(ias)") {
         updateEntries(message);
+    }
 }
 // ItemsPropertiesUpdated: the properties changed, (ia{sv}), and removed, (ias), entry by entry.
 void TrayItemClient::updateEntries(const QDBusMessage &message) {

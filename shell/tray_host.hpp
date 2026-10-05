@@ -47,7 +47,7 @@ class TrayItemClient : public QObject {
     TrayModel &model_;
     QDBusConnection bus_;
     QString service_, path_, key_;
-    // Gathers a burst of change signals into one read.
+    // Gathers a burst of change signals into one read, 10 ms after the first.
     QTimer refresh_;
     bool getAll_ = true, reading_ = false, again_ = false;
     void refresh();

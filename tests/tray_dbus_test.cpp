@@ -15,6 +15,7 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTimer>
 #include <memory>
 #include <sys/stat.h>
 
@@ -262,6 +263,19 @@ class TrayDbusTest : public QObject {
         QTRY_COMPARE(model.find(named->key())->iconThemePath, QString("/nonexistent/icons"));
         ayatana->item->change("Title", "Ayatana again", "NewTitle"); // read with one Get each
         QTRY_COMPARE(model.find(ayatana->key())->title, QString("Ayatana again"));
+        // An item announcing changes without pause is still read while it goes on.
+        {
+            int frame = 0;
+            QTimer stream;
+            QObject::connect(&stream, &QTimer::timeout, [&] {
+                named->item->change("Title", QString("Frame %1").arg(++frame), "NewTitle");
+            });
+            stream.start(2);
+            QTRY_VERIFY(model.find(named->key())->title.startsWith("Frame"));
+            QVERIFY(stream.isActive());
+        }
+        named->item->change("Title", "Renamed", "NewTitle");
+        QTRY_COMPARE(model.find(named->key())->title, QString("Renamed"));
 
         // What the panel asks reaches the item.
         model.activate(named->key(), 10, 20);
