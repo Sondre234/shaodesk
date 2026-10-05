@@ -273,6 +273,9 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
     case SH_LOCK:
         power_run(server, action);
         break;
+    case SH_POWER_MENU:
+        request_shell(server, "power-menu");
+        break;
     case SH_TOGGLE_STICKY:
         if (current && server_settings(server)->sticky)
             set_sticky(current, !current->sticky, true);

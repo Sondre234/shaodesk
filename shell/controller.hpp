@@ -234,6 +234,8 @@ class ShellController : public QObject {
     void cardsOutputChanged();
     // The compositor asked for the notification history on `output`.
     void notificationsRequested(const QString &output);
+    // The compositor asked for the power menu on `output`.
+    void powerMenuRequested(const QString &output);
 
   private:
     struct App {

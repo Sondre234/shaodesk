@@ -334,6 +334,10 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
             wait_for(answers_are(poweroff="na", reboot="no", hibernate="yes"), "the new answers")
             wait_for(lambda: subscriber.last("power ") == "power lock,suspend,hibernate,logout",
                      "subscribers told of the new answers")
+            # power_menu asks the shell for its menu on the monitor under the pointer.
+            msg("power_menu")
+            wait_for(lambda: subscriber.last("power-menu ") == "power-menu HEADLESS-1",
+                     "the shell asked for its power menu")
             assert "logind does not allow power off here (CanPowerOff: na)" in msg(
                 "poweroff", ok=False)
             assert "logind does not allow reboot here (CanReboot: no)" in msg("reboot", ok=False)

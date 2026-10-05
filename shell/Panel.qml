@@ -99,6 +99,21 @@ Item {
         audioPopup = kind
         launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false
     }
+    // The power menu, from the power_menu action: by the power button, or at the right end of
+    // the bar when that is switched off.
+    function togglePowerMenu() {
+        if (audioPopup === "power" || shell.power.entries.length === 0) {
+            audioPopup = ""
+            return
+        }
+        if (powerButton.visible) {
+            toggleAudioPopup("power", powerButton)
+            return
+        }
+        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false
+        audioPopupX = width - 126
+        audioPopup = "power"
+    }
     function pinAction(appId) {
         // Reading shell.pinned re-evaluates the menu when pins change. Pinning waits until
         // the click is handled: the change rebuilds the menu, destroying the clicked item.
@@ -676,7 +691,21 @@ Item {
                 id: powerMenu
                 parent: root
                 objectName: "powerMenu"
+                // The entry Up and Down move to and Enter runs.
+                property int current: 0
+                function run(index) {
+                    var entry = shell.power.entries[index]
+                    // Closing the menu first hands the keyboard back before it runs.
+                    root.audioPopup = ""
+                    if (entry)
+                        shell.power.request(entry.action, outputName)
+                }
                 visible: root.audioPopup === "power"
+                onVisibleChanged: if (visible) { current = 0; forceActiveFocus() }
+                Keys.onUpPressed: current = (current + shell.power.entries.length - 1) % Math.max(1, shell.power.entries.length)
+                Keys.onDownPressed: current = (current + 1) % Math.max(1, shell.power.entries.length)
+                Keys.onReturnPressed: run(current)
+                Keys.onEnterPressed: run(current)
                 width: 220; height: 12 + shell.power.entries.length * 44 + Math.max(0, shell.power.entries.length - 1) * 2
                 x: Math.max(8, Math.min(root.audioPopupX - width / 2, root.width - width - 8))
                 y: root.onTop ? bar.y + bar.height + 8 : bar.y - height - 8
@@ -690,17 +719,15 @@ Item {
                         delegate: Button {
                             id: powerItem
                             required property var modelData
+                            required property int index
                             objectName: "powerItem:" + modelData.action
                             width: parent.width; height: 44
                             text: modelData.title
+                            focusPolicy: Qt.NoFocus
                             palette.buttonText: shell.textColor
-                            // Closing the menu first hands the keyboard back before it runs.
-                            onClicked: {
-                                var action = modelData.action
-                                root.audioPopup = ""
-                                shell.power.request(action, outputName)
-                            }
-                            background: Rectangle { color: powerItem.hovered ? Qt.lighter(shell.panelColor, 1.5) : "transparent"; radius: 6 }
+                            onClicked: powerMenu.run(index)
+                            onHoveredChanged: if (hovered) powerMenu.current = index
+                            background: Rectangle { color: powerItem.hovered || powerMenu.current === powerItem.index ? Qt.lighter(shell.panelColor, 1.5) : "transparent"; radius: 6 }
                         }
                     }
                 }

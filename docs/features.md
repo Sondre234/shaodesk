@@ -855,8 +855,9 @@ that sends `subscribe` keeps its connection and receives `tiling on|off` and
 COUNT lines `switcher-window APP_ID TITLE OUTPUT WORKSPACE MINIMIZED URGENT` (tab-separated) when it
 opens or a listed window closes, `switcher-select N` as the selection moves (both counting
 from 0), and `switcher-close`. The state ends with `power ACTIONS`, the power actions that may
-run (`lock,suspend,reboot,poweroff,logout`, in the order menus list them, or `-`), and a power
-action that fails or is cancelled after it was accepted sends `power-error MESSAGE`. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
+run (`lock,suspend,reboot,poweroff,logout`, in the order menus list them, or `-`), a power
+action that fails or is cancelled after it was accepted sends `power-error MESSAGE`, and
+`power_menu` sends `power-menu OUTPUT`. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
 refused while the session is locked.
 
 ## Screen locking and idle
@@ -882,7 +883,8 @@ compositor, which also reports across the panel an action that fails or is cance
 Restart, Power off and Log out ask first: a dialog in the middle of the monitor counts down
 `power.countdown` seconds (10; 0 waits for a click) and then goes ahead, as do its button and
 Enter, while Escape, Cancel or a click beside it gives up. The actions themselves, bound to keys
-or sent with `shaodesk msg`, do not ask.
+or sent with `shaodesk msg`, do not ask. The `power_menu` action opens the menu on the monitor
+under the pointer with the keyboard in it: Up and Down choose, Enter runs, Escape closes.
 
 The `suspend`, `hibernate`, `poweroff` and `reboot` actions ask logind (systemd-logind or
 elogind, on the system bus) to suspend, hibernate, power off or restart the machine, letting it

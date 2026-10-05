@@ -1411,6 +1411,7 @@ constexpr std::pair<std::string_view, sh_action> action_table[] = {
         {"hibernate", SH_HIBERNATE},
         {"logout", SH_LOGOUT},
         {"lock", SH_LOCK},
+        {"power_menu", SH_POWER_MENU},
         {"scroll_left", SH_SCROLL_LEFT},
         {"scroll_right", SH_SCROLL_RIGHT},
         {"column_widen", SH_COLUMN_WIDEN},

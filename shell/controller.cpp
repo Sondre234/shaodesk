@@ -495,6 +495,9 @@ void ShellController::subscribe() {
                 // power ACTIONS: those that may run, as "lock,suspend,logout", or "-".
                 power_.setAvailable(line.sliced(6));
                 continue;
+            } else if (line.startsWith("power-menu ")) {
+                Q_EMIT powerMenuRequested(line.sliced(11));
+                continue;
             } else if (line.startsWith("power-error ")) {
                 report(line.sliced(12));
                 continue;

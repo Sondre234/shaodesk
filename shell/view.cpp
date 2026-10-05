@@ -47,6 +47,10 @@ ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop,
         std::cerr << "shaodesk launcher " << (open ? "opened" : "closed") << " on "
                   << output.toStdString() << '\n';
     });
+    connect(&controller, &ShellController::powerMenuRequested, this, [this](const QString &output) {
+        if (!desktop_ && rootObject() && outputScreen_->name() == output)
+            QMetaObject::invokeMethod(rootObject(), "togglePowerMenu");
+    });
     connect(screen, &QScreen::geometryChanged, this, [this] { resizeForContent(); });
     connect(this, &QWindow::activeChanged, this, [this] {
         if (!isActive() && expanded_ && rootObject())

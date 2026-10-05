@@ -461,8 +461,8 @@ void send_event(struct sh_server *server, const char *text, size_t length) {
     }
 }
 
-/* Asks the shell to open something (`what`: "launcher" or "palette") on the output under the
- * pointer. */
+/* Asks the shell to open something (`what`: "launcher", "palette", "notifications" or
+ * "power-menu") on the output under the pointer. */
 void request_shell(struct sh_server *server, const char *what) {
     struct wlr_output *output =
         wlr_output_layout_output_at(server->output_layout, server->cursor->x, server->cursor->y);

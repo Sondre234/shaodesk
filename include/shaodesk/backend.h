@@ -159,6 +159,8 @@ enum sh_action {
     SH_HIBERNATE,
     SH_LOGOUT,
     SH_LOCK, /* starts power.lock_command */
+    /* Asks the shell for its power menu on the output under the pointer. */
+    SH_POWER_MENU,
 };
 
 enum sh_screenshot_mode {

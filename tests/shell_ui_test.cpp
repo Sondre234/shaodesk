@@ -1389,6 +1389,31 @@ int main(int argc, char **argv) {
                 return 1;
             }
         }
+        // The power_menu action opens the menu with the keyboard in it: the arrows choose, Enter
+        // runs, and asking again closes it.
+        requests.clear();
+        subscriber->write(("power-menu " + output + "\n").toUtf8());
+        if (!QTest::qWaitFor([&] { return menu->isVisible() && menu->hasActiveFocus(); })) {
+            std::cerr << "power_menu did not open the power menu with the keyboard\n";
+            return 1;
+        }
+        subscriber->write(("power-menu " + output + "\n").toUtf8());
+        if (!QTest::qWaitFor([&] { return !menu->isVisible(); })) {
+            std::cerr << "power_menu again did not close the power menu\n";
+            return 1;
+        }
+        subscriber->write(("power-menu " + output + "\n").toUtf8());
+        if (!QTest::qWaitFor([&] { return menu->isVisible() && menu->hasActiveFocus(); }))
+            return 1;
+        QTest::keyClick(&view, Qt::Key_Down);
+        QTest::keyClick(&view, Qt::Key_Down);
+        QTest::keyClick(&view, Qt::Key_Up);
+        QTest::keyClick(&view, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return requests == QStringList{"suspend"} && !menu->isVisible(); })) {
+            std::cerr << "the keyboard did not run the chosen power action: "
+                      << requests.join("|").toStdString() << '\n';
+            return 1;
+        }
         // What the compositor refuses, at once or later, shows across the panel.
         powerRefusal = "no screen locker: power.lock_command is not set";
         if (!openMenu())
