@@ -11,8 +11,9 @@ taskbar, launcher and notifications, and a Lua configuration that reloads when y
 [![Lua](https://img.shields.io/badge/config-Lua%205.4-navy)](docs/config-reference.md)
 [![status](https://img.shields.io/badge/status-early%20development-orange)](docs/verification.md)
 
-[Highlights](#highlights) · [Building](#building) · [Running](#running) ·
-[Configuration](#configuration) · [Features](docs/features.md) · [Contributing](CONTRIBUTING.md)
+[Highlights](#highlights) · [Building](#building) · [Installing](#installing) ·
+[Running](#running) · [Configuration](#configuration) · [Features](docs/features.md) ·
+[Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -68,8 +69,7 @@ ctest --test-dir build --output-on-failure
 ```
 
 Without `CMAKE_BUILD_TYPE` the build is `RelWithDebInfo`; pass `-DCMAKE_BUILD_TYPE=Debug` for a
-debug build. Installing honours the usual prefix and `DESTDIR`. Gentoo setup is described in
-[docs/gentoo.md](docs/gentoo.md).
+debug build.
 
 | Option | Default | Effect |
 | --- | --- | --- |
@@ -80,6 +80,36 @@ debug build. Installing honours the usual prefix and `DESTDIR`. Gentoo setup is 
 | `SHAODESK_PULSEAUDIO` | `ON` | Build the panel's volume control (needs libpulse, which PipeWire also serves) |
 | `SHAODESK_INSTALL_SESSION` | `OFF` | Install the display-manager session entry |
 | `SHAODESK_XWM_WAKER` | `ON` | Work around lost X11 windows; turn off with wlroots patched by `packaging/patches/wlroots-xwm-drain.patch` |
+
+## Installing
+
+```sh
+cmake -S . -B build -G Ninja -DCMAKE_INSTALL_PREFIX=/usr -DSHAODESK_INSTALL_SESSION=ON
+cmake --build build
+sudo cmake --install build
+```
+
+This installs `shaodesk` and `shaodesk-shell`, the default configuration
+(`share/shaodesk/init.lua`), `shaodesk-portals.conf` for xdg-desktop-portal, the documentation,
+and with `SHAODESK_INSTALL_SESSION` the session entry display managers list. Choose the prefix
+when configuring, as above: shaodesk looks for its default configuration under it, so
+`cmake --install --prefix` with another one leaves that unfound. `DESTDIR` stages an install
+for packaging. On Gentoo, `packaging/gentoo` has ebuilds; see [docs/gentoo.md](docs/gentoo.md).
+
+shaodesk runs without any of these, and uses them when they are installed:
+
+- a terminal: Super + Q runs `kitty` ([how to change it](#first-run))
+- `grim` and `slurp` for screenshots, and `wl-clipboard` to copy them
+- `xdg-desktop-portal-wlr`, `xdg-desktop-portal-gtk` and PipeWire for screen sharing and file
+  choosers ([Portals](docs/features.md#portals))
+- `Xwayland` for X11 applications
+- a locker such as swaylock or gtklock, and swayidle, for
+  [locking and idle timeouts](docs/features.md#screen-locking-and-idle)
+- an icon theme (Adwaita, Breeze, Papirus, ...) for application icons, and `dconf` for the
+  window buttons of GTK applications
+
+The shell is the notification daemon; `notifications = { enabled = false }` leaves that to mako,
+dunst or another one.
 
 ## Running
 
