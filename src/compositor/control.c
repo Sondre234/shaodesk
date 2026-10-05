@@ -4,6 +4,8 @@
  * and events for the shell. */
 #include "server.h"
 
+#include <ctype.h>
+
 /* Control socket: one newline-terminated request per connection, answered with
  * "ok\n" plus any output, or "error: ...\n". Lives in the private runtime dir. */
 struct sh_control_client {
@@ -509,6 +511,24 @@ void request_shell(struct sh_server *server, const char *what) {
 
 void send_shell_line(struct sh_server *server, const char *line) {
     send_event(server, line, strlen(line));
+}
+
+/* Tells the user what went wrong with something they no longer wait on: in the log, and across
+ * the panel, which hears "EVENT TEXT" (such as "power-error Suspend failed: ..."). */
+void report_failure(struct sh_server *server, const char *event, const char *text) {
+    char line[384];
+    int start = snprintf(line, sizeof(line), "%s ", event);
+    if (start < 0 || (size_t)start + 2 > sizeof(line))
+        return;
+    snprintf(line + start, sizeof(line) - (size_t)start - 1, "%s", text); // room for "\n"
+    drop_partial_utf8(line);
+    line[start] = (char)toupper((unsigned char)line[start]);
+    for (char *c = line + start; *c; ++c)
+        if (*c == '\n' || *c == '\r' || *c == '\t')
+            *c = ' ';
+    wlr_log(WLR_ERROR, "%s", line + start);
+    strcat(line, "\n");
+    send_shell_line(server, line);
 }
 
 void request_launcher(struct sh_server *server) {

@@ -644,6 +644,7 @@ void notify_subscribers(struct sh_server *server);
 void send_event(struct sh_server *server, const char *text, size_t length);
 void request_shell(struct sh_server *server, const char *what);
 void send_shell_line(struct sh_server *server, const char *line);
+void report_failure(struct sh_server *server, const char *event, const char *text);
 void request_launcher(struct sh_server *server);
 void request_palette(struct sh_server *server);
 void open_control_socket(struct sh_server *server, const char *wayland_socket);
