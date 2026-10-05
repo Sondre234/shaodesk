@@ -35,7 +35,7 @@ month calendar (previous and next month buttons; the title returns to today). Ea
 switched off from Lua: `shell = { widgets = { battery = false, calendar = false } }`, with
 `workspaces`, `battery`, `network`, `volume`, `clock`, `calendar` (the clock stays, the
 calendar goes), `tiling`, `profiles` (the appearance profile picker), `keyboard_layout`,
-`power` (the [power menu](#power)) and `tray` (the [system tray](#system-tray)) all on by
+`power` (the [power button](#power) in the application menu) and `tray` (the [system tray](#system-tray)) all on by
 default. All of them take the panel's `accent`,
 `panel_color`, `text_color`, `font` and `font_size`. In a nested
 session, applications that reuse an existing process or D-Bus service can open
@@ -966,15 +966,17 @@ This needs sd-bus from libsystemd, libelogind, or basu at build time.
 
 ## Power
 
-The panel's power button opens a menu of what may run now: Lock screen (with a locker
-installed), Suspend, Hibernate, Restart, Power off (as logind allows them) and Log out; the
-button is left out when nothing may. Its entries, and what is refused, come from the
+The power button in the bottom-right corner of the application menu, as in the Windows start
+menu, opens a menu above it of what may run now: Lock screen (with a locker installed),
+Suspend, Hibernate, Restart, Power off (as logind allows them) and Log out; the button is left
+out when nothing may. A click elsewhere in the application menu closes only the power menu. Its entries, and what is refused, come from the
 compositor, which also reports across the panel an action that fails or is cancelled later.
 Restart, Power off and Log out ask first: a dialog in the middle of the monitor counts down
 `power.countdown` seconds (10; 0 waits for a click) and then goes ahead, as do its button and
 Enter, while Escape, Cancel or a click beside it gives up. The actions themselves, bound to keys
-or sent with `shaodesk msg`, do not ask. The `power_menu` action opens the menu on the monitor
-under the pointer with the keyboard in it: Up and Down choose, Enter runs, Escape closes.
+or sent with `shaodesk msg`, do not ask. The `power_menu` action opens the application menu
+with the power menu up on the monitor under the pointer, with the keyboard in it: Up and Down
+choose, Enter runs, Escape closes.
 
 The `suspend`, `hibernate`, `poweroff` and `reboot` actions ask logind (systemd-logind or
 elogind, on the system bus) to suspend, hibernate, power off or restart the machine, letting it
