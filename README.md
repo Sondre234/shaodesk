@@ -56,6 +56,9 @@ Requirements:
 - For the shell: Qt 6.5+ (Core, Gui, Network, Qml, Quick, Quick Controls Basic, Quick Layouts,
   the Wayland platform plugin, and DBus for notifications), LayerShellQt 6.6+, GLib/GIO,
   wayland-client
+- libinput and xcb (with xcb-xfixes) when wlroots is built with its libinput backend or with
+  XWayland; optionally sd-bus (libsystemd, libelogind or basu) for the
+  [sleep inhibitor](docs/features.md#screen-locking-and-idle) and libpulse for the volume control
 - Python 3 for the tests
 
 ```sh
