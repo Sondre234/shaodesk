@@ -74,6 +74,7 @@ debug build. Installing honours the usual prefix and `DESTDIR`. Gentoo setup is 
 | `SHAODESK_BUILD_SHELL` | `ON` | Build the Qt Quick shell |
 | `SHAODESK_SHELL_PREVIEW_ONLY` | `OFF` | Build only a shell UI preview, without LayerShellQt (see [Development](#development)) |
 | `SHAODESK_NOTIFICATIONS` | `ON` | Build the shell's notification daemon (needs Qt DBus) |
+| `SHAODESK_PULSEAUDIO` | `ON` | Build the panel's volume control (needs libpulse, which PipeWire also serves) |
 | `SHAODESK_INSTALL_SESSION` | `OFF` | Install the display-manager session entry |
 | `SHAODESK_XWM_WAKER` | `ON` | Work around lost X11 windows; turn off with wlroots patched by `packaging/patches/wlroots-xwm-drain.patch` |
 
