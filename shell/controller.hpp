@@ -9,6 +9,7 @@
 #include "shaodesk/config.hpp"
 #include "system_status.hpp"
 #include "task_model.hpp"
+#include "tray.hpp"
 #include <QColor>
 #include <QLocalSocket>
 #include <QMap>
@@ -72,6 +73,8 @@ class ShellController : public QObject {
     // The notification daemon (cards, history, do-not-disturb) and the on-screen display.
     Q_PROPERTY(NotificationCenter *notifications READ notifications CONSTANT)
     Q_PROPERTY(Osd *osd READ osd CONSTANT)
+    // The system tray's items, empty until startTray().
+    Q_PROPERTY(TrayModel *tray READ tray CONSTANT)
     // The output the compositor says has the focus, and the one showing the notification cards
     // now: chosen when the first card appears and kept until the last is gone.
     Q_PROPERTY(QString focusedOutput READ focusedOutput NOTIFY focusedOutputChanged)
@@ -173,6 +176,10 @@ class ShellController : public QObject {
     // Starts answering on the session bus when notifications are enabled and QtDBus is built
     // in; later configuration reloads follow the setting. Returns whether it is serving.
     bool startNotifications();
+    TrayModel *tray() { return &tray_; }
+    // Starts the tray's host on the session bus when QtDBus is built in. Returns whether it is
+    // running.
+    bool startTray();
     bool tiling() const { return tiling_; }
     bool tilingAvailable() const { return subscribed_; }
     int workspaceCount() const { return config_.settings.workspaces; }
@@ -267,6 +274,10 @@ class ShellController : public QObject {
     QString focusedOutput_, cardsOutput_;
     QVariantMap keyboardLayout_;
     QObject *notificationService_ = nullptr;
+    TrayModel tray_;
+    QObject *trayHost_ = nullptr;
+    bool serveTray_ = false;
+    void updateTrayHost();
     bool serveNotifications_ = false, noBusReported_ = false;
     int lastVolume_ = -1;
     bool lastMuted_ = false;

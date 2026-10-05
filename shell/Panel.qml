@@ -114,6 +114,28 @@ Item {
         audioPopupX = width - 126
         audioPopup = "power"
     }
+    // Where a tray item's icon is on the screen, which some applications place a window by: the
+    // panel spans its output's width, at its top or bottom edge.
+    function trayPoint(item) {
+        var p = item.mapToItem(root, item.width / 2, item.height / 2)
+        return Qt.point(Math.round(Screen.virtualX + p.x),
+                        Math.round(Screen.virtualY + (onTop ? p.y : Screen.height - height + p.y)))
+    }
+    function trayActivate(button) {
+        closeMenus()
+        var p = trayPoint(button)
+        shell.tray.activate(button.key, p.x, p.y)
+    }
+    function traySecondary(button) {
+        closeMenus()
+        var p = trayPoint(button)
+        shell.tray.secondaryActivate(button.key, p.x, p.y)
+    }
+    function trayMenu(button) {
+        closeMenus()
+        var p = trayPoint(button)
+        shell.tray.contextMenu(button.key, p.x, p.y)
+    }
     function pinAction(appId) {
         // Reading shell.pinned re-evaluates the menu when pins change. Pinning waits until
         // the click is handled: the change rebuilds the menu, destroying the clicked item.
@@ -251,6 +273,76 @@ Item {
             }
             onClicked: (mouse) => {
                 if (mouse.button === Qt.MiddleButton) { task.panel.closeMenus(); shell.tasks.close(task.taskId) }
+            }
+        }
+    }
+
+    // An application's status icon in the tray (a StatusNotifierItem), its attention icon while
+    // it needs attention. Left-click activates the application, middle-click is its secondary
+    // action, right-click asks it for its menu, and the wheel scrolls it.
+    component TrayButton: Button {
+        id: trayButton
+        required property string key
+        required property string title
+        required property string status
+        required property string image
+        required property string toolTip
+        required property bool itemIsMenu
+        required property bool hasMenu
+        // Inline components do not see this file's ids, so each use passes the panel in.
+        required property Item panel
+        objectName: "trayItem"
+        visible: status !== "Passive"
+        width: 32; height: shell.panelHeight - 10
+        hoverEnabled: true
+        Accessible.name: title
+        onClicked: panel.trayActivate(trayButton)
+        ToolTip {
+            id: trayTip
+            visible: trayButton.hovered && !trayButton.panel.menuOpen && !trayButton.pressed && text.length > 0
+            delay: 500
+            text: trayButton.toolTip
+            width: Math.min(implicitWidth, 420)
+            // An application's text, shown as it is rather than read as markup.
+            contentItem: Text { text: trayTip.text; textFormat: Text.PlainText; font: trayTip.font; wrapMode: Text.Wrap; color: trayTip.palette.toolTipText }
+            y: trayButton.panel.onTop ? trayButton.height + 6 : -implicitHeight - 6
+            Component.onCompleted: if ("popupType" in trayTip) trayTip.popupType = Popup.Window
+        }
+        background: Rectangle {
+            radius: 7
+            color: trayButton.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent"
+        }
+        contentItem: Item {
+            Image {
+                objectName: "trayIcon"
+                readonly property int size: Math.max(12, Math.min(20, shell.panelHeight - 30))
+                anchors.centerIn: parent
+                width: size; height: size
+                source: trayButton.image; sourceSize: Qt.size(size, size)
+            }
+        }
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.RightButton | Qt.MiddleButton
+            onPressed: (mouse) => {
+                if (mouse.button === Qt.RightButton)
+                    trayButton.panel.trayMenu(trayButton)
+            }
+            onClicked: (mouse) => {
+                if (mouse.button === Qt.MiddleButton)
+                    trayButton.panel.traySecondary(trayButton)
+            }
+        }
+        // A notch at a time, in Qt's units (120 a notch), as KDE's tray sends it.
+        WheelHandler {
+            property real travel: 0
+            onWheel: (event) => {
+                var horizontal = event.angleDelta.y === 0
+                travel += horizontal ? event.angleDelta.x : event.angleDelta.y
+                var steps = travel > 0 ? Math.floor(travel / 120) : Math.ceil(travel / 120)
+                travel -= steps * 120
+                if (steps !== 0)
+                    shell.tray.scroll(trayButton.key, steps * 120, horizontal)
             }
         }
     }
@@ -1594,6 +1686,18 @@ Item {
                         name: root.tiling ? "layout-panel-left" : "copy"
                         color: root.tiling ? shell.accent : shell.textColor
                     }
+                }
+            }
+            // The system tray: the status icons of applications, in the order they appeared.
+            // Passive ones stay hidden, and so does the tray when none is left.
+            Row {
+                id: tray
+                objectName: "tray"
+                visible: shell.tray.shown > 0
+                Layout.alignment: Qt.AlignVCenter
+                Repeater {
+                    model: shell.tray
+                    delegate: TrayButton { panel: root }
                 }
             }
             NotificationBell { panel: root; barHeight: bar.height }

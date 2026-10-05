@@ -32,7 +32,8 @@ if(NOT SHAODESK_SHELL_PREVIEW_ONLY)
 endif()
 
 set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_images.cpp
-    notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp)
+    notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp tray.cpp tray.hpp
+    tray_images.cpp tray_images.hpp)
 # The QML is compiled ahead of time into the binary (qmlcachegen), so starting the shell parses
 # and compiles none of it. It lives at qrc:/shell/ShaodeskShell/*.qml.
 qt_add_library(shaodesk_shell_qml STATIC)
@@ -57,6 +58,11 @@ if(SHAODESK_DBUS)
     target_sources(shaodesk-shell PRIVATE notification_service.cpp notification_service.hpp)
     target_link_libraries(shaodesk-shell PRIVATE Qt6::DBus)
     target_compile_definitions(shaodesk-shell PRIVATE SHAODESK_DBUS=1)
+endif()
+if(SHAODESK_TRAY_DBUS)
+    target_sources(shaodesk-shell PRIVATE tray_host.cpp tray_host.hpp tray_watcher.cpp tray_watcher.hpp)
+    target_link_libraries(shaodesk-shell PRIVATE Qt6::DBus)
+    target_compile_definitions(shaodesk-shell PRIVATE SHAODESK_TRAY=1)
 endif()
 if(SHAODESK_PULSEAUDIO AND PULSE_FOUND)
     target_sources(shaodesk-shell PRIVATE pulse_audio.cpp)

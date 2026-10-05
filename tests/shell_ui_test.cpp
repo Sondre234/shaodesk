@@ -1644,9 +1644,122 @@ int main(int argc, char **argv) {
         }
         daemon->setDnd(false);
     }
+    // The system tray: hidden while empty, a button for each item shown in the order they came,
+    // and clicks and the wheel passed on to the item's application. The items are put in the
+    // model by hand, as the D-Bus host puts them.
+    {
+        auto *trayModel = controller.tray();
+        auto *trayRow = find(view.rootObject(), "tray");
+        if (!trayRow || trayRow->isVisible()) {
+            std::cerr << "the tray shows without items\n";
+            return 1;
+        }
+        auto solid = [](const QColor &color) {
+            QImage image(22, 22, QImage::Format_ARGB32);
+            image.fill(color);
+            return image;
+        };
+        auto trayItem = [&](const QString &key, const QString &status, const QColor &color) {
+            TrayItem item;
+            item.key = key;
+            item.id = key;
+            item.title = "Title of " + key;
+            item.status = status;
+            item.icon = {solid(color)};
+            return item;
+        };
+        TrayItem first = trayItem("first", "Active", Qt::green);
+        first.toolTipTitle = "First";
+        first.toolTipText = "<b>not markup</b>";
+        trayModel->add(first);
+        trayModel->add(trayItem("asleep", "Passive", Qt::red));
+        trayModel->add(trayItem("third", "NeedsAttention", Qt::blue));
+        auto trayButtons = [&] {
+            QList<QQuickItem *> shown;
+            for (auto *child : trayRow->childItems())
+                if (child->objectName() == "trayItem" && child->isVisible())
+                    shown << child;
+            std::sort(shown.begin(), shown.end(), [](QQuickItem *a, QQuickItem *b) { return a->x() < b->x(); });
+            return shown;
+        };
+        if (!QTest::qWaitFor([&] { return trayRow->isVisible() && trayButtons().size() == 2; }) ||
+            trayButtons()[0]->property("key").toString() != "first" ||
+            trayButtons()[1]->property("key").toString() != "third" ||
+            trayButtons()[0]->property("toolTip").toString() != "First\n<b>not markup</b>") {
+            std::cerr << "the tray does not show its items in order, leaving out the passive one\n";
+            return 1;
+        }
+        // The icon comes from the model's pixels.
+        auto iconColor = [&](QQuickItem *button) {
+            const QImage frame = view.grabWindow();
+            return frame.pixelColor(center(button));
+        };
+        if (!QTest::qWaitFor([&] { return iconColor(trayButtons()[0]) == QColor(Qt::green); }) ||
+            iconColor(trayButtons()[1]) != QColor(Qt::blue)) {
+            std::cerr << "the tray does not draw its items' icons\n";
+            return 1;
+        }
+        QSignalSpy activated(trayModel, &TrayModel::activateRequested);
+        QSignalSpy secondary(trayModel, &TrayModel::secondaryActivateRequested);
+        QSignalSpy context(trayModel, &TrayModel::contextMenuRequested);
+        QSignalSpy scrolled(trayModel, &TrayModel::scrollRequested);
+        QQuickItem *button = trayButtons()[0];
+        // The point is on the screen: this panel is at the bottom of a 720 pixel high output.
+        const QPoint at = center(button);
+        const QVariantList point{"first", at.x(), 720 - view.height() + at.y()};
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, at);
+        if (!QTest::qWaitFor([&] { return activated.size() == 1; }) || activated[0] != point) {
+            std::cerr << "a left click on a tray item did not activate it\n";
+            return 1;
+        }
+        QTest::mouseClick(&view, Qt::MiddleButton, Qt::NoModifier, at);
+        if (!QTest::qWaitFor([&] { return secondary.size() == 1; }) || secondary[0] != point) {
+            std::cerr << "a middle click on a tray item did not reach its secondary action\n";
+            return 1;
+        }
+        QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, at);
+        if (!QTest::qWaitFor([&] { return context.size() == 1; }) || context[0] != point) {
+            std::cerr << "a right click on a tray item without a menu did not ask for its own\n";
+            return 1;
+        }
+        // The wheel goes to the item a notch at a time, not to the workspaces.
+        switches.clear();
+        scrollAt(at, -120);
+        scrollAt(at, 60);
+        scrollAt(at, 60);
+        QWheelEvent sideways(at, view.mapToGlobal(at), QPoint(), QPoint(120, 0), Qt::NoButton, Qt::NoModifier,
+                             Qt::NoScrollPhase, false);
+        QCoreApplication::sendEvent(&view, &sideways);
+        if (!QTest::qWaitFor([&] { return scrolled.size() == 3; }) ||
+            scrolled[0] != QVariantList{"first", -120, "vertical"} ||
+            scrolled[1] != QVariantList{"first", 120, "vertical"} ||
+            scrolled[2] != QVariantList{"first", 120, "horizontal"} || !switches.isEmpty()) {
+            std::cerr << "the wheel over a tray item did not scroll it\n";
+            return 1;
+        }
+        // A changed picture is drawn again; an item going passive leaves.
+        trayModel->find("first")->icon = {solid(Qt::yellow)};
+        trayModel->changed("first", true);
+        if (!QTest::qWaitFor([&] { return iconColor(trayButtons()[0]) == QColor(Qt::yellow); })) {
+            std::cerr << "the tray did not draw an item's new icon\n";
+            return 1;
+        }
+        trayModel->find("first")->status = "Passive";
+        trayModel->changed("first", true);
+        if (!QTest::qWaitFor([&] { return trayButtons().size() == 1; }) ||
+            trayButtons()[0]->property("key").toString() != "third") {
+            std::cerr << "a passive tray item stayed\n";
+            return 1;
+        }
+        trayModel->clear();
+        if (!QTest::qWaitFor([&] { return !trayRow->isVisible(); })) {
+            std::cerr << "the tray stayed with no items\n";
+            return 1;
+        }
+    }
     std::cout << "Hover/click, launcher keyboard focus, search, command launch, tiling toggle, and "
                  "workspace indicator, task and bar context menus, pinning into a window's slot, "
                  "reordering pins, "
                  "task reordering, grouped windows, the volume control, the command palette, and the "
-                 "notification bell, cards and history passed\n";
+                 "notification bell, cards and history, and the tray passed\n";
 }

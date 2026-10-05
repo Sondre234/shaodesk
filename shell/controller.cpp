@@ -2,6 +2,7 @@
 #include "controller.hpp"
 #include "icons.hpp"
 #include "notification_images.hpp"
+#include "tray_images.hpp"
 #include "wallpapers.hpp"
 #include <QQmlContext>
 #include <QQmlEngine>
@@ -22,6 +23,9 @@
 #include <memory>
 #if SHAODESK_DBUS
 #include "notification_service.hpp"
+#endif
+#if SHAODESK_TRAY
+#include "tray_host.hpp"
 #endif
 
 ShellController::ShellController(std::filesystem::path path, QObject *parent)
@@ -57,6 +61,7 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
 }
 ShellController::~ShellController() {
     delete engine_; // Before the objects its context refers to go away.
+    delete trayHost_; // Before the model it fills.
     clearApps();
 }
 QQmlEngine *ShellController::engine() {
@@ -64,6 +69,7 @@ QQmlEngine *ShellController::engine() {
         engine_ = new QQmlEngine(this);
         engine_->addImageProvider("icons", new Icons);
         engine_->addImageProvider("notify", new NotificationImages(notifications_));
+        engine_->addImageProvider("tray", new TrayImages(tray_));
         engine_->addImageProvider("thumbs", new Thumbnails);
         engine_->rootContext()->setContextProperty("shell", this);
     }
@@ -737,6 +743,37 @@ void ShellController::updateNotificationService() {
         delete notificationService_;
         notificationService_ = nullptr;
         notifications_.setServing(false);
+    }
+#endif
+}
+bool ShellController::startTray() {
+    serveTray_ = true;
+    updateTrayHost();
+    return trayHost_ != nullptr;
+}
+void ShellController::updateTrayHost() {
+    if (!serveTray_)
+        return;
+#if SHAODESK_TRAY
+    if (!trayHost_) {
+        // As for notifications: without an address libdbus would start a bus nobody knows of.
+        if (qEnvironmentVariableIsEmpty("DBUS_SESSION_BUS_ADDRESS") &&
+            !QFileInfo::exists(qEnvironmentVariable("XDG_RUNTIME_DIR") + "/bus")) {
+            std::cerr << "shaodesk tray: no session bus (DBUS_SESSION_BUS_ADDRESS is unset)\n";
+            serveTray_ = false;
+            return;
+        }
+        auto *host = new TrayHost(tray_, this);
+        if (host->start()) {
+            trayHost_ = host;
+            std::cerr << "shaodesk tray: "
+                      << (host->ownsWatcher() ? "serving org.kde.StatusNotifierWatcher"
+                                              : "showing the items of another StatusNotifierWatcher")
+                      << '\n';
+        } else {
+            std::cerr << "shaodesk tray: " << host->error().toStdString() << '\n';
+            delete host;
+        }
     }
 #endif
 }
