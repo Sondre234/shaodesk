@@ -215,6 +215,8 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
             assert power()["lock"] == "no", power()
             assert "no screen locker: power.lock_command is not set" in msg("lock", ok=False)
             wait_for(lambda: inhibitors() == 0, "the delay inhibitor released")
+            wait_for(lambda: subscriber.last("power ") == "power suspend,reboot,poweroff,logout",
+                     "subscribers told there is nothing to lock with")
             reconfigure(locker='{ "shaodesk-no-such-locker", "-f" }')
             assert "no screen locker: shaodesk-no-such-locker is not installed" in msg(
                 "lock", ok=False)

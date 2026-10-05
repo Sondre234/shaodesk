@@ -535,6 +535,7 @@ const char *power_pending(struct sh_server *server, char *text, size_t size) {
 void power_reload(struct sh_server *server) {
     power_ask(server);
     hold_sleep(server);
+    notify_subscribers(server); // a locker may have come or gone
 }
 
 void power_init(struct sh_server *server) {
