@@ -2,7 +2,6 @@
 """packaging/shaodesk-session with a stand-in shaodesk (and dbus-run-session) on PATH: it passes
 its arguments on after --session, logs to $XDG_STATE_HOME/shaodesk/session.log keeping the last
 log as session.log.old, and starts a session bus only where there is none."""
-import os
 from pathlib import Path
 import shutil
 import socket

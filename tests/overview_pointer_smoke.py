@@ -6,7 +6,6 @@ the backdrop closes it. Driven by a virtual pointer (pointer_probe)."""
 import os
 from pathlib import Path
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
