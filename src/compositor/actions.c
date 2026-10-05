@@ -269,6 +269,7 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
     case SH_REBOOT:
     case SH_SUSPEND:
     case SH_HIBERNATE:
+    case SH_LOGOUT:
         power_run(server, action);
         break;
     case SH_TOGGLE_STICKY:

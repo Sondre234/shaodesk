@@ -1,22 +1,23 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Power: suspend, hibernate, reboot and power off through logind, and what it allows of them,
- * over a connection that never blocks the compositor (src/login1.c). */
+ * over a connection that never blocks the compositor (src/login1.c); and logging out. */
 #include "server.h"
 
 #include <ctype.h>
 #include <stdarg.h>
 
-/* Each power action: its name in the action table and in messages, and the logind method that
- * carries it out. */
+/* Each power action, in the order menus list them: its name in the action table and in
+ * messages, and the logind method that carries it out (SH_LOGIN1_METHODS for none). */
 static const struct {
     enum sh_action action;
     const char *name, *label;
     enum sh_login1_method method;
 } actions[] = {
-    {SH_POWER_OFF, "poweroff", "power off", SH_LOGIN1_POWER_OFF},
-    {SH_REBOOT, "reboot", "reboot", SH_LOGIN1_REBOOT},
     {SH_SUSPEND, "suspend", "suspend", SH_LOGIN1_SUSPEND},
     {SH_HIBERNATE, "hibernate", "hibernate", SH_LOGIN1_HIBERNATE},
+    {SH_REBOOT, "reboot", "reboot", SH_LOGIN1_REBOOT},
+    {SH_POWER_OFF, "poweroff", "power off", SH_LOGIN1_POWER_OFF},
+    {SH_LOGOUT, "logout", "log out", SH_LOGIN1_METHODS},
 };
 
 static int action_index(enum sh_action action) {
@@ -174,10 +175,16 @@ static bool power_connect(struct sh_server *server, char *error, size_t error_si
     return true;
 }
 
-/* Hands the action under way to logind. */
+/* Carries out the action under way: hands it to logind, or ends the session. */
 static bool power_call(struct sh_server *server, char *error, size_t error_size) {
     struct sh_power *power = &server->power;
     enum sh_login1_method method = actions[action_index(power->action)].method;
+    if (method == SH_LOGIN1_METHODS) {
+        wlr_log(WLR_INFO, "Logging out");
+        power->step = SH_POWER_IDLE;
+        wl_display_terminate(server->wl_display);
+        return true;
+    }
     if (!sh_login1_call(power->login1, method)) {
         snprintf(error, error_size, "cannot reach logind");
         power->step = SH_POWER_IDLE;
@@ -201,20 +208,23 @@ bool power_start(struct sh_server *server, enum sh_action action, char *error,
         snprintf(error, error_size, "%s is already under way", action_label(power->action));
         return false;
     }
+    enum sh_login1_method method = actions[index].method;
     char reason[256];
-    if (!power_connect(server, reason, sizeof(reason))) {
+    if (method != SH_LOGIN1_METHODS && !power_connect(server, reason, sizeof(reason))) {
         snprintf(error, error_size, "logind is out of reach: %s", reason);
         return false;
     }
-    // A refusal stands on the last answer; asking again keeps the next one current.
-    const char *answer = power->answers[actions[index].method];
-    bool refused = !strcmp(answer, "no") || !strcmp(answer, "na");
-    if (refused)
-        snprintf(error, error_size, "logind does not allow %s here (Can%s: %s)",
-                 actions[index].label, sh_login1_method_name(actions[index].method), answer);
-    power_ask(server);
-    if (refused)
-        return false;
+    if (method != SH_LOGIN1_METHODS) {
+        // A refusal stands on the last answer; asking again keeps the next one current.
+        const char *answer = power->answers[method];
+        bool refused = !strcmp(answer, "no") || !strcmp(answer, "na");
+        if (refused)
+            snprintf(error, error_size, "logind does not allow %s here (Can%s: %s)",
+                     actions[index].label, sh_login1_method_name(method), answer);
+        power_ask(server);
+        if (refused)
+            return false;
+    }
     power->action = action;
     return power_call(server, error, error_size);
 }
@@ -223,6 +233,23 @@ void power_run(struct sh_server *server, enum sh_action action) {
     char error[300];
     if (!power_start(server, action, error, sizeof(error)))
         power_report(server, "%s", error);
+}
+
+/* The `index`th power action, in menu order, and whether it may run: "yes" or "no" for those
+ * of shaodesk's own; for logind's, its answer, "unknown" until it gives one, or "unavailable"
+ * without logind. False past the last. */
+bool power_describe(struct sh_server *server, size_t index, const char **name,
+                    const char **status) {
+    if (index >= sizeof(actions) / sizeof(*actions))
+        return false;
+    struct sh_power *power = &server->power;
+    enum sh_login1_method method = actions[index].method;
+    *name = actions[index].name;
+    *status = method == SH_LOGIN1_METHODS ? "yes"
+              : !power->login1           ? "unavailable"
+              : power->answers[method][0] ? power->answers[method]
+                                          : "unknown";
+    return true;
 }
 
 /* What `get power` says of the action under way: its name and step, or "-". */

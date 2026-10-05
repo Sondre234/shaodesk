@@ -810,6 +810,8 @@ bool power_start(struct sh_server *server, enum sh_action action, char *error,
                  size_t error_size);
 void power_run(struct sh_server *server, enum sh_action action);
 const char *power_action_name(enum sh_action action);
+bool power_describe(struct sh_server *server, size_t index, const char **name,
+                    const char **status);
 const char *power_pending(struct sh_server *server, char *text, size_t size);
 
 /* query.c */

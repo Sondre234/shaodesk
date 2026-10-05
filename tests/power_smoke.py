@@ -89,11 +89,15 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
             server = start(output, {})
             assert power() == {"poweroff": "unavailable", "reboot": "unavailable",
                                "suspend": "unavailable", "hibernate": "unavailable",
-                               "pending": "-"}, power()
+                               "logout": "yes", "pending": "-"}, power()
             assert "SHAODESK_LOGIN1_BUS" in compositor_log.read_text()
             assert "logind is out of reach" in msg("poweroff", ok=False)
             assert "takes no argument" in msg("reboot", "now", ok=False)
-            stop(server)
+            # Logging out needs no logind: the session ends as with quit.
+            msg("logout")
+            assert server.wait(timeout=30) == 0, compositor_log.read_text()
+            processes.remove(server)
+            assert "Logging out" in compositor_log.read_text()
         assert logged() == [], logged()
 
         with compositor_log.open("w") as output:

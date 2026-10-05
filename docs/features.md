@@ -877,7 +877,7 @@ refused with that reason; one it turns down later, such as a password not given,
 across the panel. `shaodesk msg get power` shows what logind allows. This needs sd-bus from
 libsystemd, libelogind, or basu at build time. A headless compositor (`--headless`, as the
 tests run it) never uses the machine's logind: only one on the bus that `SHAODESK_LOGIN1_BUS`
-names.
+names. `logout` ends the session, as `quit` does, and needs no logind.
 
 ## Screenshots and screen sharing
 

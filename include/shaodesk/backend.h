@@ -152,11 +152,12 @@ enum sh_action {
     SH_DND_ON,
     SH_DND_OFF,
     SH_NOTIFICATION_HISTORY,
-    /* Power, through logind (systemd-logind or elogind). */
+    /* Power, through logind (systemd-logind or elogind); logout ends the session as quit does. */
     SH_POWER_OFF,
     SH_REBOOT,
     SH_SUSPEND,
     SH_HIBERNATE,
+    SH_LOGOUT,
 };
 
 enum sh_screenshot_mode {

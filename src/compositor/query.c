@@ -319,19 +319,13 @@ static void get_layers(struct sh_server *server, int fd, const char *arguments) 
 }
 
 static void get_power(struct sh_server *server, int fd, const char *arguments) {
-    // Each power action logind carries out and whether it allows it: its answer ("yes", "no",
-    // "challenge" for after authenticating, "na"), "unknown" until it gives one, or
-    // "unavailable" without logind. Then "pending" and the action under way with its step, or
-    // "-".
-    static const char *const names[SH_LOGIN1_METHODS] = {"poweroff", "reboot", "suspend",
-                                                         "hibernate"};
+    // Each power action and whether it may run (see power_describe), then "pending" and the
+    // action under way with its step, or "-".
     control_reply(fd, "ok\n");
     char line[128], pending[64];
-    for (int i = 0; i < SH_LOGIN1_METHODS; ++i) {
-        const char *answer = !server->power.login1      ? "unavailable"
-                             : server->power.answers[i][0] ? server->power.answers[i]
-                                                         : "unknown";
-        snprintf(line, sizeof(line), "%s\t%s\n", names[i], answer);
+    const char *name, *status;
+    for (size_t i = 0; power_describe(server, i, &name, &status); ++i) {
+        snprintf(line, sizeof(line), "%s\t%s\n", name, status);
         control_reply(fd, line);
     }
     snprintf(line, sizeof(line), "pending\t%s\n", power_pending(server, pending, sizeof(pending)));
