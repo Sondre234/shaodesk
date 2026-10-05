@@ -458,6 +458,9 @@ const Option options[] = {
      "Milliseconds the windows get to close. One still open then (an application asking "
      "whether to save) cancels the power off, unless `force` is set; answering it in time lets "
      "the power off go on."},
+    {"power.countdown", "integer", "10", "10", 0, 300,
+     "Seconds the shell's confirmation of power off, restart and log out counts down before "
+     "it goes ahead (Escape, Cancel or a click beside it gives up); 0 waits for a click."},
     {"power.force", "boolean", "false", "false", none, none,
      "Go ahead with the power off, reboot or log out even when windows are still open after "
      "`close_timeout`; their applications are then ended without saving."},
@@ -523,8 +526,8 @@ const Option options[] = {
      "The wallpaper picker: thumbnails of the images in `shell.wallpapers`; the one picked "
      "replaces `shell.wallpaper` for the profile in use until the configured one changes."},
     {"shell.widgets.power", "boolean", "true", "true", none, none,
-     "The power menu: lock, suspend and hibernate, as far as `power.lock_command` and logind "
-     "allow them."},
+     "The power menu: lock, suspend, hibernate, restart, power off and log out, as far as "
+     "`power.lock_command` and logind allow them."},
     {"shell.launchers", "list of tables", "unset", "", none, none,
      "Pinned commands for programs without a desktop file, at most 64."},
     {"shell.launchers[].name", "string", "", "", none, none, "Label, 1 to 128 bytes. Required."},

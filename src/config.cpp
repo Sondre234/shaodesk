@@ -1194,6 +1194,7 @@ Config read(lua_State *L, size_t own = SIZE_MAX) {
         config.settings.close_timeout =
             integer(L, "close_timeout", config.settings.close_timeout, 500, 60000);
         boolean(L, "force", "power.force", config.settings.close_force);
+        config.power.countdown = integer(L, "countdown", config.power.countdown, 0, 300);
     }
     lua_pop(L, 1);
     current_section.clear();

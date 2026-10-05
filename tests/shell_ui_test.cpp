@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
     // Long Lua strings preserve paths without shell interpolation.
     file.write(
         (QString(
-             "return {layout={workspace_names={'web','','','mail'}},"
+             "return {layout={workspace_names={'web','','','mail'}},power={countdown=2},"
              "profile='dark',profiles={dark={},light={shell={accent='#336699'}}},"
              "shell={wallpaper='walls/a/one.png',wallpapers=[[%3]],"
              "launchers={{name='Test app',command={[[%1]],'-E','touch',[[%2]]}}}}}")
@@ -1261,6 +1261,93 @@ int main(int argc, char **argv) {
                       << '\n';
             return 1;
         }
+        // Restart, power off and log out ask first, on the panel's output: a dialog counts down
+        // and goes ahead when it runs out, on its button or on Enter; Escape, Cancel or a click
+        // beside it gives up.
+        PowerView dialog(controller, app.primaryScreen());
+        if (dialog.status() != QQuickView::Ready) {
+            for (const auto &error : dialog.errors())
+                std::cerr << error.toString().toStdString() << '\n';
+            return 1;
+        }
+        auto *power = controller.power();
+        auto ask = [&](const QString &action) {
+            if (!openMenu() || !item(action))
+                return false;
+            QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, center(item(action)));
+            return QTest::qWaitFor([&] {
+                return dialog.isVisible() && power->pending() == action && !menu->isVisible();
+            });
+        };
+        auto gaveUp = [&] {
+            return QTest::qWaitFor([&] { return !dialog.isVisible() && power->pending().isEmpty(); });
+        };
+        auto dialogItem = [&](const char *name) { return find(dialog.rootObject(), name); };
+        requests.clear();
+        if (!ask("poweroff") || power->countdown() != 2 || power->output() != output ||
+            power->pendingTitle() != "Power off" ||
+            power->message() != "The computer powers off in 2 seconds." || !requests.isEmpty() ||
+            dialogItem("powerMessage")->property("text") != power->message()) {
+            std::cerr << "power off did not ask first: " << power->message().toStdString() << '\n';
+            return 1;
+        }
+        QTest::keyClick(&dialog, Qt::Key_Escape);
+        if (!gaveUp()) {
+            std::cerr << "Escape did not give up the power off\n";
+            return 1;
+        }
+        if (!ask("reboot") || power->message() != "The computer restarts in 2 seconds.")
+            return 1;
+        QTest::mouseClick(&dialog, Qt::LeftButton, Qt::NoModifier, QPoint(10, 10));
+        if (!gaveUp()) {
+            std::cerr << "a click beside the dialog did not give up the restart\n";
+            return 1;
+        }
+        if (!ask("logout"))
+            return 1;
+        QTest::mouseClick(&dialog, Qt::LeftButton, Qt::NoModifier, center(dialogItem("powerCancel")));
+        if (!gaveUp()) {
+            std::cerr << "Cancel did not give up the log out\n";
+            return 1;
+        }
+        if (!ask("reboot"))
+            return 1;
+        QTest::mouseClick(&dialog, Qt::LeftButton, Qt::NoModifier, center(dialogItem("powerConfirm")));
+        if (!QTest::qWaitFor([&] { return requests == QStringList{"reboot"}; }) || !gaveUp()) {
+            std::cerr << "the restart button did not restart: " << requests.join("|").toStdString()
+                      << '\n';
+            return 1;
+        }
+        requests.clear();
+        if (!ask("logout"))
+            return 1;
+        QTest::keyClick(&dialog, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return requests == QStringList{"logout"}; }) || !gaveUp()) {
+            std::cerr << "Enter did not log out\n";
+            return 1;
+        }
+        requests.clear();
+        if (!ask("poweroff"))
+            return 1;
+        if (!QTest::qWaitFor([&] {
+                return power->countdown() == 1 &&
+                       power->message() == "The computer powers off in 1 second.";
+            }) ||
+            !requests.isEmpty() ||
+            !QTest::qWaitFor([&] { return requests == QStringList{"poweroff"}; }) || !gaveUp()) {
+            std::cerr << "the countdown did not run out into a power off: "
+                      << requests.join("|").toStdString() << '\n';
+            return 1;
+        }
+        // An action that may no longer run is not asked about any more.
+        if (!ask("reboot"))
+            return 1;
+        subscriber->write("power lock,suspend,poweroff,logout\n");
+        if (!gaveUp() || !requests.contains("poweroff") || requests.size() != 1) {
+            std::cerr << "a restart that may no longer run was still asked about\n";
+            return 1;
+        }
+        subscriber->write("power lock,suspend,reboot,poweroff,logout\n");
         // What the compositor refuses, at once or later, shows across the panel.
         powerRefusal = "no screen locker: power.lock_command is not set";
         if (!openMenu())

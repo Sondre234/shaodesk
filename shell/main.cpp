@@ -89,6 +89,7 @@ int main(int argc, char **argv) {
         std::vector<std::unique_ptr<ShellView>> views;
         std::vector<std::unique_ptr<SwitcherView>> switchers;
         std::vector<std::unique_ptr<PaletteView>> palettes;
+        std::vector<std::unique_ptr<PowerView>> powerViews;
         std::vector<std::unique_ptr<OverviewView>> overviews;
         std::vector<std::unique_ptr<CardsView>> cardViews;
         std::vector<std::unique_ptr<OsdView>> osdViews;
@@ -139,6 +140,13 @@ int main(int argc, char **argv) {
                     throw std::runtime_error("could not load shell QML");
                 }
                 palettes.push_back(std::move(palette));
+                auto powerView = std::make_unique<PowerView>(controller, screen);
+                if (powerView->status() == QQuickView::Error) {
+                    for (const auto &error : powerView->errors())
+                        std::cerr << error.toString().toStdString() << '\n';
+                    throw std::runtime_error("could not load shell QML");
+                }
+                powerViews.push_back(std::move(powerView));
                 auto overview = std::make_unique<OverviewView>(controller, screen);
                 if (overview->status() == QQuickView::Error) {
                     for (const auto &error : overview->errors())
@@ -198,6 +206,7 @@ int main(int argc, char **argv) {
             std::erase_if(palettes, [screen](const auto &palette) {
                 return palette->outputScreen() == screen;
             });
+            std::erase_if(powerViews, [screen](const auto &view) { return view->outputScreen() == screen; });
             std::erase_if(overviews, [screen](const auto &overview) {
                 return overview->outputScreen() == screen;
             });

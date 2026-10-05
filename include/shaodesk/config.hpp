@@ -109,6 +109,9 @@ struct ScreenshotConfig {
 struct PowerConfig {
     // The screen locker the `lock` action starts; empty for none.
     Command lock_command{"swaylock", "-f"};
+    // Seconds the shell's confirmation of power off, reboot and log out counts down before it
+    // goes ahead; 0 waits for a click.
+    int countdown = 10;
 };
 
 // Where the notification cards and the on-screen display sit on the focused monitor.

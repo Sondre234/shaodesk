@@ -663,6 +663,7 @@ Item {
     }
 
     // The power button: lock, suspend and the rest, as far as the compositor says they may run.
+    // Restart, power off and log out ask first (PowerDialog.qml).
     Loader {
         id: powerLoader
         asynchronous: !(root.audioPopup === "power")
@@ -697,7 +698,7 @@ Item {
                             onClicked: {
                                 var action = modelData.action
                                 root.audioPopup = ""
-                                shell.power.request(action)
+                                shell.power.request(action, outputName)
                             }
                             background: Rectangle { color: powerItem.hovered ? Qt.lighter(shell.panelColor, 1.5) : "transparent"; radius: 6 }
                         }
@@ -1659,7 +1660,7 @@ Item {
                 Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
                 onClicked: root.toggleAudioPopup("power", powerButton)
                 Accessible.name: "Power"
-                BarTip { owner: powerButton; text: "Power" }
+                BarTip { owner: powerButton; text: "Lock, suspend, power off" }
                 background: Rectangle {
                     radius: 7
                     color: root.audioPopup === "power" ? Qt.lighter(shell.panelColor, 1.8) : (powerButton.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")

@@ -281,6 +281,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `power.lock_before_sleep` | boolean | true | - | Lock the screen with `lock_command` before the machine sleeps, whether `suspend`, `hibernate`, the lid or an idle daemon sends it to sleep, and hold the sleep until the lock holds. |
 | `power.close_windows` | boolean | true | - | `poweroff`, `reboot` and `logout` first ask every window to close, as its close button would, and go ahead once all have, so that applications save their state. |
 | `power.close_timeout` | integer | 5000 | 500 to 60000 | Milliseconds the windows get to close. One still open then (an application asking whether to save) cancels the power off, unless `force` is set; answering it in time lets the power off go on. |
+| `power.countdown` | integer | 10 | 0 to 300 | Seconds the shell's confirmation of power off, restart and log out counts down before it goes ahead (Escape, Cancel or a click beside it gives up); 0 waits for a click. |
 | `power.force` | boolean | false | - | Go ahead with the power off, reboot or log out even when windows are still open after `close_timeout`; their applications are then ended without saving. |
 
 ## `startup`
@@ -323,7 +324,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.widgets.tiling` | boolean | true | - | The tiling on/off button. |
 | `shell.widgets.profiles` | boolean | true | - | The appearance profile picker: a button that lists `profiles` to switch between; shown only when there are two or more. |
 | `shell.widgets.wallpapers` | boolean | true | - | The wallpaper picker: thumbnails of the images in `shell.wallpapers`; the one picked replaces `shell.wallpaper` for the profile in use until the configured one changes. |
-| `shell.widgets.power` | boolean | true | - | The power menu: lock, suspend and hibernate, as far as `power.lock_command` and logind allow them. |
+| `shell.widgets.power` | boolean | true | - | The power menu: lock, suspend, hibernate, restart, power off and log out, as far as `power.lock_command` and logind allow them. |
 | `shell.launchers` | list of tables | unset | - | Pinned commands for programs without a desktop file, at most 64. |
 | `shell.launchers[].name` | string | - | - | Label, 1 to 128 bytes. Required. |
 | `shell.launchers[].icon` | string | "application-x-executable" | - | Icon theme name. |

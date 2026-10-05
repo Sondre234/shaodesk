@@ -44,6 +44,7 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
     subscribe();
     notifications_.configure(config_.notifications);
     osd_.configure(config_.osd);
+    power_.setCountdown(config_.power.countdown);
     connect(&power_, &Power::failed, this, &ShellController::report);
     connect(notifications_.cards(), &NotificationModel::countChanged, this,
             &ShellController::updateCards);
@@ -382,6 +383,7 @@ void ShellController::reload() {
         loadConfig();
         notifications_.configure(config_.notifications);
         osd_.configure(config_.osd);
+        power_.setCountdown(config_.power.countdown);
         updateNotificationService();
         refreshApps();
         Q_EMIT configChanged();

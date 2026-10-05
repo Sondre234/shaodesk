@@ -875,9 +875,13 @@ This needs sd-bus from libsystemd, libelogind, or basu at build time.
 ## Power
 
 The panel's power button opens a menu of what may run now: Lock screen (with a locker
-installed), Suspend and Hibernate (as logind allows them); the button is left out when nothing
-may. Its entries, and what is refused, come from the compositor, which also reports across the
-panel an action that fails or is cancelled later.
+installed), Suspend, Hibernate, Restart, Power off (as logind allows them) and Log out; the
+button is left out when nothing may. Its entries, and what is refused, come from the
+compositor, which also reports across the panel an action that fails or is cancelled later.
+Restart, Power off and Log out ask first: a dialog in the middle of the monitor counts down
+`power.countdown` seconds (10; 0 waits for a click) and then goes ahead, as do its button and
+Enter, while Escape, Cancel or a click beside it gives up. The actions themselves, bound to keys
+or sent with `shaodesk msg`, do not ask.
 
 The `suspend`, `hibernate`, `poweroff` and `reboot` actions ask logind (systemd-logind or
 elogind, on the system bus) to suspend, hibernate, power off or restart the machine, letting it
