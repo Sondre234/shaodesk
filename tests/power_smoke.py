@@ -301,6 +301,22 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
             os.kill(pid, signal.SIGUSR1)
             wait_for(locked_and(mark, "external suspend", *SLEPT), "the outside suspend")
             unlock()
+            # A locker that crashed leaves the screen covered and locked; before a sleep another
+            # takes its place. (Locked, the compositor takes a reload only from SIGHUP.)
+            reconfigure(locker=f'{{ [[{lock_probe}]], "abandon" }}')
+            msg("lock")
+            wait_for(lambda: "Lock client vanished" in compositor_log.read_text(),
+                     "the locker gone")
+            config.write_text(CONFIG.format(locker=LOCKER, before="true", close="true",
+                                            force="false"))
+            reloads = compositor_log.read_text().count("Configuration reloaded")
+            server.send_signal(signal.SIGHUP)
+            wait_for(lambda: compositor_log.read_text().count("Configuration reloaded") > reloads,
+                     "the reload")
+            mark = len(logged())
+            login1.send_signal(signal.SIGUSR1)
+            wait_for(locked_and(mark, "external suspend", *SLEPT), "the suspend after a crash")
+            unlock()
 
             # Without power.lock_before_sleep it just sleeps, whoever asks.
             reconfigure(before="false")

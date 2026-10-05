@@ -77,9 +77,10 @@ static bool locker(struct sh_server *server, bool start, char *error, size_t err
     return callbacks->lock(callbacks->userdata, start, error, error_size);
 }
 
-/* Starts the screen locker, unless the screen is locked already. */
+/* Starts the screen locker, unless one holds the screen already. One that has crashed left the
+ * screen covered and locked; another takes its place. */
 static bool power_lock(struct sh_server *server, char *error, size_t error_size) {
-    if (server->locked)
+    if (server->lock)
         return true;
     if (!locker(server, true, error, error_size))
         return false;
