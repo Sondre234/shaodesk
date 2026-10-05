@@ -4,6 +4,7 @@
 #include "version.h"
 #include <wlr/version.h>
 
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -32,7 +33,10 @@ bool has_env(const char *name) {
     const char *value = std::getenv(name);
     return value && *value;
 }
-pid_t spawn(const shaodesk::Command &command, const std::vector<std::string> &extra_env = {}) {
+/* Starts `command`, with `extra_env` laid over the environment: its pid, or -1 with `failure`
+ * saying why. */
+pid_t start_program(const shaodesk::Command &command, std::string &failure,
+                    const std::vector<std::string> &extra_env = {}) {
     std::vector<char *> argv;
     for (const auto &arg : command)
         argv.push_back(const_cast<char *>(arg.c_str()));
@@ -56,7 +60,7 @@ pid_t spawn(const shaodesk::Command &command, const std::vector<std::string> &ex
     posix_spawnattr_t attributes;
     int error = posix_spawnattr_init(&attributes);
     if (error) {
-        std::cerr << "Cannot prepare child process: " << std::strerror(error) << '\n';
+        failure = std::string("cannot prepare a child process: ") + std::strerror(error);
         return -1;
     }
     sigset_t mask;
@@ -68,8 +72,17 @@ pid_t spawn(const shaodesk::Command &command, const std::vector<std::string> &ex
         error = posix_spawnp(&pid, argv[0], nullptr, &attributes, argv.data(), env.data());
     posix_spawnattr_destroy(&attributes);
     if (error)
-        std::cerr << "Cannot launch " << command.front() << ": " << std::strerror(error) << '\n';
+        failure = "cannot launch " + command.front() + ": " + std::strerror(error);
     return error ? -1 : pid;
+}
+/* start_program, saying on standard error when it fails. */
+pid_t spawn(const shaodesk::Command &command, const std::vector<std::string> &extra_env = {}) {
+    std::string failure;
+    pid_t pid = start_program(command, failure, extra_env);
+    if (pid < 0)
+        std::cerr << static_cast<char>(std::toupper(static_cast<unsigned char>(failure[0])))
+                  << failure.substr(1) << '\n';
+    return pid;
 }
 /* D-Bus-activated services such as xdg-desktop-portal start with the bus's environment, not
  * ours, so screen sharing and file choosers need to learn about this session. Only a standalone
@@ -213,6 +226,7 @@ struct Runtime {
     // The running screenshot script; another request is refused until it exits.
     pid_t screenshot_pid = -1;
     std::string target{}; // the output target of the action last resolved
+    shaodesk::Command program{}; // the program of the spawn action last resolved
     bool watch = false; // whether saving a configuration file reloads (off in headless tests)
     int watch_fd = -1;
     // Why power.lock_command cannot lock ("" when it can), worked out once per load.
@@ -278,7 +292,7 @@ struct Runtime {
         if (!binding)
             return SH_NONE;
         if (binding->action == SH_SPAWN)
-            spawn(binding->command);
+            self.program = binding->command;
         *argument = binding->action == SH_SCREENSHOT ? binding->screenshot : binding->workspace;
         if (shaodesk::action_takes_amount(binding->action))
             *argument = binding->amount;
@@ -294,7 +308,7 @@ struct Runtime {
         if (!binding)
             return SH_NONE;
         if (binding->action == SH_SPAWN)
-            spawn(binding->command);
+            self.program = binding->command;
         *argument = binding->action == SH_SCREENSHOT ? binding->screenshot : binding->workspace;
         if (shaodesk::action_takes_amount(binding->action))
             *argument = binding->amount;
@@ -321,8 +335,7 @@ struct Runtime {
             if (action == SH_SPAWN) {
                 if (words.size() < 2)
                     throw std::runtime_error("spawn needs a program");
-                if (spawn({words.begin() + 1, words.end()}) < 0)
-                    throw std::runtime_error("cannot launch " + words[1]);
+                self.program = {words.begin() + 1, words.end()};
                 return action;
             }
             if (shaodesk::action_takes_workspace(action)) {
@@ -425,6 +438,17 @@ struct Runtime {
     }
     static const char *action_target(void *data) {
         return static_cast<Runtime *>(data)->target.c_str();
+    }
+    /* Starts the program of the spawn action that key, button, command or hot_corner returned
+     * last. */
+    static bool launch(void *data, sh_action action, char *error, size_t error_size) {
+        auto &self = *static_cast<Runtime *>(data);
+        std::string failure = "nothing to launch";
+        if (action == SH_SPAWN && !self.program.empty() &&
+            start_program(self.program, failure) > 0)
+            return true;
+        std::snprintf(error, error_size, "%s", failure.c_str());
+        return false;
     }
     static sh_action hot_corner(void *data, int corner, int *argument) {
         auto &self = *static_cast<Runtime *>(data);
@@ -807,7 +831,7 @@ int main(int argc, char **argv) {
             Runtime::command,   Runtime::reload,   Runtime::startup,      Runtime::child_exited,
             Runtime::opacity,   Runtime::screenshot, Runtime::window_rule,
             Runtime::hot_corner, Runtime::action_target, Runtime::config_watch,
-            Runtime::config_changed, Runtime::lock};
+            Runtime::config_changed, Runtime::lock, Runtime::launch};
         int result = sh_run(&callbacks, mode);
         if (runtime.shell_pid > 0)
             kill(runtime.shell_pid, SIGTERM);

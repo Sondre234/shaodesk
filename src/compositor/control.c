@@ -312,6 +312,17 @@ static void control_handle(struct sh_server *server, int fd, const char *request
         control_reply(fd, reply);
         return;
     }
+    if (action == SH_SPAWN) {
+        // The caller hears why the program did not start, as the panel does.
+        if (!launch_program(server, action, error, sizeof(error))) {
+            char reply[300];
+            snprintf(reply, sizeof(reply), "error: %s\n", error);
+            control_reply(fd, reply);
+            return;
+        }
+        control_reply(fd, "ok\n");
+        return;
+    }
     if (action == SH_SCREENSHOT) {
         // Report why no screenshot started, such as grim missing, to the caller.
         if (!take_screenshot(server, (enum sh_screenshot_mode)argument, error, sizeof(error))) {

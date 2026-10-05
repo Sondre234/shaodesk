@@ -14,7 +14,7 @@ extern "C" {
 /* No wlroots types cross this boundary. C++ owns configuration and policy. */
 enum sh_action {
     SH_NONE,
-    SH_SPAWN, /* starts a program; the configuration side starts it as it returns this */
+    SH_SPAWN, /* starts a program, through sh_callbacks.launch */
     SH_QUIT,
     SH_CLOSE,
     SH_CYCLE,
@@ -409,6 +409,9 @@ struct sh_callbacks {
      * (as of the configuration's last load). With `start`, also starts it. False, with the
      * reason, when it cannot. */
     bool (*lock)(void *, bool start, char *error, size_t error_size);
+    /* Starts the program of the SH_SPAWN that key, button, command or hot_corner returned
+     * last. False, with the reason, when it cannot. */
+    bool (*launch)(void *, enum sh_action action, char *error, size_t error_size);
 };
 
 enum sh_backend_mode { SH_BACKEND_NESTED, SH_BACKEND_HEADLESS, SH_BACKEND_SESSION };

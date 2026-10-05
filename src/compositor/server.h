@@ -635,6 +635,8 @@ void reload_config(struct sh_server *server);
 /* actions.c */
 bool take_screenshot(struct sh_server *server, enum sh_screenshot_mode mode, char *error,
                      size_t error_size);
+bool launch_program(struct sh_server *server, enum sh_action action, char *error,
+                    size_t error_size);
 void run_action(struct sh_server *server, enum sh_action action, int argument);
 
 /* control.c */
