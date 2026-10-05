@@ -81,6 +81,12 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-maximized-tile-") as directory
             wait_for(lambda: msg("get", "tiling") == "off\n", "tiling off")
             msg("toggle_tiling")
             wait_for(lambda: all_tiled(2), "both tiled after tiling is on again")
+            server.terminate()
+            assert server.wait(timeout=30) == 0, log.read_text()
+            print("A maximized tile comes back into the tiling")
+        except Exception:
+            print(log.read_text(), file=sys.stderr)
+            raise
         finally:
             for process in reversed(processes):
                 process.terminate()
