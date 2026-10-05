@@ -123,7 +123,9 @@ header to `server.h`.
   under `SHAODESK_BUILD_COMPOSITOR` in `CMakeLists.txt`. Keep the temporary directory's prefix
   to 26 characters or fewer: the control socket goes in it, a Unix socket's path is limited to
   about 107 bytes, and a Gentoo package build runs the tests in a `TMPDIR` of 43 characters or
-  more.
+  more. Under `--headless`, `shaodesk msg headless_output` and `headless_keyboard` plug in
+  outputs and keyboards (`headless_keyboard key NAME CODE press` types on one; see
+  `keymap_smoke.py`), and `wayland_probe --keymap` prints the keymap an application gets.
 
 ## A fast loop
 
