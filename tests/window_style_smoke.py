@@ -1,12 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Tiled windows keep gap_outer at the edges, gap_inner between them, and their border inside."""
-import os
 from pathlib import Path
-import re
 import signal
-import subprocess
 import sys
-import tempfile
 
 import harness
 
@@ -21,26 +17,14 @@ def settings(inner, outer, border):
 }}"""
 
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-style-test-") as directory:
-    root = Path(directory)
-    config = root / "init.lua"
-    config.write_text(settings(4, 20, 3))
-    log = root / "compositor.log"
-    env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
-        env.pop(name, None)
-
-    def msg(*words):
-        result = subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                                text=True, timeout=30, check=True)
-        return result.stdout
+with harness.Compositor(compositor, settings(4, 20, 3)) as desktop:
+    msg, wait_for = desktop.msg, desktop.wait_for
 
     def boxes():
-        rows = [line.split("\t") for line in msg("get", "windows").splitlines()]
+        rows = desktop.rows("windows")
         return sorted(tuple(map(int, r[4:8])) for r in rows)
 
-    def wait_for(predicate, message):
-        harness.wait_for(predicate, processes, message, detail=lambda: f"windows: {boxes()}")
+    desktop.detail = lambda: f"windows: {boxes()}"
 
     def laid_out(inner, outer, border):
         found = boxes()
@@ -52,42 +36,18 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-style-test-") as directory:
         return (lx == edge and ly == edge and ry == edge and lh == rh and
                 rx + rw == width - edge and rx - (lx + lw) == inner + 2 * border)
 
-    with log.open("w") as output:
-        server = subprocess.Popen([compositor, "--headless", "--config", str(config)],
-                                  env=env, stdout=output, stderr=output)
-        processes = [server]
-        try:
-            harness.wait_for(lambda: "Running Wayland compositor" in log.read_text(), processes,
-                             "startup")
-            text = log.read_text()
-            env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-            env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
-            _, _, x, y, width, height, *_ = msg("get", "outputs").split("\t")
-            assert (int(x), int(y)) == (0, 0)
-            width = int(width)
-            for _ in range(2):
-                processes.append(subprocess.Popen([probe, "--external-control"], env=env,
-                                                  stdout=subprocess.DEVNULL))
-            wait_for(lambda: laid_out(4, 20, 3), "gaps and borders around two tiles")
+    _, _, x, y, width, height, *_ = msg("get", "outputs").split("\t")
+    assert (int(x), int(y)) == (0, 0)
+    width = int(width)
+    for _ in range(2):
+        desktop.spawn([probe, "--external-control"])
+    wait_for(lambda: laid_out(4, 20, 3), "gaps and borders around two tiles")
 
-            config.write_text(settings(10, 0, 0))
-            server.send_signal(signal.SIGHUP)
-            wait_for(lambda: laid_out(10, 0, 0), "reloaded gaps without borders")
+    desktop.config.write_text(settings(10, 0, 0))
+    desktop.server.send_signal(signal.SIGHUP)
+    wait_for(lambda: laid_out(10, 0, 0), "reloaded gaps without borders")
 
-            config.write_text(settings(0, 12, 5))
-            server.send_signal(signal.SIGHUP)
-            wait_for(lambda: laid_out(0, 12, 5), "reloaded outer gap and thicker border")
-
-            for process in processes[1:]:
-                process.terminate()
-                process.wait(timeout=30)
-            server.send_signal(signal.SIGTERM)
-            assert server.wait(timeout=30) == 0, log.read_text()
-            print("Inner and outer gaps, borders, and their reload passed")
-        except Exception:
-            print(log.read_text(), file=sys.stderr)
-            raise
-        finally:
-            for process in reversed(processes):
-                if process.poll() is None:
-                    process.kill()
+    desktop.config.write_text(settings(0, 12, 5))
+    desktop.server.send_signal(signal.SIGHUP)
+    wait_for(lambda: laid_out(0, 12, 5), "reloaded outer gap and thicker border")
+print("Inner and outer gaps, borders, and their reload passed")
