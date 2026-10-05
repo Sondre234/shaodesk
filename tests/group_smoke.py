@@ -71,7 +71,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-group-test-") as directory:
         wait_for(lambda: title not in windows(), f"{title} closed")
 
     def settled(*names):
-        """The windows are visible and tiled, and their rectangles no longer change."""
+        """The windows are visible and tiled, with a size."""
         def check():
             first = [rect(n) for n in names]
             return all(windows()[n]["tiled"] and windows()[n]["visible"] for n in names) and \
