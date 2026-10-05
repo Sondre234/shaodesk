@@ -177,7 +177,10 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-test-") as directory:
             wait_for(lambda: len(urgent()) == 1, "a urgent a third time")
             subprocess.run([probe, "--close", "urgent-a"], env=env, check=True, timeout=5,
                            stdout=subprocess.DEVNULL)
-            wait_for(lambda: urgent() == [], "closing clears the mark")
+            # The probe exits once its window has closed, which may be before the mark is
+            # checked, so only the others must keep running meanwhile.
+            harness.wait_for(lambda: urgent() == [], [p for p in processes if p is not a],
+                             "closing clears the mark")
             assert a.wait(timeout=5) == 0
             processes.remove(a)
             harness.wait_for(lambda: "urgent 0\n" in subscriber.state(), processes,
