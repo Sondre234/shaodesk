@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(shaodesk VERSION 0.1.0 LANGUAGES C CXX)
+project(shaodesk VERSION 0.1.1 LANGUAGES C CXX)
 
 # An unoptimised compositor is noticeably slower; default to an optimised build with symbols
 # unless the caller (or a multi-config generator) chose one.
