@@ -130,6 +130,8 @@ void update_keymap(struct sh_server *server) {
             wlr_keyboard_set_repeat_info(keyboard->wlr_keyboard, settings->repeat_rate,
                                          settings->repeat_delay);
     }
+    if (server->running)
+        notify_subscribers(server); // the layouts, or their short names, may have changed
 }
 
 /* Makes `layout` (from 0) the one every keyboard but the virtual ones types in. `source` is a
@@ -151,6 +153,7 @@ static void set_keyboard_layout(struct sh_server *server, xkb_layout_index_t lay
     struct wlr_keyboard *seat_keyboard = wlr_seat_get_keyboard(server->seat);
     if (!source && seat_keyboard && seat_keyboard->keymap == server->keymap)
         wlr_seat_keyboard_notify_modifiers(server->seat, &seat_keyboard->modifiers);
+    notify_subscribers(server); // the panel's layout indicator
 }
 
 /* After a keyboard's modifiers changed: when it switched layout itself, by an XKB option such

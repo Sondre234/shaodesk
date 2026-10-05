@@ -879,8 +879,10 @@ namespace, output, layer (0 background to 3 overlay), and whether it is shown.
 the scene (closing windows count until their animation ends), and of focus fades, mainly
 for tests. A client
 that sends `subscribe` keeps its connection and receives `tiling on|off` and
-`workspace N` (the focused monitor's), and one `output NAME N USED TILING` line per monitor
-(as in `get workspaces`) after every change, plus `launcher OUTPUT` when the `launcher` action
+`workspace N` (the focused monitor's), one `output NAME N USED TILING` line per monitor
+(as in `get workspaces`), and `keyboard-layout N COUNT SHORT NAME` (the active
+[keyboard layout](#keyboard-layouts), from 1, of how many, as in `get keyboard`) after every
+change, plus `launcher OUTPUT` when the `launcher` action
 (Super + R) asks the panel on that monitor to open or close its application menu; the panel uses this. The window switcher sends `switcher OUTPUT SELECTED COUNT` followed by
 COUNT lines `switcher-window APP_ID TITLE OUTPUT WORKSPACE MINIMIZED URGENT` (tab-separated) when it
 opens or a listed window closes, `switcher-select N` as the selection moves (both counting

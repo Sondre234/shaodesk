@@ -360,7 +360,8 @@ static void drop_partial_utf8(char *text) {
 
 /* The state subscribers get: "tiling on|off", "workspace N" and "focused NAME" for the focused
  * output, and "output NAME N USED TILING" for each output, with its current workspace, those
- * holding windows ("1,3", or "-"), and whether it tiles ("on" or "off"). */
+ * holding windows ("1,3", or "-"), and whether it tiles ("on" or "off"); then the urgent
+ * windows and the keyboard layout, as described below. */
 static void describe_state(struct sh_server *server, char *state, size_t size) {
     struct wlr_output *focused = focused_output(server);
     size_t length = snprintf(state, size, "tiling %s\nworkspace %d\nfocused %s\n",
@@ -427,6 +428,19 @@ static void describe_state(struct sh_server *server, char *state, size_t size) {
             *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
         length += snprintf(state + length, size - length, "urgent-window %s\t%d\t%s\t%s\n",
                            next->output, next->workspace + 1, app_id, title);
+    }
+    // "keyboard-layout N COUNT SHORT NAME": the active keyboard layout (from 1) of how many,
+    // its short name ("us") and its name ("English (US)").
+    if (server->keymap && length < size) {
+        char code[32], name[256];
+        layout_short_name(server, server->keyboard_layout, code, sizeof(code));
+        const char *full = xkb_keymap_layout_get_name(server->keymap, server->keyboard_layout);
+        snprintf(name, sizeof(name), "%s", full ? full : "");
+        drop_partial_utf8(name);
+        for (char *c = name; *c; ++c)
+            *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
+        snprintf(state + length, size - length, "keyboard-layout %u %u %s %s\n",
+                 server->keyboard_layout + 1, xkb_keymap_num_layouts(server->keymap), code, name);
     }
 }
 
