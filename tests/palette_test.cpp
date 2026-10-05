@@ -51,7 +51,7 @@ class PaletteTest : public QObject {
     }
     void handlesUnusualText() {
         QVERIFY(fuzzy::score("é", "Café") >= 0);
-        QVERIFY(fuzzy::score("straße", "STRASSE") >= 0 || true); // must not crash on folding
+        (void)fuzzy::score("straße", "STRASSE"); // must not crash on folding
         QVERIFY(fuzzy::score("a", QString(5000, 'b') + "a") >= 0);
         QVERIFY(fuzzy::score(QString(200, 'a'), QString(5000, 'a')) >= 0);
     }

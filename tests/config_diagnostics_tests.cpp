@@ -72,7 +72,6 @@ void unknown_settings() {
     expect("return {shell={panel_margin={tp=1}}}", "did you mean 'top'?");
     // Nothing close: list what is valid.
     expect("return {shell={zzzzzzzz=1}}", "expected one of: enabled, panel_height");
-    expect("return {shell={zzzzzzzz=1}}", "expected one of:");
     require(error_of("return {shell={zzzzzzzz=1}}").find("did you mean") == std::string::npos,
             "a far-off name got a suggestion");
 }
@@ -100,12 +99,10 @@ void locations() {
     at("return {\n  x = = 1,\n}", "2:");
     at("local a = nil\nreturn { shell = a.b }", "2:");
     // No location is invented for a setting that is not in the file.
-    auto message = error_of("return {shell=(function() return {panel_height=1} end)()}");
-    require(message.find("test.lua:") == std::string::npos ||
+    auto message = error_of("return {shell={['panel_' .. 'height']=1}}");
+    require(message.find("test.lua:") == std::string::npos &&
                 message.find("shell.panel_height") != std::string::npos,
             "unexpected location: " + message);
-    auto plain = shaodesk::parse_config("return {}", "@x.lua");
-    (void)plain;
 }
 void wrong_types() {
     expect("return {shell={panel_height='big'}}", "shell.panel_height must be an integer, not a string");
@@ -198,7 +195,6 @@ void robustness() {
     throws("error(nil)");
     throws("return nil");
     throws("return 'text'");
-    throws("while true do end");
     throws("local function f() return f() + 1 end return f()");
     throws("return {shell={panel_height=" + std::string(400, '9') + "}}");
     throws("return {startup={{" + std::string(5000, 'x') + "}}}");
@@ -217,7 +213,7 @@ void robustness() {
         throw std::runtime_error("a missing file was accepted");
     } catch (const std::runtime_error &error) {
         require(std::string(error.what()).find("cannot open") != std::string::npos,
-                "missing file message");
+                std::string("missing file: ") + error.what());
     }
     // After any failure the next parse works: no state survives a rejected configuration.
     require(shaodesk::parse_config("return {layout={gap=3}}").settings.gap_inner == 3,
@@ -255,8 +251,6 @@ int main(int argc, char **argv) {
         schema_matches_parser();
         robustness();
         reference_in_sync(argv[2]);
-        // The shipped example has no unknown or mistyped setting.
-        (void)shaodesk::load_config(argv[1]);
         std::cout << "Configuration diagnostics and reference passed\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';

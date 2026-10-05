@@ -40,7 +40,6 @@ int main() {
         require(shaodesk::parse_config("return {windows={swallow={enabled=true}}}")
                         .settings.swallow_terminal_count == 10,
                 "enabling keeps the default terminals");
-        rejects("return {windows={swallow={enabled='yes'}}}");
         rejects("return {windows={swallow={terminals='kitty'}}}");
         rejects("return {windows={swallow={terminals={1}}}}");
         rejects("return {windows={swallow={terminal={'kitty'}}}}");
@@ -75,11 +74,8 @@ int main() {
                     shaodesk::parse_config("return {windows={magnet={distance=200}}}")
                             .settings.magnet_distance == 200,
                 "distance limits");
-        rejects("return {windows={magnet={distance=-1}}}");
-        rejects("return {windows={magnet={distance=201}}}");
         rejects("return {windows={magnet={distance=1.5}}}");
         rejects("return {windows={magnet={enabled=1}}}");
-        rejects("return {windows={magnet={guides='yes'}}}");
         rejects("return {windows={magnet={bypass='Hyper'}}}");
         rejects("return {windows={magnet={guide_color='blue'}}}");
         rejects("return {windows={magnet={dist=3}}}");

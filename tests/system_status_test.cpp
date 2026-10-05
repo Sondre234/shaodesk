@@ -139,8 +139,13 @@ class SystemStatusTest : public QObject {
                 return env;
             }());
             child.start("unshare", {"-rn", QCoreApplication::applicationFilePath(), "linkChangePromptsRead"});
-            if (!child.waitForStarted() || !child.waitForFinished(20000))
+            if (!child.waitForStarted())
                 QSKIP("unshare is not available here");
+            if (!child.waitForFinished(20000)) {
+                child.kill();
+                child.waitForFinished();
+                QFAIL("the run in a network namespace hung");
+            }
             if (child.exitCode() == 77)
                 QSKIP("cannot make a network namespace or an interface here");
             QVERIFY2(child.exitCode() == 0, child.readAllStandardOutput().constData());

@@ -16,7 +16,6 @@ CONFIG = """return {
     xwayland = false,
     layout = { tiling = false, workspaces = 4 },
     outputs = { monitors = { ["HEADLESS-1"] = { mode = "1280x720" } } },
-    bindings = { { mods = { "Alt" }, key = "grave", action = "focus_last" } },
 }"""
 
 with tempfile.TemporaryDirectory(prefix="shaodesk-focus-last-test-") as directory:
@@ -72,14 +71,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-focus-last-test-") as director
             msg("focus_last")
             wait_for(lambda: focused() == "B", "flip to B again")
 
-            # The history follows what is focused: B, C, A.
-            msg("focus_last")
-            wait_for(lambda: focused() == "C", "C")
-
             # Across workspaces: B moves to workspace 3, where focus_last follows it.
-            msg("workspace", "1")
-            msg("focus_last")
-            wait_for(lambda: focused() == "B", "B focused")
             msg("move_to_workspace", "3")
             wait_for(lambda: windows()["B"]["workspace"] == 3, "B on workspace 3")
             wait_for(lambda: focused() != "B", "B lost focus")

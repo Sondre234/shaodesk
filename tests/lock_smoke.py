@@ -6,7 +6,8 @@ import re
 import subprocess
 import sys
 import tempfile
-import time
+
+import harness
 
 compositor, lock_probe, example = (str(Path(p).resolve()) for p in sys.argv[1:4])
 
@@ -16,16 +17,14 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-lock-test-") as directory:
     config.write_text(Path(example).read_text().replace("xwayland = true", "xwayland = false"))
     log = root / "compositor.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY"):
+    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
         env.pop(name, None)
     with log.open("w") as output:
         server = subprocess.Popen([compositor, "--headless", "--config", str(config)],
                                   env=env, stdout=output, stderr=output)
         try:
-            deadline = time.monotonic() + 5
-            while "Running Wayland compositor" not in log.read_text():
-                assert server.poll() is None and time.monotonic() < deadline, "startup failed"
-                time.sleep(.02)
+            harness.wait_for(lambda: "Running Wayland compositor" in log.read_text(), [server],
+                             "startup")
             env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", log.read_text())[1]
             # A crashed locker leaves the session locked; a new locker may take over.
             for mode in ("abandon", "check-locked", "cycle"):

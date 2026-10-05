@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 
-from harness import wait_for
+from harness import Timeout, wait_for
 
 compositor, shell, probe, example = (str(Path(p).resolve()) for p in sys.argv[1:])
 
@@ -74,7 +74,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-shell-test-") as directory:
                 try:
                     wait_for(opened, processes, "launcher opened", timeout=.5)
                     break
-                except AssertionError:
+                except Timeout:
                     pass
             assert opened() and "launcher closed" not in shell_log.read_text()
             launcher()

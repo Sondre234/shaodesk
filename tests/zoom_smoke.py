@@ -108,14 +108,11 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-zoom-test-") as directory:
             if grim and wlrctl:
                 assert harness.grab(grim, env).at(*probe_at) == BACKGROUND
 
-            # A key-less wheel does nothing without a modifier configured; with one, the
-            # wheel steps (wlrctl cannot hold a modifier or scroll, so only the setting is
-            # checked here).
+            # A zero duration steps at once; the wheel needs the modifier configured here.
             config.write_text(settings(0, ", scroll_modifier = 'Super'"))
-            server.send_signal(signal.SIGHUP)
-            time.sleep(0.3)
+            msg("reload")
             msg("zoom_in")
-            wait_for(lambda: zoom()[:2] == (2000, 2000), "immediate with a zero duration")
+            assert zoom()[:2] == (2000, 2000), zoom()
             msg("zoom_reset")
             wait_for(lambda: zoom() == (1000, 1000, 0), "reset")
 

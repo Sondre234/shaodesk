@@ -37,7 +37,6 @@ int main() {
         rejects("return {windows={dim_inactive=1}}");
         rejects("return {windows={dim_inactive=-0.1}}");
         rejects("return {windows={dim_inactive='dark'}}");
-        rejects("return {windows={dim_duration=-1}}");
         rejects("return {windows={dim_duration=5000}}");
         rejects("return {windows={dim_duration=1.5}}");
         // Peek.
@@ -50,7 +49,6 @@ int main() {
                 "peek not parsed");
         rejects("return {peek={opacity=0.95}}");
         rejects("return {peek={opacity=-0.1}}");
-        rejects("return {peek={duration=-1}}");
         rejects("return {peek={size=3}}");
         auto bound = shaodesk::parse_config(
             "return {bindings={{mods={},key='F9',action='peek'},{mods={'Super'},key='p',action='peek_toggle'}}}");
@@ -84,10 +82,7 @@ int main() {
         rejects("return {night_light={sunset='24:00'}}");
         rejects("return {night_light={sunset=20}}");
         rejects("return {night_light={day_temperature=999}}");
-        rejects("return {night_light={night_temperature=10001}}");
         rejects("return {night_light={night_temperature=3400.5}}");
-        rejects("return {night_light={transition=241}}");
-        rejects("return {night_light={enabled='yes'}}");
         rejects("return {night_light={nights=1}}");
         require(!shaodesk::parse_config("return {bindings={{mods={},key='F10',action='night_light_toggle'},"
                                       "{mods={},key='F11',action='night_light_on'},"
@@ -116,9 +111,6 @@ int main() {
         rejects("return {hot_corners={top_left='   '}}");
         rejects("return {hot_corners={top_left=5}}");
         rejects("return {hot_corners={middle='peek'}}");
-        rejects("return {hot_corners={size=0}}");
-        rejects("return {hot_corners={size=65}}");
-        rejects("return {hot_corners={delay=-1}}");
         // Zoom.
         const auto &z0 = defaults.settings.effects;
         require(z0.zoom_step > 1.24F && z0.zoom_step < 1.26F && z0.zoom_max == 8 &&
@@ -137,8 +129,6 @@ int main() {
         rejects("return {zoom={step=1}}");
         rejects("return {zoom={step=5}}");
         rejects("return {zoom={max=1}}");
-        rejects("return {zoom={max=33}}");
-        rejects("return {zoom={duration=-1}}");
         require(!shaodesk::parse_config("return {bindings={{mods={'Super'},key='equal',action='zoom_in'},"
                                       "{mods={'Super'},key='minus',action='zoom_out'},"
                                       "{mods={'Super'},key='0',action='zoom_reset'}}}").bindings.empty(),

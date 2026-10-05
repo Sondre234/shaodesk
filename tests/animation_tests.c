@@ -90,7 +90,7 @@ static void test_retarget_is_continuous(void) {
     // The layout changes again: the destination moves 400 further.
     sh_anim_glide(rig.animator, &rig.anim, rig.content, 400, 0);
     int after = rig.content->node.x;
-    CHECK(abs(after - before) <= 400 + 1 && after == before + 400,
+    CHECK(after == before + 400,
           "the glide restarts from the drawn place plus the change: %d -> %d", before, after);
     CHECK(sh_animator_running(rig.animator) == 1, "still one animation");
     advance(&rig, 400);

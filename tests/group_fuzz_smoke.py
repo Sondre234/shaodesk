@@ -116,6 +116,9 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-group-fuzz-test-") as director
                              "the groups dissolved", detail=lambda: str(windows()))
             assert run("get", "windows").returncode == 0
             print(f"Group fuzz passed ({steps} steps, seed {seed}, largest group {stacked})")
+        except Exception:
+            print(log.read_text(), file=sys.stderr)
+            raise
         finally:
             for process in reversed(clients + processes):
                 if process.poll() is None:

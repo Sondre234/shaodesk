@@ -125,7 +125,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-overview-output-") as director
 
             # The first monitor's overview lists its own window only.
             msg("output", "HEADLESS-1", "toggle_overview")
-            state, where, thumbs = overview()
+            _, where, thumbs = overview()
             assert where == "HEADLESS-1" and [t[4] for t in thumbs] == ["A"], (where, thumbs)
             print("Overview outputs passed")
         finally:

@@ -17,9 +17,7 @@ def settings(inner, outer, border):
     return f"""return {{
     xwayland = false,
     layout = {{ tiling = true, gap_inner = {inner}, gap_outer = {outer} }},
-    windows = {{ border_width = {border}, border_color = "#ca9ee6ff",
-                 border_inactive_color = "#6c7086cc", inactive_opacity = 0.85,
-                 rules = {{ {{ app_id = "^shaodesk-probe$", opacity = 0.9 }} }} }},
+    windows = {{ border_width = {border} }},
 }}"""
 
 

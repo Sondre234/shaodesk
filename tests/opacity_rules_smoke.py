@@ -11,7 +11,7 @@ import tempfile
 
 import harness
 
-compositor, client = (str(Path(p).resolve()) for p in sys.argv[1:3])
+compositor, client, probe = (str(Path(p).resolve()) for p in sys.argv[1:4])
 
 
 def settings(alpha):
@@ -57,6 +57,9 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-opacity-test-") as directory:
         wait_for(lambda: title in opacities(), f"{title} opens")
         return processes[-1]
 
+    def activate(app_id):
+        subprocess.run([probe, "--activate", app_id], env=env, check=True, timeout=30)
+
     with log.open("w") as output:
         server = subprocess.Popen([compositor, "--headless", "--config", str(config)],
                                   env=env, stdout=output, stderr=output)
@@ -70,7 +73,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-opacity-test-") as directory:
 
             open_window("plain", "first")
             wait_for(lambda: opacities()["first"] == (True, 1.0), "focused window is opaque")
-            second = open_window("plain", "second")
+            second = open_window("retitled", "second")
             wait_for(lambda: opacities()["second"] == (True, 1.0) and
                      opacities()["first"] == (False, 0.5), "focus moves the dimming")
             open_window("solid", "third")
@@ -83,11 +86,8 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-opacity-test-") as directory:
             # A title change re-matches the rules.
             second.send_signal(signal.SIGUSR1)
             wait_for(lambda: "changed" in opacities(), "title changes")
-            focused = [t for t, (f, _) in opacities().items() if f][0]
-            if focused == "changed":
-                assert opacities()["changed"][1] == 0.75, opacities()
-            else:
-                assert opacities()["changed"][1] == 0.75 or opacities()["changed"][1] == 0.5
+            activate("retitled")
+            wait_for(lambda: opacities()["changed"] == (True, 0.75), "the title's rule applies")
 
             # A window that commits on every frame does not have the rules matched each time.
             processes.append(subprocess.Popen(
@@ -102,13 +102,11 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-opacity-test-") as directory:
             assert rule_matches() - before < 5, "rules matched on every commit"
 
             # A reload with different rules takes effect for windows that did not change.
+            activate("retitled")
+            wait_for(lambda: opacities()["changed"] == (True, 0.75), "changed focused again")
             config.write_text(settings(0.6))
             server.send_signal(signal.SIGHUP)
-            wait_for(lambda: opacities()["changed"][1] in (0.6, 0.5) and
-                     "Configuration reloaded" in log.read_text(), "reload applied")
-            wait_for(lambda: opacities()["changed"][1] != 0.75, "old opacity replaced")
-            if opacities()["changed"][0]:
-                assert opacities()["changed"][1] == 0.6, opacities()
+            wait_for(lambda: opacities()["changed"] == (True, 0.6), "reload applied")
         finally:
             for process in processes[1:]:
                 process.terminate()

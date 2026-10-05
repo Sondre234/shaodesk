@@ -90,7 +90,9 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-overview-fuzz-") as directory:
             run("overview_cancel")
             harness.wait_for(lambda: run("get", "overview").stdout.startswith("closed"),
                              processes, "the overview closed")
-            assert run("get", "windows").returncode == 0
+            harness.wait_for(lambda: len(run("get", "windows").stdout.splitlines()) ==
+                             sum(client.poll() is None for client in clients), processes,
+                             "every live client's window listed")
             print(f"Overview fuzz passed ({steps} steps, seed {seed})")
         finally:
             for process in reversed(clients + processes):

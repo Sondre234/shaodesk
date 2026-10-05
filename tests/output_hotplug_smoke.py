@@ -128,7 +128,6 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-output-hotplug-") as directory
         assert [(w[0], w[1], w[6]) for w in windows()] == [
             (1, True, "HEADLESS-1"), (1, True, "HEADLESS-1"), (2, True, "HEADLESS-1"),
             (1, True, "HEADLESS-2")], windows()
-        home = windows()
 
         unplug("HEADLESS-1")
         wait_for(lambda: all(w[6] == "HEADLESS-2" for w in windows()), "windows moved")
@@ -181,7 +180,6 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-output-hotplug-") as directory
         assert inside(moved, "HEADLESS-2") and moved[4:6] == before[4:6], (before, moved)
         plug("HEADLESS-1")
         wait_for(lambda: windows()[0][6] == "HEADLESS-1", "floating window returned")
-        back = windows()[0]
         # Turning an output off in the configuration moves its windows the same way, and turning
         # it on again returns them.
         reload(config(tiling="false", first="enabled = false"))

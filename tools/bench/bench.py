@@ -142,7 +142,9 @@ class Compositor:
             client.wait(timeout=10)
         self.clients = []
         deadline = time.monotonic() + 10
-        while self.windows() and time.monotonic() < deadline:
+        while self.windows():
+            if time.monotonic() >= deadline:
+                raise RuntimeError("windows outlived their clients")
             time.sleep(0.02)
 
     def stop(self):

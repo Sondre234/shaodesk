@@ -52,7 +52,8 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-pid-at-test-") as directory:
             msg("close")
             assert client.wait(timeout=30) == 0
             processes.remove(client)
-            assert msg("get", "pid_at", *middle) == ""
+            wait_for(lambda: msg("get", "pid_at", *middle) == "", processes,
+                     "nothing at the closed window's place")
 
             server.terminate()
             assert server.wait(timeout=30) == 0, log.read_text()

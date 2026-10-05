@@ -3,6 +3,10 @@
 import time
 
 
+class Timeout(AssertionError):
+    """wait_for ran out of time (rather than a process exiting): worth retrying."""
+
+
 def wait_for(predicate, processes, message, timeout=15, detail=None):
     """Polls `predicate` until it holds, failing if a process exits or time runs out."""
     deadline = time.monotonic() + timeout
@@ -12,7 +16,18 @@ def wait_for(predicate, processes, message, timeout=15, detail=None):
         if predicate():
             return
         time.sleep(.02)
-    raise AssertionError(f"timed out: {message}" + (f"; {detail()}" if detail else ""))
+    raise Timeout(f"timed out: {message}" + (f"; {detail()}" if detail else ""))
+
+
+def stays(predicate, processes, message, duration=.3, detail=None):
+    """Checks that `predicate` keeps holding for `duration`: for something that must not happen,
+    which an animation or a client's commit could otherwise do after a single look."""
+    deadline = time.monotonic() + duration
+    while time.monotonic() < deadline:
+        for process in processes:
+            assert process.poll() is None, f"process exited ({process.returncode}): {message}"
+        assert predicate(), message + (f"; {detail()}" if detail else "")
+        time.sleep(.02)
 
 
 class Shot:

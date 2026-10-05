@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Workspaces named in layout.workspace_names are reached by name from the control socket and
-from bindings; an unknown name is refused."""
+"""Workspaces named in layout.workspace_names are reached by name from the control socket; an
+unknown name is refused."""
 import os
 from pathlib import Path
 import re

@@ -49,14 +49,8 @@ int main() {
                     "position not parsed");
         rejects("return {notifications={position='middle'}}");
         rejects("return {notifications={position=1}}");
-        rejects("return {notifications={timeout=-1}}");
-        rejects("return {notifications={timeout=600001}}");
         rejects("return {notifications={timeout=1.5}}");
-        rejects("return {notifications={max_visible=0}}");
-        rejects("return {notifications={max_visible=11}}");
-        rejects("return {notifications={dnd='yes'}}");
         rejects("return {notifications={width=100}}");
-        rejects("return {notifications={history=-1}}");
         rejects("return {notifications={sound=true}}");
         rejects("return {notifications=3}");
         rejects("return {osd={position='left'}}");

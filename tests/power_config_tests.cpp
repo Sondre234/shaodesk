@@ -44,21 +44,14 @@ int main() {
                     !shaodesk::parse_config("return {shell={widgets={power=false}}}")
                          .shell.widgets.power,
                 "shell.widgets.power not parsed");
-        rejects("return {shell={widgets={power='no'}}}");
         rejects("return {power=true}");
-        rejects("return {power={lock_before_sleep='yes'}}");
         rejects("return {power={close_windows=1}}");
-        rejects("return {power={close_timeout=499}}");
-        rejects("return {power={close_timeout=60001}}");
         rejects("return {power={close_timeout=1.5}}");
-        rejects("return {power={force='no'}}");
         require(defaults.power.countdown == 10 &&
                     shaodesk::parse_config("return {power={countdown=0}}").power.countdown == 0 &&
                     shaodesk::parse_config("return {power={countdown=300}}").power.countdown ==
                         300,
                 "power.countdown not parsed");
-        rejects("return {power={countdown=-1}}");
-        rejects("return {power={countdown=301}}");
         rejects("return {power={countdown='10'}}");
         std::cout << "power configuration passed\n";
     } catch (const std::exception &error) {

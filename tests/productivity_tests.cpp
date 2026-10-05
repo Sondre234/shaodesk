@@ -7,7 +7,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
-#include <sstream>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -259,9 +258,10 @@ void group_config() {
         require(binding && binding->action == action, "group binding wrong");
     }
     // The merge actions are consecutive, in the order the compositor reads them.
-    require(SH_GROUP_MERGE_RIGHT == SH_GROUP_MERGE_LEFT + 1 && SH_GROUP_MERGE_UP == SH_GROUP_MERGE_LEFT + 2 &&
-                SH_GROUP_MERGE_DOWN == SH_GROUP_MERGE_LEFT + 3,
-            "merge actions not in order");
+    static_assert(SH_GROUP_MERGE_RIGHT == SH_GROUP_MERGE_LEFT + 1 &&
+                      SH_GROUP_MERGE_UP == SH_GROUP_MERGE_LEFT + 2 &&
+                      SH_GROUP_MERGE_DOWN == SH_GROUP_MERGE_LEFT + 3,
+                  "merge actions not in order");
     rejects("return {features={groups='yes'}}", "features.groups");
     rejects("return {features={groupz=true}}", "groupz");
 }
@@ -273,7 +273,7 @@ void tab_strip() {
             for (int i = 0; i < count; ++i) {
                 int x, length;
                 sh_tabs_span(width, count, i, &x, &length);
-                require(x >= previous_end + (i ? SH_TABS_GAP : SH_TABS_GAP), "tabs overlap");
+                require(x >= previous_end + SH_TABS_GAP, "tabs overlap");
                 require(length >= 1, "empty tab");
                 if (width >= 20 * count)
                     require(x + length <= width, "tab past the strip");

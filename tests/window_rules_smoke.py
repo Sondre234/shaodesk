@@ -81,9 +81,8 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-rules-test-") as directory:
             env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
             first = next(line for line in msg("get", "outputs").splitlines()
                          if line.startswith("HEADLESS-1\t"))
-            _, _, x, y, width, height, *_ = first.split("\t")
-            assert (int(x), int(y), int(width), int(height)) == (0, 0, 1280, 720), first
-            width, height = 1280, 720
+            x, y, width, height = map(int, first.split("\t")[2:6])
+            assert (x, y, width, height) == (0, 0, 1280, 720), first
 
             open_window("shaodesk-probe", "Plain")
             wait_for(lambda: window("Plain")[:3] == (1, True, True) and

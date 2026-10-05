@@ -80,10 +80,11 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-tiling-open-test-") as directo
                         changed = previous[index] != boxes[index]
                         assert new == (1 if changed or index == opened - 1 else 0), \
                             (opened, index, seen, previous, boxes)
+                if opened == 2:
+                    # The third window split the second (focused) one and left the first alone.
+                    assert boxes[0] == previous[0], (previous, boxes)
                 counts = [len(sizes) for sizes in seen]
                 previous = boxes
-            # The third window split the second (focused) one and left the first alone.
-            assert previous[0][2:] == windows()[0][2:]
 
             # A taskbar maximize request leaves a fullscreen window alone, as a client's does.
             output = subprocess.run([compositor, "msg", "get", "outputs"], env=env,

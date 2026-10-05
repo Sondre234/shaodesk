@@ -76,7 +76,7 @@ class TaskFilterTest : public QObject {
     FakeTasks source;
     std::vector<std::unique_ptr<TaskFilter>> filters;
 
-    QList<int> appIds(TaskFilter &filter) {
+    QList<int> taskIds(TaskFilter &filter) {
         QList<int> ids;
         for (int row = 0; row < filter.rowCount(); ++row)
             ids.push_back(filter.data(filter.index(row, 0), FakeTasks::TaskId).toInt());
@@ -102,13 +102,13 @@ class TaskFilterTest : public QObject {
     }
     void groupsOneWindowPerApplication() {
         QCOMPARE(filters[0]->rowCount(), 20);
-        QCOMPARE(appIds(*filters[0]).first(), 1);
+        QCOMPARE(taskIds(*filters[0]).first(), 1);
         // Removing the first window of an application promotes the next one, which stands
         // where that window is, after the other applications' first windows.
         source.remove(0);
         QCOMPARE(filters[0]->rowCount(), 20);
-        QCOMPARE(appIds(*filters[0]).first(), 2);
-        QCOMPARE(appIds(*filters[0]).last(), 21);
+        QCOMPARE(taskIds(*filters[0]).first(), 2);
+        QCOMPARE(taskIds(*filters[0]).last(), 21);
         // A window changing application moves between groups.
         source.rows[5].appId = "app0";
         source.changed(5, {FakeTasks::AppId});
@@ -139,7 +139,7 @@ class TaskFilterTest : public QObject {
         QCOMPARE(filters[3]->rowCount(), 3);
         source.moveLastToFront();
         QCOMPARE(filters[0]->rowCount(), 3);
-        QCOMPARE(appIds(*filters[0]).first(), source.rows[0].id);
+        QCOMPARE(taskIds(*filters[0]).first(), source.rows[0].id);
     }
     void stateChangesUpdateTheSummary() {
         QSignalSpy summaries(filters[0].get(), &TaskFilter::summaryChanged);
@@ -169,17 +169,6 @@ class TaskFilterTest : public QObject {
         source.rows[43].urgent = false;
         source.changed(43, {FakeTasks::Urgent});
         QVERIFY(!app3.urgent());
-    }
-    void refilterCostWithManyWindows() {
-        for (int i = 0; i < 40; ++i)
-            source.add(QString("extra%1").arg(i), "x");
-        const int before = source.reads;
-        QElapsedTimer timer;
-        timer.start();
-        for (int i = 0; i < 20; ++i)
-            source.remove(int(source.rows.size()) - 1), source.add("again", "x");
-        std::cerr << "20 window replacements, 100 windows, 8 filters: "
-                  << timer.nsecsElapsed() / 1000 << " us, " << (source.reads - before) << " reads\n";
     }
 };
 QTEST_GUILESS_MAIN(TaskFilterTest)

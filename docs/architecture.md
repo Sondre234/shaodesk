@@ -123,7 +123,9 @@ them in `shell/controller.cpp`.
   `sticky_smoke.py`. It starts a headless compositor with the pixman renderer in a temporary
   `XDG_RUNTIME_DIR`, opens windows with `wayland_probe` (or `x11_probe`), drives it with
   `shaodesk msg`, and reads the state back with `get` queries. Wait with
-  `harness.wait_for`, never with a fixed sleep. Register it with `add_test` and a `TIMEOUT`
+  `harness.wait_for`, never with a fixed sleep; to check that something does not happen,
+  which an animation or a client's commit could do a little later, use `harness.stays`.
+  Register it with `add_test` and a `TIMEOUT`
   under `SHAODESK_BUILD_COMPOSITOR` in `CMakeLists.txt`. Keep the temporary directory's prefix
   to 26 characters or fewer: the control socket goes in it, a Unix socket's path is limited to
   about 107 bytes, and a Gentoo package build runs the tests in a `TMPDIR` of 43 characters or

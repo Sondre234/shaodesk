@@ -69,10 +69,9 @@ int main() {
         // Three in a 2 x 2 grid: the last row is centered.
         sh_rect three_in[3] = {shapes[0], shapes[0], shapes[0]}, three[3];
         require(sh_overview_grid(three_in, 3, area, 20, 1.0, three), "three windows");
-        if (three[2].y > three[0].y) {
-            int middle = three[2].x + three[2].width / 2;
-            require(std::abs(middle - (area.x + area.width / 2)) <= 1, "the short row is centered");
-        }
+        require(three[0].y == three[1].y && three[2].y > three[0].y, "three windows in two rows");
+        int middle = three[2].x + three[2].width / 2;
+        require(std::abs(middle - (area.x + area.width / 2)) <= 1, "the short row is centered");
         // A wide strip of windows prefers a single row; tall ones prefer columns.
         sh_rect tall_in[3] = {shapes[2], shapes[2], shapes[2]}, tall[3];
         require(sh_overview_grid(tall_in, 3, area, 20, 1.0, tall), "tall windows");
@@ -89,6 +88,10 @@ int main() {
         for (auto &size : crowd_in)
             size = shapes[0];
         require(sh_overview_grid(crowd_in, 30, {0, 0, 100, 100}, 90, 1.0, crowd), "crowded");
+        for (const auto &thumb : crowd)
+            require(thumb.width > 0 && thumb.x >= 0 && thumb.y >= 0 && thumb.x + thumb.width <= 100 &&
+                        thumb.y + thumb.height <= 100,
+                    "a crowded thumbnail outside the area");
 
         // Directions in a 3 x 2 grid.
         sh_rect grid[5] = {{0, 0, 100, 100},   {120, 0, 100, 100},   {240, 0, 100, 100},

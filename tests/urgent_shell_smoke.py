@@ -42,15 +42,14 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-shell-") as directory:
         return subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
                               text=True, timeout=5, check=True).stdout
 
+    def is_orange(pixel):
+        return pixel[0] > 200 and 120 < pixel[1] < 190 and 60 < pixel[2] < 140
+
     def orange():
         """How many pixels in the panel's band are the urgent color."""
         shot = harness.grab(grim, env)
-        count = 0
-        for y in range(shot.height - 52, shot.height):
-            for x in range(0, shot.width, 1):
-                r, g, b = shot.at(x, y)
-                count += r > 200 and 120 < g < 190 and 60 < b < 140
-        return count
+        return sum(is_orange(shot.at(x, y))
+                   for y in range(shot.height - 52, shot.height) for x in range(shot.width))
 
     def wait_for(predicate, message):
         harness.wait_for(predicate, processes, message, timeout=10,
@@ -103,17 +102,10 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-shell-") as directory:
                     found[tail.split("\t")[1]] = shot.at(int(x) + int(w) // 2, int(y) + 1)
                 return found
 
-            def is_orange(pixel):
-                return pixel[0] > 200 and 120 < pixel[1] < 190 and 60 < pixel[2] < 140
-
-            def overview_marks():
-                msg("toggle_overview")
-                harness.wait_for(lambda: "shaodesk overview shown" in shell_log.read_text(),
-                                 processes, "the overview's text", timeout=5)
-                harness.wait_for(lambda: rims() and len(rims()) == 2, processes, "two thumbnails")
-                return None
-
-            overview_marks()
+            msg("toggle_overview")
+            harness.wait_for(lambda: "shaodesk overview shown" in shell_log.read_text(),
+                             processes, "the overview's text", timeout=5)
+            harness.wait_for(lambda: len(rims() or {}) == 2, processes, "two thumbnails")
             wait_for(lambda: (r := rims()) and is_orange(r["Alpha"]) and not is_orange(r["Beta"]),
                      "the overview frames only Alpha's thumbnail")
             msg("overview_cancel")

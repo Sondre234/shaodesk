@@ -47,6 +47,9 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-resize-test-") as directory:
     def wait_for(predicate, message):
         harness.wait_for(predicate, processes, message, detail=lambda: f"windows: {windows()}")
 
+    def stays(predicate, message):
+        harness.stays(predicate, processes, message, detail=lambda: f"windows: {windows()}")
+
     def focused():
         return next(w for w in windows() if w[0])
 
@@ -93,7 +96,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-resize-test-") as directory:
             before = tiles()
             msg("resize_up")
             msg("resize_down", "100")
-            assert tiles() == before, (before, tiles())
+            stays(lambda: tiles() == before, "up and down left the tiles alone")
             # Bad sizes are refused.
             for words in (("resize_right", "x"), ("resize_right", "0"),
                           ("resize_right", "40", "40"), ("resize_right", "99999")):
@@ -137,14 +140,14 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-resize-test-") as directory:
             before = focused()
             for action in ("resize_left", "resize_right", "resize_up", "resize_down"):
                 msg(action, "60")
-            assert focused() == before, (before, focused())
+            stays(lambda: focused() == before, "the maximized window kept its size")
             msg("restore")
             wait_for(lambda: focused()[4] < 1000, "restored")
             msg("fullscreen")
             wait_for(lambda: focused()[4] == 1280, "fullscreen")
             before = focused()
             msg("resize_left", "60")
-            assert focused() == before, (before, focused())
+            stays(lambda: focused() == before, "the fullscreen window kept its size")
             msg("fullscreen")
             wait_for(lambda: focused()[4] < 1280, "left fullscreen")
 
@@ -153,13 +156,12 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-resize-test-") as directory:
             msg("reload")
             before = focused()
             msg("resize_right", "80")
-            assert focused() == before, (before, focused())
+            stays(lambda: focused() == before, "turned off, the floating window kept its size")
             msg("toggle_floating")
             wait_for(lambda: len(tiles()) == 2, "tiled again")
             start = split()
             msg("resize_right", "80")
-            msg("resize_left", "80")
-            assert split() == start, (start, tiles())
+            stays(lambda: split() == start, "turned off, the split stayed")
             # Turned back on, the same request works again.
             init.write_text(CONFIG % (GAP, "true"))
             msg("reload")

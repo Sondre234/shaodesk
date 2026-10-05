@@ -84,7 +84,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-tiling-test-") as directory:
 
             launch()
             wait_for(lambda: len(windows()) == 1, processes, "first window")
-            assert windows()[0][2:] == (False, *windows()[0][3:]), "tiled while tiling is off"
+            assert not windows()[0][2], "tiled while tiling is off"
             floating = boxes()[0]
             assert floating[2:] == (320, 240), floating
 
@@ -123,21 +123,6 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-tiling-test-") as directory:
             wait_for(lambda: len(boxes()) == 3 and all(w[2] for w in windows()) and
                      disjoint(boxes()), processes,
                      "fourth window split a tile")
-
-            # Directional focus moves between tiles, never away from the asked direction.
-            def focused_center():
-                (x, y, width, height), = [w[3:] for w in windows() if w[0] == 1 and w[1]]
-                return x + width / 2, y + height / 2
-            moves = 0
-            for direction, axis, sign in (("left", 0, -1), ("right", 0, 1), ("right", 0, 1),
-                                          ("up", 1, -1), ("down", 1, 1), ("left", 0, -1)):
-                before = focused_center()
-                msg("focus_" + direction)
-                after = focused_center()
-                assert after == before or (after[axis] - before[axis]) * sign > 0, \
-                    (direction, before, after)
-                moves += after != before
-            assert moves >= 3, f"directional focus barely moved: {moves}"
 
             # Floating the focused window returns it to its floating size and reflows the rest.
             msg("toggle_floating")

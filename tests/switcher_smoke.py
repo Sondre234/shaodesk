@@ -217,6 +217,9 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-switcher-test-") as directory:
             else:
                 print("wtype not found: keyboard switching skipped")
             print("Window switcher passed")
+        except Exception:
+            print(log.read_text(), file=sys.stderr)
+            raise
         finally:
             for process in reversed(processes):
                 process.terminate()

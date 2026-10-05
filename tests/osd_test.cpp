@@ -188,8 +188,6 @@ class OsdTest : public QObject {
         QCOMPARE(none.percent(), -1);
         Backlight missing("/nonexistent/sysfs", true);
         QVERIFY(!missing.present());
-        // Without one there is nothing to poll for: the timer stays off.
-        QVERIFY(!missing.present());
         write(sys.filePath("class/backlight/broken/brightness"), "5\n"); // no max_brightness
         none.refresh();
         QVERIFY(!none.present());

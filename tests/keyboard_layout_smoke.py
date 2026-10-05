@@ -116,7 +116,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-layout-test-") as directory:
         assert active() == (1, {"one": 1, "two": 1}), active()
         msg("switch_layout", "1")
         assert active() == (1, {"one": 1, "two": 1}), active()
-        for words in (("3",), ("0",), ("-1",), ("sideways",), ("next", "next")):
+        for words in (("0",), ("-1",), ("sideways",), ("next", "next")):
             result = run("switch_layout", *words)
             assert result.returncode != 0, words
         result = run("switch_layout", "3")

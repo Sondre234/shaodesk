@@ -94,15 +94,11 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-magnet-test-") as directory:
             ww, wh = windows()["W"][2:4]
             assert (ww, wh) == (320, 240), windows()
 
-            def drag(x, y, *before):
-                """Presses on W, so it asks to move, and takes it so that it wants (x, y)."""
+            def drag():
+                """Presses on W, so it asks to move."""
                 wx, wy = where()
-                grab = (wx + 100, wy + 100)
-                pointer("move", str(grab[0]), str(grab[1]), "press", "left")
+                pointer("move", str(wx + 100), str(wy + 100), "press", "left")
                 time.sleep(0.15)  # the client turns the press into a move request
-                for command in before:
-                    pointer(*command.split())
-                return grab
 
             def to(grab_offset, x, y):
                 """Moves the pointer so the window would be at (x, y) without magnetism."""
@@ -112,7 +108,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-magnet-test-") as directory:
                 pointer("release", "left")
 
             # The output's left edge holds it (5 px away), and it stays 12 px out and no more.
-            drag(0, 0)
+            drag()
             to(100, 5, 200)
             assert where() == (0, 200), where()
             assert guides()[0] == (1, -1, 200, 3, 240) and guides()[1][0] == 0, guides()
@@ -161,7 +157,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-magnet-test-") as directory:
             assert where() == (0, 200) and guides()[0][0] == 0, (where(), guides())
 
             # Dropping at the top of the screen still maximizes.
-            drag(0, 0)
+            drag()
             pointer("move", "640", "0")
             release()
             wait_for(lambda: windows()["W"][2] > 1000, "dropped at the top: maximized")
@@ -172,7 +168,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-magnet-test-") as directory:
             # A shorter distance, or none, changes what is caught; the guides can be left out.
             init.write_text(config("distance = 4"))
             msg("reload")
-            drag(0, 0)
+            drag()
             to(100, 5, 200)
             assert where() == (5, 200), where()
             to(100, 3, 200)
@@ -180,7 +176,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-magnet-test-") as directory:
             release()
             init.write_text(config("distance = 30, guides = false, bypass = \"none\""))
             msg("reload")
-            drag(0, 0)
+            drag()
             to(100, 25, 380)
             assert where() == (0, 380), where()
             assert guides()[0][0] == 0, guides()
@@ -191,7 +187,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-magnet-test-") as directory:
             release()
             init.write_text(config("enabled = false"))
             msg("reload")
-            drag(0, 0)
+            drag()
             to(100, 3, 200)
             assert where() == (3, 200), where()
             assert guides()[0][0] == 0, guides()
