@@ -156,6 +156,8 @@ class NotificationsDbusTest : public QObject {
         // Closing what does not exist is not an error and sends nothing.
         auto reply = call("CloseNotification", {uint(987654)});
         QCOMPARE(reply.type(), QDBusMessage::ReplyMessage);
+        QCoreApplication::processEvents(); // a signal would have come before the reply
+        QCOMPARE(client_.closed.size(), 1);
     }
     void actionInvoked() {
         const uint id = notify("act", {}, {"default", "Open", "yes", "Yes"}, {}, 0);
@@ -310,10 +312,11 @@ class NotificationsDbusTest : public QObject {
         // The first keeps answering.
         QVERIFY(notify("still here", {}, {}, {}, 0) > 0);
     }
+    // Last, since it takes down the service the others use.
     void releasesTheName() {
         NotificationCenter other;
         NotificationService transient(other);
-        // A name that is taken is not stolen; once the owner goes it can be had.
+        // Once the owner goes, the name can be had.
         delete server_;
         server_ = nullptr;
         QVERIFY2(transient.start(QDBusConnection::connectToBus(address_, "shaodesk-test-third-" + clientName_)),
