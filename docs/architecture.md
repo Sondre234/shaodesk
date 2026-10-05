@@ -72,7 +72,8 @@ Code that only exists with XWayland is inside `#if WLR_HAS_XWAYLAND`.
    `shaodesk msg` and hot corners, and listed in the configuration reference.
 3. If it takes an argument, parse it in the `command` callback in `src/main.cpp` (the
    `action_takes_*` helpers in `config.cpp` say which kinds exist); otherwise it is refused
-   with "takes no argument".
+   with "takes no argument". One that starts a program goes through the `launch` callback
+   there, as `spawn` and `terminal` do, so a failure reaches the panel.
 4. Add a `case` to `run_action` in `src/compositor/actions.c` that calls the module doing the
    work. If it acts on the window under the pointer when bound to a button, list it in
    `action_targets_window` in `cursor.c`.
@@ -110,7 +111,9 @@ header to `server.h`.
 ### Telling the shell something
 
 `send_event` (`control.c`) sends a line to every subscriber; `send_shell_line` and
-`request_shell` are the shell-specific forms. The shell reads them in `shell/controller.cpp`.
+`request_shell` are the shell-specific forms, and `report_failure` logs a failure the user no
+longer waits on and shows it across the panel (`power-error`, `spawn-error`). The shell reads
+them in `shell/controller.cpp`.
 
 ### A new test
 
