@@ -50,6 +50,11 @@ const Option options[] = {
      "XKB options, e.g. `\"caps:escape\"`."},
     {"keyboard.rules", "string", "\"\"", "\"evdev\"", none, none,
      "XKB rules the other names are looked up in; `\"\"` uses xkbcommon's default, `evdev`."},
+    {"keyboard.file", "string", "\"\"", "", none, none,
+     "An XKB keymap file, such as `xkbcli compile-keymap` writes or a hand-written "
+     "`xkb_keymap { ... }`, used instead of the names above: absolute, starting with `~/`, or "
+     "relative to this file. One that cannot be read or compiled is a configuration error; "
+     "should it break while the session runs, the names above stand in for it."},
     {"keyboard.repeat_rate", "integer", "25", "25", 0, 100, "Key repeats per second."},
     {"keyboard.repeat_delay", "integer", "600", "600", 0, 5000,
      "Milliseconds a key is held before it repeats."},

@@ -35,6 +35,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `keyboard.model` | string | "" | - | XKB keyboard model. |
 | `keyboard.options` | string | "" | - | XKB options, e.g. `"caps:escape"`. |
 | `keyboard.rules` | string | "" | - | XKB rules the other names are looked up in; `""` uses xkbcommon's default, `evdev`. |
+| `keyboard.file` | string | "" | - | An XKB keymap file, such as `xkbcli compile-keymap` writes or a hand-written `xkb_keymap { ... }`, used instead of the names above: absolute, starting with `~/`, or relative to this file. One that cannot be read or compiled is a configuration error; should it break while the session runs, the names above stand in for it. |
 | `keyboard.repeat_rate` | integer | 25 | 0 to 100 | Key repeats per second. |
 | `keyboard.repeat_delay` | integer | 600 | 0 to 5000 | Milliseconds a key is held before it repeats. |
 

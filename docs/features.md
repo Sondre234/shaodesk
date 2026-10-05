@@ -668,6 +668,12 @@ cannot be turned off.
 The `keyboard` table sets the XKB `layout`, `variant`, `model`, `options` and `rules` (for example
 `{ layout = "us,no", variant = ",", options = "grp:alt_shift_toggle" }`), and the `repeat_rate` and
 `repeat_delay` clients see. An unknown combination is rejected with the rest of the file.
+`keyboard.file` names an XKB keymap to use instead, absolute, under `~/`, or relative to the
+configuration: what `xkbcli compile-keymap --layout us,no > keymap.xkb` writes, edited to
+taste, or a hand-written `xkb_keymap { ... }`. A file that cannot be read or does not compile is an error
+like any other, shown with the line of the setting and, where xkbcommon knows it, the line of
+the keymap (`init.lua:4: keyboard.file: /home/me/us-custom.xkb:12:5: syntax error`); should it
+break while the session runs, the keyboard falls back to the names.
 
 Pointer devices in a standalone `--session` take `mouse.speed` (-1 to 1),
 `mouse.acceleration` (`"flat"` or `"adaptive"`), and `mouse.natural_scroll`; touchpads also

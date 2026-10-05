@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -932,6 +933,18 @@ void read_effects(lua_State *L, Config &config) {
     lua_pop(L, 1);
     current_section.clear();
 }
+// A path as the configuration writes it, made absolute: "~/..." in the home directory, else
+// relative to the configuration file's `directory`.
+std::filesystem::path config_relative(const std::string &path,
+                                      const std::filesystem::path &directory) {
+    if (path.starts_with("~/")) {
+        const char *home = std::getenv("HOME");
+        if (!home || !*home)
+            fail(qualified("file") + " starts with ~/, but HOME is not set", "file");
+        return std::filesystem::path(home) / path.substr(2);
+    }
+    return std::filesystem::absolute(directory / path).lexically_normal();
+}
 // Keeps the first error xkbcommon reports, without its message code, in the string that is the
 // context's user data, instead of printing it.
 __attribute__((format(printf, 3, 0))) void keep_xkb_error(xkb_context *context,
@@ -950,7 +963,9 @@ __attribute__((format(printf, 3, 0))) void keep_xkb_error(xkb_context *context,
     *error = message;
 }
 // The compositor builds its keymap from these settings, so a configuration it could not build
-// one from is refused here, pointing at the keyboard table.
+// one from is refused here, pointing at the keyboard table, or at keyboard.file and the line of
+// the keymap file that xkbcommon stopped at. The names are checked with a file too, as they
+// stand in for one that breaks later.
 void check_keymap(const sh_settings &settings) {
     current_section = "keyboard";
     std::string error;
@@ -972,6 +987,35 @@ void check_keymap(const sh_settings &settings) {
     if (!keymap)
         fail("XKB has no keymap for this keyboard layout, variant, model, options and rules" +
              (error.empty() ? "" : ": " + error));
+    if (settings.keyboard_file[0]) {
+        const std::string path = settings.keyboard_file;
+        std::unique_ptr<FILE, decltype(&std::fclose)> file(std::fopen(path.c_str(), "rb"),
+                                                           std::fclose);
+        if (!file)
+            fail("keyboard.file: cannot read " + path + ": " + std::strerror(errno), "file");
+        std::string text;
+        char buffer[4096];
+        for (size_t count; (count = std::fread(buffer, 1, sizeof buffer, file.get())) > 0;) {
+            text.append(buffer, count);
+            if (text.size() > 4 * 1024 * 1024)
+                fail("keyboard.file: " + path + " exceeds 4 MiB", "file");
+        }
+        if (std::ferror(file.get()))
+            fail("keyboard.file: cannot read " + path, "file");
+        error.clear();
+        keymap.reset(xkb_keymap_new_from_string(context.get(), text.c_str(),
+                                                XKB_KEYMAP_FORMAT_TEXT_V1,
+                                                XKB_KEYMAP_COMPILE_NO_FLAGS));
+        if (!keymap) {
+            // xkbcommon calls what it parsed "(input string)": that is the file.
+            auto at = error.find("(input string)");
+            if (at != std::string::npos)
+                error.replace(at, std::strlen("(input string)"), path);
+            else
+                error = path + ": " + (error.empty() ? "not an XKB keymap" : error);
+            fail("keyboard.file: " + error, "file");
+        }
+    }
     current_section.clear();
 }
 void instruction_limit(lua_State *L, lua_Debug *) {
@@ -979,7 +1023,8 @@ void instruction_limit(lua_State *L, lua_Debug *) {
     if (--*remaining <= 0)
         luaL_error(L, "configuration exceeded its instruction budget");
 }
-Config read(lua_State *L, size_t own = SIZE_MAX) {
+// `directory` is the configuration file's, which relative paths in it start from.
+Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
     Config config;
     table(L, -1, "configuration result");
     keys(L, -1, "");
@@ -1008,6 +1053,14 @@ Config read(lua_State *L, size_t own = SIZE_MAX) {
         text_field(L, "model", config.settings.keyboard_model);
         text_field(L, "options", config.settings.keyboard_options);
         text_field(L, "rules", config.settings.keyboard_rules);
+        lua_getfield(L, -1, "file");
+        if (!lua_isnil(L, -1)) {
+            auto file = string(L, -1, "keyboard.file");
+            if (!file.empty())
+                copy_text(config_relative(file, directory).string(), config.settings.keyboard_file,
+                          "keyboard.file");
+        }
+        lua_pop(L, 1);
         config.settings.repeat_rate = integer(L, "repeat_rate", 25, 0, 100);
         config.settings.repeat_delay = integer(L, "repeat_delay", 600, 0, 5000);
     }
@@ -1961,7 +2014,7 @@ Config parse_config(const std::string &source, const std::string &name,
             start = starting_profile(L, names);
             if (!profile.empty())
                 apply_profile(L, profile);
-            return read(L, own);
+            return read(L, own, directory);
         };
         auto config = build("");
         // Every profile is checked, so picking one later cannot fail; the configuration
