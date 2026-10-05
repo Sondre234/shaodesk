@@ -32,7 +32,8 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-shell-") as directory:
     compositor_log, shell_log = root / "compositor.log", root / "shell.log"
     env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
                QT_QPA_PLATFORM="wayland", QT_QUICK_BACKEND="software", QT_FORCE_STDERR_LOGGING="1",
-               XDG_DATA_HOME=directory, XDG_DATA_DIRS=directory)
+               XDG_DATA_HOME=directory, XDG_DATA_DIRS=directory,
+               DBUS_SESSION_BUS_ADDRESS="disabled:")  # the shell must not use the real session bus
     env.pop("DISPLAY", None)
     env.pop("WAYLAND_DISPLAY", None)
     processes = []
