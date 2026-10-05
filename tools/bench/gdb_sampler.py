@@ -25,7 +25,7 @@ gdb.execute("set pagination off")
 gdb.execute("set confirm off")
 
 
-def frames_of(thread):
+def frames():
     names = []
     frame = gdb.newest_frame()
     while frame is not None and len(names) < depth:
@@ -43,9 +43,8 @@ def exited(event):
             out.write(f"incl {count} {name}\n")
 
 
-
 def sample():
-    names = frames_of(gdb.selected_thread())
+    names = frames()
     if names:
         total[0] += 1
         self_time[names[0]] += 1
