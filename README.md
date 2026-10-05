@@ -9,7 +9,7 @@ taskbar, launcher and notifications, and a Lua configuration that reloads when y
 [![license](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
 [![wlroots](https://img.shields.io/badge/wlroots-0.20-teal)](https://gitlab.freedesktop.org/wlroots/wlroots)
 [![Lua](https://img.shields.io/badge/config-Lua%205.4-navy)](docs/config-reference.md)
-[![release](https://img.shields.io/badge/release-0.1.0%20beta-yellowgreen)](CHANGELOG.md)
+[![release](https://img.shields.io/badge/release-0.1.1%20beta-yellowgreen)](CHANGELOG.md)
 
 [Highlights](#highlights) · [Building](#building) · [Installing](#installing) ·
 [Running](#running) · [Configuration](#configuration) · [Features](docs/features.md) ·
@@ -17,7 +17,7 @@ taskbar, launcher and notifications, and a Lua configuration that reloads when y
 
 </div>
 
-> **Status:** beta; 0.1.0 is the first release. It is the author's everyday desktop on Gentoo,
+> **Status:** beta; the latest release is 0.1.1. It is the author's everyday desktop on Gentoo,
 > as a session started from a display manager or a TTY, and it also runs nested in another
 > Wayland session. It has been used on few machines so far, so expect rough edges on hardware
 > it has not met: [docs/verification.md](docs/verification.md) records what has been checked,
