@@ -223,7 +223,7 @@ The match is by process ancestry, not by guessing: the new window's process (its
 client's pid, or the X11 window's) has to descend from the process of a terminal's window, however many shells and
 launchers lie between, read from `/proc`. Only windows whose `app_id` (X11 class) is in
 `windows.swallow.terminals` (compared without regard to case; by default kitty, foot, footclient,
-Alacritty, wezterm, ghostty, xterm, URxvt and konsole) can be swallowed. A window that is
+Alacritty, wezterm, ghostty, xterm, URxvt, konsole and GNOME Terminal) can be swallowed. A window that is
 itself a terminal never swallows (so a terminal started from a terminal opens beside it), nor
 does a dialog, an `app_id` in `windows.swallow.exceptions`, or a window a rule sends elsewhere
 (floating, another workspace or monitor, sticky). When a process has several windows (a

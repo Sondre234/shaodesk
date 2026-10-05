@@ -198,7 +198,8 @@ const Option options[] = {
     {"windows.swallow.enabled", "boolean", "false", "true", none, none,
      "Swallow automatically as windows open; `swallow_toggle` works either way."},
     {"windows.swallow.terminals", "list of strings", "kitty, foot, footclient, Alacritty, "
-     "org.wezfurlong.wezterm, com.mitchellh.ghostty, xterm, URxvt, org.kde.konsole",
+     "org.wezfurlong.wezterm, com.mitchellh.ghostty, xterm, URxvt, org.kde.konsole, "
+     "org.gnome.Terminal",
      "{ \"kitty\", \"foot\" }", none, none,
      "The `app_id`s (X11 class) of terminals that can be swallowed, compared without regard to "
      "case; at most 32. A window that is itself one of these never swallows."},

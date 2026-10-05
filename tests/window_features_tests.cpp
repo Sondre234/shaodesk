@@ -23,7 +23,7 @@ int main() {
     try {
         // Swallowing is off by default and knows the common terminals.
         auto defaults = shaodesk::parse_config("return {}");
-        require(!defaults.settings.swallow && defaults.settings.swallow_terminal_count == 9 &&
+        require(!defaults.settings.swallow && defaults.settings.swallow_terminal_count == 10 &&
                     !std::strcmp(defaults.settings.swallow_terminals[0], "kitty") &&
                     defaults.settings.swallow_exception_count == 0,
                 "swallow defaults changed");
@@ -38,7 +38,7 @@ int main() {
         require(!none.settings.swallow && none.settings.swallow_terminal_count == 0,
                 "an empty terminal list should clear the defaults");
         require(shaodesk::parse_config("return {windows={swallow={enabled=true}}}")
-                        .settings.swallow_terminal_count == 9,
+                        .settings.swallow_terminal_count == 10,
                 "enabling keeps the default terminals");
         rejects("return {windows={swallow={enabled='yes'}}}");
         rejects("return {windows={swallow={terminals='kitty'}}}");
