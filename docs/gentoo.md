@@ -131,8 +131,9 @@ ctest --test-dir build --output-on-failure
 cmake --install build
 ```
 
-Replace `foot` with an installed Wayland terminal. The default configuration starts kitty
-with Super+Q; the README's "First run" shows how to bind another. The executable uses the
+Replace `foot` with an installed Wayland terminal. The default configuration's Super+Q opens
+`$TERMINAL`, else the first of kitty, foot, alacritty, wezterm, ghostty, konsole,
+gnome-terminal and xterm that is installed; the README's "First run" shows how to choose one. The executable uses the
 installed example configuration when no personal config exists. To customize it, create
 `~/.config/shaodesk/init.lua` holding `extends = "default"` and your changes (see the
 README); installation never overwrites this personal file. For a custom location use `--config /path/to/init.lua`.
