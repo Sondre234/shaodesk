@@ -93,6 +93,16 @@ static void keyboard_handle_destroy(struct wl_listener *listener, void *data) {
     wl_list_remove(&keyboard->key.link);
     wl_list_remove(&keyboard->destroy.link);
     wl_list_remove(&keyboard->link);
+    // Without a seat keyboard, applications that start get no keymap until a key is typed: the
+    // seat takes another keyboard, a real one if there is one.
+    if (wlr_seat_get_keyboard(server->seat) == keyboard->wlr_keyboard) {
+        struct sh_keyboard *other, *next = NULL;
+        wl_list_for_each(other, &server->keyboards, link) {
+            if (!next || (next->is_virtual && !other->is_virtual))
+                next = other;
+        }
+        wlr_seat_set_keyboard(server->seat, next ? next->wlr_keyboard : NULL);
+    }
     free(keyboard);
 }
 
