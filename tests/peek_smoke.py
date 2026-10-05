@@ -9,7 +9,6 @@ import signal
 import subprocess
 import sys
 import tempfile
-import time
 
 import harness
 
@@ -105,13 +104,13 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-peek-test-") as directory:
                 print("wtype not found: held key skipped")
 
             # Immediate with animations off or a zero duration.
-            config.write_text(settings(0.25, 0))
-            server.send_signal(signal.SIGHUP)
-            time.sleep(0.3)
-            msg("peek_toggle")
-            wait_for(lambda: peek() == (1000, 1, 0), "immediate peek")
-            msg("peek_toggle")
-            wait_for(lambda: peek() == (0, 0, 0), "immediate end")
+            for immediate in (settings(0.25, 400, animations=False), settings(0.25, 0)):
+                config.write_text(immediate)
+                msg("reload")
+                msg("peek_toggle")
+                assert peek() == (1000, 1, 0), peek()
+                msg("peek_toggle")
+                assert peek() == (0, 0, 0), peek()
 
             server.send_signal(signal.SIGTERM)
             assert server.wait(timeout=30) == 0, log.read_text()
