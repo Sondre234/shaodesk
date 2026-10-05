@@ -763,6 +763,8 @@ void ShellController::updateTrayHost() {
     // Off, the shell leaves the names to another tray: applications would otherwise think their
     // icons are shown.
     if (!config_.shell.widgets.tray) {
+        if (trayHost_)
+            std::cerr << "shaodesk tray: off, its names released\n";
         delete trayHost_;
         trayHost_ = nullptr;
     } else if (!trayHost_) {
