@@ -914,6 +914,14 @@ inhibitor and lets it go once the lock holds, or when logind stops waiting (its
 without locking, and so does a session with no locker installed; turn it off if an idle daemon
 already locks before sleep (swayidle's `before-sleep`), or two lockers race.
 
+```lua
+power = {
+    lock_command = { "swaylock", "-f", "-c", "000000" },
+    close_timeout = 10000, -- ten seconds for applications to close
+    countdown = 5,         -- the confirmation's seconds
+},
+```
+
 ## Screenshots and screen sharing
 
 The `screenshot` action (Print, or `shaodesk msg screenshot region|output|window`) runs
