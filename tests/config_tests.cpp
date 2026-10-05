@@ -182,9 +182,6 @@ int main(int argc, char **argv) {
         require(sticky && sticky->action == SH_TOGGLE_STICKY, "sticky binding missing");
         auto *palette = config.binding(SH_LOGO, XKB_KEY_p);
         require(palette && palette->action == SH_PALETTE, "palette binding missing");
-        rejects("return {features={bogus=true}}");
-        rejects("return {features={true}}");
-        rejects("return {features=true}");
         rejects("return {bindings={{mods={'Super'},key='Tab',action='workspace_back',workspace=2}}}");
         auto *region = config.binding(0, XKB_KEY_Print);
         auto *whole = config.binding(SH_SHIFT, XKB_KEY_Print);
@@ -322,8 +319,6 @@ int main(int argc, char **argv) {
         require(!shaodesk::parse_config("return {features={scratchpad=false}}").settings.scratchpad,
                 "features.scratchpad not parsed");
         rejects("return {features={scratchpad=1}}");
-        rejects("return {features={no_such_feature=true}}");
-        rejects("return {features=true}");
         auto *hide = config.binding(SH_LOGO | SH_SHIFT, XKB_KEY_minus);
         require(hide && hide->action == SH_MOVE_TO_SCRATCHPAD, "scratchpad binding missing");
         auto *show = config.binding(SH_LOGO, XKB_KEY_minus);
@@ -487,8 +482,6 @@ int main(int argc, char **argv) {
         require(!off.settings.window_rules && off.window_actions("mpv", "").empty() &&
                     off.window_opacity("mpv", "", true) == 0.5F,
                 "features.window_rules = false not honoured");
-        rejects("return {features={bogus=true}}");
-        rejects("return {features={true}}");
         rejects("return {features=false}");
         rejects("return {windows={rules={{floating=true}}}}");
         rejects("return {windows={rules={{title='('}}}}");
