@@ -231,5 +231,11 @@ if(BUILD_TESTING)
                 $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:notify_probe> $<TARGET_FILE:pointer_probe>)
             set_tests_properties(notifications_smoke PROPERTIES TIMEOUT 90)
         endif()
+        if(SHAODESK_TRAY_DBUS)
+            add_test(NAME tray_smoke COMMAND ${Python3_EXECUTABLE}
+                ${PROJECT_SOURCE_DIR}/tests/tray_smoke.py $<TARGET_FILE:shaodesk>
+                $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:tray_probe> $<TARGET_FILE:pointer_probe>)
+            set_tests_properties(tray_smoke PROPERTIES TIMEOUT 90)
+        endif()
     endif()
 endif()
