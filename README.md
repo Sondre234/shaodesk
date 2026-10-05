@@ -134,6 +134,35 @@ When nested, the host may keep shortcuts for itself: a host that grabs Super (Hy
 needs `mod = "Alt"` in the configuration. Applications that reuse an existing process or D-Bus
 service may also open in the host session instead.
 
+### First run
+
+- **From a display manager**, pick shaodesk from its list of sessions. The entry (installed with
+  `SHAODESK_INSTALL_SESSION`, and by the Gentoo ebuild) runs `shaodesk --session`.
+- **From a text console**, log in and run `shaodesk --session`. A seat manager (elogind,
+  systemd-logind or seatd) has to give you the GPU and input devices, as it does for any
+  Wayland desktop. Where nothing else starts a D-Bus session bus, as is usual without systemd,
+  run `dbus-run-session -- shaodesk --session` instead: portals and notifications need one.
+- **To try it first**, run `shaodesk` inside your current Wayland session; it opens in a window.
+
+Without `~/.config/shaodesk/init.lua`, the installed [config/init.lua](config/init.lua) is
+used. Super + R opens the application menu, Super + Q starts kitty, Super + C closes the
+focused window, and Super + M quits; [Default bindings](#default-bindings) lists the rest. To
+use another terminal, write a configuration that extends the default:
+
+```lua
+return {
+    version = 1,
+    extends = "default",
+    bindings = {
+        { mods = { "Super" }, key = "q", action = "spawn", command = { "foot" } },
+    },
+}
+```
+
+shaodesk, the shell and the programs they start log to standard error. From a console, keep it
+in a file with `shaodesk --session 2> ~/shaodesk.log`; a display manager keeps it in its own
+log, such as SDDM's `~/.local/share/sddm/wayland-session.log`, or the journal under systemd.
+
 ## Configuration
 
 shaodesk reads `$XDG_CONFIG_HOME/shaodesk/init.lua` (`~/.config/shaodesk/init.lua`), else the
