@@ -221,6 +221,7 @@ struct sh_power {
      * being asked for, and whether logind has said the machine is about to sleep. */
     int sleep_delay;
     bool inhibiting, before_sleep;
+    int64_t locker_started; /* when a locker started for a sleep, until the lock holds (ms) */
     /* The Wayland clients whose windows closed to log out, until they disconnect. */
     struct sh_power_client {
         struct sh_server *server;

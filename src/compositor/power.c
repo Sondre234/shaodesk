@@ -88,6 +88,17 @@ static bool power_lock(struct sh_server *server, char *error, size_t error_size)
     return true;
 }
 
+/* Starts the locker for a sleep, unless one started for that is still on its way. */
+static bool lock_for_sleep(struct sh_server *server, char *error, size_t error_size) {
+    struct sh_power *power = &server->power;
+    if (power->locker_started && now_ms() - power->locker_started < LOCK_TIMEOUT_MS)
+        return true;
+    if (!power_lock(server, error, error_size))
+        return false;
+    power->locker_started = now_ms();
+    return true;
+}
+
 /* Whether the screen locks before the machine sleeps: power.lock_before_sleep, and a locker to
  * lock it with. */
 static bool lock_wanted(struct sh_server *server) {
@@ -161,12 +172,17 @@ static void prepare_for_sleep(void *data, bool before) {
         hold_sleep(server);
         return;
     }
+    // A suspend of ours still waiting for the lock is not needed any more: the machine sleeps.
+    if (power->step == SH_POWER_LOCKING) {
+        power->step = SH_POWER_IDLE;
+        wl_event_source_timer_update(power->timer, 0);
+    }
     if (power->sleep_delay < 0)
         return;
     char error[256];
     if (lock_holds(server)) {
         release_sleep(server);
-    } else if (!power_lock(server, error, sizeof(error))) {
+    } else if (!lock_for_sleep(server, error, sizeof(error))) {
         wlr_log(WLR_ERROR, "Sleeping without locking: %s", error);
         release_sleep(server);
     }
@@ -420,6 +436,7 @@ static int power_timeout(void *data) {
 /* The lock holds on every output: a suspend waiting for it goes ahead, and so does a sleep. */
 void power_locked(struct sh_server *server) {
     struct sh_power *power = &server->power;
+    power->locker_started = 0;
     if (power->before_sleep)
         release_sleep(server);
     if (power->step == SH_POWER_LOCKING)
@@ -460,7 +477,7 @@ bool power_start(struct sh_server *server, enum sh_action action, char *error,
     power->action = action;
     if ((action == SH_SUSPEND || action == SH_HIBERNATE) && lock_wanted(server) &&
         !lock_holds(server)) {
-        if (!power_lock(server, error, error_size))
+        if (!lock_for_sleep(server, error, error_size))
             return false;
         power->step = SH_POWER_LOCKING;
         wl_event_source_timer_update(power->timer, LOCK_TIMEOUT_MS);

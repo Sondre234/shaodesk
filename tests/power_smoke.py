@@ -319,6 +319,22 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
             login1.send_signal(signal.SIGUSR1)
             wait_for(locked_and(mark, "external suspend", *SLEPT), "the suspend after a crash")
             unlock()
+            # A sleep from elsewhere while a suspend of ours waits for the lock makes that one
+            # unneeded: the machine sleeps once, not again after waking.
+            reconfigure(locker=WAITING)
+            mark = len(logged())
+            msg("suspend")
+            pid = waiting(mark)
+            login1.send_signal(signal.SIGUSR1)
+            wait_for(lambda: "prepare" in logged(mark), "the outside suspend")
+            wait_for(lambda: power()["pending"] == "-", "our suspend given up")
+            os.kill(pid, signal.SIGUSR1)
+            wait_for(locked_and(mark, "external suspend", *SLEPT), "one sleep")
+            unlock()
+            assert "Suspend true" not in logged(mark), logged(mark)
+            # and one locker, not a second for the second reason to lock
+            assert len([line for line in logged(mark) if line.startswith("waiting ")]) == 1
+            reconfigure()
 
             # Without power.lock_before_sleep it just sleeps, whoever asks.
             reconfigure(before="false")
