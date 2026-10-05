@@ -54,9 +54,11 @@ if [ $sanitize = 1 ]; then
         -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
         -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
     # The test programs themselves exit without freeing their Wayland and Qt state; the
-    # suppressions leave leak reports to the compositor and the shell.
-    ASAN_OPTIONS=detect_leaks=1:abort_on_error=0 \
-    LSAN_OPTIONS=suppressions=$root/tests/lsan.supp:print_suppressions=0 \
+    # suppressions leave leak reports to the compositor and the shell. They match a test's
+    # source file, which the fast unwinder loses inside libraries built without frame
+    # pointers (libwayland-client, Qt), so leaks are unwound the slow way.
+    ASAN_OPTIONS=detect_leaks=1:abort_on_error=0:fast_unwind_on_malloc=0 \
+    LSAN_OPTIONS=suppressions=$root/tests/lsan.supp:print_suppressions=0:fast_unwind_on_malloc=0 \
     UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1 \
         ctest --test-dir "$asan" -j "$jobs" --output-on-failure "${repeat[@]}"
 fi
