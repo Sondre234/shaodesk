@@ -154,6 +154,21 @@ static void get_windows(struct sh_server *server, int fd, const char *arguments)
     control_describe_windows(server, fd);
 }
 
+static void get_pid_at(struct sh_server *server, int fd, const char *arguments) {
+    // The process of the window drawn at layout point X Y, or no line when there is none.
+    double x, y;
+    if (sscanf(arguments, "%lf %lf", &x, &y) != 2) {
+        control_reply(fd, "error: usage: get pid_at X Y\n");
+        return;
+    }
+    struct sh_toplevel *toplevel = toplevel_at(server, x, y);
+    pid_t pid = toplevel ? toplevel_pid(toplevel) : 0;
+    char reply[32] = "ok\n";
+    if (pid > 0)
+        snprintf(reply, sizeof(reply), "ok\n%d\n", (int)pid);
+    control_reply(fd, reply);
+}
+
 static void get_swallow(struct sh_server *server, int fd, const char *arguments) {
     // Per window, oldest first: app_id, whether it is swallowed (hidden), and the app_id of
     // the window it swallowed or was swallowed by ("-" for none).
@@ -332,6 +347,7 @@ static const struct {
     {"tiling", get_tiling, false},
     {"urgent", get_urgent, false},
     {"windows", get_windows, false},
+    {"pid_at", get_pid_at, true},
     {"swallow", get_swallow, false},
     {"guides", get_guides, false},
     {"animations", get_animations, false},

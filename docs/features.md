@@ -838,7 +838,8 @@ enabled, x, y, logical width and height, scale, transform, mode, and "make model
 `shaodesk msg get windows` prints one tab-separated line per window:
 workspace, focused, minimized, tiled, x, y, width, height, app ID, title, monitor,
 visible, scratchpad (a window hidden there is also minimized), sticky, and its window group
-(a number; 0 for none). `shaodesk msg get layers` prints one line per panel or other layer-shell surface:
+(a number; 0 for none). `shaodesk msg get pid_at X Y` prints the process ID of the window
+drawn at that layout point, or nothing over bare desktop. `shaodesk msg get layers` prints one line per panel or other layer-shell surface:
 namespace, output, layer (0 background to 3 overlay), and whether it is shown.
 `shaodesk msg get animations` prints the number of running animations and of window trees in
 the scene (closing windows count until their animation ends), and of focus fades, mainly

@@ -354,6 +354,11 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(swallow_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME pid_at_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/pid_at_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>
+            ${EXAMPLE_CONFIG})
+        set_tests_properties(pid_at_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME placement_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/placement_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)

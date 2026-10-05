@@ -618,6 +618,7 @@ void server_cursor_axis(struct wl_listener *listener, void *data);
 void server_cursor_frame(struct wl_listener *listener, void *data);
 void seat_request_cursor(struct wl_listener *listener, void *data);
 void set_default_cursor(struct sh_server *server);
+struct sh_toplevel *toplevel_at(struct sh_server *server, double x, double y);
 void seat_pointer_focus_change(struct wl_listener *listener, void *data);
 
 /* effects.c */
