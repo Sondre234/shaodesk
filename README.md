@@ -30,7 +30,7 @@ taskbar, launcher and notifications, and a Lua configuration that reloads when y
 - **Per-monitor workspaces**, a scratchpad, sticky windows, tab groups, window rules,
   terminal swallowing, and saved sessions you can restore.
 - **A Qt Quick shell** on every monitor: taskbar, application menu, workspace indicator,
-  battery, network, volume, clock and calendar, a notification daemon with history and
+  battery, network, volume, keyboard layout, clock and calendar, a notification daemon with history and
   do-not-disturb, an on-screen display, an Alt + Tab switcher, an Exposé-style overview,
   and a command palette.
 - **Effects:** interruptible animations with spring curves, dimming of inactive windows, peek,
