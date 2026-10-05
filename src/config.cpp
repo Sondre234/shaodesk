@@ -1171,6 +1171,25 @@ Config read(lua_State *L, size_t own = SIZE_MAX) {
     }
     lua_pop(L, 1);
     current_section.clear();
+    if (section(L, "power")) {
+        lua_getfield(L, -1, "lock_command");
+        if (!lua_isnil(L, -1)) {
+            // A program and its arguments, or {} for no locker.
+            auto size = array_size(L, -1, 64);
+            Command locker;
+            for (size_t i = 1; i <= size; ++i) {
+                lua_rawgeti(L, -1, static_cast<lua_Integer>(i));
+                locker.push_back(string(L, -1, "power.lock_command argument"));
+                lua_pop(L, 1);
+            }
+            if (!locker.empty() && locker.front().empty())
+                fail("power.lock_command's program is empty", "lock_command");
+            config.power.lock_command = std::move(locker);
+        }
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+    current_section.clear();
     lua_getfield(L, -1, "bindings");
     current_section = "bindings";
     if (!lua_isnil(L, -1)) {
@@ -1383,6 +1402,7 @@ constexpr std::pair<std::string_view, sh_action> action_table[] = {
         {"suspend", SH_SUSPEND},
         {"hibernate", SH_HIBERNATE},
         {"logout", SH_LOGOUT},
+        {"lock", SH_LOCK},
         {"scroll_left", SH_SCROLL_LEFT},
         {"scroll_right", SH_SCROLL_RIGHT},
         {"column_widen", SH_COLUMN_WIDEN},

@@ -104,6 +104,12 @@ struct ScreenshotConfig {
     bool notify = true;    // announce the file with notify-send, when it is installed
 };
 
+// Lua `power`.
+struct PowerConfig {
+    // The screen locker the `lock` action starts; empty for none.
+    Command lock_command{"swaylock", "-f"};
+};
+
 // Where the notification cards and the on-screen display sit on the focused monitor.
 enum class Corner { TopRight, TopLeft, BottomRight, BottomLeft };
 
@@ -239,6 +245,7 @@ struct Config {
     NotificationsConfig notifications;
     OsdConfig osd;
     ScreenshotConfig screenshots;
+    PowerConfig power;
     float opacity = 1, inactive_opacity = 1;
     std::vector<WindowRule> window_rules;
     // GTK's button layout for client-decorated windows (Firefox's tab strip); empty: GTK's own.

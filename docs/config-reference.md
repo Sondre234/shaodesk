@@ -272,6 +272,13 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `osd.volume` | boolean | true | - | Show it when the default output's volume or mute changes, by keys or from any application. |
 | `osd.brightness` | boolean | true | - | Show it when a backlight's brightness changes. |
 
+## `power`
+
+| Setting | Type | Default | Range | Description |
+| --- | --- | --- | --- | --- |
+| `power` | table | - | - | Power controls: the `lock`, `suspend`, `hibernate`, `reboot`, `poweroff` and `logout` actions. All but `lock` and `logout` go through logind (systemd-logind or elogind). |
+| `power.lock_command` | list of strings | { "swaylock", "-f" } | - | The screen locker `lock` starts, an `ext-session-lock-v1` client, as a program and its arguments; `{}` for none. Locking is offered only while the program is installed. |
+
 ## `startup`
 
 | Setting | Type | Default | Range | Description |
@@ -341,7 +348,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 
 ## Binding actions
 
-`spawn`, `quit`, `close`, `cycle`, `snap_left`, `snap_right`, `maximize`, `restore`, `tile`, `reload`, `fullscreen`, `workspace`, `move_to_workspace`, `workspace_next`, `workspace_prev`, `workspace_back`, `toggle_tiling`, `layout_next`, `layout_prev`, `layout_dwindle`, `layout_master`, `layout_spiral`, `layout_monocle`, `layout_scroll`, `promote`, `focus_next`, `focus_prev`, `swap_next`, `swap_prev`, `master_grow`, `master_shrink`, `master_more`, `master_less`, `peek`, `peek_toggle`, `night_light_toggle`, `night_light_on`, `night_light_off`, `night_light_auto`, `zoom_in`, `zoom_out`, `zoom_reset`, `move_workspace_to_output`, `swap_workspaces`, `swallow_toggle`, `dnd_toggle`, `dnd_on`, `dnd_off`, `notification_history`, `poweroff`, `reboot`, `scroll_left`, `scroll_right`, `column_widen`, `column_narrow`, `column_cycle_width`, `consume_left`, `consume_right`, `expel`, `center_column`, `toggle_floating`, `launcher`, `focus_left`, `focus_right`, `focus_up`, `focus_down`, `screenshot`, `move_left`, `move_right`, `move_up`, `move_down`, `move_to_scratchpad`, `scratchpad_show`, `toggle_sticky`, `resize_left`, `resize_right`, `resize_up`, `resize_down`, `switcher`, `switcher_prev`, `switcher_confirm`, `switcher_cancel`, `focus_last`, `focus_urgent`, `group_toggle`, `group_next`, `group_prev`, `ungroup`, `group_merge_left`, `group_merge_right`, `group_merge_up`, `group_merge_down`, `palette`, `toggle_overview`, `overview_confirm`, `overview_cancel`
+`spawn`, `quit`, `close`, `cycle`, `snap_left`, `snap_right`, `maximize`, `restore`, `tile`, `reload`, `fullscreen`, `workspace`, `move_to_workspace`, `workspace_next`, `workspace_prev`, `workspace_back`, `toggle_tiling`, `layout_next`, `layout_prev`, `layout_dwindle`, `layout_master`, `layout_spiral`, `layout_monocle`, `layout_scroll`, `promote`, `focus_next`, `focus_prev`, `swap_next`, `swap_prev`, `master_grow`, `master_shrink`, `master_more`, `master_less`, `peek`, `peek_toggle`, `night_light_toggle`, `night_light_on`, `night_light_off`, `night_light_auto`, `zoom_in`, `zoom_out`, `zoom_reset`, `move_workspace_to_output`, `swap_workspaces`, `swallow_toggle`, `dnd_toggle`, `dnd_on`, `dnd_off`, `notification_history`, `poweroff`, `reboot`, `suspend`, `hibernate`, `logout`, `lock`, `scroll_left`, `scroll_right`, `column_widen`, `column_narrow`, `column_cycle_width`, `consume_left`, `consume_right`, `expel`, `center_column`, `toggle_floating`, `launcher`, `focus_left`, `focus_right`, `focus_up`, `focus_down`, `screenshot`, `move_left`, `move_right`, `move_up`, `move_down`, `move_to_scratchpad`, `scratchpad_show`, `toggle_sticky`, `resize_left`, `resize_right`, `resize_up`, `resize_down`, `switcher`, `switcher_prev`, `switcher_confirm`, `switcher_cancel`, `focus_last`, `focus_urgent`, `group_toggle`, `group_next`, `group_prev`, `ungroup`, `group_merge_left`, `group_merge_right`, `group_merge_up`, `group_merge_down`, `palette`, `toggle_overview`, `overview_confirm`, `overview_cancel`
 
 `spawn` needs `command`; `workspace` and `move_to_workspace` need `workspace`; `screenshot` takes `mode`; `resize_*` take `amount`.
 

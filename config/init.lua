@@ -183,6 +183,8 @@ return {
     -- Notifications (the shell answers org.freedesktop.Notifications) and the on-screen display:
     -- notifications = { position = "top-right", timeout = 6000, max_visible = 4, dnd = false },
     -- osd = { position = "bottom", timeout = 1500, volume = true, brightness = true },
+    -- The screen locker the lock action starts ({} for none):
+    -- power = { lock_command = { "swaylock", "-f" } },
     startup = {}, -- e.g. { { "kitty" } }
     bindings = {
         -- Mouse buttons bind too: left, right, middle, side, extra (most mice's back and

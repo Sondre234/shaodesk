@@ -440,6 +440,14 @@ const Option options[] = {
     {"osd.brightness", "boolean", "true", "true", none, none,
      "Show it when a backlight's brightness changes."},
 
+    {"power", "table", "", "", none, none,
+     "Power controls: the `lock`, `suspend`, `hibernate`, `reboot`, `poweroff` and `logout` "
+     "actions. All but `lock` and `logout` go through logind (systemd-logind or elogind)."},
+    {"power.lock_command", "list of strings", "{ \"swaylock\", \"-f\" }", "{ \"gtklock\" }", none,
+     none,
+     "The screen locker `lock` starts, an `ext-session-lock-v1` client, as a program and its "
+     "arguments; `{}` for none. Locking is offered only while the program is installed."},
+
     {"startup", "list of commands", "unset", "", none, none,
      "Commands started once when the compositor starts (not on reload), at most 32; each is "
      "an argument list, e.g. `{ { \"kitty\" } }`."},

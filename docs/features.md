@@ -858,7 +858,9 @@ refused while the session is locked.
 ## Screen locking and idle
 
 Screen locking uses the standard `ext-session-lock-v1` protocol, so lockers such
-as swaylock or gtklock work; bind one with a `spawn` action. The desktop is covered
+as swaylock or gtklock work; the `lock` action starts the one `power.lock_command` names
+(`{ "swaylock", "-f" }` unless set; `{}` for none), and is refused while that program is not
+installed. The desktop is covered
 before the locker draws, only the locker receives input, and if it crashes the
 session stays locked until a new locker takes over. Idle notification and idle
 inhibition (`ext-idle-notify-v1`, `idle-inhibit-unstable-v1`) let swayidle lock

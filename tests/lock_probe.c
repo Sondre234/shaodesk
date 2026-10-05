@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-/* Session-lock client: locking, rejection, focus isolation, unlock, and abandonment. */
+/* Session-lock client: locking, rejection, focus isolation, unlock, and abandonment; and a
+ * locker that holds the lock until told to let go, for the power tests. */
 #define _GNU_SOURCE
 #include "ext-session-lock-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
+#include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/signalfd.h>
 #include <time.h>
 #include <unistd.h>
 #include <wayland-client.h>
@@ -218,10 +223,62 @@ static void map_window(struct probe *probe) {
         die("a window was focused while the session was locked");
 }
 
+/* Appends a line to `path` in one write, so it lands whole among other writers' lines. */
+static void append(const char *path, const char *format, ...) {
+    char line[128];
+    va_list arguments;
+    va_start(arguments, format);
+    int length = vsnprintf(line, sizeof(line) - 1, format, arguments);
+    va_end(arguments);
+    line[length++] = '\n';
+    int fd = open(path, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0644);
+    if (fd < 0 || write(fd, line, (size_t)length) != length)
+        die("cannot write the log");
+    close(fd);
+}
+
+/* "hold LOG": locks, appends "locked PID" to LOG, and keeps the lock until SIGTERM; then unlocks
+ * and appends "unlocked". */
+static int hold(struct probe *probe, const char *log) {
+    sigset_t signals;
+    sigemptyset(&signals);
+    sigaddset(&signals, SIGTERM);
+    sigaddset(&signals, SIGINT);
+    sigprocmask(SIG_BLOCK, &signals, NULL);
+    int signal_fd = signalfd(-1, &signals, SFD_CLOEXEC);
+    if (signal_fd < 0)
+        die("cannot watch for signals");
+    struct ext_session_lock_v1 *lock = lock_session(probe);
+    append(log, "locked %d", (int)getpid());
+    for (bool done = false; !done;) {
+        while (wl_display_prepare_read(probe->display) != 0)
+            wl_display_dispatch_pending(probe->display);
+        wl_display_flush(probe->display);
+        struct pollfd fds[2] = {{wl_display_get_fd(probe->display), POLLIN, 0},
+                                {signal_fd, POLLIN, 0}};
+        if (poll(fds, 2, -1) > 0 && (fds[0].revents & POLLIN)) {
+            if (wl_display_read_events(probe->display) < 0)
+                die("dispatch failed");
+        } else {
+            wl_display_cancel_read(probe->display);
+        }
+        if (wl_display_dispatch_pending(probe->display) < 0)
+            die("dispatch failed");
+        done = fds[1].revents & POLLIN;
+    }
+    ext_session_lock_v1_unlock_and_destroy(lock);
+    if (wl_display_roundtrip(probe->display) < 0)
+        die("unlock failed");
+    append(log, "unlocked");
+    return 0;
+}
+
 int main(int argc, char **argv) {
-    const char *mode = argc == 2 ? argv[1] : "";
-    if (strcmp(mode, "cycle") && strcmp(mode, "abandon") && strcmp(mode, "check-locked"))
-        die("usage: lock_probe cycle|abandon|check-locked");
+    const char *mode = argc >= 2 ? argv[1] : "";
+    if (!(argc == 3 && !strcmp(mode, "hold")) &&
+        (argc != 2 || (strcmp(mode, "cycle") && strcmp(mode, "abandon") &&
+                       strcmp(mode, "check-locked"))))
+        die("usage: lock_probe cycle|abandon|check-locked|hold LOG");
     struct probe probe = {0};
     probe.display = wl_display_connect(NULL);
     if (!probe.display)
@@ -234,6 +291,9 @@ int main(int argc, char **argv) {
         die("session lock globals missing");
     if (!probe.idle_notifier || !probe.idle_inhibit)
         die("idle notify/inhibit globals missing");
+
+    if (!strcmp(mode, "hold"))
+        return hold(&probe, argv[2]);
 
     if (!strcmp(mode, "check-locked")) {
         // An abandoned lock must keep refusing focus to new windows.

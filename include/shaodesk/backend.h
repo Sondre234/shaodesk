@@ -158,6 +158,7 @@ enum sh_action {
     SH_SUSPEND,
     SH_HIBERNATE,
     SH_LOGOUT,
+    SH_LOCK, /* starts power.lock_command */
 };
 
 enum sh_screenshot_mode {
@@ -386,6 +387,10 @@ struct sh_callbacks {
     /* Reads what is pending on that descriptor; true when a configuration file changed and the
      * configuration should be reloaded. */
     bool (*config_changed)(void *);
+    /* Whether power.lock_command can lock the screen: one is set and its program is installed
+     * (as of the configuration's last load). With `start`, also starts it. False, with the
+     * reason, when it cannot. */
+    bool (*lock)(void *, bool start, char *error, size_t error_size);
 };
 
 enum sh_backend_mode { SH_BACKEND_NESTED, SH_BACKEND_HEADLESS, SH_BACKEND_SESSION };

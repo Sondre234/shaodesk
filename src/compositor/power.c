@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Power: suspend, hibernate, reboot and power off through logind, and what it allows of them,
- * over a connection that never blocks the compositor (src/login1.c); and logging out. */
+ * over a connection that never blocks the compositor (src/login1.c); locking the screen with
+ * power.lock_command; and logging out. */
 #include "server.h"
 
 #include <ctype.h>
@@ -13,6 +14,7 @@ static const struct {
     const char *name, *label;
     enum sh_login1_method method;
 } actions[] = {
+    {SH_LOCK, "lock", "lock the screen", SH_LOGIN1_METHODS},
     {SH_SUSPEND, "suspend", "suspend", SH_LOGIN1_SUSPEND},
     {SH_HIBERNATE, "hibernate", "hibernate", SH_LOGIN1_HIBERNATE},
     {SH_REBOOT, "reboot", "reboot", SH_LOGIN1_REBOOT},
@@ -179,7 +181,7 @@ static bool power_connect(struct sh_server *server, char *error, size_t error_si
 static bool power_call(struct sh_server *server, char *error, size_t error_size) {
     struct sh_power *power = &server->power;
     enum sh_login1_method method = actions[action_index(power->action)].method;
-    if (method == SH_LOGIN1_METHODS) {
+    if (power->action == SH_LOGOUT) {
         wlr_log(WLR_INFO, "Logging out");
         power->step = SH_POWER_IDLE;
         wl_display_terminate(server->wl_display);
@@ -196,6 +198,26 @@ static bool power_call(struct sh_server *server, char *error, size_t error_size)
     return true;
 }
 
+/* Whether power.lock_command can lock the screen; with `start`, starts it too. */
+static bool locker(struct sh_server *server, bool start, char *error, size_t error_size) {
+    const struct sh_callbacks *callbacks = server->callbacks;
+    if (!callbacks->lock) {
+        snprintf(error, error_size, "no screen locker");
+        return false;
+    }
+    return callbacks->lock(callbacks->userdata, start, error, error_size);
+}
+
+/* Starts the screen locker, unless the screen is locked already. */
+static bool power_lock(struct sh_server *server, char *error, size_t error_size) {
+    if (server->locked)
+        return true;
+    if (!locker(server, true, error, error_size))
+        return false;
+    wlr_log(WLR_INFO, "Started the screen locker");
+    return true;
+}
+
 bool power_start(struct sh_server *server, enum sh_action action, char *error,
                  size_t error_size) {
     struct sh_power *power = &server->power;
@@ -204,6 +226,8 @@ bool power_start(struct sh_server *server, enum sh_action action, char *error,
         snprintf(error, error_size, "not a power action");
         return false;
     }
+    if (action == SH_LOCK)
+        return power_lock(server, error, error_size);
     if (power->step != SH_POWER_IDLE) {
         snprintf(error, error_size, "%s is already under way", action_label(power->action));
         return false;
@@ -244,11 +268,15 @@ bool power_describe(struct sh_server *server, size_t index, const char **name,
         return false;
     struct sh_power *power = &server->power;
     enum sh_login1_method method = actions[index].method;
+    char ignored[256];
     *name = actions[index].name;
-    *status = method == SH_LOGIN1_METHODS ? "yes"
-              : !power->login1           ? "unavailable"
-              : power->answers[method][0] ? power->answers[method]
-                                          : "unknown";
+    *status = actions[index].action == SH_LOCK ? (locker(server, false, ignored, sizeof(ignored))
+                                                      ? "yes"
+                                                      : "no")
+              : method == SH_LOGIN1_METHODS ? "yes"
+              : !power->login1             ? "unavailable"
+              : power->answers[method][0]   ? power->answers[method]
+                                            : "unknown";
     return true;
 }
 
