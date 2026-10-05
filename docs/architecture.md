@@ -41,6 +41,7 @@ all. In short:
 | `control.c` | The control socket: reading requests, commands that are not actions, subscribers and shell events. |
 | `query.c` | `shaodesk msg get ...`: one function per query, and the table that names them. |
 | `input.c` | Keyboards, key bindings, pointers' libinput settings, virtual devices, selection and drag-and-drop. |
+| `keymap.c` | The keymap from the keyboard settings, given to every keyboard but virtual ones. |
 | `cursor.c` | What is under the pointer, focus on hover, button bindings, scrolling, the cursor image. |
 | `grab.c` | Moving and resizing with the pointer, magnetic edges, dropping. |
 | `focus.c` | Keyboard focus and urgent windows. |

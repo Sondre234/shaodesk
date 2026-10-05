@@ -703,7 +703,6 @@ void group_merge(struct sh_server *server, enum sh_action action);
 void dissolve_groups(struct sh_server *server);
 
 /* input.c */
-bool configure_keyboard(struct sh_server *server, struct wlr_keyboard *keyboard);
 void configure_pointer(struct sh_server *server, struct wlr_input_device *device);
 void server_new_input(struct wl_listener *listener, void *data);
 void server_new_virtual_keyboard(struct wl_listener *listener, void *data);
@@ -714,6 +713,10 @@ void seat_request_start_drag(struct wl_listener *listener, void *data);
 void seat_start_drag(struct wl_listener *listener, void *data);
 void server_new_constraint(struct wl_listener *listener, void *data);
 void seat_keyboard_focus_change(struct wl_listener *listener, void *data);
+
+/* keymap.c */
+bool configure_keyboard(struct sh_server *server, struct wlr_keyboard *keyboard);
+void reload_keymaps(struct sh_server *server);
 
 /* layer_shell.c */
 void arrange_layers(struct sh_server *server);

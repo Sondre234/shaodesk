@@ -161,6 +161,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/grab.c
         src/compositor/group.c
         src/compositor/input.c
+        src/compositor/keymap.c
         src/compositor/layer_shell.c
         src/compositor/lock.c
         src/compositor/output.c

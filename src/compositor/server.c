@@ -57,13 +57,7 @@ void reload_config(struct sh_server *server) {
     night_light_update(server);
     if (!server_settings(server)->overview)
         overview_dismiss(server);
-    struct sh_keyboard *keyboard;
-    wl_list_for_each(keyboard, &server->keyboards, link) {
-        if (wlr_input_device_get_virtual_keyboard(&keyboard->wlr_keyboard->base))
-            continue;
-        if (!configure_keyboard(server, keyboard->wlr_keyboard))
-            wlr_log(WLR_ERROR, "Could not apply reloaded keymap");
-    }
+    reload_keymaps(server);
     struct sh_pointer *pointer;
     wl_list_for_each(pointer, &server->pointers, link) configure_pointer(server, pointer->device);
     // Enable outputs before disabling others, so a swap never leaves none on.
