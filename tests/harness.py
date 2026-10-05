@@ -60,9 +60,9 @@ class Compositor:
     (WAYLAND_DISPLAY, SHAODESK_SOCKET, and DISPLAY when XWayland listens).
 
     As a context manager it starts the compositor (unless start=False, for a test that sets
-    something up first). On the way out it ends every process it started, checks that the
-    compositor shuts down cleanly (unless the test failed), prints the logs if anything failed,
-    and removes the directory.
+    something up first). On the way out, unless the test failed, it checks that the compositor
+    shuts down cleanly with its clients still connected, as at the end of a session; then it ends
+    every process it started, prints the logs if anything failed, and removes the directory.
 
         with harness.Compositor(compositor, CONFIG) as desktop:
             desktop.spawn([probe, "--window-only"])
@@ -107,9 +107,6 @@ class Compositor:
     def __exit__(self, kind, error, trace):
         failed = kind is not None
         try:
-            for process in reversed(self.clients):
-                end(process)
-            self.clients.clear()
             if self.server is not None and not failed:
                 self.stop()
         except BaseException:
@@ -118,6 +115,7 @@ class Compositor:
         finally:
             for process in reversed(self._started):
                 end(process)
+            self.clients.clear()
             if failed:
                 for path in self._logs:
                     if path.exists():
