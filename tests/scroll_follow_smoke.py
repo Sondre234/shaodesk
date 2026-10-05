@@ -24,7 +24,7 @@ CONFIG = """return {
 EXPECTED = {"edge": 0, "center": 320, "never": -640}
 
 for follow, expected in EXPECTED.items():
-    with tempfile.TemporaryDirectory(prefix="shaodesk-scroll-follow-test-") as directory:
+    with tempfile.TemporaryDirectory(prefix="shaodesk-scroll-follow-") as directory:
         root = Path(directory)
         init = root / "init.lua"
         init.write_text(CONFIG % follow)

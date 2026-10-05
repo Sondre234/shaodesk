@@ -2,9 +2,12 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Network Qml Quick)
 pkg_check_modules(GIO REQUIRED IMPORTED_TARGET gio-unix-2.0)
 pkg_check_modules(SHELL_WAYLAND REQUIRED IMPORTED_TARGET wayland-client)
 # PulseAudio's client library (PipeWire serves it too) drives the panel's volume control.
-pkg_check_modules(PULSE IMPORTED_TARGET libpulse)
-if(NOT PULSE_FOUND)
-    message(STATUS "libpulse not found: the panel's volume control is left out")
+option(SHAODESK_PULSEAUDIO "Control sound from the panel through libpulse" ON)
+if(SHAODESK_PULSEAUDIO)
+    pkg_check_modules(PULSE IMPORTED_TARGET libpulse)
+    if(NOT PULSE_FOUND)
+        message(STATUS "libpulse not found: the panel's volume control is left out")
+    endif()
 endif()
 # The notification daemon speaks D-Bus; without QtDBus the shell builds without it and the panel
 # leaves out the bell.
@@ -38,7 +41,7 @@ add_executable(shaodesk-shell main.cpp ${SHAODESK_NOTIFY_SOURCES} controller.cpp
     task_filter.cpp task_filter.hpp icons.cpp icons.hpp wallpapers.cpp wallpapers.hpp view.cpp view.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp
     ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
     ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h)
-add_dependencies(shaodesk-shell shaodesk_wlr_client_protocols)
+add_dependencies(shaodesk-shell shaodesk_wlr_client_protocols shaodesk_version)
 set_target_properties(shaodesk-shell PROPERTIES AUTOMOC ON RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 target_include_directories(shaodesk-shell PRIVATE ${PROJECT_BINARY_DIR})
 target_link_libraries(shaodesk-shell PRIVATE shaodesk_config Qt6::Core Qt6::Gui Qt6::Network Qt6::Qml Qt6::Quick
@@ -49,7 +52,7 @@ if(SHAODESK_DBUS)
     target_link_libraries(shaodesk-shell PRIVATE Qt6::DBus)
     target_compile_definitions(shaodesk-shell PRIVATE SHAODESK_DBUS=1)
 endif()
-if(PULSE_FOUND)
+if(SHAODESK_PULSEAUDIO AND PULSE_FOUND)
     target_sources(shaodesk-shell PRIVATE pulse_audio.cpp)
     target_link_libraries(shaodesk-shell PRIVATE PkgConfig::PULSE)
     target_compile_definitions(shaodesk-shell PRIVATE SHAODESK_PULSE=1)
@@ -172,6 +175,8 @@ if(BUILD_TESTING)
         ${PROJECT_SOURCE_DIR}/tests/shell_preview.py $<TARGET_FILE:shaodesk-shell>
         ${PROJECT_SOURCE_DIR}/config/init.lua)
     set_tests_properties(shell_preview PROPERTIES TIMEOUT 90)
+    add_test(NAME shell_version COMMAND shaodesk-shell --version)
+    set_tests_properties(shell_version PROPERTIES PASS_REGULAR_EXPRESSION "^shaodesk-shell ${PROJECT_VERSION}( \\(git [^)]+\\))?\n$")
     if(NOT SHAODESK_SHELL_PREVIEW_ONLY)
         add_test(NAME shell_integration COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/shell_integration.py $<TARGET_FILE:shaodesk>

@@ -26,7 +26,7 @@ CONFIG = """return {
                              ["HEADLESS-2"] = { mode = "800x600" } } },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-overview-fuzz-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-overview-fuzz-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(CONFIG)

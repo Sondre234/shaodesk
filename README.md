@@ -11,8 +11,9 @@ taskbar, launcher and notifications, and a Lua configuration that reloads when y
 [![Lua](https://img.shields.io/badge/config-Lua%205.4-navy)](docs/config-reference.md)
 [![status](https://img.shields.io/badge/status-early%20development-orange)](docs/verification.md)
 
-[Highlights](#highlights) · [Building](#building) · [Running](#running) ·
-[Configuration](#configuration) · [Features](docs/features.md) · [Contributing](CONTRIBUTING.md)
+[Highlights](#highlights) · [Building](#building) · [Installing](#installing) ·
+[Running](#running) · [Configuration](#configuration) · [Features](docs/features.md) ·
+[Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -56,6 +57,9 @@ Requirements:
 - For the shell: Qt 6.5+ (Core, Gui, Network, Qml, Quick, Quick Controls Basic, Quick Layouts,
   the Wayland platform plugin, and DBus for notifications), LayerShellQt 6.6+, GLib/GIO,
   wayland-client
+- libinput and xcb (with xcb-xfixes) when wlroots is built with its libinput backend or with
+  XWayland; optionally sd-bus (libsystemd, libelogind or basu) for the
+  [sleep inhibitor](docs/features.md#screen-locking-and-idle) and libpulse for the volume control
 - Python 3 for the tests
 
 ```sh
@@ -65,8 +69,7 @@ ctest --test-dir build --output-on-failure
 ```
 
 Without `CMAKE_BUILD_TYPE` the build is `RelWithDebInfo`; pass `-DCMAKE_BUILD_TYPE=Debug` for a
-debug build. Installing honours the usual prefix and `DESTDIR`. Gentoo setup is described in
-[docs/gentoo.md](docs/gentoo.md).
+debug build.
 
 | Option | Default | Effect |
 | --- | --- | --- |
@@ -74,8 +77,39 @@ debug build. Installing honours the usual prefix and `DESTDIR`. Gentoo setup is 
 | `SHAODESK_BUILD_SHELL` | `ON` | Build the Qt Quick shell |
 | `SHAODESK_SHELL_PREVIEW_ONLY` | `OFF` | Build only a shell UI preview, without LayerShellQt (see [Development](#development)) |
 | `SHAODESK_NOTIFICATIONS` | `ON` | Build the shell's notification daemon (needs Qt DBus) |
+| `SHAODESK_PULSEAUDIO` | `ON` | Build the panel's volume control (needs libpulse, which PipeWire also serves) |
 | `SHAODESK_INSTALL_SESSION` | `OFF` | Install the display-manager session entry |
 | `SHAODESK_XWM_WAKER` | `ON` | Work around lost X11 windows; turn off with wlroots patched by `packaging/patches/wlroots-xwm-drain.patch` |
+
+## Installing
+
+```sh
+cmake -S . -B build -G Ninja -DCMAKE_INSTALL_PREFIX=/usr -DSHAODESK_INSTALL_SESSION=ON
+cmake --build build
+sudo cmake --install build
+```
+
+This installs `shaodesk` and `shaodesk-shell`, the default configuration
+(`share/shaodesk/init.lua`), `shaodesk-portals.conf` for xdg-desktop-portal, the documentation,
+and with `SHAODESK_INSTALL_SESSION` the session entry display managers list. Choose the prefix
+when configuring, as above: shaodesk looks for its default configuration under it, so
+`cmake --install --prefix` with another one leaves that unfound. `DESTDIR` stages an install
+for packaging. On Gentoo, `packaging/gentoo` has ebuilds; see [docs/gentoo.md](docs/gentoo.md).
+
+shaodesk runs without any of these, and uses them when they are installed:
+
+- a terminal: Super + Q runs `kitty` ([how to change it](#first-run))
+- `grim` and `slurp` for screenshots, and `wl-clipboard` to copy them
+- `xdg-desktop-portal-wlr`, `xdg-desktop-portal-gtk` and PipeWire for screen sharing and file
+  choosers ([Portals](docs/features.md#portals))
+- `Xwayland` for X11 applications
+- a locker such as swaylock or gtklock, and swayidle, for
+  [locking and idle timeouts](docs/features.md#screen-locking-and-idle)
+- an icon theme (Adwaita, Breeze, Papirus, ...) for application icons, and `dconf` for the
+  window buttons of GTK applications
+
+The shell is the notification daemon; `notifications = { enabled = false }` leaves that to mako,
+dunst or another one.
 
 ## Running
 
@@ -99,6 +133,35 @@ command, run without a shell, that inherits the compositor's Wayland socket.
 When nested, the host may keep shortcuts for itself: a host that grabs Super (Hyprland, GNOME)
 needs `mod = "Alt"` in the configuration. Applications that reuse an existing process or D-Bus
 service may also open in the host session instead.
+
+### First run
+
+- **From a display manager**, pick shaodesk from its list of sessions. The entry (installed with
+  `SHAODESK_INSTALL_SESSION`, and by the Gentoo ebuild) runs `shaodesk --session`.
+- **From a text console**, log in and run `shaodesk --session`. A seat manager (elogind,
+  systemd-logind or seatd) has to give you the GPU and input devices, as it does for any
+  Wayland desktop. Where nothing else starts a D-Bus session bus, as is usual without systemd,
+  run `dbus-run-session -- shaodesk --session` instead: portals and notifications need one.
+- **To try it first**, run `shaodesk` inside your current Wayland session; it opens in a window.
+
+Without `~/.config/shaodesk/init.lua`, the installed [config/init.lua](config/init.lua) is
+used. Super + R opens the application menu, Super + Q starts kitty, Super + C closes the
+focused window, and Super + M quits; [Default bindings](#default-bindings) lists the rest. To
+use another terminal, write a configuration that extends the default:
+
+```lua
+return {
+    version = 1,
+    extends = "default",
+    bindings = {
+        { mods = { "Super" }, key = "q", action = "spawn", command = { "foot" } },
+    },
+}
+```
+
+shaodesk, the shell and the programs they start log to standard error. From a console, keep it
+in a file with `shaodesk --session 2> ~/shaodesk.log`; a display manager keeps it in its own
+log, such as SDDM's `~/.local/share/sddm/wayland-session.log`, or the journal under systemd.
 
 ## Configuration
 
@@ -223,6 +286,13 @@ Work happens on short-lived branches off `main` that are merged back with `--no-
 
 Not yet done: a system tray, power controls, drag-to-edge snap previews, blur and shadows, and
 Lua extension APIs for custom layouts and shell widgets.
+
+## Reporting bugs
+
+Open an issue at [github.com/Sondre234/shaodesk/issues](https://github.com/Sondre234/shaodesk/issues).
+The bug report template asks for `shaodesk --version`, the GPU and its driver, the wlroots version,
+whether shaodesk ran nested or with `--session`, your configuration, and the log
+([First run](#first-run) says where it goes).
 
 ## References
 

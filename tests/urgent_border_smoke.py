@@ -35,7 +35,7 @@ def near(pixel, want, tolerance=3):
     return all(abs(a - b) <= tolerance for a, b in zip(pixel, want))
 
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-border-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-urgent-border-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(settings(3))

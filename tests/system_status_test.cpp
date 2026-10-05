@@ -127,6 +127,11 @@ class SystemStatusTest : public QObject {
     // the real ones.
     void linkChangePromptsRead() {
         if (!qEnvironmentVariableIsSet("SHAODESK_TEST_NETNS")) {
+            // Portage's sandbox treats writing /proc/self/uid_map as a violation.
+            if (qEnvironmentVariable("SANDBOX_ON") == "1")
+                QSKIP("Portage's sandbox does not allow user namespaces");
+            if (QProcess::execute("unshare", {"-rn", "true"}) != 0)
+                QSKIP("cannot make a network namespace here");
             QProcess child;
             child.setProcessEnvironment([] {
                 auto env = QProcessEnvironment::systemEnvironment();

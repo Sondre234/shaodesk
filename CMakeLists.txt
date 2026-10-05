@@ -27,7 +27,7 @@ option(SHAODESK_INSTALL_SESSION "Install the experimental display-manager sessio
 option(SHAODESK_BUILD_SHELL "Build the Qt Quick desktop shell" ON)
 option(SHAODESK_SHELL_PREVIEW_ONLY "Build only the shell UI preview without LayerShellQt" OFF)
 
-add_library(shaodesk_config src/curve.c src/session.c src/tabs.c src/config.cpp src/config_schema.cpp src/layout.cpp src/tiling.cpp
+add_library(shaodesk_config STATIC src/curve.c src/session.c src/tabs.c src/config.cpp src/config_schema.cpp src/layout.cpp src/tiling.cpp
     src/overview_layout.cpp src/window_placement.cpp
     src/import/common.cpp src/import/hyprland.cpp src/import/waybar.cpp src/import/import.cpp)
 target_include_directories(shaodesk_config PUBLIC include)
@@ -179,9 +179,13 @@ if(SHAODESK_BUILD_COMPOSITOR)
     target_sources(shaodesk PRIVATE src/overview_scene.c)
     target_include_directories(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_compile_definitions(shaodesk PRIVATE WLR_USE_UNSTABLE)
-    target_compile_definitions(shaodesk PRIVATE
-        SHAODESK_VERSION="${PROJECT_VERSION}"
-        SHAODESK_DEFAULT_CONFIG="${CMAKE_INSTALL_FULL_DATADIR}/shaodesk/init.lua")
+    # version.h, for --version: the project version, and `git describe` in a git checkout.
+    add_custom_target(shaodesk_version
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+            -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/version.h -DVERSION=${PROJECT_VERSION}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.cmake
+        BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/version.h)
+    add_dependencies(shaodesk shaodesk_version)
     target_compile_options(shaodesk PRIVATE -Wall -Wextra -Wno-unused-parameter)
     # A compositor function shared between files is declared in src/compositor/server.h; any
     # other is static. This flags one that is neither.
@@ -234,7 +238,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
     endif()
     install(TARGETS shaodesk RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(FILES config/init.lua DESTINATION ${CMAKE_INSTALL_DATADIR}/shaodesk)
-    install(FILES README.md CHANGELOG.md docs/features.md docs/gentoo.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+    # docs/ keeps the README's links to them working in the installed copy.
+    install(FILES README.md CHANGELOG.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+    install(FILES docs/features.md docs/config-reference.md docs/dotfile-import.md docs/gentoo.md
+        DESTINATION ${CMAKE_INSTALL_DOCDIR}/docs)
     install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/shaodesk)
     install(FILES vendor/tinywl/LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/shaodesk
         RENAME TinyWL-LICENSE)
@@ -339,6 +346,16 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/auto_reload_smoke.py $<TARGET_FILE:shaodesk>
             ${EXAMPLE_CONFIG})
         set_tests_properties(auto_reload_smoke PROPERTIES TIMEOUT 60)
+        # Without a personal configuration, shaodesk runs the shipped one.
+        set(EMPTY_HOME ${CMAKE_CURRENT_BINARY_DIR}/empty-home)
+        file(MAKE_DIRECTORY ${EMPTY_HOME})
+        add_test(NAME version COMMAND shaodesk --version)
+        set_tests_properties(version PROPERTIES
+            PASS_REGULAR_EXPRESSION "^shaodesk ${PROJECT_VERSION}( \\(git [^)]+\\))?\nbuilt with wlroots 0\\.20\\.[0-9]+\n$")
+        add_test(NAME default_config COMMAND shaodesk --check-config)
+        set_tests_properties(default_config PROPERTIES
+            ENVIRONMENT "HOME=${EMPTY_HOME};XDG_CONFIG_HOME=${EMPTY_HOME};SHAODESK_DEFAULT_CONFIG=${EXAMPLE_CONFIG}"
+            PASS_REGULAR_EXPRESSION "Configuration valid: .*example-config/init.lua")
         add_test(NAME workspaces COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/workspace_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>

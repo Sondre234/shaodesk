@@ -25,7 +25,7 @@ CONFIG = """return {
     },
 }"""
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-output-workspace-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-output-workspace-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text(CONFIG % "HEADLESS-1")

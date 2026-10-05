@@ -119,7 +119,10 @@ header to `server.h`.
   `XDG_RUNTIME_DIR`, opens windows with `wayland_probe` (or `x11_probe`), drives it with
   `shaodesk msg`, and reads the state back with `get` queries. Wait with
   `harness.wait_for`, never with a fixed sleep. Register it with `add_test` and a `TIMEOUT`
-  under `SHAODESK_BUILD_COMPOSITOR` in `CMakeLists.txt`.
+  under `SHAODESK_BUILD_COMPOSITOR` in `CMakeLists.txt`. Keep the temporary directory's prefix
+  to 26 characters or fewer: the control socket goes in it, a Unix socket's path is limited to
+  about 107 bytes, and a Gentoo package build runs the tests in a `TMPDIR` of 43 characters or
+  more.
 
 ## A fast loop
 

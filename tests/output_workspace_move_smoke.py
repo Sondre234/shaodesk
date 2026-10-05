@@ -29,7 +29,7 @@ def config(primary="HEADLESS-1", second_tiling="true"):
 }}"""
 
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-workspace-move-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-workspace-move-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(config())

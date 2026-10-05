@@ -14,7 +14,7 @@ import harness
 
 compositor, probe = (str(Path(p).resolve()) for p in sys.argv[1:3])
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-fullscreen-panel-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-fullscreen-panel-") as directory:
     root = Path(directory)
     config = root / "init.lua"
     config.write_text("return { xwayland = false }")

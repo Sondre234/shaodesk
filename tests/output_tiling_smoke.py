@@ -29,7 +29,7 @@ def config(primary=None, first="position = { x = 0, y = 0 }", second=""):
 }}"""
 
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-output-tiling-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-output-tiling-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(config())

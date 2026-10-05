@@ -3,6 +3,31 @@
 Notable changes, newest first. Dates are when the work landed. The project has not made a
 tagged release yet; everything below is on `main`.
 
+## Unreleased (2026-10-05)
+
+- Gentoo ebuilds: `packaging/gentoo` is an ebuild repository with `gui-wm/shaodesk-9999`
+  (the newest `main`) and `shaodesk-0.1.0`, with USE flags for the shell, notifications,
+  the volume control and X11 applications. [docs/gentoo.md](docs/gentoo.md) shows how to
+  use it.
+- An installed shaodesk starts again from builds made with `BUILD_SHARED_LIBS=ON`, which
+  Gentoo's CMake eclass sets: the configuration library is always linked in, rather than
+  built as a shared library that was never installed.
+- `shaodesk --version` names the wlroots version it was built with, and the git commit when
+  built from a checkout (`shaodesk 0.1.0 (git v0.1.0-3-g1234abc)`); `shaodesk-shell --version`
+  prints its version too, even without a display.
+- Without a personal configuration, shaodesk looks for the shipped one at
+  `$SHAODESK_DEFAULT_CONFIG` before the installed path, as `extends = "default"` already did,
+  so a staged or relocated install can be tried before it is in place.
+- `-DSHAODESK_PULSEAUDIO=OFF` builds the shell without the volume control even where libpulse
+  is installed.
+- The configuration reference and the import guide are installed with the other documentation,
+  under `docs/`, where the README's links expect them.
+- The README describes installing, the optional programs shaodesk uses, starting the first
+  session from a display manager or a text console, where the log goes, and how to report a
+  bug; GitHub issues offer a bug report template.
+- CI runs on pushes to `main` (it waited for a `master` branch), runs `shell_preview` again, and
+  checks that a staged install runs.
+
 ## Unreleased (2026-10-03)
 
 - `layout.tiling_per_workspace = true` makes tiling a setting of each workspace rather than

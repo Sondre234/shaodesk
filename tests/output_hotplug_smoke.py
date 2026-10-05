@@ -30,7 +30,7 @@ def config(primary="HEADLESS-1", tiling="true", extra="", first='mode = "1280x72
 }}"""
 
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-output-hotplug-test-") as directory:
+with tempfile.TemporaryDirectory(prefix="shaodesk-output-hotplug-") as directory:
     root = Path(directory)
     init = root / "init.lua"
     init.write_text(config())

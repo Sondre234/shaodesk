@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "shaodesk/config.hpp"
 #include "shaodesk/import.hpp"
+#include "version.h"
+#include <wlr/version.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -565,8 +567,8 @@ std::filesystem::path default_config() {
     auto personal = personal_config();
     if (!personal.empty() && std::filesystem::exists(personal))
         return personal;
-    if (std::filesystem::exists(SHAODESK_DEFAULT_CONFIG))
-        return SHAODESK_DEFAULT_CONFIG;
+    if (auto shipped = shaodesk::default_config_path(); std::filesystem::exists(shipped))
+        return shipped;
     throw std::runtime_error(
         "no configuration found; use --config config/init.lua from the source directory");
 }
@@ -683,6 +685,7 @@ void usage() {
            "Config: $XDG_CONFIG_HOME/shaodesk/init.lua or ~/.config/shaodesk/init.lua\n"
            "Falls back to the installed default; use --config config/init.lua in the source tree.\n"
            "--no-shell disables automatic shell startup; headless mode never starts it.\n"
+           "--version prints the version, and the wlroots version shaodesk was built with.\n"
            "SIGHUP reloads configuration; SIGINT/SIGTERM exits.\n"
            "shaodesk msg [output NAME] ACTION [ARGUMENT] runs an action in the running session;\n"
            "shaodesk msg get workspace|workspaces|tiling|windows|outputs|animations prints its state.\n"
@@ -708,7 +711,8 @@ int main(int argc, char **argv) {
                 return 0;
             }
             if (arg == "--version") {
-                std::cout << "shaodesk " << SHAODESK_VERSION << '\n';
+                std::cout << "shaodesk " SHAODESK_VERSION "\n"
+                             "built with wlroots " WLR_VERSION_STR "\n";
                 return 0;
             }
             if (arg == "--config" && i + 1 < argc)
