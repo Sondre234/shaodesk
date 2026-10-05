@@ -578,7 +578,6 @@ int main() {
             {
                 int c_of[3] = {0, 2, 0}, row_of[3] = {1, 0, 0};
                 void *win[3] = {&c[0], &c[1], &c[2]};
-                c_of[1] = 2;
                 double widths[3] = {0.4, 0.2, 0.6};
                 require(sh_tiling_scroll_restore(late, "DP-1", 0, win, c_of, row_of, 3, widths, 3),
                         "scroll restore failed");
