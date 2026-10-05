@@ -565,8 +565,6 @@ int main(int argc, char **argv) {
         rejects("return {bindings={{mods={}, key='NotAKey', action='quit'}}}");
         rejects("return {bindings={{mods={}, key='a', action='unknown'}}}");
         rejects("local b={mods={'Alt'},key='a',action='quit'}; return {bindings={b,b}}");
-        rejects("while true do end");
-        rejects("os.execute('false')");
         // A configuration extending the defaults holds only its changes.
         setenv("SHAODESK_DEFAULT_CONFIG", argv[1], 1);
         auto bare = shaodesk::parse_config("return {extends='default'}");

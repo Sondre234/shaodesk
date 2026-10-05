@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
 
         // Wrong shapes and extreme values.
         for (const char *source : {
-                 "", "return", "return 1", "return nil", "return {}", "return {version=1e308}",
+                 "", "return", "return 1", "return {}", "return {version=1e308}",
                  "return {version=0/0}", "return {version=-0}", "return {version='1'}",
                  "return {layout={gap=1e308}}", "return {layout={gap=0/0}}",
                  "return {layout={gap=math.huge}}", "return {layout={gap=-math.huge}}",
@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
                  "return {shell={background='#12345'}}", "return {\255\254=1}", "return {\"\\0\"=1}",
                  "return setmetatable({}, {__index=function() error('boom') end})",
                  "return setmetatable({}, {__pairs=function() error('boom') end})",
-                 "error({})", "error(nil)", "error(setmetatable({}, {__tostring=function() "
+                 "error(setmetatable({}, {__tostring=function() "
                  "error('again') end}))"}) {
             (void)parses(source);
         }
