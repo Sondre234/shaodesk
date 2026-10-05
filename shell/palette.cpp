@@ -150,6 +150,18 @@ void Palette::collect() {
     for (const auto &action : actions)
         entries.push_back(entry("action", action.title, QString("Action · ") + action.name,
                                 "system-run", action.name));
+    // The power actions that may run; power off, restart and log out ask first, as from the
+    // panel.
+    static const QMap<QString, QString> powerIcons{
+        {"lock", "system-lock-screen"}, {"suspend", "system-suspend"},
+        {"hibernate", "system-suspend-hibernate"}, {"reboot", "system-reboot"},
+        {"poweroff", "system-shutdown"}, {"logout", "system-log-out"}};
+    for (const auto &action : controller_.power()->available()) {
+        auto item = entry("action", Power::title(action), "Action · " + action,
+                          powerIcons.value(action, "system-run"), action);
+        item["power"] = true;
+        entries.push_back(item);
+    }
     for (const auto &app : controller_.apps()) {
         const auto map = app.toMap();
         entries.push_back(entry("app", map["name"].toString(), "Application",
@@ -207,6 +219,8 @@ void Palette::activate(int index) {
     if (kind == "window") {
         if (item["number"].toInt() == 0) // the focused one would minimize on a second click
             controller_.tasks()->activate(target.toInt());
+    } else if (item["power"].toBool()) {
+        controller_.power()->request(target, output);
     } else if (kind == "app") {
         controller_.launch(target);
     } else if (kind == "workspace" && target.toInt() > 0) {

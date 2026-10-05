@@ -1348,6 +1348,47 @@ int main(int argc, char **argv) {
             return 1;
         }
         subscriber->write("power lock,suspend,reboot,poweroff,logout\n");
+        // The command palette offers the same, and asks first the same way.
+        {
+            auto *palette = controller.palette();
+            auto titles = [&] {
+                QStringList found;
+                for (const auto &result : palette->results())
+                    found << result.toMap()["title"].toString();
+                return found;
+            };
+            if (!QTest::qWaitFor([&] { return power->available().size() == 5; }))
+                return 1;
+            palette->open(output);
+            if (!QTest::qWaitFor([&] {
+                    return titles().contains("Lock screen") && titles().contains("Suspend") &&
+                           titles().contains("Restart…") && titles().contains("Power off…") &&
+                           titles().contains("Log out…");
+                }) ||
+                titles().contains("Hibernate")) {
+                std::cerr << "the palette does not offer what may run: "
+                          << titles().join("|").toStdString() << '\n';
+                return 1;
+            }
+            requests.clear();
+            palette->setQuery(">power off");
+            palette->activate(0);
+            if (!QTest::qWaitFor([&] { return dialog.isVisible() && power->pending() == "poweroff"; }) ||
+                !requests.isEmpty()) {
+                std::cerr << "power off from the palette did not ask first\n";
+                return 1;
+            }
+            power->cancel();
+            palette->open(output);
+            palette->setQuery("lock screen");
+            palette->activate(0);
+            if (!QTest::qWaitFor([&] { return requests == QStringList{"lock"}; }) ||
+                !power->pending().isEmpty()) {
+                std::cerr << "locking from the palette failed: " << requests.join("|").toStdString()
+                          << '\n';
+                return 1;
+            }
+        }
         // What the compositor refuses, at once or later, shows across the panel.
         powerRefusal = "no screen locker: power.lock_command is not set";
         if (!openMenu())
