@@ -32,8 +32,7 @@ jobs:
       - name: Build
         run: cmake --build build
       - name: Test
-        # Headless tests only; the runner has no GPU or display. shell_preview is excluded
-        # while it is being fixed on master.
-        run: ctest --test-dir build --output-on-failure -E shell_preview
+        # Headless tests only; the runner has no GPU or display.
+        run: ctest --test-dir build --output-on-failure
         env:
           QT_QPA_PLATFORM: offscreen
