@@ -5,6 +5,9 @@ tagged release yet; everything below is on `main`.
 
 ## Unreleased (2026-10-05)
 
+- A compositor that cannot create its Wayland socket, because `XDG_RUNTIME_DIR` is unset, not
+  writable, or too long for a socket's path, says which and exits with status 1, instead of
+  aborting on a wlroots assertion.
 - A system tray: the panel shows applications' status icons (StatusNotifierItem, as KDE and Qt
   applications, Electron applications and Ayatana's indicators use) beside the bell on every
   monitor, with their tooltips, attention and overlay icons. Left-click activates an application,

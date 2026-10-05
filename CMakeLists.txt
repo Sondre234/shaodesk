@@ -417,6 +417,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(screenshot_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME startup_failure_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/startup_failure_smoke.py
+            $<TARGET_FILE:shaodesk> ${EXAMPLE_CONFIG})
+        set_tests_properties(startup_failure_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME output_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
