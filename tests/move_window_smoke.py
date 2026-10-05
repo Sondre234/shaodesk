@@ -78,7 +78,8 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-move-window-test-") as directo
 
             # At the edge, with no output to the left, nothing happens.
             msg("move_left")
-            assert windows()[1][2] < windows()[0][2] and tiled_pair(), windows()
+            harness.stays(lambda: windows()[1][2] < windows()[0][2] and tiled_pair(), processes,
+                          "B moved at the left edge", detail=windows)
             # B trades places with A, and back; neither ever covers the other.
             msg("move_right")
             wait_for(lambda: tiled_pair() and windows()[1][2] > windows()[0][2], "B right of A")
@@ -104,7 +105,8 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-move-window-test-") as directo
             assert windows()[1][4:6] == size, f"B changed size: {windows()[1]} vs {size}"
             before = windows()[1]
             msg("move_right")
-            assert windows()[1] == before, "B moved past the last output"
+            harness.stays(lambda: windows()[1] == before, processes, "B moved past the last output",
+                          detail=windows)
 
             # Back to the left edge, then into HEADLESS-1's tiling on its right side.
             msg("move_left")
