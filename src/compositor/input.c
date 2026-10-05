@@ -9,6 +9,8 @@ static bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, ui
 
 static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) {
     struct sh_keyboard *keyboard = wl_container_of(listener, keyboard, modifiers);
+    if (keyboard->server->syncing_keyboards)
+        return; // keymap.c is changing it, not a key, and tells the seat itself
 
     wlr_seat_set_keyboard(keyboard->server->seat, keyboard->wlr_keyboard);
 
@@ -103,6 +105,7 @@ static void server_new_keyboard(struct sh_server *server, struct wlr_input_devic
 
     // A virtual keyboard (wtype and the like) sends its own keymap, which ours would replace.
     bool is_virtual = wlr_input_device_get_virtual_keyboard(device) != NULL;
+    keyboard->is_virtual = is_virtual;
     if (!is_virtual && !configure_keyboard(server, wlr_keyboard)) {
         wlr_log(WLR_ERROR, "Failed to configure keyboard");
         free(keyboard);

@@ -358,6 +358,12 @@ struct sh_server {
     struct wlr_pointer_constraint_v1 *active_constraint; // on the keyboard-focused surface
     struct wl_listener new_constraint, keyboard_focus_change;
     struct wl_list keyboards;
+    /* The keymap of the keyboard settings, shared by every keyboard but the virtual ones, and
+     * the layout active on all of them (from 0). keymap.c sets `syncing_keyboards` while it
+     * changes keyboards' state itself, and tells the seat afterwards. */
+    struct xkb_keymap *keymap;
+    xkb_layout_index_t keyboard_layout;
+    bool syncing_keyboards;
     struct wl_list headless_keyboards; // added by tests with "headless_keyboard add"
     struct wl_list pointers; /* struct sh_pointer */
     enum sh_cursor_mode cursor_mode;
@@ -571,6 +577,7 @@ struct sh_keyboard {
     struct wl_list link;
     struct sh_server *server;
     struct wlr_keyboard *wlr_keyboard;
+    bool is_virtual; // wtype and the like, which send their own keymap
     /* A held key bound to a repeating action (keyboard resizing) runs it again at the
      * keyboard's repeat rate, as clients repeat keys themselves. */
     struct wl_event_source *repeat_timer;
@@ -721,7 +728,7 @@ void seat_keyboard_focus_change(struct wl_listener *listener, void *data);
 
 /* keymap.c */
 bool configure_keyboard(struct sh_server *server, struct wlr_keyboard *keyboard);
-void reload_keymaps(struct sh_server *server);
+void update_keymap(struct sh_server *server);
 
 /* layer_shell.c */
 void arrange_layers(struct sh_server *server);

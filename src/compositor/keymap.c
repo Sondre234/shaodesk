@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
-/* Keymaps: the one the keyboard settings describe (keyboard.file, else the XKB names), given to
- * every keyboard but the virtual ones, which bring their own. */
+/* Keymaps: the one the keyboard settings describe (keyboard.file, else the XKB names), compiled
+ * once and shared by every keyboard but the virtual ones, which bring their own, and the layout
+ * active on all of them. */
 #include "server.h"
 
 /* keyboard.file when it is set and compiles (the configuration checked it, but it may have
@@ -34,24 +35,93 @@ static struct xkb_keymap *compile_keymap(const struct sh_settings *settings) {
     return keymap;
 }
 
-bool configure_keyboard(struct sh_server *server, struct wlr_keyboard *keyboard) {
-    const struct sh_settings *settings = server_settings(server);
-    struct xkb_keymap *keymap = compile_keymap(settings);
-    if (!keymap)
-        return false;
-    bool ok = wlr_keyboard_set_keymap(keyboard, keymap);
-    xkb_keymap_unref(keymap);
-    wlr_keyboard_set_repeat_info(keyboard, settings->repeat_rate, settings->repeat_delay);
+/* The layout of `keymap` that `layout` of `old` becomes: the one of the same name, else the one
+ * in the same place, else the first. */
+static xkb_layout_index_t carry_layout(struct xkb_keymap *old, xkb_layout_index_t layout,
+                                       struct xkb_keymap *keymap) {
+    xkb_layout_index_t count = xkb_keymap_num_layouts(keymap);
+    const char *name = layout < xkb_keymap_num_layouts(old)
+                           ? xkb_keymap_layout_get_name(old, layout)
+                           : NULL;
+    for (xkb_layout_index_t i = 0; name && i < count; ++i) {
+        const char *candidate = xkb_keymap_layout_get_name(keymap, i);
+        if (candidate && !strcmp(candidate, name))
+            return i;
+    }
+    return layout < count ? layout : 0;
+}
+
+/* The modifiers in `mask` of `old`, as those of the same names in `keymap`. */
+static xkb_mod_mask_t carry_modifiers(struct xkb_keymap *old, xkb_mod_mask_t mask,
+                                      struct xkb_keymap *keymap) {
+    xkb_mod_mask_t carried = 0;
+    for (xkb_mod_index_t i = 0; old && i < xkb_keymap_num_mods(old) && i < 32; ++i) {
+        if (!(mask & 1u << i))
+            continue;
+        xkb_mod_index_t index = xkb_keymap_mod_get_index(keymap, xkb_keymap_mod_get_name(old, i));
+        if (index < 32)
+            carried |= 1u << index;
+    }
+    return carried;
+}
+
+/* Gives `keyboard` the shared keymap, in the active layout. The keys it holds stay down (wlroots
+ * presses them again in the new keymap), and so do its locks, such as Caps Lock. */
+static bool give_keymap(struct sh_server *server, struct wlr_keyboard *keyboard) {
+    struct xkb_keymap *old = keyboard->keymap ? xkb_keymap_ref(keyboard->keymap) : NULL;
+    xkb_mod_mask_t locked = keyboard->modifiers.locked;
+    bool ok = wlr_keyboard_set_keymap(keyboard, server->keymap);
+    if (ok)
+        wlr_keyboard_notify_modifiers(keyboard, keyboard->modifiers.depressed,
+                                      keyboard->modifiers.latched,
+                                      carry_modifiers(old, locked, server->keymap),
+                                      server->keyboard_layout);
+    xkb_keymap_unref(old);
     return ok;
 }
 
-/* After a reload: the keymap again, for every keyboard but the virtual ones. */
-void reload_keymaps(struct sh_server *server) {
+/* A keyboard plugged in: the shared keymap, the active layout, the repeat settings. */
+bool configure_keyboard(struct sh_server *server, struct wlr_keyboard *keyboard) {
+    const struct sh_settings *settings = server_settings(server);
+    if (!server->keymap || !give_keymap(server, keyboard))
+        return false;
+    wlr_keyboard_set_repeat_info(keyboard, settings->repeat_rate, settings->repeat_delay);
+    return true;
+}
+
+/* At startup and after a reload: compiles the keymap the settings describe and, when it is not
+ * the one in use, gives it to every keyboard but the virtual ones. The active layout becomes the
+ * new keymap's of the same name, else the one in its place, else the first. A reload that leaves
+ * the keymap as it was leaves the keyboards alone, but for the repeat settings. */
+void update_keymap(struct sh_server *server) {
+    const struct sh_settings *settings = server_settings(server);
+    struct xkb_keymap *keymap = compile_keymap(settings);
     struct sh_keyboard *keyboard;
+    if (!keymap) {
+        wlr_log(WLR_ERROR, "Cannot compile any keymap; keeping the one in use");
+    } else if (server->keymap && wlr_keyboard_keymaps_match(server->keymap, keymap)) {
+        xkb_keymap_unref(keymap);
+    } else {
+        struct xkb_keymap *old = server->keymap;
+        server->keyboard_layout = old ? carry_layout(old, server->keyboard_layout, keymap) : 0;
+        server->keymap = keymap;
+        server->syncing_keyboards = true;
+        wl_list_for_each(keyboard, &server->keyboards, link) {
+            if (!keyboard->is_virtual && !give_keymap(server, keyboard->wlr_keyboard))
+                wlr_log(WLR_ERROR, "Could not apply reloaded keymap");
+        }
+        server->syncing_keyboards = false;
+        // Applications got the new keymap from the seat's keyboard; the focused one also needs
+        // the modifiers and layout that came with it.
+        struct wlr_keyboard *seat_keyboard = wlr_seat_get_keyboard(server->seat);
+        if (seat_keyboard && seat_keyboard->keymap == server->keymap)
+            wlr_seat_keyboard_notify_modifiers(server->seat, &seat_keyboard->modifiers);
+        if (old)
+            xkb_keymap_unref(old);
+    }
     wl_list_for_each(keyboard, &server->keyboards, link) {
-        if (wlr_input_device_get_virtual_keyboard(&keyboard->wlr_keyboard->base))
-            continue;
-        if (!configure_keyboard(server, keyboard->wlr_keyboard))
-            wlr_log(WLR_ERROR, "Could not apply reloaded keymap");
+        if (!keyboard->is_virtual)
+            wlr_keyboard_set_repeat_info(keyboard->wlr_keyboard, settings->repeat_rate,
+                                         settings->repeat_delay);
     }
 }
