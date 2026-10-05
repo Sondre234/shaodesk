@@ -86,6 +86,9 @@ if(BUILD_TESTING)
     add_executable(effects_config_tests tests/effects_config_tests.cpp)
     target_link_libraries(effects_config_tests PRIVATE shaodesk_config)
     add_test(NAME effects_config COMMAND effects_config_tests)
+    add_executable(keyboard_config_tests tests/keyboard_config_tests.cpp)
+    target_link_libraries(keyboard_config_tests PRIVATE shaodesk_config)
+    add_test(NAME keyboard_config COMMAND keyboard_config_tests)
     add_executable(notifications_config_tests tests/notifications_config_tests.cpp)
     target_link_libraries(notifications_config_tests PRIVATE shaodesk_config)
     add_test(NAME notifications_config COMMAND notifications_config_tests)
@@ -158,6 +161,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/grab.c
         src/compositor/group.c
         src/compositor/input.c
+        src/compositor/keymap.c
         src/compositor/layer_shell.c
         src/compositor/lock.c
         src/compositor/output.c
@@ -535,6 +539,15 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/keyboard_resize_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(keyboard_resize_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME keymap_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/keymap_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>
+            ${EXAMPLE_CONFIG})
+        set_tests_properties(keymap_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME keyboard_layout_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/keyboard_layout_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:pointer_probe>)
+        set_tests_properties(keyboard_layout_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME window_style_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_style_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)

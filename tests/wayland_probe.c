@@ -58,6 +58,7 @@ struct probe {
     struct xdg_activation_v1 *activation;
     struct zxdg_decoration_manager_v1 *decorations;
     bool commands; // --commands: an external-control window that obeys lines on standard input
+    bool print_keymap, keymap_seen; // --keymap
 };
 static void die(const char *message) {
     fprintf(stderr, "wayland probe: %s\n", message);
@@ -255,6 +256,36 @@ static void pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, 
 static const struct wl_pointer_listener pointer_listener = {
     .enter = pointer_enter, .leave = pointer_leave, .motion = pointer_motion,
     .button = pointer_button, .axis = pointer_axis};
+/* --keymap: prints the keymap the seat's keyboard gives a new client, as text, or "no keymap". */
+static void keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int32_t fd,
+                            uint32_t size) {
+    struct probe *probe = data;
+    char *text = format == WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1 && size
+                     ? mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0)
+                     : MAP_FAILED;
+    if (text != MAP_FAILED) {
+        fwrite(text, 1, strnlen(text, size), stdout);
+        munmap(text, size);
+    } else {
+        puts("no keymap");
+    }
+    close(fd);
+    probe->keymap_seen = true;
+}
+static void keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial,
+                           struct wl_surface *surface, struct wl_array *keys) {}
+static void keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial,
+                           struct wl_surface *surface) {}
+static void keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t time,
+                         uint32_t key, uint32_t state) {}
+static void keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial,
+                               uint32_t depressed, uint32_t latched, uint32_t locked,
+                               uint32_t group) {}
+static void keyboard_repeat_info(void *data, struct wl_keyboard *keyboard, int32_t rate,
+                                 int32_t delay) {}
+static const struct wl_keyboard_listener keyboard_listener = {
+    .keymap = keyboard_keymap, .enter = keyboard_enter, .leave = keyboard_leave,
+    .key = keyboard_key, .modifiers = keyboard_modifiers, .repeat_info = keyboard_repeat_info};
 static void frame_done(void *data, struct wl_callback *callback, uint32_t time) {
     struct probe *probe = data;
     wl_callback_destroy(callback);
@@ -445,6 +476,8 @@ int main(int argc, char **argv) {
         probe.external_control = probe.external_panel = probe.commands = true;
     else if (argc == 2 && !strcmp(argv[1], "--globals"))
         probe.list_globals = true;
+    else if (argc == 2 && !strcmp(argv[1], "--keymap"))
+        probe.print_keymap = true;
     else if (argc == 3 && !strcmp(argv[1], "--external-panel")) {
         char *end;
         long height = strtol(argv[2], &end, 10);
@@ -458,7 +491,7 @@ int main(int argc, char **argv) {
         probe.activate = !strcmp(argv[1], "--activate");
         probe.maximize = !strcmp(argv[1], "--maximize");
     } else if (argc != 1)
-        die("usage: wayland_probe [--globals | --external-control | --window-only | "
+        die("usage: wayland_probe [--globals | --keymap | --external-control | --window-only | "
             "--commands | --external-panel HEIGHT | --close APP_ID | --activate APP_ID | --maximize APP_ID]");
     struct wl_display *display = wl_display_connect(NULL);
     if (!display)
@@ -478,6 +511,17 @@ int main(int argc, char **argv) {
         die("registry roundtrip failed");
     if (probe.list_globals)
         return 0;
+    if (probe.print_keymap) {
+        // The seat sends its keyboard's keymap as soon as a client asks for a keyboard.
+        if (!probe.seat)
+            die("no seat");
+        wl_keyboard_add_listener(wl_seat_get_keyboard(probe.seat), &keyboard_listener, &probe);
+        if (wl_display_roundtrip(display) < 0)
+            die("keyboard roundtrip failed");
+        if (!probe.keymap_seen)
+            die("no keymap arrived");
+        return 0;
+    }
     if (!probe.compositor || !probe.shm || !probe.shell)
         die("required globals missing");
     if (!probe.layer_shell || !probe.manager || !probe.seat || !probe.output)

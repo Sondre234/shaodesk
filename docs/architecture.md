@@ -41,6 +41,7 @@ all. In short:
 | `control.c` | The control socket: reading requests, commands that are not actions, subscribers and shell events. |
 | `query.c` | `shaodesk msg get ...`: one function per query, and the table that names them. |
 | `input.c` | Keyboards, key bindings, pointers' libinput settings, virtual devices, selection and drag-and-drop. |
+| `keymap.c` | The keymap from the keyboard settings, given to every keyboard but virtual ones. |
 | `cursor.c` | What is under the pointer, focus on hover, button bindings, scrolling, the cursor image. |
 | `grab.c` | Moving and resizing with the pointer, magnetic edges, dropping. |
 | `focus.c` | Keyboard focus and urgent windows. |
@@ -122,7 +123,9 @@ header to `server.h`.
   under `SHAODESK_BUILD_COMPOSITOR` in `CMakeLists.txt`. Keep the temporary directory's prefix
   to 26 characters or fewer: the control socket goes in it, a Unix socket's path is limited to
   about 107 bytes, and a Gentoo package build runs the tests in a `TMPDIR` of 43 characters or
-  more.
+  more. Under `--headless`, `shaodesk msg headless_output` and `headless_keyboard` plug in
+  outputs and keyboards (`headless_keyboard key NAME CODE press` types on one; see
+  `keymap_smoke.py`), and `wayland_probe --keymap` prints the keymap an application gets.
 
 ## A fast loop
 

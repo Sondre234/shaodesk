@@ -16,7 +16,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `profile` | string | unset | - | The appearance profile to start with, a name from `profiles`. One picked from the panel's menu, the command palette or `shaodesk msg profile NAME` replaces it until another is picked; that choice is kept in `$XDG_STATE_HOME/shaodesk/profile`. |
 | `profiles` | table of tables | unset | - | Appearance profiles, keyed by a name of up to 32 letters, digits, `-` and `_` (not `next` or `prev`), at most 32. Each holds `appearance`, `windows` and `shell` settings that replace this file's own (and its theme's and defaults') while the profile is in use, e.g. `light = { shell = { panel_color = "#f2f4f8" } }`. Every profile is checked as the file loads. A file with `extends = "default"` gets the default configuration's profiles only when it has none of its own. |
 | `xwayland` | boolean | true | - | Run X11 applications; Xwayland starts on first use. Restart to change. |
-| `auto_reload` | boolean | true | - | Reload when this file, or another `.lua` file in its directory, is saved. A file with an error loads the default configuration instead and shows the error on screen. |
+| `auto_reload` | boolean | true | - | Reload when this file, or another `.lua` or `.xkb` file in its directory (or the `keyboard.file` there), is saved. A file with an error loads the default configuration instead and shows the error on screen. |
 
 ## `appearance`
 
@@ -34,6 +34,8 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `keyboard.variant` | string | "" | - | XKB layout variant, e.g. `"intl"`. |
 | `keyboard.model` | string | "" | - | XKB keyboard model. |
 | `keyboard.options` | string | "" | - | XKB options, e.g. `"caps:escape"`. |
+| `keyboard.rules` | string | "" | - | XKB rules the other names are looked up in; `""` uses xkbcommon's default, `evdev`. |
+| `keyboard.file` | string | "" | - | An XKB keymap file, such as `xkbcli compile-keymap` writes or a hand-written `xkb_keymap { ... }`, used instead of the names above: absolute, starting with `~/`, or relative to this file. One that cannot be read or compiled is a configuration error; should it break while the session runs, the names above stand in for it. |
 | `keyboard.repeat_rate` | integer | 25 | 0 to 100 | Key repeats per second. |
 | `keyboard.repeat_delay` | integer | 600 | 0 to 5000 | Milliseconds a key is held before it repeats. |
 
@@ -247,6 +249,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `bindings[].output` | string | "next" for `swap_workspaces` | - | With `move_workspace_to_output` (required) and `swap_workspaces`: the other monitor, `"left"` or `"right"` of the focused one, `"next"` or `"prev"` in order with wrap, or a connector name or `"desc:"` description as in `outputs.monitors`. |
 | `bindings[].mode` | enum | "region" | - | With `screenshot` only: `"region"`, `"output"`, or `"window"`. |
 | `bindings[].amount` | integer | 40 | 1 to 4000 | With `resize_*` only: pixels moved per press. |
+| `bindings[].layout` | string or integer | "next" | - | With `switch_layout` only: `"next"` or `"prev"` (wrapping), or a layout's number from 1, in the order of `keyboard.layout`. |
 
 ## `notifications`
 
@@ -312,6 +315,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.widgets.tiling` | boolean | true | - | The tiling on/off button. |
 | `shell.widgets.profiles` | boolean | true | - | The appearance profile picker: a button that lists `profiles` to switch between; shown only when there are two or more. |
 | `shell.widgets.wallpapers` | boolean | true | - | The wallpaper picker: thumbnails of the images in `shell.wallpapers`; the one picked replaces `shell.wallpaper` for the profile in use until the configured one changes. |
+| `shell.widgets.keyboard_layout` | boolean | true | - | The active keyboard layout's short name, such as `us`; clicking it switches to the next. Shown only when the keymap has two or more layouts. |
 | `shell.launchers` | list of tables | unset | - | Pinned commands for programs without a desktop file, at most 64. |
 | `shell.launchers[].name` | string | - | - | Label, 1 to 128 bytes. Required. |
 | `shell.launchers[].icon` | string | "application-x-executable" | - | Icon theme name. |
@@ -341,7 +345,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 
 ## Binding actions
 
-`spawn`, `quit`, `close`, `cycle`, `snap_left`, `snap_right`, `maximize`, `restore`, `tile`, `reload`, `fullscreen`, `workspace`, `move_to_workspace`, `workspace_next`, `workspace_prev`, `workspace_back`, `toggle_tiling`, `layout_next`, `layout_prev`, `layout_dwindle`, `layout_master`, `layout_spiral`, `layout_monocle`, `layout_scroll`, `promote`, `focus_next`, `focus_prev`, `swap_next`, `swap_prev`, `master_grow`, `master_shrink`, `master_more`, `master_less`, `peek`, `peek_toggle`, `night_light_toggle`, `night_light_on`, `night_light_off`, `night_light_auto`, `zoom_in`, `zoom_out`, `zoom_reset`, `move_workspace_to_output`, `swap_workspaces`, `swallow_toggle`, `dnd_toggle`, `dnd_on`, `dnd_off`, `notification_history`, `scroll_left`, `scroll_right`, `column_widen`, `column_narrow`, `column_cycle_width`, `consume_left`, `consume_right`, `expel`, `center_column`, `toggle_floating`, `launcher`, `focus_left`, `focus_right`, `focus_up`, `focus_down`, `screenshot`, `move_left`, `move_right`, `move_up`, `move_down`, `move_to_scratchpad`, `scratchpad_show`, `toggle_sticky`, `resize_left`, `resize_right`, `resize_up`, `resize_down`, `switcher`, `switcher_prev`, `switcher_confirm`, `switcher_cancel`, `focus_last`, `focus_urgent`, `group_toggle`, `group_next`, `group_prev`, `ungroup`, `group_merge_left`, `group_merge_right`, `group_merge_up`, `group_merge_down`, `palette`, `toggle_overview`, `overview_confirm`, `overview_cancel`
+`spawn`, `quit`, `close`, `cycle`, `snap_left`, `snap_right`, `maximize`, `restore`, `tile`, `reload`, `fullscreen`, `workspace`, `move_to_workspace`, `workspace_next`, `workspace_prev`, `workspace_back`, `toggle_tiling`, `layout_next`, `layout_prev`, `layout_dwindle`, `layout_master`, `layout_spiral`, `layout_monocle`, `layout_scroll`, `promote`, `focus_next`, `focus_prev`, `swap_next`, `swap_prev`, `master_grow`, `master_shrink`, `master_more`, `master_less`, `peek`, `peek_toggle`, `night_light_toggle`, `night_light_on`, `night_light_off`, `night_light_auto`, `zoom_in`, `zoom_out`, `zoom_reset`, `move_workspace_to_output`, `swap_workspaces`, `swallow_toggle`, `switch_layout`, `dnd_toggle`, `dnd_on`, `dnd_off`, `notification_history`, `scroll_left`, `scroll_right`, `column_widen`, `column_narrow`, `column_cycle_width`, `consume_left`, `consume_right`, `expel`, `center_column`, `toggle_floating`, `launcher`, `focus_left`, `focus_right`, `focus_up`, `focus_down`, `screenshot`, `move_left`, `move_right`, `move_up`, `move_down`, `move_to_scratchpad`, `scratchpad_show`, `toggle_sticky`, `resize_left`, `resize_right`, `resize_up`, `resize_down`, `switcher`, `switcher_prev`, `switcher_confirm`, `switcher_cancel`, `focus_last`, `focus_urgent`, `group_toggle`, `group_next`, `group_prev`, `ungroup`, `group_merge_left`, `group_merge_right`, `group_merge_up`, `group_merge_down`, `palette`, `toggle_overview`, `overview_confirm`, `overview_cancel`
 
 `spawn` needs `command`; `workspace` and `move_to_workspace` need `workspace`; `screenshot` takes `mode`; `resize_*` take `amount`.
 

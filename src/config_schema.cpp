@@ -33,8 +33,9 @@ const Option options[] = {
     {"xwayland", "boolean", "true", "true", none, none,
      "Run X11 applications; Xwayland starts on first use. Restart to change."},
     {"auto_reload", "boolean", "true", "false", none, none,
-     "Reload when this file, or another `.lua` file in its directory, is saved. A file with "
-     "an error loads the default configuration instead and shows the error on screen."},
+     "Reload when this file, or another `.lua` or `.xkb` file in its directory (or the "
+     "`keyboard.file` there), is saved. A file with an error loads the default configuration "
+     "instead and shows the error on screen."},
 
     {"appearance", "table", "", "", none, none, "Desktop look."},
     {"appearance.background", "color", "\"#19212e\"", "\"#19212e\"", none, none,
@@ -48,6 +49,13 @@ const Option options[] = {
     {"keyboard.model", "string", "\"\"", "\"pc105\"", none, none, "XKB keyboard model."},
     {"keyboard.options", "string", "\"\"", "\"caps:escape\"", none, none,
      "XKB options, e.g. `\"caps:escape\"`."},
+    {"keyboard.rules", "string", "\"\"", "\"evdev\"", none, none,
+     "XKB rules the other names are looked up in; `\"\"` uses xkbcommon's default, `evdev`."},
+    {"keyboard.file", "string", "\"\"", "", none, none,
+     "An XKB keymap file, such as `xkbcli compile-keymap` writes or a hand-written "
+     "`xkb_keymap { ... }`, used instead of the names above: absolute, starting with `~/`, or "
+     "relative to this file. One that cannot be read or compiled is a configuration error; "
+     "should it break while the session runs, the names above stand in for it."},
     {"keyboard.repeat_rate", "integer", "25", "25", 0, 100, "Key repeats per second."},
     {"keyboard.repeat_delay", "integer", "600", "600", 0, 5000,
      "Milliseconds a key is held before it repeats."},
@@ -403,6 +411,9 @@ const Option options[] = {
      "With `screenshot` only: `\"region\"`, `\"output\"`, or `\"window\"`."},
     {"bindings[].amount", "integer", "40", "", 1, 4000,
      "With `resize_*` only: pixels moved per press."},
+    {"bindings[].layout", "string or integer", "\"next\"", "", none, none,
+     "With `switch_layout` only: `\"next\"` or `\"prev\"` (wrapping), or a layout's number "
+     "from 1, in the order of `keyboard.layout`."},
 
     {"notifications", "table", "", "", none, none,
      "Notifications: the shell serves `org.freedesktop.Notifications` on the session bus and shows "
@@ -500,6 +511,9 @@ const Option options[] = {
     {"shell.widgets.wallpapers", "boolean", "true", "true", none, none,
      "The wallpaper picker: thumbnails of the images in `shell.wallpapers`; the one picked "
      "replaces `shell.wallpaper` for the profile in use until the configured one changes."},
+    {"shell.widgets.keyboard_layout", "boolean", "true", "true", none, none,
+     "The active keyboard layout's short name, such as `us`; clicking it switches to the next. "
+     "Shown only when the keymap has two or more layouts."},
     {"shell.launchers", "list of tables", "unset", "", none, none,
      "Pinned commands for programs without a desktop file, at most 64."},
     {"shell.launchers[].name", "string", "", "", none, none, "Label, 1 to 128 bytes. Required."},

@@ -5,6 +5,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
+#include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -317,7 +319,8 @@ void read_shell(lua_State *L, ShellConfig &shell) {
                                    {"calendar", &shell.widgets.calendar},
                                    {"tiling", &shell.widgets.tiling},
                                    {"profiles", &shell.widgets.profiles},
-                                   {"wallpapers", &shell.widgets.wallpapers}})
+                                   {"wallpapers", &shell.widgets.wallpapers},
+                                   {"keyboard_layout", &shell.widgets.keyboard_layout}})
             boolean(L, key, (std::string("shell.widgets.") + key).c_str(), *target);
     }
     lua_pop(L, 1);
@@ -931,12 +934,100 @@ void read_effects(lua_State *L, Config &config) {
     lua_pop(L, 1);
     current_section.clear();
 }
+// A path as the configuration writes it, made absolute: "~/..." in the home directory, else
+// relative to the configuration file's `directory`.
+std::filesystem::path config_relative(const std::string &path,
+                                      const std::filesystem::path &directory) {
+    if (path.starts_with("~/")) {
+        const char *home = std::getenv("HOME");
+        if (!home || !*home)
+            fail(qualified("file") + " starts with ~/, but HOME is not set", "file");
+        return std::filesystem::path(home) / path.substr(2);
+    }
+    return std::filesystem::absolute(directory / path).lexically_normal();
+}
+// Keeps the first error xkbcommon reports, without its message code, in the string that is the
+// context's user data, instead of printing it.
+__attribute__((format(printf, 3, 0))) void keep_xkb_error(xkb_context *context,
+                                                          xkb_log_level level,
+                                                          const char *format, va_list args) {
+    auto *error = static_cast<std::string *>(xkb_context_get_user_data(context));
+    if (!error || !error->empty() || level > XKB_LOG_LEVEL_ERROR)
+        return;
+    char text[512];
+    std::vsnprintf(text, sizeof text, format, args);
+    std::string_view message = text;
+    if (message.starts_with("[XKB-") && message.find("] ") != std::string_view::npos)
+        message.remove_prefix(message.find("] ") + 2);
+    while (!message.empty() && (message.back() == '\n' || message.back() == ' '))
+        message.remove_suffix(1);
+    *error = message;
+}
+// The compositor builds its keymap from these settings, so a configuration it could not build
+// one from is refused here, pointing at the keyboard table, or at keyboard.file and the line of
+// the keymap file that xkbcommon stopped at. The names are checked with a file too, as they
+// stand in for one that breaks later.
+void check_keymap(const sh_settings &settings) {
+    current_section = "keyboard";
+    std::string error;
+    std::unique_ptr<xkb_context, decltype(&xkb_context_unref)> context(
+        xkb_context_new(XKB_CONTEXT_NO_FLAGS), xkb_context_unref);
+    if (!context)
+        fail("cannot create XKB context");
+    xkb_context_set_user_data(context.get(), &error);
+    xkb_context_set_log_fn(context.get(), keep_xkb_error);
+    xkb_rule_names names{};
+    names.rules = settings.keyboard_rules;
+    names.layout = settings.keyboard_layout;
+    names.variant = settings.keyboard_variant;
+    names.model = settings.keyboard_model;
+    names.options = settings.keyboard_options;
+    std::unique_ptr<xkb_keymap, decltype(&xkb_keymap_unref)> keymap(
+        xkb_keymap_new_from_names(context.get(), &names, XKB_KEYMAP_COMPILE_NO_FLAGS),
+        xkb_keymap_unref);
+    if (!keymap)
+        fail("XKB has no keymap for this keyboard layout, variant, model, options and rules" +
+             (error.empty() ? "" : ": " + error));
+    if (settings.keyboard_file[0]) {
+        const std::string path = settings.keyboard_file;
+        struct Close {
+            void operator()(FILE *file) const { std::fclose(file); }
+        };
+        std::unique_ptr<FILE, Close> file(std::fopen(path.c_str(), "rb"));
+        if (!file)
+            fail("keyboard.file: cannot read " + path + ": " + std::strerror(errno), "file");
+        std::string text;
+        char buffer[4096];
+        for (size_t count; (count = std::fread(buffer, 1, sizeof buffer, file.get())) > 0;) {
+            text.append(buffer, count);
+            if (text.size() > 4 * 1024 * 1024)
+                fail("keyboard.file: " + path + " exceeds 4 MiB", "file");
+        }
+        if (std::ferror(file.get()))
+            fail("keyboard.file: cannot read " + path, "file");
+        error.clear();
+        keymap.reset(xkb_keymap_new_from_string(context.get(), text.c_str(),
+                                                XKB_KEYMAP_FORMAT_TEXT_V1,
+                                                XKB_KEYMAP_COMPILE_NO_FLAGS));
+        if (!keymap) {
+            // xkbcommon calls what it parsed "(input string)": that is the file.
+            auto at = error.find("(input string)");
+            if (at != std::string::npos)
+                error.replace(at, std::strlen("(input string)"), path);
+            else
+                error = path + ": " + (error.empty() ? "not an XKB keymap" : error);
+            fail("keyboard.file: " + error, "file");
+        }
+    }
+    current_section.clear();
+}
 void instruction_limit(lua_State *L, lua_Debug *) {
     auto *remaining = static_cast<int *>(lua_getextraspace(L));
     if (--*remaining <= 0)
         luaL_error(L, "configuration exceeded its instruction budget");
 }
-Config read(lua_State *L, size_t own = SIZE_MAX) {
+// `directory` is the configuration file's, which relative paths in it start from.
+Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
     Config config;
     table(L, -1, "configuration result");
     keys(L, -1, "");
@@ -964,6 +1055,15 @@ Config read(lua_State *L, size_t own = SIZE_MAX) {
         text_field(L, "variant", config.settings.keyboard_variant);
         text_field(L, "model", config.settings.keyboard_model);
         text_field(L, "options", config.settings.keyboard_options);
+        text_field(L, "rules", config.settings.keyboard_rules);
+        lua_getfield(L, -1, "file");
+        if (!lua_isnil(L, -1)) {
+            auto file = string(L, -1, "keyboard.file");
+            if (!file.empty())
+                copy_text(config_relative(file, directory).string(), config.settings.keyboard_file,
+                          "keyboard.file");
+        }
+        lua_pop(L, 1);
         config.settings.repeat_rate = integer(L, "repeat_rate", 25, 0, 100);
         config.settings.repeat_delay = integer(L, "repeat_delay", 600, 0, 5000);
     }
@@ -1272,6 +1372,18 @@ Config read(lua_State *L, size_t own = SIZE_MAX) {
                 binding.screenshot = parse_screenshot_mode(string(L, -1, "mode"));
             }
             lua_pop(L, 1);
+            lua_getfield(L, -1, "layout");
+            bool has_layout = !lua_isnil(L, -1), numbered = lua_type(L, -1) == LUA_TNUMBER;
+            if (has_layout && !numbered && lua_type(L, -1) != LUA_TSTRING)
+                wrong_type(L, "layout", "\"next\", \"prev\" or a number");
+            auto choice = has_layout && !numbered ? string(L, -1, "layout") : "";
+            lua_pop(L, 1);
+            if (has_layout && binding.action != SH_SWITCH_LAYOUT)
+                fail("layout is only valid with switch_layout");
+            if (numbered)
+                binding.layout = integer(L, "layout", 0, 1, max_layouts);
+            else if (has_layout)
+                binding.layout = parse_layout_choice(choice);
             lua_getfield(L, -1, "amount");
             bool has_amount = !lua_isnil(L, -1);
             lua_pop(L, 1);
@@ -1309,20 +1421,7 @@ Config read(lua_State *L, size_t own = SIZE_MAX) {
     current_section.clear();
 
     current_section.clear();
-    std::unique_ptr<xkb_context, decltype(&xkb_context_unref)> context(
-        xkb_context_new(XKB_CONTEXT_NO_FLAGS), xkb_context_unref);
-    if (!context)
-        fail("cannot create XKB context");
-    xkb_rule_names names{};
-    names.layout = config.settings.keyboard_layout;
-    names.variant = config.settings.keyboard_variant;
-    names.model = config.settings.keyboard_model;
-    names.options = config.settings.keyboard_options;
-    std::unique_ptr<xkb_keymap, decltype(&xkb_keymap_unref)> keymap(
-        xkb_keymap_new_from_names(context.get(), &names, XKB_KEYMAP_COMPILE_NO_FLAGS),
-        xkb_keymap_unref);
-    if (!keymap)
-        fail("invalid keyboard layout/options");
+    check_keymap(config.settings);
     return config;
 }
 } // namespace
@@ -1374,6 +1473,7 @@ constexpr std::pair<std::string_view, sh_action> action_table[] = {
         {"move_workspace_to_output", SH_MOVE_WORKSPACE_TO_OUTPUT},
         {"swap_workspaces", SH_SWAP_WORKSPACES},
         {"swallow_toggle", SH_SWALLOW_TOGGLE},
+        {"switch_layout", SH_SWITCH_LAYOUT},
         {"dnd_toggle", SH_DND_TOGGLE},
         {"dnd_on", SH_DND_ON},
         {"dnd_off", SH_DND_OFF},
@@ -1484,6 +1584,24 @@ bool valid_output_target(const std::string &target) {
 bool action_takes_amount(sh_action action) {
     return action == SH_RESIZE_LEFT || action == SH_RESIZE_RIGHT || action == SH_RESIZE_UP ||
            action == SH_RESIZE_DOWN;
+}
+
+int parse_layout_choice(const std::string &word) {
+    if (word == "next")
+        return 0;
+    if (word == "prev")
+        return -1;
+    std::size_t used = 0;
+    int number = 0;
+    try {
+        number = std::stoi(word, &used);
+    } catch (const std::logic_error &) {
+    }
+    if (used != word.size() || number < 1 || number > max_layouts)
+        fail("switch_layout takes \"next\", \"prev\", or a layout's number from 1 to " +
+                 std::to_string(max_layouts) + ", not '" + word + "'",
+             "layout");
+    return number;
 }
 
 sh_screenshot_mode parse_screenshot_mode(const std::string &name) {
@@ -1930,7 +2048,7 @@ Config parse_config(const std::string &source, const std::string &name,
             start = starting_profile(L, names);
             if (!profile.empty())
                 apply_profile(L, profile);
-            return read(L, own);
+            return read(L, own, directory);
         };
         auto config = build("");
         // Every profile is checked, so picking one later cannot fail; the configuration

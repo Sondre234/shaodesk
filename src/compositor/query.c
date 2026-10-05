@@ -333,6 +333,65 @@ static void get_layers(struct sh_server *server, int fd, const char *arguments) 
     control_describe_layers(server, fd);
 }
 
+/* `mask` (xkb modifiers of `keyboard`'s keymap) as sh_modifier bits: Shift 1, Caps Lock 2,
+ * Ctrl 4, Alt 8, Num Lock 16, Super 64, ... */
+static uint32_t keyboard_modifier_bits(struct wlr_keyboard *keyboard, xkb_mod_mask_t mask) {
+    uint32_t bits = 0;
+    for (size_t i = 0; keyboard->keymap && i < WLR_MODIFIER_COUNT; ++i) {
+        if (keyboard->mod_indexes[i] < 32 && mask & 1u << keyboard->mod_indexes[i])
+            bits |= 1u << i;
+    }
+    return bits;
+}
+
+/* Replaces what would break a tab-separated line. */
+static void one_field(char *text) {
+    for (char *c = text; *c; ++c)
+        *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
+}
+
+static void get_keyboard(struct sh_server *server, int fd, const char *arguments) {
+    // Where the keymap comes from, "source rules" or "source file PATH"; a line per layout,
+    // "layout N ACTIVE SHORT NAME" (N from 1, ACTIVE 1 or 0, SHORT as the panel shows it);
+    // and a line per keyboard, "keyboard LAYOUT LAYOUTS VIRTUAL HELD LOCKED NAME": the layout
+    // it types in (from 1), how many its keymap has, whether it is virtual (it brings its own
+    // keymap), and the modifiers it holds and has locked as sh_modifier bits (Caps Lock 2, Num
+    // Lock 16). Tab-separated.
+    char line[1280], name[sizeof(server_settings(server)->keyboard_file)];
+    control_reply(fd, "ok\n");
+    snprintf(name, sizeof(name), "%s", server_settings(server)->keyboard_file);
+    one_field(name);
+    snprintf(line, sizeof(line), server->keymap_from_file ? "source\tfile\t%s\n" : "source\trules\n",
+             name);
+    control_reply(fd, line);
+    xkb_layout_index_t count = server->keymap ? xkb_keymap_num_layouts(server->keymap) : 0;
+    for (xkb_layout_index_t i = 0; i < count; ++i) {
+        char code[32];
+        layout_short_name(server, i, code, sizeof(code));
+        const char *full = xkb_keymap_layout_get_name(server->keymap, i);
+        snprintf(name, sizeof(name), "%s", full ? full : "");
+        one_field(name);
+        snprintf(line, sizeof(line), "layout\t%u\t%d\t%s\t%s\n", i + 1,
+                 i == server->keyboard_layout, code, name);
+        control_reply(fd, line);
+    }
+    struct sh_keyboard *keyboard;
+    wl_list_for_each_reverse(keyboard, &server->keyboards, link) {
+        struct wlr_keyboard *wlr_keyboard = keyboard->wlr_keyboard;
+        xkb_layout_index_t layout =
+            wlr_keyboard->xkb_state
+                ? xkb_state_serialize_layout(wlr_keyboard->xkb_state, XKB_STATE_LAYOUT_LOCKED)
+                : wlr_keyboard->modifiers.group;
+        snprintf(name, sizeof(name), "%s", wlr_keyboard->base.name ? wlr_keyboard->base.name : "");
+        one_field(name);
+        snprintf(line, sizeof(line), "keyboard\t%u\t%u\t%d\t%u\t%u\t%s\n", layout + 1,
+                 wlr_keyboard->keymap ? xkb_keymap_num_layouts(wlr_keyboard->keymap) : 0,
+                 keyboard->is_virtual, wlr_keyboard_get_modifiers(wlr_keyboard),
+                 keyboard_modifier_bits(wlr_keyboard, wlr_keyboard->modifiers.locked), name);
+        control_reply(fd, line);
+    }
+}
+
 /* The queries, "get NAME" (or "get NAME ARGUMENTS" for one that takes them), which answer
  * even while the session is locked. A handler gets NULL for no arguments. */
 static const struct {
@@ -360,6 +419,7 @@ static const struct {
     {"night_light", get_night_light, false},
     {"overview", get_overview, false},
     {"layers", get_layers, false},
+    {"keyboard", get_keyboard, false},
 };
 
 /* Answers `request` if it is a query; false if it is not one. */

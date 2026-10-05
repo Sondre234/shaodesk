@@ -117,15 +117,21 @@ static void find_headless(struct wlr_backend *backend, void *data) {
         *found = backend;
 }
 
-/* "headless_output add [NAME] [WIDTHxHEIGHT]" plugs in a virtual output, and "headless_output
- * remove NAME" unplugs one, so tests can exercise hotplug without a display. Only under
- * --headless. */
-static void control_headless_output(struct sh_server *server, int fd, const char *args) {
+/* The headless backend, where tests plug in outputs and keyboards; NULL without --headless. */
+struct wlr_backend *headless_backend(struct sh_server *server) {
     struct wlr_backend *headless = NULL;
     if (wlr_backend_is_headless(server->backend))
         headless = server->backend;
     else if (wlr_backend_is_multi(server->backend))
         wlr_multi_for_each_backend(server->backend, find_headless, &headless);
+    return headless;
+}
+
+/* "headless_output add [NAME] [WIDTHxHEIGHT]" plugs in a virtual output, and "headless_output
+ * remove NAME" unplugs one, so tests can exercise hotplug without a display. Only under
+ * --headless. */
+static void control_headless_output(struct sh_server *server, int fd, const char *args) {
+    struct wlr_backend *headless = headless_backend(server);
     if (!headless) {
         control_reply(fd, "error: headless_output needs --headless\n");
         return;
@@ -228,6 +234,10 @@ static void control_handle(struct sh_server *server, int fd, const char *request
         control_headless_output(server, fd, request + (request[15] ? 16 : 15));
         return;
     }
+    if (!strncmp(request, "headless_keyboard", 17) && (!request[17] || request[17] == ' ')) {
+        control_headless_keyboard(server, fd, request + (request[17] ? 18 : 17));
+        return;
+    }
     if (!strncmp(request, "session", 7) && (!request[7] || request[7] == ' ')) {
         control_session(server, fd, request + 7);
         return;
@@ -311,6 +321,14 @@ static void control_handle(struct sh_server *server, int fd, const char *request
         control_reply(fd, "ok\n");
         return;
     }
+    xkb_layout_index_t layouts = server->keymap ? xkb_keymap_num_layouts(server->keymap) : 0;
+    if (action == SH_SWITCH_LAYOUT && argument > 0 && (xkb_layout_index_t)argument > layouts) {
+        char reply[96];
+        snprintf(reply, sizeof(reply), "error: the keymap has %u layout%s\n", layouts,
+                 layouts == 1 ? "" : "s");
+        control_reply(fd, reply);
+        return;
+    }
     server->target_output = target;
     run_action(server, action, argument);
     server->target_output = NULL;
@@ -342,7 +360,8 @@ static void drop_partial_utf8(char *text) {
 
 /* The state subscribers get: "tiling on|off", "workspace N" and "focused NAME" for the focused
  * output, and "output NAME N USED TILING" for each output, with its current workspace, those
- * holding windows ("1,3", or "-"), and whether it tiles ("on" or "off"). */
+ * holding windows ("1,3", or "-"), and whether it tiles ("on" or "off"); then the urgent
+ * windows and the keyboard layout, as described below. */
 static void describe_state(struct sh_server *server, char *state, size_t size) {
     struct wlr_output *focused = focused_output(server);
     size_t length = snprintf(state, size, "tiling %s\nworkspace %d\nfocused %s\n",
@@ -409,6 +428,19 @@ static void describe_state(struct sh_server *server, char *state, size_t size) {
             *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
         length += snprintf(state + length, size - length, "urgent-window %s\t%d\t%s\t%s\n",
                            next->output, next->workspace + 1, app_id, title);
+    }
+    // "keyboard-layout N COUNT SHORT NAME": the active keyboard layout (from 1) of how many,
+    // its short name ("us") and its name ("English (US)").
+    if (server->keymap && length < size) {
+        char code[32], name[256];
+        layout_short_name(server, server->keyboard_layout, code, sizeof(code));
+        const char *full = xkb_keymap_layout_get_name(server->keymap, server->keyboard_layout);
+        snprintf(name, sizeof(name), "%s", full ? full : "");
+        drop_partial_utf8(name);
+        for (char *c = name; *c; ++c)
+            *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
+        snprintf(state + length, size - length, "keyboard-layout %u %u %s %s\n",
+                 server->keyboard_layout + 1, xkb_keymap_num_layouts(server->keymap), code, name);
     }
 }
 

@@ -28,11 +28,14 @@ through them). The battery shows the charge of the first battery in `/sys/class/
 (red when nearly empty, accent-coloured while charging) and is left out on machines without
 one; the network icon shows Wi-Fi, a wired link, or a dimmed struck-through icon when the
 interface is down, read from `/sys/class/net` (physical interfaces only, wired preferred), and
-is left out without any interface. Both refresh every five seconds. Clicking the clock opens a
+is left out without any interface. Both refresh every five seconds. With two or more
+[keyboard layouts](#keyboard-layouts), the active one's short name (`us`, `no`) sits beside the
+clock, and clicking it switches every keyboard to the next. Clicking the clock opens a
 month calendar (previous and next month buttons; the title returns to today). Each widget is
 switched off from Lua: `shell = { widgets = { battery = false, calendar = false } }`, with
 `workspaces`, `battery`, `network`, `volume`, `clock`, `calendar` (the clock stays, the
-calendar goes), `tiling`, and `profiles` (the appearance profile picker) all on by default. All of them take the panel's `accent`,
+calendar goes), `tiling`, `profiles` (the appearance profile picker) and `keyboard_layout` all
+on by default. All of them take the panel's `accent`,
 `panel_color`, `text_color`, `font` and `font_size`. In a nested
 session, applications that reuse an existing process or D-Bus service can open
 in the host session instead.
@@ -665,15 +668,50 @@ cannot be turned off.
 
 ## Input
 
-The `keyboard` table sets the XKB `layout`, `variant`, `model` and `options` (for example
-`{ layout = "us,no", variant = ",", options = "grp:alt_shift_toggle" }`), and the `repeat_rate` and
-`repeat_delay` clients see. An unknown combination is rejected with the rest of the file.
+The `keyboard` table sets the XKB `layout`, `variant`, `model`, `options` and `rules`, and the
+`repeat_rate` and `repeat_delay` clients see. An unknown combination is rejected with the rest of
+the file, with xkbcommon's reason. `keyboard.file` names an XKB keymap to use instead, absolute,
+under `~/`, or relative to the configuration: what `xkbcli compile-keymap --layout us,no >
+keymap.xkb` writes, edited to taste, or a hand-written `xkb_keymap { ... }`. A file that cannot
+be read or does not compile is an error like any other, shown with the line of the setting and,
+where xkbcommon knows it, the line of the keymap (`init.lua:4: keyboard.file:
+/home/me/us-custom.xkb:12:5: syntax error`); should it break while the session runs, the
+keyboard falls back to the names. Saving an `.xkb` file beside the configuration reloads it, as
+saving a `.lua` file there does, so a fixed keymap brings the configuration back.
 
 Pointer devices in a standalone `--session` take `mouse.speed` (-1 to 1),
 `mouse.acceleration` (`"flat"` or `"adaptive"`), and `mouse.natural_scroll`; touchpads also
 take `touchpad.natural_scroll`, `tap_to_click`, and `disable_while_typing`. Unset settings
 keep each device's defaults, and a reload applies changes. Nested sessions get their pointer
 from the host, so these do nothing there.
+
+### Keyboard layouts
+
+Several layouts are a comma-separated list, with variants in the same places:
+
+```lua
+keyboard = { layout = "us,no", variant = ",nodeadkeys", options = "grp:alt_shift_toggle" },
+```
+
+Every keyboard types in the same layout. The `switch_layout` action moves them all to the next
+one, wrapping; a binding's `layout = "prev"` goes back instead, and `layout = 2` picks the second
+(`shaodesk msg switch_layout`, `switch_layout prev`, `switch_layout 2`; a number past the last
+layout is refused). An XKB option such as `grp:alt_shift_toggle` switches from the keyboard
+itself, and the other keyboards follow it. Virtual keyboards (wtype, on-screen keyboards) keep
+the keymap and layout they bring. Unbound by default:
+
+```lua
+{ mods = { "Super", "Alt" }, key = "space", action = "switch_layout" },
+```
+
+A reload that changes the keymap gives it to every keyboard at once, keeping the keys held and
+the locks such as Caps Lock, and the active layout where the new keymap has it (by name, else
+by place); one that leaves the keymap as it was leaves the keyboards alone.
+`shaodesk msg get keyboard` prints where the keymap comes from (`source rules`, or `source file
+PATH`), a line per layout (`layout`, its number, 1 for the active one, the short name the panel
+shows, such as `us` or `no`, and its name), and a line per keyboard (`keyboard`, the layout it
+types in, how many its keymap has, 1 for a virtual one, the modifiers it holds and has locked as
+bits: Shift 1, Caps Lock 2, Ctrl 4, Alt 8, Num Lock 16, Super 64, and its name), tab-separated.
 
 ### Mouse button bindings
 
@@ -845,8 +883,10 @@ namespace, output, layer (0 background to 3 overlay), and whether it is shown.
 the scene (closing windows count until their animation ends), and of focus fades, mainly
 for tests. A client
 that sends `subscribe` keeps its connection and receives `tiling on|off` and
-`workspace N` (the focused monitor's), and one `output NAME N USED TILING` line per monitor
-(as in `get workspaces`) after every change, plus `launcher OUTPUT` when the `launcher` action
+`workspace N` (the focused monitor's), one `output NAME N USED TILING` line per monitor
+(as in `get workspaces`), and `keyboard-layout N COUNT SHORT NAME` (the active
+[keyboard layout](#keyboard-layouts), from 1, of how many, as in `get keyboard`) after every
+change, plus `launcher OUTPUT` when the `launcher` action
 (Super + R) asks the panel on that monitor to open or close its application menu; the panel uses this. The window switcher sends `switcher OUTPUT SELECTED COUNT` followed by
 COUNT lines `switcher-window APP_ID TITLE OUTPUT WORKSPACE MINIMIZED URGENT` (tab-separated) when it
 opens or a listed window closes, `switcher-select N` as the selection moves (both counting

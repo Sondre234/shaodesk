@@ -373,3 +373,29 @@ VM. Daily use is not a targeted test, so the hardware items listed as not checke
 sections above stay unconfirmed until someone checks them on purpose: suspend and resume, lid
 close (this machine has none), monitors unplugged or woken through DRM, VT switching on NVIDIA,
 and brightness keys.
+
+## Keyboard layouts and keymap files
+
+Added 2026-10-05. Headless keyboards (`headless_keyboard`, keyboards without a device that the
+compositor treats as real ones) stand in for hardware. `keymap_smoke` checks with `wayland_probe
+--keymap` that a new application gets the keymap of `keyboard.layout` or `keyboard.file`, that a
+reload swaps it while a held Shift stays held and Caps Lock stays on, that a virtual keyboard
+(from `pointer_probe`) keeps its own keymap and held Alt through it, and that a keymap file
+that does not compile, at startup or on a reload, gives the default configuration's keymap,
+with the setting's and the keymap's lines in the log and from `--check-config`.
+`keyboard_layout_smoke` drives `switch_layout` next, prev and by number from the control socket
+and a binding, Alt + Shift with `grp:alt_shift_toggle` on either of two keyboards, a virtual
+keyboard left in its own layout, and reloads that keep the active layout by name or by place,
+reading `get keyboard` and the subscription's `keyboard-layout` lines. `keyboard_config`
+covers the settings and their diagnostics (paths relative to the configuration, `~/`, missing
+and unreadable files, syntax and include errors with their lines, the fallback through
+`load_config_or_default`), `import` the Hyprland keys, `auto_reload_smoke` reloading on a saved
+`.xkb` file, and `shell_ui` the panel indicator: hidden with one layout, the short name with two,
+`switch_layout next` on a click, and `shell.widgets.keyboard_layout = false`. The suite passed;
+under AddressSanitizer and UBSan the failures were the known leaks of the test clients and the
+shell.
+
+Not checked: real keyboards through libinput (two plugged in at once, one unplugged while a key
+is held), whether applications (GTK, Qt, Firefox, foot, Xwayland clients) type in the switched
+layout and follow a reload's new keymap, the indicator on a real display, an input method
+alongside the layouts, and xkbcommon older than 1.13.

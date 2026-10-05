@@ -99,14 +99,12 @@ int main(int argc, char **argv) {
     if (!file.open(QIODevice::WriteOnly))
         return 1;
     // Long Lua strings preserve paths without shell interpolation.
-    file.write(
-        (QString(
-             "return {layout={workspace_names={'web','','','mail'}},"
-             "profile='dark',profiles={dark={},light={shell={accent='#336699'}}},"
-             "shell={wallpaper='walls/a/one.png',wallpapers=[[%3]],"
-             "launchers={{name='Test app',command={[[%1]],'-E','touch',[[%2]]}}}}}")
-             .arg(QString::fromLocal8Bit(argv[1]), marker, walls))
-            .toUtf8());
+    const auto lua = QString("return {layout={workspace_names={'web','','','mail'}},"
+                             "profile='dark',profiles={dark={},light={shell={accent='#336699'}}},"
+                             "shell={wallpaper='walls/a/one.png',wallpapers=[[%3]],"
+                             "launchers={{name='Test app',command={[[%1]],'-E','touch',[[%2]]}}}}}")
+                         .arg(QString::fromLocal8Bit(argv[1]), marker, walls);
+    file.write(lua.toUtf8());
     file.close();
     // A stand-in for the compositor's control socket, with this screen as its only output.
     // Tiling is per output; the focused one it reports first is always the opposite of this
@@ -127,6 +125,7 @@ int main(int argc, char **argv) {
     bool toggled = false;
     int currentWorkspace = 2;
     QStringList switches, requests;
+    int layoutSwitches = 0; // "switch_layout next" requests, answered with the second layout
     bool holdSessions = false;
     QLocalSocket *pendingSessions = nullptr;
     // What the compositor does with "profile NAME": saves it and reloads the shell.
@@ -150,6 +149,11 @@ int main(int argc, char **argv) {
                 client->write("ok\n");
                 client->disconnectFromServer();
                 pickProfile(QString::fromUtf8(request).trimmed().section(' ', 1));
+            } else if (request == "switch_layout next\n") {
+                ++layoutSwitches;
+                client->write("ok\n");
+                client->disconnectFromServer();
+                subscriber->write("keyboard-layout 2 2 no Norwegian\n");
             } else if (request == "session list\n") {
                 if (holdSessions) { // answered later, by the test
                     pendingSessions = client;
@@ -377,6 +381,56 @@ int main(int argc, char **argv) {
     if (!QTest::qWaitFor([&] { return controller.switcherWindows().isEmpty(); })) {
         std::cerr << "the switcher did not close\n";
         return 1;
+    }
+    // The keyboard layout indicator: the active layout's short name while there are two or
+    // more; clicking it asks for the next; shell.widgets.keyboard_layout = false hides it.
+    {
+        auto *layout = find(view.rootObject(), "keyboardLayout");
+        auto *label = find(view.rootObject(), "keyboardLayoutText");
+        if (!layout || !label || layout->isVisible()) {
+            std::cerr << "the keyboard layout indicator shows before the compositor names one\n";
+            return 1;
+        }
+        subscriber->write("keyboard-layout 1 1 us English (US)\n");
+        if (!QTest::qWaitFor([&] { return controller.keyboardLayout()["count"].toInt() == 1; }) ||
+            layout->isVisible()) {
+            std::cerr << "the keyboard layout indicator shows with a single layout\n";
+            return 1;
+        }
+        subscriber->write("keyboard-layout 1 2 us English (US)\n");
+        if (!QTest::qWaitFor([&] { return layout->isVisible(); }) ||
+            label->property("text").toString() != "us" ||
+            controller.keyboardLayout()["name"].toString() != "English (US)" ||
+            layout->property("description").toString() != "Keyboard layout: English (US)") {
+            std::cerr << "the keyboard layout indicator does not show the active layout\n";
+            return 1;
+        }
+        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(layout));
+        if (!QTest::qWaitFor([&] { return label->property("text").toString() == "no"; }) ||
+            layoutSwitches != 1 || controller.keyboardLayout()["number"].toInt() != 2) {
+            std::cerr << "clicking the keyboard layout did not switch to the next\n";
+            return 1;
+        }
+        auto rewrite = [&config](const QString &source) {
+            QFile again(config);
+            return again.open(QIODevice::WriteOnly | QIODevice::Truncate) &&
+                   again.write(source.toUtf8()) >= 0;
+        };
+        if (!controller.widgets()["keyboard_layout"].toBool() ||
+            !rewrite(QString(lua).replace("shell={", "shell={widgets={keyboard_layout=false},")))
+            return 1;
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return !layout->isVisible(); })) {
+            std::cerr << "shell.widgets.keyboard_layout = false did not hide the indicator\n";
+            return 1;
+        }
+        if (!rewrite(lua))
+            return 1;
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return layout->isVisible(); })) {
+            std::cerr << "the keyboard layout indicator did not come back\n";
+            return 1;
+        }
     }
     // Battery and network widgets show what a (fake) sysfs reports, and only where it exists.
     {

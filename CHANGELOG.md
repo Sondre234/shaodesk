@@ -5,6 +5,26 @@ tagged release yet; everything below is on `main`.
 
 ## Unreleased (2026-10-05)
 
+- Keyboard layouts: `keyboard = { layout = "us,no", variant = ",nodeadkeys" }` gives every
+  keyboard two layouts, and the `switch_layout` action moves them all to the next (`layout =
+  "prev"` or a layout's number picks another; `shaodesk msg switch_layout`). An XKB option
+  such as `grp:alt_shift_toggle` switches from the keyboard it is typed on, and the other
+  keyboards follow. While there are two or more, the panel shows the active one (`us`, `no`)
+  beside the clock; clicking it switches (`shell.widgets.keyboard_layout = false` hides it).
+  Subscribers hear `keyboard-layout N COUNT SHORT NAME`, and `shaodesk msg get keyboard` lists
+  the layouts and the keyboards.
+- `keyboard.file` uses an XKB keymap file instead of the layout names, and `keyboard.rules`
+  sets the XKB rules. A keymap file that cannot be read or compiled is a configuration error,
+  shown with its line in the configuration and, where xkbcommon knows it, in the keymap; names
+  XKB does not know are now refused with its reason. Saving an `.xkb` file beside the
+  configuration reloads it, as saving a `.lua` file does.
+- A reload no longer resets the keyboards: keys held stay down, Caps Lock stays on, and the
+  active layout stays (found by name in a changed keymap); a reload that leaves the keymap as it
+  was leaves the keyboards alone.
+- When the keyboard last typed on goes away (unplugged, or a virtual one such as wtype's
+  finishing), the seat takes another at once, so applications that start meanwhile get a
+  keymap.
+- `shaodesk import` carries Hyprland's `kb_variant`, `kb_model`, `kb_rules` and `kb_file` over.
 - Gentoo ebuilds: `packaging/gentoo` is an ebuild repository with `gui-wm/shaodesk-9999`
   (the newest `main`) and `shaodesk-0.1.0`, with USE flags for the shell, notifications,
   the volume control and X11 applications. [docs/gentoo.md](docs/gentoo.md) shows how to

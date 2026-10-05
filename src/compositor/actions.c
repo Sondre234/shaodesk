@@ -242,6 +242,9 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
     case SH_SWALLOW_TOGGLE:
         swallow_toggle(server, current);
         break;
+    case SH_SWITCH_LAYOUT:
+        switch_keyboard_layout(server, argument);
+        break;
     case SH_MOVE_WORKSPACE_TO_OUTPUT:
     case SH_SWAP_WORKSPACES: {
         const char *target = server->callbacks->action_target

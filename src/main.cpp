@@ -279,6 +279,8 @@ struct Runtime {
         *argument = binding->action == SH_SCREENSHOT ? binding->screenshot : binding->workspace;
         if (shaodesk::action_takes_amount(binding->action))
             *argument = binding->amount;
+        if (binding->action == SH_SWITCH_LAYOUT)
+            *argument = binding->layout;
         self.target = binding->output;
         return binding->action;
     }
@@ -293,12 +295,14 @@ struct Runtime {
         *argument = binding->action == SH_SCREENSHOT ? binding->screenshot : binding->workspace;
         if (shaodesk::action_takes_amount(binding->action))
             *argument = binding->amount;
+        if (binding->action == SH_SWITCH_LAYOUT)
+            *argument = binding->layout;
         self.target = binding->output;
         return binding->action;
     }
     /* Control requests: "<action> [workspace]", "screenshot [region|output|window]",
-     * "resize_<direction> [pixels]", "switcher_confirm [N]", "profile NAME|next|prev", or
-     * "spawn PROGRAM [ARGS...]". */
+     * "resize_<direction> [pixels]", "switcher_confirm [N]", "switch_layout [next|prev|N]",
+     * "profile NAME|next|prev", or "spawn PROGRAM [ARGS...]". */
     static sh_action command(void *data, const char *request, int *argument, char *error,
                              size_t error_size) {
         auto &self = *static_cast<Runtime *>(data);
@@ -360,6 +364,15 @@ struct Runtime {
                     throw std::runtime_error(words[0] + " takes a size in pixels, from 1 to " +
                                              std::to_string(shaodesk::max_resize_amount));
                 *argument = amount;
+            } else if (action == SH_SWITCH_LAYOUT) {
+                try {
+                    if (words.size() > 2)
+                        throw std::runtime_error("too many words");
+                    *argument = words.size() == 2 ? shaodesk::parse_layout_choice(words[1]) : 0;
+                } catch (const std::runtime_error &) {
+                    throw std::runtime_error("switch_layout takes next, prev, or a layout's "
+                                             "number from 1");
+                }
             } else if ((action == SH_SWITCHER_CONFIRM || action == SH_OVERVIEW_CONFIRM) &&
                        words.size() == 2) {
                 std::size_t used = 0;
@@ -529,12 +542,19 @@ struct Runtime {
     static bool config_changed(void *data) {
         auto &self = *static_cast<Runtime *>(data);
         bool changed = false;
+        // XKB keymaps count as well: an .xkb file, even while a broken one has the default
+        // configuration standing in, or keyboard.file by any name.
+        const std::filesystem::path file = self.config.settings.keyboard_file;
+        const auto keymap = file.parent_path() == self.path.parent_path().lexically_normal()
+                                ? file.filename()
+                                : std::filesystem::path();
         alignas(inotify_event) char buffer[4096];
         for (ssize_t count; (count = read(self.watch_fd, buffer, sizeof(buffer))) > 0;) {
             for (char *at = buffer; at < buffer + count;) {
                 auto *event = reinterpret_cast<inotify_event *>(at);
                 std::string_view name = event->len ? event->name : "";
-                if (name.ends_with(".lua"))
+                if (name.ends_with(".lua") || name.ends_with(".xkb") ||
+                    (!keymap.empty() && name == keymap.native()))
                     changed = true;
                 at += sizeof(inotify_event) + event->len;
             }

@@ -57,13 +57,7 @@ void reload_config(struct sh_server *server) {
     night_light_update(server);
     if (!server_settings(server)->overview)
         overview_dismiss(server);
-    struct sh_keyboard *keyboard;
-    wl_list_for_each(keyboard, &server->keyboards, link) {
-        if (wlr_input_device_get_virtual_keyboard(&keyboard->wlr_keyboard->base))
-            continue;
-        if (!configure_keyboard(server, keyboard->wlr_keyboard))
-            wlr_log(WLR_ERROR, "Could not apply reloaded keymap");
-    }
+    update_keymap(server);
     struct sh_pointer *pointer;
     wl_list_for_each(pointer, &server->pointers, link) configure_pointer(server, pointer->device);
     // Enable outputs before disabling others, so a swap never leaves none on.
@@ -335,6 +329,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     add_listener(&server.cursor->events.frame, &server.cursor_frame, server_cursor_frame);
 
     wl_list_init(&server.keyboards);
+    wl_list_init(&server.headless_keyboards);
     wl_list_init(&server.pointers);
     add_listener(&server.backend->events.new_input, &server.new_input, server_new_input);
     struct wlr_virtual_keyboard_manager_v1 *virtual_keyboards =
@@ -348,6 +343,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     server.seat = wlr_seat_create(server.wl_display, "seat0");
     // Always offered, so clients bind a keyboard even before one (maybe virtual) appears.
     wlr_seat_set_capabilities(server.seat, WL_SEAT_CAPABILITY_POINTER | WL_SEAT_CAPABILITY_KEYBOARD);
+    update_keymap(&server); // for the keyboards the backend finds as it starts
     add_listener(&server.seat->events.request_set_cursor, &server.request_cursor,
                  seat_request_cursor);
     struct wlr_cursor_shape_manager_v1 *cursor_shape_mgr =
@@ -442,6 +438,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     }
 #endif
     close_control_socket(&server);
+    destroy_headless_keyboards(&server);
     wl_display_destroy_clients(server.wl_display);
 
     wl_list_remove(&server.new_xdg_toplevel.link);
@@ -508,5 +505,6 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     wlr_renderer_destroy(server.renderer);
     wl_display_destroy(server.wl_display);
     sh_tiling_destroy(server.tiling);
+    xkb_keymap_unref(server.keymap);
     return 0;
 }

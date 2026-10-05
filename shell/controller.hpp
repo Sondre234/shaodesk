@@ -54,8 +54,11 @@ class ShellController : public QObject {
     Q_PROPERTY(bool iconsOnly READ iconsOnly NOTIFY configChanged)
     Q_PROPERTY(bool groupWindows READ groupWindows NOTIFY configChanged)
     // Which panel widgets Lua enables: {workspaces, battery, network, volume, clock, calendar,
-    // tiling, profiles}.
+    // tiling, profiles, wallpapers, keyboard_layout}.
     Q_PROPERTY(QVariantMap widgets READ widgets NOTIFY configChanged)
+    // The compositor's active keyboard layout: {number (from 1), count, short ("us"), name}, or
+    // empty without a compositor.
+    Q_PROPERTY(QVariantMap keyboardLayout READ keyboardLayout NOTIFY keyboardLayoutChanged)
     Q_PROPERTY(QVariantList pinned READ pinned NOTIFY appsChanged)
     Q_PROPERTY(QVariantList apps READ apps NOTIFY appsChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
@@ -140,6 +143,7 @@ class ShellController : public QObject {
     // Switches to another appearance profile: the compositor saves the choice and reloads.
     Q_INVOKABLE void pickProfile(const QString &name) { send("profile " + name); }
     QVariantMap widgets() const;
+    QVariantMap keyboardLayout() const { return keyboardLayout_; }
     QVariantList pinned() const;
     QVariantList apps() const;
     QString error() const { return error_; }
@@ -228,6 +232,7 @@ class ShellController : public QObject {
     void overviewSelectedChanged();
     void focusedOutputChanged();
     void cardsOutputChanged();
+    void keyboardLayoutChanged();
     // The compositor asked for the notification history on `output`.
     void notificationsRequested(const QString &output);
 
@@ -253,6 +258,7 @@ class ShellController : public QObject {
     Backlight backlight_{qEnvironmentVariable("SHAODESK_SYSFS", "/sys"), !qEnvironmentVariableIsSet("SHAODESK_SYSFS"),
                          qEnvironmentVariableIsSet("SHAODESK_SYSFS") ? 100 : 0};
     QString focusedOutput_, cardsOutput_;
+    QVariantMap keyboardLayout_;
     QObject *notificationService_ = nullptr;
     bool serveNotifications_ = false, noBusReported_ = false;
     int lastVolume_ = -1;

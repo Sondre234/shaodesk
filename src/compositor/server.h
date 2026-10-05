@@ -42,6 +42,7 @@
 #include <wlr/backend/headless.h>
 #include <wlr/backend/multi.h>
 #include <wlr/backend/wayland.h>
+#include <wlr/interfaces/wlr_keyboard.h>
 #include <wlr/config.h>
 #if WLR_HAS_LIBINPUT_BACKEND
 #include <libinput.h>
@@ -357,6 +358,14 @@ struct sh_server {
     struct wlr_pointer_constraint_v1 *active_constraint; // on the keyboard-focused surface
     struct wl_listener new_constraint, keyboard_focus_change;
     struct wl_list keyboards;
+    /* The keymap of the keyboard settings, shared by every keyboard but the virtual ones, and
+     * the layout active on all of them (from 0). keymap.c sets `syncing_keyboards` while it
+     * changes keyboards' state itself, and tells the seat afterwards. */
+    struct xkb_keymap *keymap;
+    bool keymap_from_file; // keyboard.file, rather than the names
+    xkb_layout_index_t keyboard_layout;
+    bool syncing_keyboards;
+    struct wl_list headless_keyboards; // added by tests with "headless_keyboard add"
     struct wl_list pointers; /* struct sh_pointer */
     enum sh_cursor_mode cursor_mode;
     struct sh_toplevel *grabbed_toplevel;
@@ -569,6 +578,7 @@ struct sh_keyboard {
     struct wl_list link;
     struct sh_server *server;
     struct wlr_keyboard *wlr_keyboard;
+    bool is_virtual; // wtype and the like, which send their own keymap
     /* A held key bound to a repeating action (keyboard resizing) runs it again at the
      * keyboard's repeat rate, as clients repeat keys themselves. */
     struct wl_event_source *repeat_timer;
@@ -598,6 +608,7 @@ void run_action(struct sh_server *server, enum sh_action action, int argument);
 
 /* control.c */
 void control_reply(int fd, const char *text);
+struct wlr_backend *headless_backend(struct sh_server *server);
 void notify_subscribers(struct sh_server *server);
 void send_event(struct sh_server *server, const char *text, size_t length);
 void request_shell(struct sh_server *server, const char *what);
@@ -703,7 +714,8 @@ void group_merge(struct sh_server *server, enum sh_action action);
 void dissolve_groups(struct sh_server *server);
 
 /* input.c */
-bool configure_keyboard(struct sh_server *server, struct wlr_keyboard *keyboard);
+void control_headless_keyboard(struct sh_server *server, int fd, const char *arguments);
+void destroy_headless_keyboards(struct sh_server *server);
 void configure_pointer(struct sh_server *server, struct wlr_input_device *device);
 void server_new_input(struct wl_listener *listener, void *data);
 void server_new_virtual_keyboard(struct wl_listener *listener, void *data);
@@ -714,6 +726,14 @@ void seat_request_start_drag(struct wl_listener *listener, void *data);
 void seat_start_drag(struct wl_listener *listener, void *data);
 void server_new_constraint(struct wl_listener *listener, void *data);
 void seat_keyboard_focus_change(struct wl_listener *listener, void *data);
+
+/* keymap.c */
+bool configure_keyboard(struct sh_server *server, struct wlr_keyboard *keyboard);
+void update_keymap(struct sh_server *server);
+void follow_keyboard_layout(struct sh_server *server, struct sh_keyboard *keyboard);
+void switch_keyboard_layout(struct sh_server *server, int choice);
+void layout_short_name(struct sh_server *server, xkb_layout_index_t layout, char *name,
+                       size_t size);
 
 /* layer_shell.c */
 void arrange_layers(struct sh_server *server);

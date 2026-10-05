@@ -44,6 +44,8 @@ return {
         },
     },
     -- keyboard = { layout = "us", variant = "", model = "", options = "", repeat_rate = 25, repeat_delay = 600 },
+    -- Several layouts: layout = "us,no", variant = ",nodeadkeys"; or file = "keymap.xkb", a
+    -- whole XKB keymap beside this file.
     mouse = {
         modifier = mod, -- modifier + left drag moves; right drag resizes
         -- focus_follows = true, -- hovering a window focuses it (without raising it)
@@ -170,7 +172,8 @@ return {
         -- group_windows = true, -- one button per application, its windows listed on hover;
         --                          false gives every window its own button
         -- widgets = { workspaces = true, battery = true, network = true, volume = true,
-        --             clock = true, calendar = true, tiling = true, wallpapers = true }, -- false hides one
+        --             clock = true, calendar = true, tiling = true, wallpapers = true,
+        --             keyboard_layout = true }, -- false hides one
         -- accent = "#7da8ff",
         -- panel_color = "#151e2c", -- #RRGGBBAA makes it translucent
         -- text_color = "#edf2fa",
@@ -234,6 +237,9 @@ return {
         -- number of windows in the master column.
         { mods = { mod }, key = "space", action = "layout_next" },
         { mods = { mod, "Shift" }, key = "space", action = "layout_prev" },
+        -- With several keyboard layouts (keyboard.layout = "us,no"), switch_layout moves every
+        -- keyboard to the next one; layout = "prev", or a layout's number, picks another.
+        -- { mods = { mod, "Alt" }, key = "space", action = "switch_layout" },
         { mods = { mod }, key = "Return", action = "promote" },
         { mods = { mod }, key = "j", action = "focus_next" },
         { mods = { mod }, key = "k", action = "focus_prev" },
