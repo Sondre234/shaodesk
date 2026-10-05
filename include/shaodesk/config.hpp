@@ -76,6 +76,7 @@ struct ShellWidgets {
     bool tiling = true;   // the tiling on/off button
     bool profiles = true; // the appearance profile picker, only with two or more profiles
     bool wallpapers = true; // the wallpaper picker
+    bool power = true;      // the power menu, only with something in it
 };
 
 struct ShellConfig {

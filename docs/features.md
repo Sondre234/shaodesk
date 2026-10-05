@@ -32,7 +32,8 @@ is left out without any interface. Both refresh every five seconds. Clicking the
 month calendar (previous and next month buttons; the title returns to today). Each widget is
 switched off from Lua: `shell = { widgets = { battery = false, calendar = false } }`, with
 `workspaces`, `battery`, `network`, `volume`, `clock`, `calendar` (the clock stays, the
-calendar goes), `tiling`, and `profiles` (the appearance profile picker) all on by default. All of them take the panel's `accent`,
+calendar goes), `tiling`, `profiles` (the appearance profile picker) and `power` (the
+[power menu](#power)) all on by default. All of them take the panel's `accent`,
 `panel_color`, `text_color`, `font` and `font_size`. In a nested
 session, applications that reuse an existing process or D-Bus service can open
 in the host session instead.
@@ -872,6 +873,11 @@ another desktop on a different VT cannot suspend the machine; switching VTs away
 This needs sd-bus from libsystemd, libelogind, or basu at build time.
 
 ## Power
+
+The panel's power button opens a menu of what may run now: Lock screen (with a locker
+installed), Suspend and Hibernate (as logind allows them); the button is left out when nothing
+may. Its entries, and what is refused, come from the compositor, which also reports across the
+panel an action that fails or is cancelled later.
 
 The `suspend`, `hibernate`, `poweroff` and `reboot` actions ask logind (systemd-logind or
 elogind, on the system bus) to suspend, hibernate, power off or restart the machine, letting it

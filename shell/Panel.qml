@@ -662,6 +662,51 @@ Item {
         }
     }
 
+    // The power button: lock, suspend and the rest, as far as the compositor says they may run.
+    Loader {
+        id: powerLoader
+        asynchronous: !(root.audioPopup === "power")
+        active: root.audioPopup === "power" || root.warm || used
+        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+        property bool used: false
+        onLoaded: used = true
+        sourceComponent: Component {
+            Rectangle {
+                id: powerMenu
+                parent: root
+                objectName: "powerMenu"
+                visible: root.audioPopup === "power"
+                width: 220; height: 12 + shell.power.entries.length * 44 + Math.max(0, shell.power.entries.length - 1) * 2
+                x: Math.max(8, Math.min(root.audioPopupX - width / 2, root.width - width - 8))
+                y: root.onTop ? bar.y + bar.height + 8 : bar.y - height - 8
+                color: shell.panelColor; radius: 10
+                border.color: Qt.lighter(shell.panelColor, 1.6)
+                MouseArea { anchors.fill: parent }
+                Column {
+                    anchors.fill: parent; anchors.margins: 6; spacing: 2
+                    Repeater {
+                        model: shell.power.entries
+                        delegate: Button {
+                            id: powerItem
+                            required property var modelData
+                            objectName: "powerItem:" + modelData.action
+                            width: parent.width; height: 44
+                            text: modelData.title
+                            palette.buttonText: shell.textColor
+                            // Closing the menu first hands the keyboard back before it runs.
+                            onClicked: {
+                                var action = modelData.action
+                                root.audioPopup = ""
+                                shell.power.request(action)
+                            }
+                            background: Rectangle { color: powerItem.hovered ? Qt.lighter(shell.panelColor, 1.5) : "transparent"; radius: 6 }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // The wallpaper button: thumbnails of the pictures in shell.wallpapers, by subfolder, with
     // a filter; clicking one shows it at once and keeps the picker open to try another.
     Loader {
@@ -1605,6 +1650,22 @@ Item {
                         interval: untilMinute(); running: true; repeat: true
                         onTriggered: { clock.now = new Date(); interval = untilMinute() }
                     }
+                }
+            }
+            Button {
+                id: powerButton
+                objectName: "powerButton"
+                visible: shell.widgets.power && shell.power.available.length > 0
+                Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
+                onClicked: root.toggleAudioPopup("power", powerButton)
+                Accessible.name: "Power"
+                BarTip { owner: powerButton; text: "Power" }
+                background: Rectangle {
+                    radius: 7
+                    color: root.audioPopup === "power" ? Qt.lighter(shell.panelColor, 1.8) : (powerButton.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
+                }
+                contentItem: Item {
+                    Icon { anchors.centerIn: parent; name: "power"; color: root.audioPopup === "power" ? shell.accent : shell.textColor }
                 }
             }
             Button {

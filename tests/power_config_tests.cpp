@@ -40,6 +40,11 @@ int main() {
         rejects("return {power={lock_command={'swaylock',1}}}");
         rejects("return {power={lock_command={[2]='swaylock'}}}");
         rejects("return {power={locker={'swaylock'}}}");
+        require(defaults.shell.widgets.power &&
+                    !shaodesk::parse_config("return {shell={widgets={power=false}}}")
+                         .shell.widgets.power,
+                "shell.widgets.power not parsed");
+        rejects("return {shell={widgets={power='no'}}}");
         rejects("return {power=true}");
         rejects("return {power={lock_before_sleep='yes'}}");
         rejects("return {power={close_windows=1}}");

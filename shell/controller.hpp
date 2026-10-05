@@ -5,6 +5,7 @@
 #include "notifications.hpp"
 #include "osd.hpp"
 #include "palette.hpp"
+#include "power.hpp"
 #include "shaodesk/config.hpp"
 #include "system_status.hpp"
 #include "task_model.hpp"
@@ -54,7 +55,7 @@ class ShellController : public QObject {
     Q_PROPERTY(bool iconsOnly READ iconsOnly NOTIFY configChanged)
     Q_PROPERTY(bool groupWindows READ groupWindows NOTIFY configChanged)
     // Which panel widgets Lua enables: {workspaces, battery, network, volume, clock, calendar,
-    // tiling, profiles}.
+    // tiling, profiles, wallpapers, power}.
     Q_PROPERTY(QVariantMap widgets READ widgets NOTIFY configChanged)
     Q_PROPERTY(QVariantList pinned READ pinned NOTIFY appsChanged)
     Q_PROPERTY(QVariantList apps READ apps NOTIFY appsChanged)
@@ -88,6 +89,8 @@ class ShellController : public QObject {
     Q_PROPERTY(int switcherSelected READ switcherSelected NOTIFY switcherSelectedChanged)
     // The command palette (Super + P).
     Q_PROPERTY(Palette *palette READ palette CONSTANT)
+    // The power menu: what may run of lock, suspend, hibernate and the rest.
+    Q_PROPERTY(Power *power READ power CONSTANT)
     // The compositor's overview: the output showing it, empty while closed; its thumbnails as
     // {x, y, w, h, appId, title, workspace, urgent} and workspace strip cells as {x, y, w, h,
     // workspace, windows}, in the output's coordinates; the selected thumbnail, the workspace
@@ -147,6 +150,7 @@ class ShellController : public QObject {
     TaskModel *tasks() { return &tasks_; }
     Audio *audio() { return audio_.get(); }
     Palette *palette() { return &palette_; }
+    Power *power() { return &power_; }
     // Sends the compositor a request (an action, or "session restore NAME"), as `shaodesk msg`
     // would; `done` gets its whole reply. Without a session, `done` is not called.
     void ask(const QByteArray &line, std::function<void(const QByteArray &)> done);
@@ -245,6 +249,7 @@ class ShellController : public QObject {
     shaodesk::Config config_;
     TaskModel tasks_;
     Palette palette_{*this};
+    Power power_{*this};
     std::unique_ptr<Audio> audio_ = makeAudio();
     SystemStatus status_{"/sys", nullptr, true};
     NotificationCenter notifications_;
