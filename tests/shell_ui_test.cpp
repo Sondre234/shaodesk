@@ -1318,15 +1318,14 @@ int main(int argc, char **argv) {
             std::cerr << "the power button did not appear\n";
             return 1;
         }
-        {
-            auto *launcher = find(view.rootObject(), "launcher");
-            const auto corner = button->mapRectToScene(QRectF(0, 0, button->width(), button->height()));
-            const auto area = launcher->mapRectToScene(QRectF(0, 0, launcher->width(), launcher->height()));
-            if (corner.right() < area.right() - 40 || corner.bottom() < area.bottom() - 40) {
-                std::cerr << "the power button is not in the launcher's bottom-right corner\n";
-                return 1;
-            }
-        }
+        // The footer's layout places the button on its next polish.
+        if (!QTest::qWaitFor([&] {
+                auto *launcher = find(view.rootObject(), "launcher");
+                const auto corner = button->mapRectToScene(QRectF(0, 0, button->width(), button->height()));
+                const auto area = launcher->mapRectToScene(QRectF(0, 0, launcher->width(), launcher->height()));
+                return corner.right() >= area.right() - 40 && corner.bottom() >= area.bottom() - 40;
+            }))
+            return fail("the power button is not in the launcher's bottom-right corner");
         auto openMenu = [&] {
             if (!openLauncher())
                 return false;
