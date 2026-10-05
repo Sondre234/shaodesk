@@ -104,7 +104,9 @@ src_install() {
 
 pkg_postinst() {
 	optfeature_header "Programs the default configuration and the desktop use when present:"
-	optfeature "the default terminal (Super+Q)" x11-terms/kitty
+	optfeature "a terminal for Super+Q (the first one installed)" x11-terms/kitty gui-apps/foot \
+		x11-terms/alacritty x11-terms/wezterm kde-apps/konsole x11-terms/gnome-terminal \
+		x11-terms/xterm
 	optfeature "screenshots (Print)" "gui-apps/grim gui-apps/slurp"
 	optfeature "copying screenshots to the clipboard" gui-apps/wl-clipboard
 	optfeature "screen sharing" "gui-libs/xdg-desktop-portal-wlr media-video/pipewire"

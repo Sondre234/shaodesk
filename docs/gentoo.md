@@ -11,7 +11,7 @@ installed by hand as described after that.
 ## Installing with the ebuild
 
 `packaging/gentoo` is a small ebuild repository holding `gui-wm/shaodesk`: `shaodesk-9999`
-builds the newest `main` from GitHub, and `shaodesk-0.1.0` the 0.1.0 release. To use it as a
+builds the newest `main` from GitHub, and `shaodesk-0.1.1` the latest release. To use it as a
 local repository, as root:
 
 ```sh
@@ -28,7 +28,7 @@ emerge --ask gui-wm/shaodesk
 
 `**` accepts the live ebuild; accept `~amd64` instead for the release. A release ebuild needs a
 Manifest, which the repository does not carry: create it once with
-`ebuild /var/db/repos/shaodesk/gui-wm/shaodesk/shaodesk-0.1.0.ebuild manifest`, which downloads
+`ebuild /var/db/repos/shaodesk/gui-wm/shaodesk/shaodesk-0.1.1.ebuild manifest`, which downloads
 the release. `LUA_SINGLE_TARGET` is needed because the configuration language is Lua 5.4,
 while Gentoo's default Lua target is 5.1.
 
