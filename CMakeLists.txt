@@ -686,7 +686,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
         set_tests_properties(bench_smoke PROPERTIES TIMEOUT 120)
         add_test(NAME opacity_rules_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/opacity_rules_smoke.py
-            $<TARGET_FILE:shaodesk> $<TARGET_FILE:shaodesk-bench-client>)
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:shaodesk-bench-client>
+            $<TARGET_FILE:wayland_probe>)
         set_tests_properties(opacity_rules_smoke PROPERTIES TIMEOUT 60)
         # XWayland coverage needs wlroots built with X support and an Xwayland binary.
         find_program(XWAYLAND_BINARY Xwayland)
