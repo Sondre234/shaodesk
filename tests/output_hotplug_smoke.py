@@ -2,13 +2,9 @@
 """Unplugging an output moves its windows to the nearest one, keeping their workspace numbers and
 tiling; plugging it back in returns them (outputs.return_windows), unless the setting is off or
 they were placed elsewhere by hand. Uses the headless backend's virtual outputs."""
-import os
 from pathlib import Path
-import re
 import signal
-import subprocess
 import sys
-import tempfile
 
 import harness
 
@@ -30,19 +26,11 @@ def config(primary="HEADLESS-1", tiling="true", extra="", first='mode = "1280x72
 }}"""
 
 
-with tempfile.TemporaryDirectory(prefix="shaodesk-output-hotplug-") as directory:
-    root = Path(directory)
-    init = root / "init.lua"
-    init.write_text(config())
-    log = root / "compositor.log"
-    env = dict(os.environ, XDG_RUNTIME_DIR=directory, WLR_RENDERER="pixman",
-               WLR_HEADLESS_OUTPUTS="2")
-    for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
-        env.pop(name, None)
+with harness.Compositor(compositor, env={"WLR_HEADLESS_OUTPUTS": "2"}, start=False) as desktop:
+    log = desktop.log
 
     def msg(*words):
-        result = subprocess.run([compositor, "msg", *words], env=env, capture_output=True,
-                                text=True, timeout=5)
+        result = desktop.run(*words, timeout=5)
         assert result.returncode == 0 and not result.stdout.startswith("error"), \
             (words, result.stdout, result.stderr)
         return result.stdout
@@ -66,155 +54,132 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-output-hotplug-") as directory
         return (a[2] + a[4] <= b[2] or b[2] + b[4] <= a[2] or a[3] + a[5] <= b[3]
                 or b[3] + b[5] <= a[3])
 
-    def wait_for(predicate, message):
-        harness.wait_for(predicate, processes, message,
-                         detail=lambda: f"windows: {windows()}, outputs: {outputs()}")
+    desktop.detail = lambda: f"windows: {windows()}, outputs: {outputs()}"
 
     reloads = 0
 
     def reload(text):
         global reloads
         reloads += 1
-        init.write_text(text)
-        server.send_signal(signal.SIGHUP)
-        wait_for(lambda: log.read_text().count("Configuration reloaded") == reloads, "reload")
+        desktop.config.write_text(text)
+        desktop.server.send_signal(signal.SIGHUP)
+        desktop.wait_for(lambda: log.read_text().count("Configuration reloaded") == reloads,
+                         "reload")
 
     def launch():
         count = len(windows())
-        processes.append(subprocess.Popen([probe, "--external-control"], env=env,
-                                          stdout=subprocess.DEVNULL))
-        wait_for(lambda: len(windows()) == count + 1, f"window {count + 1} mapped")
+        desktop.spawn([probe, "--external-control"])
+        desktop.wait_for(lambda: len(windows()) == count + 1, f"window {count + 1} mapped")
 
     def unplug(name):
         msg("headless_output", "remove", name)
-        wait_for(lambda: name not in outputs(), f"{name} removed")
+        desktop.wait_for(lambda: name not in outputs(), f"{name} removed")
 
     def plug(name):
         assert msg("headless_output", "add", name).split() == [name]
-        wait_for(lambda: name in outputs(), f"{name} added")
+        desktop.wait_for(lambda: name in outputs(), f"{name} added")
 
     def finish():
-        for window in processes[1:]:
+        for window in desktop.clients:
             window.kill()
             window.wait(timeout=5)
-        del processes[1:]
-        server.terminate()
-        assert server.wait(timeout=5) == 0, log.read_text()
+        desktop.clients.clear()
+        desktop.stop()
 
-    def start(text):
-        global server, processes
-        init.write_text(text)
-        log.write_text("")
-        handle = log.open("w")
-        server = subprocess.Popen([compositor, "--headless", "--config", str(init)], env=env,
-                                  stdout=handle, stderr=handle)
-        processes = [server]
-        wait_for(lambda: "Running Wayland compositor" in log.read_text(), "startup")
-        text = log.read_text()
-        env["WAYLAND_DISPLAY"] = re.search(r"WAYLAND_DISPLAY=(\S+)", text)[1]
-        env["SHAODESK_SOCKET"] = re.search(r"Control socket: (\S+)", text)[1]
+    # Tiled windows on two workspaces of HEADLESS-1, one window on HEADLESS-2.
+    desktop.start(config())
+    reloads = 0
+    launch()
+    launch()
+    msg("output", "HEADLESS-1", "workspace", "2")
+    launch()
+    msg("output", "HEADLESS-1", "workspace", "1")
+    reload(config(primary="HEADLESS-2"))
+    launch()
+    assert [(w[0], w[1], w[6]) for w in windows()] == [
+        (1, True, "HEADLESS-1"), (1, True, "HEADLESS-1"), (2, True, "HEADLESS-1"),
+        (1, True, "HEADLESS-2")], windows()
 
-    try:
-        # Tiled windows on two workspaces of HEADLESS-1, one window on HEADLESS-2.
-        start(config())
-        reloads = 0
-        launch()
-        launch()
-        msg("output", "HEADLESS-1", "workspace", "2")
-        launch()
-        msg("output", "HEADLESS-1", "workspace", "1")
-        reload(config(primary="HEADLESS-2"))
-        launch()
-        assert [(w[0], w[1], w[6]) for w in windows()] == [
-            (1, True, "HEADLESS-1"), (1, True, "HEADLESS-1"), (2, True, "HEADLESS-1"),
-            (1, True, "HEADLESS-2")], windows()
+    unplug("HEADLESS-1")
+    desktop.wait_for(lambda: all(w[6] == "HEADLESS-2" for w in windows()), "windows moved")
+    state = windows()
+    assert sorted((w[0], w[1]) for w in state) == [(1, True)] * 3 + [(2, True)], state
+    assert all(inside(w, "HEADLESS-2") for w in state), state
+    shown = [w for w in state if w[0] == 1]
+    assert len(shown) == 3 and all(w[7] for w in shown), state
+    assert not [w for w in state if w[0] == 2][0][7], "workspace 2 is not the one shown"
+    assert all(disjoint(a, b) for i, a in enumerate(shown) for b in shown[i + 1:]), shown
+    assert "Moved windows of HEADLESS-1" in log.read_text()
 
-        unplug("HEADLESS-1")
-        wait_for(lambda: all(w[6] == "HEADLESS-2" for w in windows()), "windows moved")
-        state = windows()
-        assert sorted((w[0], w[1]) for w in state) == [(1, True)] * 3 + [(2, True)], state
-        assert all(inside(w, "HEADLESS-2") for w in state), state
-        shown = [w for w in state if w[0] == 1]
-        assert len(shown) == 3 and all(w[7] for w in shown), state
-        assert not [w for w in state if w[0] == 2][0][7], "workspace 2 is not the one shown"
-        assert all(disjoint(a, b) for i, a in enumerate(shown) for b in shown[i + 1:]), shown
-        assert "Moved windows of HEADLESS-1" in log.read_text()
+    plug("HEADLESS-1")
+    desktop.wait_for(lambda: [w[6] for w in windows()] ==
+                     ["HEADLESS-1", "HEADLESS-1", "HEADLESS-1", "HEADLESS-2"], "windows returned")
+    state = windows()
+    assert [(w[0], w[1]) for w in state] == [(1, True), (1, True), (2, True), (1, True)], state
+    assert all(inside(w, w[6]) for w in state), state
+    assert state[0][4] + state[1][4] == 1280 and disjoint(state[0], state[1]), state
+    assert state[3][4] == 1280, state
 
-        plug("HEADLESS-1")
-        wait_for(lambda: [w[6] for w in windows()] ==
-                 ["HEADLESS-1", "HEADLESS-1", "HEADLESS-1", "HEADLESS-2"], "windows returned")
-        state = windows()
-        assert [(w[0], w[1]) for w in state] == [(1, True), (1, True), (2, True), (1, True)], state
-        assert all(inside(w, w[6]) for w in state), state
-        assert state[0][4] + state[1][4] == 1280 and disjoint(state[0], state[1]), state
-        assert state[3][4] == 1280, state
+    # Unplugging again works the same way.
+    unplug("HEADLESS-1")
+    desktop.wait_for(lambda: all(w[6] == "HEADLESS-2" for w in windows()), "windows moved again")
+    plug("HEADLESS-1")
+    desktop.wait_for(lambda: [w[6] for w in windows()].count("HEADLESS-1") == 3, "returned again")
 
-        # Unplugging again works the same way.
-        unplug("HEADLESS-1")
-        wait_for(lambda: all(w[6] == "HEADLESS-2" for w in windows()), "windows moved again")
-        plug("HEADLESS-1")
-        wait_for(lambda: [w[6] for w in windows()].count("HEADLESS-1") == 3, "returned again")
+    # With outputs.return_windows off they stay.
+    reload(config(primary="HEADLESS-2", extra="return_windows = false,"))
+    unplug("HEADLESS-1")
+    desktop.wait_for(lambda: all(w[6] == "HEADLESS-2" for w in windows()),
+                     "windows moved (no return)")
+    plug("HEADLESS-1")
+    assert all(w[6] == "HEADLESS-2" for w in windows()), windows()
+    # Turning it on afterwards does not bring back what was not remembered.
+    reload(config(primary="HEADLESS-2"))
+    assert all(w[6] == "HEADLESS-2" for w in windows()), windows()
+    finish()
 
-        # With outputs.return_windows off they stay.
-        reload(config(primary="HEADLESS-2", extra="return_windows = false,"))
-        unplug("HEADLESS-1")
-        wait_for(lambda: all(w[6] == "HEADLESS-2" for w in windows()), "windows moved (no return)")
-        plug("HEADLESS-1")
-        assert all(w[6] == "HEADLESS-2" for w in windows()), windows()
-        # Turning it on afterwards does not bring back what was not remembered.
-        reload(config(primary="HEADLESS-2"))
-        assert all(w[6] == "HEADLESS-2" for w in windows()), windows()
-        finish()
+    # Floating windows keep their relative place and size.
+    desktop.start(config(tiling="false"))
+    reloads = 0
+    launch()
+    before = windows()[0]
+    assert not before[1] and before[6] == "HEADLESS-1"
+    origin = outputs()["HEADLESS-1"]
+    relative = (before[2] - origin[0], before[3] - origin[1])
+    unplug("HEADLESS-1")
+    desktop.wait_for(lambda: windows()[0][6] == "HEADLESS-2", "floating window moved")
+    moved = windows()[0]
+    assert inside(moved, "HEADLESS-2") and moved[4:6] == before[4:6], (before, moved)
+    plug("HEADLESS-1")
+    desktop.wait_for(lambda: windows()[0][6] == "HEADLESS-1", "floating window returned")
+    # Turning an output off in the configuration moves its windows the same way, and turning
+    # it on again returns them.
+    reload(config(tiling="false", first="enabled = false"))
+    desktop.wait_for(lambda: windows()[0][6] == "HEADLESS-2", "window left the disabled output")
+    assert inside(windows()[0], "HEADLESS-2"), windows()
+    reload(config(tiling="false"))
+    desktop.wait_for(lambda: windows()[0][6] == "HEADLESS-1",
+                     "window returned to the enabled output")
+    back = windows()[0]
+    offset = (back[2] - outputs()["HEADLESS-1"][0], back[3] - outputs()["HEADLESS-1"][1])
+    assert abs(offset[0] - relative[0]) <= 1 and abs(offset[1] - relative[1]) <= 1, \
+        (before, back)
+    finish()
+    # A fullscreen window covers whichever output it is on, above the probe's 48-pixel panel,
+    # which is on HEADLESS-2.
+    def above_panel(name):
+        x, y, width, height = outputs()[name]
+        return (x, y, width, height - 48 * (name == "HEADLESS-2"))
 
-        # Floating windows keep their relative place and size.
-        start(config(tiling="false"))
-        reloads = 0
-        launch()
-        before = windows()[0]
-        assert not before[1] and before[6] == "HEADLESS-1"
-        origin = outputs()["HEADLESS-1"]
-        relative = (before[2] - origin[0], before[3] - origin[1])
-        unplug("HEADLESS-1")
-        wait_for(lambda: windows()[0][6] == "HEADLESS-2", "floating window moved")
-        moved = windows()[0]
-        assert inside(moved, "HEADLESS-2") and moved[4:6] == before[4:6], (before, moved)
-        plug("HEADLESS-1")
-        wait_for(lambda: windows()[0][6] == "HEADLESS-1", "floating window returned")
-        # Turning an output off in the configuration moves its windows the same way, and turning
-        # it on again returns them.
-        reload(config(tiling="false", first="enabled = false"))
-        wait_for(lambda: windows()[0][6] == "HEADLESS-2", "window left the disabled output")
-        assert inside(windows()[0], "HEADLESS-2"), windows()
-        reload(config(tiling="false"))
-        wait_for(lambda: windows()[0][6] == "HEADLESS-1", "window returned to the enabled output")
-        back = windows()[0]
-        offset = (back[2] - outputs()["HEADLESS-1"][0], back[3] - outputs()["HEADLESS-1"][1])
-        assert abs(offset[0] - relative[0]) <= 1 and abs(offset[1] - relative[1]) <= 1, \
-            (before, back)
-        finish()
-        # A fullscreen window covers whichever output it is on, above the probe's 48-pixel panel,
-        # which is on HEADLESS-2.
-        def above_panel(name):
-            x, y, width, height = outputs()[name]
-            return (x, y, width, height - 48 * (name == "HEADLESS-2"))
-
-        start(config(tiling="false"))
-        reloads = 0
-        launch()
-        msg("fullscreen")
-        wait_for(lambda: windows()[0][4:6] == (1280, 720), "fullscreen")
-        unplug("HEADLESS-1")
-        wait_for(lambda: windows()[0][6] == "HEADLESS-2" and
-                 windows()[0][2:6] == above_panel("HEADLESS-2"), "fullscreen window moved")
-        plug("HEADLESS-1")
-        wait_for(lambda: windows()[0][6] == "HEADLESS-1" and
-                 windows()[0][2:6] == above_panel("HEADLESS-1"), "fullscreen window returned")
-        finish()
-        print("Output unplug and replug moved windows away and back")
-    except Exception:
-        print(log.read_text(), file=sys.stderr)
-        raise
-    finally:
-        for process in reversed(processes if "processes" in globals() else []):
-            if process.poll() is None:
-                process.kill()
+    desktop.start(config(tiling="false"))
+    reloads = 0
+    launch()
+    msg("fullscreen")
+    desktop.wait_for(lambda: windows()[0][4:6] == (1280, 720), "fullscreen")
+    unplug("HEADLESS-1")
+    desktop.wait_for(lambda: windows()[0][6] == "HEADLESS-2" and
+                     windows()[0][2:6] == above_panel("HEADLESS-2"), "fullscreen window moved")
+    plug("HEADLESS-1")
+    desktop.wait_for(lambda: windows()[0][6] == "HEADLESS-1" and
+                     windows()[0][2:6] == above_panel("HEADLESS-1"), "fullscreen window returned")
+print("Output unplug and replug moved windows away and back")
