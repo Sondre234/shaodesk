@@ -5,6 +5,9 @@ tagged release yet; everything below is on `main`.
 
 ## Unreleased (2026-10-05)
 
+- A program that a binding, a hot corner, the command palette or `shaodesk msg spawn` cannot
+  start, because it is not installed, now says so across the panel (subscribers hear
+  `spawn-error MESSAGE`), not only in the log.
 - A compositor that cannot create its Wayland socket, because `XDG_RUNTIME_DIR` is unset, not
   writable, or too long for a socket's path, says which and exits with status 1, instead of
   aborting on a wlroots assertion.

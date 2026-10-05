@@ -933,8 +933,9 @@ COUNT lines `switcher-window APP_ID TITLE OUTPUT WORKSPACE MINIMIZED URGENT` (ta
 opens or a listed window closes, `switcher-select N` as the selection moves (both counting
 from 0), and `switcher-close`. The state ends with `power ACTIONS`, the power actions that may
 run (`lock,suspend,reboot,poweroff,logout`, in the order menus list them, or `-`), a power
-action that fails or is cancelled after it was accepted sends `power-error MESSAGE`, and
-`power_menu` sends `power-menu OUTPUT`. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
+action that fails or is cancelled after it was accepted sends `power-error MESSAGE`, a program
+that `spawn` could not start sends `spawn-error MESSAGE` (the panel shows either
+across itself for eight seconds), and `power_menu` sends `power-menu OUTPUT`. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
 refused while the session is locked.
 
 ## Screen locking and idle

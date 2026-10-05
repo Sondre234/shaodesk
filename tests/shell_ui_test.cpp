@@ -1491,6 +1491,13 @@ int main(int argc, char **argv) {
             std::cerr << "a power action cancelled later was not reported\n";
             return 1;
         }
+        subscriber->write("spawn-error Cannot launch kitty: No such file or directory\n");
+        if (!QTest::qWaitFor([&] {
+                return controller.error() == "Cannot launch kitty: No such file or directory";
+            })) {
+            std::cerr << "a program that did not start was not reported\n";
+            return 1;
+        }
         controller.clearError();
         // With nothing that may run, the button goes.
         subscriber->write("power -\n");

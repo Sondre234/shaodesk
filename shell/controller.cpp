@@ -523,6 +523,10 @@ void ShellController::subscribe() {
             } else if (line.startsWith("power-error ")) {
                 report(line.sliced(12));
                 continue;
+            } else if (line.startsWith("spawn-error ")) {
+                // A program a binding, a hot corner or the palette asked for did not start.
+                report(line.sliced(12));
+                continue;
             } else if (line.startsWith("launcher ")) {
                 Q_EMIT launcherRequested(line.sliced(9));
                 continue;
