@@ -20,7 +20,7 @@ if not shutil.which("dbus-daemon"):
 
 CONFIG = """return {{
     xwayland = false,
-    power = {{ lock_command = {locker} }},
+    power = {{ lock_command = {locker}, lock_before_sleep = {before} }},
 }}"""
 
 with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
@@ -35,7 +35,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
     # The locker writes "locked PID" and "unlocked" to the same log as the fake logind, so the
     # order of locking and sleeping shows in one place.
     LOCKER = f'{{ [[{lock_probe}]], "hold", [[{calls}]] }}'
-    config.write_text(CONFIG.format(locker=LOCKER))
+    config.write_text(CONFIG.format(locker=LOCKER, before="true"))
     answers.write_text("CanReboot challenge\nCanHibernate na\n")
     compositor_log = root / "compositor.log"
     processes = []
@@ -127,15 +127,16 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
             assert power()["pending"] == "-", power()
             unlock()
             # Without a locker, or with one not installed, there is nothing to lock with.
-            config.write_text(CONFIG.format(locker="{}"))
+            config.write_text(CONFIG.format(locker="{}", before="true"))
             msg("reload")
             assert power()["lock"] == "no", power()
             assert "no screen locker: power.lock_command is not set" in msg("lock", ok=False)
-            config.write_text(CONFIG.format(locker='{ "shaodesk-no-such-locker", "-f" }'))
+            config.write_text(CONFIG.format(locker='{ "shaodesk-no-such-locker", "-f" }',
+                                             before="true"))
             msg("reload")
             assert "no screen locker: shaodesk-no-such-locker is not installed" in msg(
                 "lock", ok=False)
-            config.write_text(CONFIG.format(locker=LOCKER))
+            config.write_text(CONFIG.format(locker=LOCKER, before="true"))
             msg("reload")
             assert power()["lock"] == "yes", power()
 
@@ -148,12 +149,51 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
             wait_for(lambda: logged(mark)[1:] == ["Reboot true"], "reboot")
             wait_for(answers_are(pending="-"), "logind's reply to reboot")
 
-            # Suspend goes to logind, which sends the machine to sleep and wakes it.
+            # Suspend locks the screen, and only once the lock holds asks logind, which sends the
+            # machine to sleep and wakes it. This locker waits to be told to lock.
+            def locked_and(*expected):
+                """The locker locked, and logind went through `expected` (in that order)."""
+                def check():
+                    lines = logged(mark)
+                    return (any(line.startswith("locked ") for line in lines) and
+                            tuple(line for line in lines if line.split()[0] not in
+                                  ("locked", "waiting")) == expected)
+                return check
+            config.write_text(CONFIG.format(locker=LOCKER[:-2] + ', "wait" }', before="true"))
+            msg("reload")
+            mark = len(logged())
+            msg("suspend")
+            wait_for(lambda: [line.split()[0] for line in logged(mark)] == ["waiting"],
+                     "the locker started")
+            assert power()["pending"] == "suspend locking", power()
+            assert len(logged(mark)) == 1, logged(mark)  # logind not asked yet
+            os.kill(int(logged(mark)[0].split()[1]), signal.SIGUSR1)
+            wait_for(locked_and("Suspend true", "prepare", "sleep", "wake"), "suspend")
+            wait_for(answers_are(pending="-"), "logind's reply to suspend")
+            text = compositor_log.read_text()
+            assert text.rindex("Session locked") < text.rindex("Asking logind to suspend"), text
+            unlock()
+            config.write_text(CONFIG.format(locker=LOCKER, before="true"))
+            msg("reload")
+            # Without power.lock_before_sleep it just sleeps.
+            config.write_text(CONFIG.format(locker=LOCKER, before="false"))
+            msg("reload")
             mark = len(logged())
             msg("suspend")
             wait_for(lambda: logged(mark) == ["Suspend true", "prepare", "sleep", "wake"],
-                     "suspend")
+                     "suspend without locking")
             wait_for(answers_are(pending="-"), "logind's reply to suspend")
+            # A locker that never locks holds the suspend back, and then cancels it.
+            config.write_text(CONFIG.format(locker='{ "true" }', before="true"))
+            msg("reload")
+            mark = len(logged())
+            msg("suspend")
+            assert power()["pending"] == "suspend locking", power()
+            wait_for(lambda: "Suspend cancelled: the screen did not lock within 5 seconds"
+                     in compositor_log.read_text(), "the suspend cancelled", timeout=10)
+            assert power()["pending"] == "-" and logged(mark) == [], (power(), logged(mark))
+            config.write_text(CONFIG.format(locker=LOCKER, before="true"))
+            msg("reload")
 
             # What logind refuses is not asked for; a reload asks what it allows afresh.
             assert "logind does not allow hibernate here (CanHibernate: na)" in msg(
@@ -166,9 +206,9 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
             assert "logind does not allow reboot here (CanReboot: no)" in msg("reboot", ok=False)
             mark = len(logged())
             msg("hibernate")
-            wait_for(lambda: logged(mark) == ["Hibernate true", "prepare", "sleep", "wake"],
-                     "hibernate")
+            wait_for(locked_and("Hibernate true", "prepare", "sleep", "wake"), "hibernate")
             wait_for(answers_are(pending="-"), "logind's reply to hibernate")
+            unlock()
 
             # A call logind turns down is reported, and leaves nothing pending.
             answers.write_text("fail Reboot\n")

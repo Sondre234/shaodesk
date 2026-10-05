@@ -1187,6 +1187,8 @@ Config read(lua_State *L, size_t own = SIZE_MAX) {
             config.power.lock_command = std::move(locker);
         }
         lua_pop(L, 1);
+        boolean(L, "lock_before_sleep", "power.lock_before_sleep",
+                config.settings.lock_before_sleep);
     }
     lua_pop(L, 1);
     current_section.clear();

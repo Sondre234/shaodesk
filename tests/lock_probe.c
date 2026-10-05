@@ -237,14 +237,26 @@ static void append(const char *path, const char *format, ...) {
     close(fd);
 }
 
-/* "hold LOG": locks, appends "locked PID" to LOG, and keeps the lock until SIGTERM; then unlocks
- * and appends "unlocked". */
-static int hold(struct probe *probe, const char *log) {
+/* "hold LOG [wait]": locks, appends "locked PID" to LOG, and keeps the lock until SIGTERM; then
+ * unlocks and appends "unlocked". With "wait" it first appends "waiting PID" and locks only on
+ * SIGUSR1. */
+static int hold(struct probe *probe, const char *log, bool wait) {
     sigset_t signals;
     sigemptyset(&signals);
     sigaddset(&signals, SIGTERM);
     sigaddset(&signals, SIGINT);
+    sigaddset(&signals, SIGUSR1);
     sigprocmask(SIG_BLOCK, &signals, NULL);
+    if (wait) {
+        append(log, "waiting %d", (int)getpid());
+        sigset_t go;
+        sigemptyset(&go);
+        sigaddset(&go, SIGUSR1);
+        int received = 0;
+        if (sigwait(&go, &received) != 0)
+            die("cannot wait for SIGUSR1");
+    }
+    sigdelset(&signals, SIGUSR1);
     int signal_fd = signalfd(-1, &signals, SFD_CLOEXEC);
     if (signal_fd < 0)
         die("cannot watch for signals");
@@ -275,10 +287,11 @@ static int hold(struct probe *probe, const char *log) {
 
 int main(int argc, char **argv) {
     const char *mode = argc >= 2 ? argv[1] : "";
-    if (!(argc == 3 && !strcmp(mode, "hold")) &&
-        (argc != 2 || (strcmp(mode, "cycle") && strcmp(mode, "abandon") &&
-                       strcmp(mode, "check-locked"))))
-        die("usage: lock_probe cycle|abandon|check-locked|hold LOG");
+    bool hold_mode = !strcmp(mode, "hold") &&
+                     (argc == 3 || (argc == 4 && !strcmp(argv[3], "wait")));
+    if (!hold_mode && (argc != 2 || (strcmp(mode, "cycle") && strcmp(mode, "abandon") &&
+                                     strcmp(mode, "check-locked"))))
+        die("usage: lock_probe cycle|abandon|check-locked|hold LOG [wait]");
     struct probe probe = {0};
     probe.display = wl_display_connect(NULL);
     if (!probe.display)
@@ -292,8 +305,8 @@ int main(int argc, char **argv) {
     if (!probe.idle_notifier || !probe.idle_inhibit)
         die("idle notify/inhibit globals missing");
 
-    if (!strcmp(mode, "hold"))
-        return hold(&probe, argv[2]);
+    if (hold_mode)
+        return hold(&probe, argv[2], argc == 4);
 
     if (!strcmp(mode, "check-locked")) {
         // An abandoned lock must keep refusing focus to new windows.

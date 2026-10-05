@@ -204,12 +204,14 @@ struct sh_overview {
 /* The power actions and what logind allows of them (power.c). One runs at a time, in steps. */
 enum sh_power_step {
     SH_POWER_IDLE,
+    SH_POWER_LOCKING, /* the screen locks before suspend or hibernate */
     SH_POWER_CALLING, /* logind has been asked and has not answered yet */
 };
 struct sh_power {
     bool system_bus;          /* logind may be reached on the system bus (not --headless) */
     struct sh_login1 *login1; /* NULL while logind is out of reach */
     struct wl_event_source *bus, *bus_timer;
+    struct wl_event_source *timer; /* how long a step may take */
     char answers[SH_LOGIN1_METHODS][16]; /* logind's Can* answers; "" until it gives one */
     enum sh_power_step step;
     enum sh_action action; /* the one under way, while step is not idle */
@@ -805,6 +807,7 @@ void resize_window(struct sh_server *server, enum sh_action action, int amount);
 void power_init(struct sh_server *server);
 void power_finish(struct sh_server *server);
 void power_reload(struct sh_server *server);
+void power_locked(struct sh_server *server);
 bool power_action(enum sh_action action);
 bool power_start(struct sh_server *server, enum sh_action action, char *error,
                  size_t error_size);

@@ -234,7 +234,8 @@ struct Config {
                          .magnet_bypass = SH_SHIFT,
                          .magnet_guide_color = {0.49F * 0.7F, 0.66F * 0.7F, 0.7F, 0.7F},
                          .placement = SH_PLACE_CASCADE,
-                         .drag_strip = 6};
+                         .drag_strip = 6,
+                         .lock_before_sleep = true};
     // layout.workspace_names: the label of workspace N is names[N - 1]; "" or past the end: none.
     std::vector<std::string> workspace_names;
     // hot_corners: what each corner runs, as a control request; "" for nothing.

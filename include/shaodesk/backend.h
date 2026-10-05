@@ -325,6 +325,9 @@ struct sh_settings {
     /* windows.drag_strip: how many pixels along the top of a window without a title bar move
      * it when dragged. */
     int drag_strip;
+    /* power.lock_before_sleep: suspend and hibernate lock the screen with power.lock_command
+     * first. */
+    bool lock_before_sleep;
 };
 
 /* What a mouse button was pressed over. */

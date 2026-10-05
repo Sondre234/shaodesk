@@ -881,6 +881,11 @@ libsystemd, libelogind, or basu at build time. A headless compositor (`--headles
 tests run it) never uses the machine's logind: only one on the bus that `SHAODESK_LOGIN1_BUS`
 names. `logout` ends the session, as `quit` does, and needs no logind.
 
+`suspend` and `hibernate` first lock the screen with `power.lock_command` and ask logind only
+once the lock holds on every monitor, so the machine never wakes up unlocked; a locker that has
+not locked within five seconds cancels the suspend. `power.lock_before_sleep = false` sleeps
+without locking, and so does a session with no locker installed.
+
 ## Screenshots and screen sharing
 
 The `screenshot` action (Print, or `shaodesk msg screenshot region|output|window`) runs
