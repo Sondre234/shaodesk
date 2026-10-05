@@ -869,9 +869,10 @@ This needs sd-bus from libsystemd, libelogind, or basu at build time.
 
 ## Power
 
-The `poweroff` and `reboot` actions ask logind (systemd-logind or elogind, on the system bus)
-to power off or restart the machine, letting it ask for a password when its policy wants one.
-An action logind does not allow on this machine (`CanPowerOff` answering `no` or `na`) is
+The `suspend`, `hibernate`, `poweroff` and `reboot` actions ask logind (systemd-logind or
+elogind, on the system bus) to suspend, hibernate, power off or restart the machine, letting it
+ask for a password when its policy wants one. An action logind does not allow on this machine
+(`CanHibernate` answering `no` or `na`, say, without swap to hibernate to) is
 refused with that reason; one it turns down later, such as a password not given, is reported
 across the panel. `shaodesk msg get power` shows what logind allows. This needs sd-bus from
 libsystemd, libelogind, or basu at build time. A headless compositor (`--headless`, as the

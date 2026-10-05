@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* Power: reboot and power off through logind, and what it allows of those and of suspend and
- * hibernate, over a connection that never blocks the compositor (src/login1.c). */
+/* Power: suspend, hibernate, reboot and power off through logind, and what it allows of them,
+ * over a connection that never blocks the compositor (src/login1.c). */
 #include "server.h"
 
 #include <ctype.h>
@@ -15,6 +15,8 @@ static const struct {
 } actions[] = {
     {SH_POWER_OFF, "poweroff", "power off", SH_LOGIN1_POWER_OFF},
     {SH_REBOOT, "reboot", "reboot", SH_LOGIN1_REBOOT},
+    {SH_SUSPEND, "suspend", "suspend", SH_LOGIN1_SUSPEND},
+    {SH_HIBERNATE, "hibernate", "hibernate", SH_LOGIN1_HIBERNATE},
 };
 
 static int action_index(enum sh_action action) {

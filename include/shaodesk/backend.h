@@ -155,6 +155,8 @@ enum sh_action {
     /* Power, through logind (systemd-logind or elogind). */
     SH_POWER_OFF,
     SH_REBOOT,
+    SH_SUSPEND,
+    SH_HIBERNATE,
 };
 
 enum sh_screenshot_mode {

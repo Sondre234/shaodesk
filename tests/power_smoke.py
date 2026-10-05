@@ -110,13 +110,25 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
             wait_for(lambda: logged()[1:] == ["Reboot true"], "reboot")
             wait_for(answers_are(pending="-"), "logind's reply to reboot")
 
+            # Suspend goes to logind, which sends the machine to sleep and wakes it.
+            msg("suspend")
+            wait_for(lambda: logged()[2:] == ["Suspend true", "prepare", "sleep", "wake"],
+                     "suspend")
+            wait_for(answers_are(pending="-"), "logind's reply to suspend")
+
             # What logind refuses is not asked for; a reload asks what it allows afresh.
+            assert "logind does not allow hibernate here (CanHibernate: na)" in msg(
+                "hibernate", ok=False)
             answers.write_text("CanPowerOff na\nCanReboot no\n")
             msg("reload")
-            wait_for(answers_are(poweroff="na", reboot="no"), "the new answers")
+            wait_for(answers_are(poweroff="na", reboot="no", hibernate="yes"), "the new answers")
             assert "logind does not allow power off here (CanPowerOff: na)" in msg(
                 "poweroff", ok=False)
             assert "logind does not allow reboot here (CanReboot: no)" in msg("reboot", ok=False)
+            msg("hibernate")
+            wait_for(lambda: logged()[6:] == ["Hibernate true", "prepare", "sleep", "wake"],
+                     "hibernate")
+            wait_for(answers_are(pending="-"), "logind's reply to hibernate")
 
             # A call logind turns down is reported, and leaves nothing pending.
             answers.write_text("fail Reboot\n")
@@ -127,9 +139,11 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-power-test-") as directory:
                      in compositor_log.read_text(), "the refusal reported")
             assert power()["pending"] == "-", power()
             stop(server)
-        assert logged() == ["PowerOff true", "Reboot true", "Reboot true"], logged()
-        print("The compositor asks only the logind it is given, which powers off and reboots "
-              "when it allows them")
+        assert logged() == ["PowerOff true", "Reboot true", "Suspend true", "prepare", "sleep",
+                            "wake", "Hibernate true", "prepare", "sleep", "wake",
+                            "Reboot true"], logged()
+        print("The compositor asks only the logind it is given, which powers off, reboots, "
+              "suspends and hibernates when it allows them")
     except Exception:
         print(compositor_log.read_text() if compositor_log.exists() else "", file=sys.stderr)
         raise
