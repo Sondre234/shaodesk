@@ -8,7 +8,7 @@ import QtQuick.Shapes
 Item {
     id: icon
     property string name
-    property color color: shell.textColor
+    property color color: Theme.text
     property real size: 18
     width: size; height: size
 
