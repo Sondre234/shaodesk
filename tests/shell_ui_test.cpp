@@ -432,6 +432,15 @@ int main(int argc, char **argv) {
         std::cerr << "clicking a workspace did not switch to it\n";
         return 1;
     }
+    // The current workspace's pill slides over to it, and takes its width.
+    {
+        auto *pill = find(view.rootObject(), "workspacePill");
+        if (!pill || !QTest::qWaitFor([&] {
+                return pill->isVisible() && pill->x() == workspace(3)->x() &&
+                       pill->width() == workspace(3)->width();
+            }))
+            return fail("the current workspace's pill did not settle under it");
+    }
     auto scrollAt = [&](QPoint at, int delta) {
         QWheelEvent event(at, view.mapToGlobal(at), QPoint(), QPoint(0, delta), Qt::NoButton,
                           Qt::NoModifier, Qt::NoScrollPhase, false);
