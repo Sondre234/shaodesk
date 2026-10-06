@@ -167,6 +167,12 @@ shadows.
   `power-dialog`, `palette`, `palette-empty`, `switcher` and `overview`, and a search finding
   nothing as `launcher-empty`.
 
+### Fixes
+
+- A program capturing one window (ext-foreign-toplevel-image-capture-source-v1, as a portal's
+  window sharing does) is no longer disconnected for asking while the session is locked: it gets
+  a source whose capture stops at once, as for a window that is gone.
+
 ## 0.1.1 (2026-10-05)
 
 Fixes to the tests, CI and the ebuild; the compositor and the shell behave as in 0.1.0.

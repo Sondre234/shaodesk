@@ -101,15 +101,19 @@ void server_new_capture_request(struct wl_listener *listener, void *data) {
     struct sh_server *server = wl_container_of(listener, server, new_capture_request);
     struct wlr_ext_foreign_toplevel_image_capture_source_manager_v1_request *request = data;
     struct sh_toplevel *toplevel = request->toplevel_handle->data;
-    if (!toplevel || !toplevel->capture_scene || server->locked)
-        return;
-    if (!toplevel->capture_source)
-        toplevel->capture_source = wlr_ext_image_capture_source_v1_create_with_scene_node(
-            &toplevel->capture_scene->tree.node, wl_display_get_event_loop(server->wl_display),
-            server->allocator, server->renderer);
-    if (toplevel->capture_source)
-        wlr_ext_foreign_toplevel_image_capture_source_manager_v1_request_accept(
-            request, toplevel->capture_source);
+    struct wlr_ext_image_capture_source_v1 *source = NULL;
+    if (toplevel && toplevel->capture_scene && !server->locked) {
+        if (!toplevel->capture_source)
+            toplevel->capture_source = wlr_ext_image_capture_source_v1_create_with_scene_node(
+                &toplevel->capture_scene->tree.node,
+                wl_display_get_event_loop(server->wl_display), server->allocator,
+                server->renderer);
+        source = toplevel->capture_source;
+    }
+    // With none to give, the client still gets the source it asked for, an inert one whose
+    // sessions stop at once: refused, its next request would name an object that does not
+    // exist, a protocol error that disconnects it.
+    wlr_ext_foreign_toplevel_image_capture_source_manager_v1_request_accept(request, source);
 }
 void publish_toplevel(struct sh_toplevel *toplevel) {
     list_toplevel(toplevel);
