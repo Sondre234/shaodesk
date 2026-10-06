@@ -125,6 +125,11 @@ menus and overlays, and motion throughout.
   take no input and are no part of a window's size. `shaodesk msg get frames` tells each
   window's controls, corners and shadow.
 - Windows no longer show thin seams between their parts while they scale open or closed.
+- Rounded corners are as smooth on the right of a wide monitor as on its left. On NVIDIA,
+  wlroots' shaders run at 16-bit precision, which stair-stepped corners and borders more than
+  1024 pixels from the monitor's left or top edge; the rounded-corners patch
+  (`packaging/patches/wlroots-rounded-corners.patch`) now measures from the window's edges
+  instead. Copy it to `/etc/portage/patches/gui-libs/wlroots/` again and re-emerge wlroots.
 - A tiled window alone on its workspace has no gaps around it and fills the space the panels
   leave, inside its border; a second tile brings the gaps back for both. `layout.smart_gaps =
   false` keeps them around a lone tile as before.

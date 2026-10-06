@@ -1,4 +1,4 @@
-From ab8fcc8750655c2dd3df6fe3abb67ab18b2e5d50 Mon Sep 17 00:00:00 2001
+From 39c5ecd538ff8726f9ac84b0466050dd79c0fcce Mon Sep 17 00:00:00 2001
 From: Sondre234 <sondrefmyrmel@gmail.com>
 Date: Sat, 3 Oct 2026 05:59:06 +0200
 Subject: [PATCH] render, scene: add rounded clips and rounded rects
@@ -10,6 +10,12 @@ which rounds everything below a tree, and wlr_scene_rect_set_rounding(), which
 rounds a rect or reduces it to a rounded frame. Both are stored as node addons
 so no public struct changes size.
 
+The fragment shaders work the rounding out from the distances to the boxes'
+edges, which the vertex shader computes. Small where they matter, these stay
+precise at mediump, which NVIDIA runs the shaders at (it leaves
+GL_FRAGMENT_PRECISION_HIGH undefined): buffer coordinates there lose the
+fractions past 1024 px, which stair-stepped the corners.
+
 Co-Authored-By: Claude <noreply@anthropic.com>
 ---
  include/render/gles2.h                 |  10 ++
@@ -18,14 +24,14 @@ Co-Authored-By: Claude <noreply@anthropic.com>
  include/wlr/types/wlr_scene.h          |  17 ++
  render/gles2/pass.c                    |  28 +++-
  render/gles2/renderer.c                |  13 ++
- render/gles2/shaders/common.vert       |   4 +
- render/gles2/shaders/quad.frag         |  28 +++-
- render/gles2/shaders/tex_external.frag |  28 +++-
- render/gles2/shaders/tex_rgba.frag     |  28 +++-
- render/gles2/shaders/tex_rgbx.frag     |  28 +++-
+ render/gles2/shaders/common.vert       |  17 ++
+ render/gles2/shaders/quad.frag         |  29 +++-
+ render/gles2/shaders/tex_external.frag |  29 +++-
+ render/gles2/shaders/tex_rgba.frag     |  29 +++-
+ render/gles2/shaders/tex_rgbx.frag     |  29 +++-
  render/pass.c                          |   8 +
  types/scene/wlr_scene.c                | 205 ++++++++++++++++++++++++-
- 13 files changed, 419 insertions(+), 7 deletions(-)
+ 13 files changed, 436 insertions(+), 7 deletions(-)
 
 diff --git a/include/render/gles2.h b/include/render/gles2.h
 index 6b852dc..07e433c 100644
@@ -147,19 +153,19 @@ index 6c627b1..107b110 100644
   * Add a node displaying a buffer to the scene-graph.
   *
 diff --git a/render/gles2/pass.c b/render/gles2/pass.c
-index a70ea13..ddbcfd9 100644
+index a70ea13..20d3acc 100644
 --- a/render/gles2/pass.c
 +++ b/render/gles2/pass.c
 @@ -153,6 +153,25 @@ static void set_tex_matrix(GLint loc, enum wl_output_transform trans,
  	glUniformMatrix3fv(loc, 1, GL_FALSE, tex_matrix);
  }
  
-+static void set_box_uniform(GLint loc, const struct wlr_box *box) {
-+	if (wlr_box_empty(box)) {
-+		glUniform4f(loc, 0, 0, 0, 0);
-+	} else {
-+		glUniform4f(loc, box->x, box->y, box->width, box->height);
-+	}
++// A box of the rounding and its corners' radius, negative for an empty box,
++// which the shaders then leave out
++static void set_rounded_box_uniforms(GLint box_loc, GLint radius_loc,
++		const struct wlr_box *box, int radius) {
++	glUniform4f(box_loc, box->x, box->y, box->width, box->height);
++	glUniform1f(radius_loc, wlr_box_empty(box) ? -1 : radius);
 +}
 +
 +// The rounding of the pass, for a draw over box
@@ -167,10 +173,10 @@ index a70ea13..ddbcfd9 100644
 +		const struct wlr_render_pass *pass, const struct wlr_box *box) {
 +	glUniform4f(uniforms->pos_box, box->x, box->y, box->width, box->height);
 +	const struct wlr_render_rounding *rounding = &pass->rounding;
-+	set_box_uniform(uniforms->clip_box, &rounding->clip);
-+	glUniform1f(uniforms->clip_radius, rounding->clip_radius);
-+	set_box_uniform(uniforms->hole_box, &rounding->hole);
-+	glUniform1f(uniforms->hole_radius, rounding->hole_radius);
++	set_rounded_box_uniforms(uniforms->clip_box, uniforms->clip_radius,
++		&rounding->clip, rounding->clip_radius);
++	set_rounded_box_uniforms(uniforms->hole_box, uniforms->hole_radius,
++		&rounding->hole, rounding->hole_radius);
 +}
 +
  static void setup_blending(enum wlr_render_blend_mode mode) {
@@ -266,54 +272,68 @@ index e362dae..962a7ce 100644
  
  	pop_gles2_debug(renderer);
 diff --git a/render/gles2/shaders/common.vert b/render/gles2/shaders/common.vert
-index f51548a..f021530 100644
+index f51548a..f2717ab 100644
 --- a/render/gles2/shaders/common.vert
 +++ b/render/gles2/shaders/common.vert
-@@ -1,10 +1,14 @@
+@@ -1,10 +1,27 @@
  uniform mat3 proj;
  uniform mat3 tex_proj;
 +uniform vec4 pos_box;
++uniform vec4 clip_box;
++uniform vec4 hole_box;
  attribute vec2 pos;
  varying vec2 v_texcoord;
-+varying vec2 v_pos;
++varying vec4 v_clip;
++varying vec4 v_hole;
++
++// How far p lies inside the left, top, right and bottom edges of box
++vec4 insets(vec2 p, vec4 box) {
++	return vec4(p - box.xy, box.xy + box.zw - p);
++}
  
  void main() {
  	vec3 pos3 = vec3(pos, 1.0);
  	gl_Position = vec4(pos3 * proj, 1.0);
  	v_texcoord = (pos3 * tex_proj).xy;
-+	// In buffer coordinates, for the rounding
-+	v_pos = pos_box.xy + pos * pos_box.zw;
++	// For the rounding: distances from the edges of its boxes, in buffer
++	// coordinates. Small where the rounding shapes anything, they keep their
++	// precision in a fragment shader at mediump (16-bit floats on NVIDIA, which
++	// leaves GL_FRAGMENT_PRECISION_HIGH undefined), as coordinates do not
++	vec2 p = pos_box.xy + pos * pos_box.zw;
++	v_clip = insets(p, clip_box);
++	v_hole = insets(p, hole_box);
  }
 diff --git a/render/gles2/shaders/quad.frag b/render/gles2/shaders/quad.frag
-index 97d3a31..3bfac6f 100644
+index 97d3a31..da1e098 100644
 --- a/render/gles2/shaders/quad.frag
 +++ b/render/gles2/shaders/quad.frag
-@@ -8,6 +8,32 @@ varying vec4 v_color;
+@@ -8,6 +8,33 @@ varying vec4 v_color;
  varying vec2 v_texcoord;
  uniform vec4 color;
  
-+varying vec2 v_pos;
-+uniform vec4 clip_box;
++varying vec4 v_clip;
++varying vec4 v_hole;
 +uniform float clip_radius;
-+uniform vec4 hole_box;
 +uniform float hole_radius;
 +
-+// Signed distance from p to a rectangle with rounded corners, negative inside
-+float rounded_box(vec2 p, vec4 box, float radius) {
-+	vec2 half_size = box.zw * 0.5;
-+	radius = min(radius, min(half_size.x, half_size.y));
-+	vec2 q = abs(p - box.xy - half_size) - half_size + radius;
++// Signed distance to a rectangle with rounded corners, negative inside, from
++// how far inside its left, top, right and bottom edges the fragment lies
++float rounded_box(vec4 insets, float radius) {
++	vec2 size = insets.xy + insets.zw;
++	radius = min(radius, 0.5 * min(size.x, size.y));
++	vec2 q = radius - min(insets.xy, insets.zw);
 +	return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
 +}
 +
-+// How much of the fragment lies inside the clip and outside the hole
++// How much of the fragment lies inside the clip and outside the hole; a
++// negative radius leaves either out
 +float rounding() {
 +	float coverage = 1.0;
-+	if (clip_box.z > 0.0) {
-+		coverage *= clamp(0.5 - rounded_box(v_pos, clip_box, clip_radius), 0.0, 1.0);
++	if (clip_radius >= 0.0) {
++		coverage *= clamp(0.5 - rounded_box(v_clip, clip_radius), 0.0, 1.0);
 +	}
-+	if (hole_box.z > 0.0) {
-+		coverage *= clamp(0.5 + rounded_box(v_pos, hole_box, hole_radius), 0.0, 1.0);
++	if (hole_radius >= 0.0) {
++		coverage *= clamp(0.5 + rounded_box(v_hole, hole_radius), 0.0, 1.0);
 +	}
 +	return coverage;
 +}
@@ -323,35 +343,36 @@ index 97d3a31..3bfac6f 100644
 +	gl_FragColor = color * rounding();
  }
 diff --git a/render/gles2/shaders/tex_external.frag b/render/gles2/shaders/tex_external.frag
-index 73909fe..d74c64a 100644
+index 73909fe..17c3335 100644
 --- a/render/gles2/shaders/tex_external.frag
 +++ b/render/gles2/shaders/tex_external.frag
-@@ -10,6 +10,32 @@ varying vec2 v_texcoord;
+@@ -10,6 +10,33 @@ varying vec2 v_texcoord;
  uniform samplerExternalOES texture0;
  uniform float alpha;
  
-+varying vec2 v_pos;
-+uniform vec4 clip_box;
++varying vec4 v_clip;
++varying vec4 v_hole;
 +uniform float clip_radius;
-+uniform vec4 hole_box;
 +uniform float hole_radius;
 +
-+// Signed distance from p to a rectangle with rounded corners, negative inside
-+float rounded_box(vec2 p, vec4 box, float radius) {
-+	vec2 half_size = box.zw * 0.5;
-+	radius = min(radius, min(half_size.x, half_size.y));
-+	vec2 q = abs(p - box.xy - half_size) - half_size + radius;
++// Signed distance to a rectangle with rounded corners, negative inside, from
++// how far inside its left, top, right and bottom edges the fragment lies
++float rounded_box(vec4 insets, float radius) {
++	vec2 size = insets.xy + insets.zw;
++	radius = min(radius, 0.5 * min(size.x, size.y));
++	vec2 q = radius - min(insets.xy, insets.zw);
 +	return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
 +}
 +
-+// How much of the fragment lies inside the clip and outside the hole
++// How much of the fragment lies inside the clip and outside the hole; a
++// negative radius leaves either out
 +float rounding() {
 +	float coverage = 1.0;
-+	if (clip_box.z > 0.0) {
-+		coverage *= clamp(0.5 - rounded_box(v_pos, clip_box, clip_radius), 0.0, 1.0);
++	if (clip_radius >= 0.0) {
++		coverage *= clamp(0.5 - rounded_box(v_clip, clip_radius), 0.0, 1.0);
 +	}
-+	if (hole_box.z > 0.0) {
-+		coverage *= clamp(0.5 + rounded_box(v_pos, hole_box, hole_radius), 0.0, 1.0);
++	if (hole_radius >= 0.0) {
++		coverage *= clamp(0.5 + rounded_box(v_hole, hole_radius), 0.0, 1.0);
 +	}
 +	return coverage;
 +}
@@ -361,35 +382,36 @@ index 73909fe..d74c64a 100644
 +	gl_FragColor = texture2D(texture0, v_texcoord) * alpha * rounding();
  }
 diff --git a/render/gles2/shaders/tex_rgba.frag b/render/gles2/shaders/tex_rgba.frag
-index c0a0dea..1b58820 100644
+index c0a0dea..9065bc7 100644
 --- a/render/gles2/shaders/tex_rgba.frag
 +++ b/render/gles2/shaders/tex_rgba.frag
-@@ -8,6 +8,32 @@ varying vec2 v_texcoord;
+@@ -8,6 +8,33 @@ varying vec2 v_texcoord;
  uniform sampler2D tex;
  uniform float alpha;
  
-+varying vec2 v_pos;
-+uniform vec4 clip_box;
++varying vec4 v_clip;
++varying vec4 v_hole;
 +uniform float clip_radius;
-+uniform vec4 hole_box;
 +uniform float hole_radius;
 +
-+// Signed distance from p to a rectangle with rounded corners, negative inside
-+float rounded_box(vec2 p, vec4 box, float radius) {
-+	vec2 half_size = box.zw * 0.5;
-+	radius = min(radius, min(half_size.x, half_size.y));
-+	vec2 q = abs(p - box.xy - half_size) - half_size + radius;
++// Signed distance to a rectangle with rounded corners, negative inside, from
++// how far inside its left, top, right and bottom edges the fragment lies
++float rounded_box(vec4 insets, float radius) {
++	vec2 size = insets.xy + insets.zw;
++	radius = min(radius, 0.5 * min(size.x, size.y));
++	vec2 q = radius - min(insets.xy, insets.zw);
 +	return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
 +}
 +
-+// How much of the fragment lies inside the clip and outside the hole
++// How much of the fragment lies inside the clip and outside the hole; a
++// negative radius leaves either out
 +float rounding() {
 +	float coverage = 1.0;
-+	if (clip_box.z > 0.0) {
-+		coverage *= clamp(0.5 - rounded_box(v_pos, clip_box, clip_radius), 0.0, 1.0);
++	if (clip_radius >= 0.0) {
++		coverage *= clamp(0.5 - rounded_box(v_clip, clip_radius), 0.0, 1.0);
 +	}
-+	if (hole_box.z > 0.0) {
-+		coverage *= clamp(0.5 + rounded_box(v_pos, hole_box, hole_radius), 0.0, 1.0);
++	if (hole_radius >= 0.0) {
++		coverage *= clamp(0.5 + rounded_box(v_hole, hole_radius), 0.0, 1.0);
 +	}
 +	return coverage;
 +}
@@ -399,35 +421,36 @@ index c0a0dea..1b58820 100644
 +	gl_FragColor = texture2D(tex, v_texcoord) * alpha * rounding();
  }
 diff --git a/render/gles2/shaders/tex_rgbx.frag b/render/gles2/shaders/tex_rgbx.frag
-index ae40ad5..bf218e7 100644
+index ae40ad5..3f25a3b 100644
 --- a/render/gles2/shaders/tex_rgbx.frag
 +++ b/render/gles2/shaders/tex_rgbx.frag
-@@ -8,6 +8,32 @@ varying vec2 v_texcoord;
+@@ -8,6 +8,33 @@ varying vec2 v_texcoord;
  uniform sampler2D tex;
  uniform float alpha;
  
-+varying vec2 v_pos;
-+uniform vec4 clip_box;
++varying vec4 v_clip;
++varying vec4 v_hole;
 +uniform float clip_radius;
-+uniform vec4 hole_box;
 +uniform float hole_radius;
 +
-+// Signed distance from p to a rectangle with rounded corners, negative inside
-+float rounded_box(vec2 p, vec4 box, float radius) {
-+	vec2 half_size = box.zw * 0.5;
-+	radius = min(radius, min(half_size.x, half_size.y));
-+	vec2 q = abs(p - box.xy - half_size) - half_size + radius;
++// Signed distance to a rectangle with rounded corners, negative inside, from
++// how far inside its left, top, right and bottom edges the fragment lies
++float rounded_box(vec4 insets, float radius) {
++	vec2 size = insets.xy + insets.zw;
++	radius = min(radius, 0.5 * min(size.x, size.y));
++	vec2 q = radius - min(insets.xy, insets.zw);
 +	return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
 +}
 +
-+// How much of the fragment lies inside the clip and outside the hole
++// How much of the fragment lies inside the clip and outside the hole; a
++// negative radius leaves either out
 +float rounding() {
 +	float coverage = 1.0;
-+	if (clip_box.z > 0.0) {
-+		coverage *= clamp(0.5 - rounded_box(v_pos, clip_box, clip_radius), 0.0, 1.0);
++	if (clip_radius >= 0.0) {
++		coverage *= clamp(0.5 - rounded_box(v_clip, clip_radius), 0.0, 1.0);
 +	}
-+	if (hole_box.z > 0.0) {
-+		coverage *= clamp(0.5 + rounded_box(v_pos, hole_box, hole_radius), 0.0, 1.0);
++	if (hole_radius >= 0.0) {
++		coverage *= clamp(0.5 + rounded_box(v_hole, hole_radius), 0.0, 1.0);
 +	}
 +	return coverage;
 +}
