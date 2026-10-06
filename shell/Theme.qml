@@ -93,6 +93,8 @@ QtObject {
     readonly property int iconSize: 18
     readonly property int appIconSize: 22
     readonly property int appIconSizeLarge: 30
+    // A line icon saying what an overlay shows, as the on-screen display's.
+    readonly property int iconSizeLarge: 22
 
     // Motion, following animations.enabled and animations.speed: every duration is 0 while
     // animations are off.
@@ -112,6 +114,10 @@ QtObject {
     readonly property color shadow: Qt.rgba(0, 0, 0, light ? 0.3 : 0.6)
     readonly property int shadowBlur: 20
     readonly property int shadowOffset: 6
+    // The room a shadow needs around what casts it, which a surface of its own (the on-screen
+    // display, the cards, the switcher) leaves so that its edge does not cut the shadow off;
+    // none without effects.
+    readonly property int shadowMargin: effects ? shadowBlur + shadowOffset : 0
 
     // `milliseconds` at the animation speed, 0 with animations off.
     function duration(milliseconds) { return Math.round(milliseconds * motionScale) }
