@@ -158,11 +158,11 @@ Item {
         case Qt.Key_PageUp: showPage(page - 1); break
         case Qt.Key_PageDown: showPage(page + 1); break
         case Qt.Key_Menu:
-            if (currentApp) openAppMenu(currentApp, currentItem(), 0, 0, true)
+            openCurrentMenu()
             break
         default:
-            if (event.key === Qt.Key_F10 && (event.modifiers & Qt.ShiftModifier) && currentApp) {
-                openAppMenu(currentApp, currentItem(), 0, 0, true)
+            if (event.key === Qt.Key_F10 && (event.modifiers & Qt.ShiftModifier)) {
+                openCurrentMenu()
                 break
             }
             // Tab stays in Launchpad.
@@ -183,8 +183,14 @@ Item {
         var page = pages.itemAt(Math.floor(current / pageSize))
         return page && currentApp ? page.cellAt(current % pageSize) : null
     }
+    // The menu of the application the keyboard is at, by its icon, its first entry highlighted.
+    function openCurrentMenu() {
+        var cell = currentItem()
+        if (cell)
+            openAppMenu(currentApp, cell, cell.width / 2, cell.height / 2, true)
+    }
     function openAppMenu(app, item, x, y, byKeyboard) {
-        var at = item ? item.mapToItem(panel.popupLayer, x, y) : Qt.point(width / 2, height / 2)
+        var at = item.mapToItem(panel.popupLayer, x, y)
         menuAnchor = Qt.rect(at.x, at.y, 0, 0)
         menuByKeyboard = !!byKeyboard
         menuApp = app

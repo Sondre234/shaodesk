@@ -31,7 +31,7 @@ AbstractButton {
     // Whether it can be chosen: drawn from the entry, so that a menu fading out, which takes no
     // input, does not grey its rows.
     readonly property bool available: !separator && !header && !title && modelData.enabled !== false
-    // Filled with the highlight that takes the text's colour over (the macOS style's accent).
+    // Whether it is filled with the macOS style's accent, its text then white.
     readonly property bool lit: Theme.macos && available && (pressed || highlighted || expanded)
     readonly property color ink: !available ? Theme.textDisabled : lit ? Theme.menuHighlightText
                                  : danger ? Theme.danger : Theme.text

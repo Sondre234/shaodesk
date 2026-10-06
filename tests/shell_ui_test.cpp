@@ -3700,6 +3700,14 @@ ListModel {
         if (!QTest::qWaitFor([&] { return !appMenu->property("open").toBool(); }) ||
             !root->property("launcherOpen").toBool())
             return fail("Escape in an application's menu closed Launchpad too");
+        // The menu key opens the highlighted application's.
+        press(Qt::Key_Right);
+        press(Qt::Key_Menu);
+        if (!QTest::qWaitFor([&] { return inPopover(appMenu); }))
+            return fail("the menu key did not open the highlighted application's menu in Launchpad");
+        press(Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !appMenu->property("open").toBool(); }))
+            return fail("Escape did not close the application's menu in Launchpad");
         // Typing and Enter launch the best match, and Launchpad closes.
         for (Qt::Key key : {Qt::Key_T, Qt::Key_E, Qt::Key_S, Qt::Key_T, Qt::Key_Space, Qt::Key_A})
             press(key);

@@ -218,7 +218,7 @@ QtObject {
     readonly property color buttonOutline: !macos ? border : light ? Qt.rgba(0, 0, 0, 0.14) : Qt.rgba(1, 1, 1, 0.06)
     readonly property color focusRing: macos ? alpha(accent, 0.55) : accent
     readonly property int focusRingWidth: macos ? 3 : 2
-    // A search field: its height and corners, and its fill.
+    // A search field: its height and its fill.
     readonly property int fieldHeight: macos ? 28 : rowHeight + spacingS
     readonly property color fieldFill: macos ? alpha(text, light ? 0.06 : 0.1) : surfaceRaised
     // The window switcher, in the macOS style as macOS's application switcher: large icons on a
