@@ -7,6 +7,9 @@
 #include <QUrl>
 #include <QVariantList>
 
+class QTimer;
+typedef struct _GAppInfoMonitor GAppInfoMonitor;
+
 // The start menu's own state, one for every monitor's menu: the applications pinned to it, apart
 // from the taskbar's as on Windows; what was launched when; the applications from A to Z; its
 // search; and who is logged in. The controller hands it the applications (setApps) and tells it
@@ -85,6 +88,8 @@ class StartMenu : public QObject {
     void recentChanged();
     void appsChanged();
     void userChanged();
+    // Applications were installed or removed (GIO's GAppInfoMonitor), and want reading again.
+    void installedChanged();
     // Saving the pins or the history failed.
     void failed(const QString &message);
 
@@ -98,6 +103,8 @@ class StartMenu : public QObject {
     LaunchHistory history_;
     QString userName_;
     QUrl userIcon_;
+    GAppInfoMonitor *monitor_ = nullptr;
+    QTimer *installing_ = nullptr;
     QVariantMap appRecord(const QString &id) const;
     bool installed(const QString &id) const;
     void savePins();

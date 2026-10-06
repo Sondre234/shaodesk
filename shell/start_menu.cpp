@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "start_menu.hpp"
 #include "fuzzy.hpp"
+#include <QAbstractEventDispatcher>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QLocale>
 #include <QSaveFile>
+#include <QTimer>
 #include <algorithm>
 #include <cmath>
 #include <gio/gdesktopappinfo.h>
@@ -67,9 +69,30 @@ StartMenu::StartMenu(QString stateDir, QObject *parent)
                 pins_.push_back(line.trimmed());
     }
     findUser();
+    // GIO says once that the installed applications changed, and again only after they have
+    // been listed anew. A package manager writes several files: they are read again once it has
+    // been quiet for a moment.
+    installing_ = new QTimer(this);
+    installing_->setSingleShot(true);
+    installing_->setInterval(300);
+    connect(installing_, &QTimer::timeout, this, &StartMenu::installedChanged);
+    monitor_ = g_app_info_monitor_get();
+    g_signal_connect_swapped(monitor_, "changed", G_CALLBACK(+[](QTimer *timer) { timer->start(); }),
+                             installing_);
+    // The monitor speaks through GLib's main loop, which Qt's runs unless it was built without
+    // it or told not to (QT_NO_GLIB); then GLib's is turned now and then instead.
+    auto *dispatcher = QAbstractEventDispatcher::instance();
+    if (dispatcher && !dispatcher->inherits("QEventDispatcherGlib")) {
+        auto *poll = new QTimer(this);
+        connect(poll, &QTimer::timeout, this, [] { g_main_context_iteration(nullptr, FALSE); });
+        poll->start(2000);
+    }
 }
 
-StartMenu::~StartMenu() = default;
+StartMenu::~StartMenu() {
+    g_signal_handlers_disconnect_by_data(monitor_, installing_);
+    g_object_unref(monitor_);
+}
 
 void StartMenu::setApps(const QVariantList &apps, const QStringList &taskbarPins) {
     apps_ = apps;

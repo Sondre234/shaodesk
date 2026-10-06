@@ -282,6 +282,24 @@ int main(int argc, char **argv) {
             record["description"] != "Leaves a file behind")
             return fail("an application's generic name, keywords and comment are not in its record");
     }
+    // Applications installed or removed while the shell runs are found without being asked.
+    {
+        auto installed = [&](const QString &id) {
+            const auto apps = controller.apps();
+            return std::any_of(apps.begin(), apps.end(),
+                               [&](const QVariant &app) { return app.toMap()["appId"] == id; });
+        };
+        QFile later(screens.filePath("data/applications/shaodesk-test-later.desktop"));
+        if (!later.open(QIODevice::WriteOnly) ||
+            later.write("[Desktop Entry]\nType=Application\nName=Later app\nExec=true\n") < 0)
+            return fail("could not write an application to install");
+        later.close();
+        if (!QTest::qWaitFor([&] { return installed("shaodesk-test-later.desktop"); }, 10000))
+            return fail("an application installed while the shell ran was not found");
+        later.remove();
+        if (!QTest::qWaitFor([&] { return !installed("shaodesk-test-later.desktop"); }, 10000))
+            return fail("an application removed while the shell ran stayed listed");
+    }
     view.show();
     if (!QTest::qWaitForWindowExposed(&view))
         return fail("the panel never showed");

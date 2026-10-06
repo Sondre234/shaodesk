@@ -48,6 +48,7 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
     connect(this, &ShellController::appsChanged, &startMenu_,
             [this] { startMenu_.setApps(apps(), userPins_); });
     connect(&startMenu_, &StartMenu::failed, this, &ShellController::report);
+    connect(&startMenu_, &StartMenu::installedChanged, this, &ShellController::refreshApps);
     refreshApps();
     subscribe();
     notifications_.configure(config_.notifications);
