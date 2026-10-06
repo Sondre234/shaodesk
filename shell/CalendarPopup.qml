@@ -13,12 +13,24 @@ PopupCard {
     property int year: new Date().getFullYear()
     // Now, to the minute, while it shows.
     property date now: new Date()
+    // Shows another month, sliding it in from the side it lies on: a later one from below.
+    function show(newYear, newMonth) {
+        var later = newYear * 12 + newMonth - (year * 12 + month)
+        year = newYear; month = newMonth
+        if (later !== 0) {
+            slide.direction = later > 0 ? 1 : -1
+            slide.restart()
+        }
+    }
     function step(delta) {
         var d = new Date(year, month + delta, 1)
-        year = d.getFullYear(); month = d.getMonth()
+        show(d.getFullYear(), d.getMonth())
     }
-    function today() { var d = new Date(); year = d.getFullYear(); month = d.getMonth() }
-    onOpened: { now = new Date(); today() }
+    function today() { var d = new Date(); show(d.getFullYear(), d.getMonth()) }
+    onOpened: {
+        now = new Date()
+        year = now.getFullYear(); month = now.getMonth()
+    }
     // A day's cell, and the room around the grid.
     readonly property real cellWidth: Theme.rowHeight + Theme.spacingL
     readonly property real cellHeight: Theme.rowHeight + Theme.spacingS
@@ -128,32 +140,48 @@ PopupCard {
                 color: Theme.textMuted; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
             }
         }
-        MonthGrid {
-            id: monthGrid
-            objectName: "monthGrid"
+        // The month slides in a little and fades in as it changes.
+        Item {
             Layout.fillWidth: true; Layout.preferredHeight: 6 * calendar.cellHeight
-            month: calendar.month; year: calendar.year
-            locale: Qt.locale()
-            spacing: 0
-            delegate: Item {
-                id: dayCell
-                required property var model
-                width: monthGrid.availableWidth / 7; height: monthGrid.availableHeight / 6
-                readonly property bool inMonth: model.month === monthGrid.month
-                readonly property bool isToday: model.today && inMonth
-                HoverHandler { id: dayHover }
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: Math.min(parent.width, parent.height) - Theme.spacingXS; height: width; radius: width / 2
-                    visible: dayCell.isToday || dayHover.hovered
-                    color: dayCell.isToday ? (dayHover.hovered ? Theme.accentHover : Theme.accent) : Theme.hover
-                }
-                Text {
-                    anchors.centerIn: parent
-                    text: dayCell.model.day
-                    color: dayCell.isToday ? Theme.textOnAccent : dayCell.inMonth ? Theme.text : Theme.textDisabled
-                    font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
-                    font.weight: dayCell.isToday ? Font.DemiBold : Font.Normal
+            clip: true
+            NumberAnimation {
+                id: slide
+                property real direction: 1
+                target: monthGrid; property: "shift"
+                from: direction; to: 0
+                duration: Theme.durationNormal; easing.type: Theme.easing
+            }
+            MonthGrid {
+                id: monthGrid
+                objectName: "monthGrid"
+                // How far it still has to slide, in cells: from 1 (below) or -1 (above) to 0.
+                property real shift: 0
+                width: parent.width; height: parent.height
+                y: shift * calendar.cellHeight
+                opacity: 1 - Math.abs(shift)
+                month: calendar.month; year: calendar.year
+                locale: Qt.locale()
+                spacing: 0
+                delegate: Item {
+                    id: dayCell
+                    required property var model
+                    width: monthGrid.availableWidth / 7; height: monthGrid.availableHeight / 6
+                    readonly property bool inMonth: model.month === monthGrid.month
+                    readonly property bool isToday: model.today && inMonth
+                    HoverHandler { id: dayHover }
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: Math.min(parent.width, parent.height) - Theme.spacingXS; height: width; radius: width / 2
+                        visible: dayCell.isToday || dayHover.hovered
+                        color: dayCell.isToday ? (dayHover.hovered ? Theme.accentHover : Theme.accent) : Theme.hover
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        text: dayCell.model.day
+                        color: dayCell.isToday ? Theme.textOnAccent : dayCell.inMonth ? Theme.text : Theme.textDisabled
+                        font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+                        font.weight: dayCell.isToday ? Font.DemiBold : Font.Normal
+                    }
                 }
             }
         }
