@@ -55,16 +55,16 @@ Button {
         Component.onCompleted: if ("popupType" in tip) tip.popupType = Popup.Window
     }
     background: Rectangle {
-        radius: 6
-        color: task.shownUrgent ? Qt.rgba(shell.urgentColor.r, shell.urgentColor.g, shell.urgentColor.b, 0.24)
-               : task.shownActive ? Qt.lighter(shell.panelColor, 1.7) : (task.hovered ? Qt.lighter(shell.panelColor, 1.4) : "transparent")
-        border.width: task.shownUrgent ? 1 : 0; border.color: shell.urgentColor
+        radius: Theme.radiusSmall
+        color: task.shownUrgent ? Theme.urgentSubtle
+               : task.shownActive ? Theme.selected : (task.hovered ? Theme.hover : "transparent")
+        border.width: task.shownUrgent ? 1 : 0; border.color: Theme.urgent
         // Several windows: a second button's edge peeks out behind this one.
         Rectangle {
             visible: task.stacked
-            z: -1; x: 3; y: 2; width: parent.width; height: parent.height - 4; radius: 6
+            z: -1; x: 3; y: 2; width: parent.width; height: parent.height - 4; radius: Theme.radiusSmall
             color: "transparent"; border.width: 1
-            border.color: Qt.lighter(shell.panelColor, task.shownActive ? 2.1 : 1.7)
+            border.color: task.shownActive ? Theme.alpha(Theme.text, 0.3) : Theme.border
         }
         Row {
             anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter
@@ -73,7 +73,7 @@ Button {
                 model: task.stacked ? 2 : 1
                 Rectangle {
                     width: task.shownActive ? (shell.iconsOnly ? 18 : 28) / (task.stacked ? 2 : 1) : (task.stacked ? 6 : 10)
-                    height: 3; radius: 1; color: task.shownUrgent ? shell.urgentColor : task.shownMinimized ? "#627084" : shell.accent
+                    height: 3; radius: 1; color: task.shownUrgent ? Theme.urgent : task.shownMinimized ? Theme.textDisabled : Theme.accent
                 }
             }
         }
@@ -83,12 +83,12 @@ Button {
             visible: task.shownUrgent
             anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 2
             width: 8; height: 8; radius: 4
-            color: shell.urgentColor
+            color: Theme.urgent
             SequentialAnimation on opacity {
                 running: task.shownUrgent
                 loops: 6; alwaysRunToEnd: true
-                NumberAnimation { to: 0.3; duration: 450 }
-                NumberAnimation { to: 1; duration: 450 }
+                NumberAnimation { to: 0.3; duration: Theme.duration(450) }
+                NumberAnimation { to: 1; duration: Theme.duration(450) }
             }
         }
         Rectangle {
@@ -96,19 +96,19 @@ Button {
             visible: task.stacked
             anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 1
             width: Math.max(14, count.implicitWidth + 6); height: 14; radius: 7
-            color: shell.accent
-            Text { id: count; anchors.centerIn: parent; text: task.windows; color: shell.panelColor; font.pixelSize: 10; font.bold: true; font.family: task.panel.uiFont }
+            color: Theme.accent
+            Text { id: count; anchors.centerIn: parent; text: task.windows; color: Theme.textOnAccent; font.pixelSize: 10; font.bold: true; font.family: Theme.fontFamily }
         }
     }
     contentItem: RowLayout {
         spacing: 6
         Item { Layout.fillWidth: shell.iconsOnly }
         Image {
-            readonly property int size: Math.min(22, task.availableHeight)
+            readonly property int size: Math.min(Theme.appIconSize, task.availableHeight)
             source: "image://icons/" + task.iconName; sourceSize: Qt.size(size, size)
             Layout.preferredWidth: size; Layout.preferredHeight: size
         }
-        Text { visible: !shell.iconsOnly; text: task.title; textFormat: Text.PlainText; color: shell.textColor; elide: Text.ElideRight; Layout.fillWidth: true; font.pixelSize: shell.fontSize; font.family: task.panel.uiFont }
+        Text { visible: !shell.iconsOnly; text: task.title; textFormat: Text.PlainText; color: Theme.text; elide: Text.ElideRight; Layout.fillWidth: true; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
         Item { Layout.fillWidth: shell.iconsOnly }
     }
     // Right-click opens the task's menu; middle-click closes its window.
