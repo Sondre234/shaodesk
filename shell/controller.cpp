@@ -58,6 +58,7 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
         if (config_.osd.brightness)
             osd_.show(overlayOutput(), "Brightness", percent, "brightness");
     });
+    connect(&backlight_, &Backlight::failed, this, &ShellController::report);
 }
 ShellController::~ShellController() {
     delete engine_; // Before the objects its context refers to go away.

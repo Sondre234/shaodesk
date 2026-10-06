@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "preview.hpp"
 #include "audio.hpp"
+#include "backlight.hpp"
 #include "controller.hpp"
 #include "system_status.hpp"
 #include "view.hpp"
@@ -85,6 +86,9 @@ PreviewData::PreviewData(ShellController &controller)
     put("class/net/wlan0/wireless", "");
     put("class/net/wlan0/operstate", "up\n");
     status_ = std::make_unique<SystemStatus>(sysfs_.path());
+    put("class/backlight/preview/max_brightness", "100\n");
+    put("class/backlight/preview/brightness", "70\n");
+    backlight_ = std::make_unique<Backlight>(sysfs_.path());
 
     TrayItem plain;
     plain.key = plain.id = plain.title = "Sync";
@@ -160,6 +164,8 @@ void PreviewData::fill(QQuickItem *panel) {
     QQmlEngine::setObjectOwnership(status_.get(), QQmlEngine::CppOwnership);
     panel->setProperty("audioSource", QVariant::fromValue<QObject *>(audio_.get()));
     panel->setProperty("statusSource", QVariant::fromValue<QObject *>(status_.get()));
+    QQmlEngine::setObjectOwnership(backlight_.get(), QQmlEngine::CppOwnership);
+    panel->setProperty("backlightSource", QVariant::fromValue<QObject *>(backlight_.get()));
     if (tasks_)
         panel->setProperty("taskSource", QVariant::fromValue(tasks_));
 }

@@ -2287,6 +2287,36 @@ int main(int argc, char **argv) {
                       << audio.requests.join(", ").toStdString() << '\n';
             return 1;
         }
+        // The screen's brightness, only where there is a backlight; the slider sets it (in a
+        // fake sysfs tree, by writing the level).
+        auto *brightness = find(quick, "quickBrightness");
+        if (!brightness || brightness->isVisible())
+            return fail("Quick Settings shows a brightness without a backlight");
+        QDir lightSys(screens.filePath("light"));
+        lightSys.mkpath("class/backlight/fake");
+        for (const auto &[name, text] : {std::pair{"max_brightness", "200\n"}, {"brightness", "100\n"}}) {
+            QFile level(lightSys.filePath(QString("class/backlight/fake/") + name));
+            if (!level.open(QIODevice::WriteOnly) || level.write(text) < 0)
+                return fail("could not write the fake backlight");
+        }
+        Backlight fakeLight(lightSys.path());
+        QQmlEngine::setObjectOwnership(&fakeLight, QQmlEngine::CppOwnership);
+        view.rootObject()->setProperty("backlightSource", QVariant::fromValue(&fakeLight));
+        auto *brightnessSlider = find(quick, "quickBrightnessSlider");
+        if (!QTest::qWaitFor([&] { return brightness->isVisible() && brightnessSlider->property("value").toInt() == 50; }))
+            return fail("Quick Settings does not show the backlight's level");
+        QTest::qWait(50); // laid out
+        const auto lightTrack =
+            brightnessSlider->mapRectToScene(QRectF(0, 0, brightnessSlider->width(), brightnessSlider->height()));
+        QTest::mouseClick(popover, Qt::LeftButton, Qt::NoModifier,
+                          QPointF(lightTrack.left() + lightTrack.width() * 0.8, lightTrack.center().y()).toPoint());
+        QFile written(lightSys.filePath("class/backlight/fake/brightness"));
+        if (!written.open(QIODevice::ReadOnly) || std::abs(written.readAll().trimmed().toInt() - 160) > 12 ||
+            std::abs(fakeLight.percent() - 80) > 6) {
+            std::cerr << "the brightness slider did not set the backlight: " << fakeLight.percent() << "%\n";
+            return 1;
+        }
+        view.rootObject()->setProperty("backlightSource", QVariant::fromValue(controller.backlight()));
         // The button's wheel changes the volume and a middle click mutes, as on the bar's.
         audio.requests.clear();
         const int before = audio.volume();

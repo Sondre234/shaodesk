@@ -5,8 +5,8 @@ import QtQuick.Layouts
 
 // The Quick Settings flyout, as on Windows 11, at the bar's right end: tiles for what
 // shell.widgets puts in it ("quick") and for night light, the volume with the outputs and the
-// applications' volumes a click away, and the battery along its foot. What sits on the bar
-// instead keeps its own button there.
+// applications' volumes a click away, the screen's brightness where it has a backlight, and the
+// battery along its foot. What sits on the bar instead keeps its own button there.
 PopupCard {
     id: quick
     required property var panel
@@ -17,6 +17,7 @@ PopupCard {
     readonly property var widgets: shell.widgets
     readonly property var status: panel.statusSource
     readonly property var audio: panel.audioSource
+    readonly property var backlight: panel.backlightSource
     readonly property var center: shell.notifications
     // Which list is open under its tile or row: "profiles", "outputs", "mixer", or "" for none.
     property string expanded: ""
@@ -151,6 +152,31 @@ PopupCard {
                         iconColumn: true
                         onClicked: if (modelData.text !== shell.profile) shell.pickProfile(modelData.text)
                     }
+                }
+            }
+            // The screen's brightness, where it has a backlight.
+            RowLayout {
+                objectName: "quickBrightness"
+                visible: quick.backlight.present
+                Layout.fillWidth: true
+                spacing: Theme.spacingS
+                Item {
+                    Layout.preferredWidth: Theme.rowHeight - Theme.spacingS; Layout.preferredHeight: Theme.rowHeight - Theme.spacingS
+                    Icon { anchors.centerIn: parent; name: "sun" }
+                }
+                AudioSlider {
+                    objectName: "quickBrightnessSlider"
+                    Layout.fillWidth: true
+                    value: Math.max(0, quick.backlight.percent)
+                    Accessible.name: "Brightness"
+                    onMoved: quick.backlight.setPercent(Math.round(value))
+                }
+                Text {
+                    Layout.preferredWidth: Theme.rowHeight
+                    // Level with the volume's percentage, whose row has a chevron after it.
+                    Layout.rightMargin: Theme.rowHeight + Theme.spacingS
+                    text: quick.backlight.percent + "%"; horizontalAlignment: Text.AlignRight
+                    color: Theme.text; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
                 }
             }
             // The default output's volume, the outputs to play through and each application's

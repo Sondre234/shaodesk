@@ -81,6 +81,8 @@ class ShellController : public QObject {
     Q_PROPERTY(TaskModel *tasks READ tasks CONSTANT)
     Q_PROPERTY(Audio *audio READ audio CONSTANT)
     Q_PROPERTY(SystemStatus *status READ status CONSTANT)
+    // The screen backlight, which Quick Settings sets.
+    Q_PROPERTY(Backlight *backlight READ backlight CONSTANT)
     // The notification daemon (cards, history, do-not-disturb) and the on-screen display.
     Q_PROPERTY(NotificationCenter *notifications READ notifications CONSTANT)
     Q_PROPERTY(Osd *osd READ osd CONSTANT)
@@ -187,6 +189,7 @@ class ShellController : public QObject {
     // imports load once instead of once per output.
     QQmlEngine *engine();
     SystemStatus *status() { return &status_; }
+    Backlight *backlight() { return &backlight_; }
     NotificationCenter *notifications() { return &notifications_; }
     Osd *osd() { return &osd_; }
     QString focusedOutput() const { return focusedOutput_; }

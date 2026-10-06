@@ -31,6 +31,8 @@ Item {
     property var audioSource: shell.audio
     // Battery and network state; tests swap in one that reads a fake sysfs.
     property var statusSource: shell.status
+    // The screen backlight, swapped the same way.
+    property var backlightSource: shell.backlight
     property string audioPopup: ""
     property real audioPopupX: 0
     // A tray item's menu: the item it belongs to ("" while closed), and where its icon is.

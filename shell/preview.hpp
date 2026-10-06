@@ -6,14 +6,15 @@
 #include <memory>
 
 class Audio;
+class Backlight;
 class QQuickItem;
 class ShellController;
 class SystemStatus;
 
 // What the panel shows in `--preview-popup`, which runs without a compositor, a sound server or
 // a session bus: windows (one application's two of them stacked, one minimized, one asking for
-// attention), sound outputs and applications playing, a battery and Wi-Fi, tray items (one with
-// a menu), a few notifications and every power action. The controller's own models take the
+// attention), sound outputs and applications playing, a battery and Wi-Fi, a backlight, tray
+// items (one with a menu), a few notifications, every power action, and night light on. The controller's own models take the
 // tray, the notifications and the power actions; the panel's sources, which the tests swap the
 // same way, take the rest.
 class PreviewData : public QObject {
@@ -32,6 +33,7 @@ class PreviewData : public QObject {
     QTemporaryDir sysfs_;
     std::unique_ptr<Audio> audio_;
     std::unique_ptr<SystemStatus> status_;
+    std::unique_ptr<Backlight> backlight_;
     QObject *tasks_ = nullptr;
 };
 
