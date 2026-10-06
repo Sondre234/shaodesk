@@ -39,6 +39,16 @@ int main(int argc, char **argv) {
             value(TaskModel::AppId).toString() != "shaodesk-probe")
             throw std::runtime_error("task metadata incorrect");
         int id = value(TaskModel::TaskId).toInt();
+        // A window has no picture until it is watched. Through a window control older than
+        // version 2 it never has one, and watching asks the compositor nothing, so everything
+        // below still works.
+        if (model.roleNames().value(TaskModel::Picture) != "picture" ||
+            !value(TaskModel::Picture).toString().isEmpty() || !model.picture(id).isNull())
+            throw std::runtime_error("the window has a picture before one was asked for");
+        model.watchPicture(id, 160, true);
+        model.watchPicture(id + 100, 160, true); // no such window
+        model.unwatchPicture(id);
+        model.unwatchPicture(id); // one more than it was watched
         // Where it is comes from the compositor's window control: its only output, the first
         // workspace, floating since the example configuration does not tile.
         wait([&] { return value(TaskModel::Workspace).toInt() == 1; }, "no workspace arrived");
