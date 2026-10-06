@@ -25,8 +25,67 @@ Item {
     readonly property int recentRows: Math.max(1, Math.min(3, Math.floor(
         (height - recentList.y) / recentRowHeight)))
     readonly property var recent: shell.startMenu.recent.slice(0, 2 * recentRows)
+    // Where the keyboard is: a pin, then the recent applications after them; -1 for nowhere,
+    // the search field keeping the keyboard. The page follows it.
+    property int current: -1
+    onCurrentChanged: if (current >= 0 && current < pins.length) page = Math.floor(current / perPage)
+    // The record of the application the keyboard is at, or null.
+    readonly property var currentApp: current < 0 ? null
+                                    : current < pins.length ? pins[current] : recent[current - pins.length] || null
 
-    function reset() { page = 0 }
+    function reset() {
+        page = 0
+        current = -1
+    }
+    // Moves through the pins as they are laid out, on to the recent list under them and back;
+    // Tab and Backtab go one by one. Returns whether the key moved.
+    function key(event) {
+        var count = pins.length, total = count + recent.length
+        var at = current, pin = at >= 0 && at < count, column = at % columns
+        switch (event.key) {
+        case Qt.Key_Tab: current = at + 1 < total ? at + 1 : -1; return true
+        case Qt.Key_Backtab: current = at < 0 ? total - 1 : at - 1; return true
+        case Qt.Key_Right:
+            if (at < 0)
+                return false
+            if (pin ? at + 1 < count : (at - count) % 2 === 0 && at + 1 < total)
+                current = at + 1
+            return true
+        case Qt.Key_Left:
+            if (at < 0)
+                return false
+            if (pin ? at > 0 : (at - count) % 2 === 1)
+                current = at - 1
+            return true
+        case Qt.Key_Down:
+            if (at < 0)
+                current = count > 0 ? page * perPage : total > 0 ? 0 : -1
+            else if (pin && at + columns < count)
+                current = at + columns
+            else if (pin && Math.floor(at / columns) < Math.floor((count - 1) / columns))
+                current = count - 1 // into the last row, which is not full
+            else if (pin && recent.length > 0)
+                current = count + Math.min(column < columns / 2 ? 0 : 1, recent.length - 1)
+            else if (!pin && at + 2 < total)
+                current = at + 2
+            return true
+        case Qt.Key_Up:
+            if (at < 0)
+                return false
+            if (pin)
+                current = at - columns >= 0 ? at - columns : -1
+            else if (at - 2 >= count)
+                current = at - 2
+            else if (count > 0) {
+                // Into the last row of the page shown, on its side of the list.
+                var last = Math.min(count, (page + 1) * perPage) - 1
+                current = Math.min(count - 1, last - last % columns + ((at - count) % 2) * columns / 2)
+            } else
+                current = -1
+            return true
+        }
+        return false
+    }
 
     Text { id: label; visible: false; text: "Ag"; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily }
 
@@ -64,6 +123,7 @@ Item {
                     required property int index
                     readonly property int place: index % home.perPage
                     app: modelData
+                    current: home.current === index
                     x: place % home.columns * home.cellWidth
                     y: (Math.floor(index / home.perPage) * home.rows + Math.floor(place / home.columns)) * home.cellHeight
                     width: home.cellWidth; height: home.cellHeight
@@ -137,7 +197,9 @@ Item {
             model: home.recent
             delegate: StartRow {
                 required property var modelData
+                required property int index
                 objectName: "startRecent:" + modelData.appId
+                current: home.current === home.pins.length + index
                 width: recentList.width / 2; height: home.recentRowHeight
                 iconName: modelData.icon
                 title: modelData.name

@@ -17,7 +17,25 @@ Item {
         return query === "" ? [] : shell.startMenu.search(query, shell.palette.entries(launcher.panel.taskSource))
     }
     onResultsChanged: current = 0
+    readonly property var currentResult: results[current] || null
     readonly property var headings: ({ best: "Best match", apps: "Apps", windows: "Open windows", actions: "Actions" })
+
+    // Down and Tab, Up and Backtab move through every result, wrapping; Page Down and Page Up
+    // move a few. Returns whether the key moved.
+    function key(event) {
+        var count = results.length
+        if (count === 0)
+            return false
+        switch (event.key) {
+        case Qt.Key_Down:
+        case Qt.Key_Tab: current = (current + 1) % count; return true
+        case Qt.Key_Up:
+        case Qt.Key_Backtab: current = (current + count - 1) % count; return true
+        case Qt.Key_PageDown: current = Math.min(count - 1, current + 5); return true
+        case Qt.Key_PageUp: current = Math.max(0, current - 5); return true
+        }
+        return false
+    }
 
     ListView {
         id: list

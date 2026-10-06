@@ -36,9 +36,33 @@ Item {
         return list
     }
 
+    // The application the keyboard is at, as an index into `entries`; -1 for none.
+    property int current: -1
+    onCurrentChanged: if (current >= 0) list.positionViewAtIndex(current, ListView.Contain)
+    readonly property var currentApp: current >= 0 && current < entries.length ? entries[current] : null
+
     function reset() {
         lettersOpen = false
+        current = -1
         list.positionViewAtBeginning()
+    }
+    // Up and Down (Tab and Backtab too) move through the applications, past the letters' headings,
+    // Page Up and Page Down a list's height. Returns whether the key moved.
+    function key(event) {
+        var step = event.key === Qt.Key_Down || event.key === Qt.Key_Tab ? 1
+                 : event.key === Qt.Key_Up || event.key === Qt.Key_Backtab ? -1
+                 : event.key === Qt.Key_PageDown ? Math.max(1, Math.floor(list.height / rowHeight))
+                 : event.key === Qt.Key_PageUp ? -Math.max(1, Math.floor(list.height / rowHeight)) : 0
+        if (step === 0)
+            return false
+        lettersOpen = false
+        // From nowhere, Up goes nowhere and Down to the first application.
+        var at = current < 0 && step < 0 ? -1 : Math.max(-1, Math.min(entries.length - 1, current + step))
+        var direction = step > 0 ? 1 : -1
+        while (at >= 0 && at < entries.length && entries[at].header !== undefined)
+            at += direction
+        current = at
+        return true
     }
     // Shows the applications under `letter` at the top of the list.
     function jump(letter) {
@@ -115,6 +139,7 @@ Item {
                 iconSize: Theme.appIconSize
                 iconName: entry.header ? "" : entry.modelData.icon
                 title: entry.header ? "" : entry.modelData.name
+                current: all.current === entry.index
                 onClicked: all.launcher.launch(entry.modelData.appId)
             }
         }

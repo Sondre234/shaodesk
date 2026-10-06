@@ -71,6 +71,30 @@ PopupCard {
             shell.palette.run(result, output)
         }
     }
+    // The keys the search field leaves: what moves through the view shown (the arrows, Tab, the
+    // page keys), Enter, which runs what the keyboard is at, and Escape, which closes the letters
+    // of All apps, else clears the search, else closes the menu.
+    function key(event) {
+        var shown = view === "search" ? searchView : view === "all" ? allView : home
+        if (event.key === Qt.Key_Escape) {
+            if (shown === allView && allView.lettersOpen)
+                allView.lettersOpen = false
+            else if (search.text !== "")
+                search.text = ""
+            else
+                panel.closeMenus()
+            event.accepted = true
+        } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            if (shown === searchView && searchView.currentResult)
+                run(searchView.currentResult)
+            else if (shown !== searchView && shown.currentApp)
+                launch(shown.currentApp.appId)
+            event.accepted = true
+        } else {
+            // Tab stays in the menu, whatever there is to move through.
+            event.accepted = shown.key(event) || event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab
+        }
+    }
     // For a preview (Panel.previewPopup): shows "launcher-all", every application, or
     // "launcher-search", what a search finds.
     function preview(name) {
@@ -106,12 +130,7 @@ PopupCard {
                 name: "search"; size: Theme.iconSizeSmall; color: Theme.textMuted
             }
         }
-        onAccepted: {
-            var result = searchView.results[searchView.current]
-            if (launcher.view === "search" && result)
-                launcher.run(result)
-        }
-        Keys.onEscapePressed: panel.closeMenus()
+        Keys.onPressed: (event) => launcher.key(event)
     }
     // The views, between the search field and the footer, across the card's whole width.
     Item {
