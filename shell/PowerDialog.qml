@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 import QtQuick.Controls.Basic
+import QtQuick.Effects
 import QtQuick.Layouts
 
 // The confirmation of power off, restart and log out, over a dimmed screen: the action goes
@@ -23,35 +24,71 @@ Rectangle {
         anchors.fill: parent
         onClicked: root.power.cancel()
     }
-    Rectangle {
+    Item {
         id: box
         objectName: "powerBox"
         anchors.centerIn: parent
-        width: Math.min(400, root.width - 32)
-        height: column.implicitHeight + 40
-        radius: Theme.radiusLarge
-        color: Theme.surface
-        border.color: Theme.border
+        width: Math.min(420, root.width - 2 * Theme.spacingXL)
+        height: column.implicitHeight + 2 * column.anchors.margins
+        Loader {
+            anchors.fill: parent
+            active: Theme.effects
+            sourceComponent: RectangularShadow {
+                radius: Theme.radiusLarge
+                blur: Theme.shadowBlur
+                offset: Qt.vector2d(0, Theme.shadowOffset)
+                color: Theme.shadow
+            }
+        }
+        Rectangle {
+            anchors.fill: parent
+            radius: Theme.radiusLarge
+            color: Theme.surface
+            border.color: Theme.border
+        }
         // A click on the dialog itself gives nothing up.
         MouseArea { anchors.fill: parent }
         ColumnLayout {
             id: column
             anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
-            anchors.margins: 20
-            spacing: 14
-            Text {
+            anchors.margins: Theme.spacingXXL
+            spacing: Theme.spacingXL
+            // The action's icon on a disc of the danger colour, beside its name and what is
+            // about to happen.
+            RowLayout {
                 Layout.fillWidth: true
-                text: root.power.pendingTitle
-                color: Theme.text
-                font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeTitle; font.weight: Font.DemiBold
-            }
-            Text {
-                objectName: "powerMessage"
-                Layout.fillWidth: true
-                text: root.power.message
-                wrapMode: Text.WordWrap
-                color: Theme.alpha(Theme.text, 0.8)
-                font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize + 1
+                spacing: Theme.spacingL
+                Rectangle {
+                    Layout.alignment: Qt.AlignTop
+                    Layout.preferredWidth: Theme.rowHeight + Theme.spacingS
+                    Layout.preferredHeight: Theme.rowHeight + Theme.spacingS
+                    radius: width / 2
+                    color: Theme.dangerSurface
+                    Icon {
+                        anchors.centerIn: parent
+                        name: root.power.pending === "reboot" ? "rotate-ccw"
+                              : root.power.pending === "logout" ? "log-out" : "power"
+                        size: Theme.iconSizeLarge; color: Theme.danger
+                    }
+                }
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingS
+                    Text {
+                        Layout.fillWidth: true
+                        text: root.power.pendingTitle
+                        color: Theme.text
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeTitle; font.weight: Font.DemiBold
+                    }
+                    Text {
+                        objectName: "powerMessage"
+                        Layout.fillWidth: true
+                        text: root.power.message
+                        wrapMode: Text.WordWrap
+                        color: Theme.textMuted
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize
+                    }
+                }
             }
             RowLayout {
                 Layout.alignment: Qt.AlignRight
