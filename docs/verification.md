@@ -516,18 +516,18 @@ tooltips over the popover beyond one look at the power button's under a headless
 ## Start menu
 
 Added 2026-10-06. The launcher became a start menu after Windows 11's. Its four pictures in the
-gallery (`launcher`, `launcher-all`, `launcher-search`, `launcher-menu`) were looked at after
-each step in both themes and both renderers, and in software at scale 1.25. `start_menu` covers
-the model without the shell: the launch history (saving, reading back what it can, the cap,
-failing to save), seeding the pins from the taskbar's and the default browser and a terminal of
-a private set of applications, pinning and moving, the applications by letter, how long ago,
-the user's picture from a private home, and the search's groups, words and ties. `shell_ui`
-drives the menu itself: the tiles, recent launches and All apps with its letters, the search's
-groups and best match, the keyboard and the pointer moving through them, Escape, the
-application menu pinning to the start menu and the taskbar, desktop actions, dragging a tile,
-an application installed and removed while the shell runs, and launches recorded from the
-start menu, desktop actions and the palette, all under a private `XDG_STATE_HOME`.
+gallery (`launcher`, `launcher-all`, `launcher-search`, `launcher-menu`) were looked at after each
+step in both themes and both renderers, and in software at scale 1.25. `start_menu` covers the
+model without the shell: the launch history (saving, reading back what it can, the cap, failing to
+save), seeding the pins from the taskbar's and the default browser and a terminal of a private set
+of applications, pinning and moving, the applications by letter, how long ago, the user's picture
+from a private home, and the search's groups, words and ties. `shell_ui` drives the menu itself:
+the tiles and their pages, recent launches and All apps with its letters, the search's groups and
+best match, the keyboard and the pointer moving through them, Escape, the application menu pinning
+to the start menu and the taskbar, desktop actions, dragging a tile, an application installed and
+removed while the shell runs, and launches recorded from the start menu, desktop actions and the
+palette, all under a private `XDG_STATE_HOME`.
 
-Not checked: any of it on a real display and GPU, a real pointer's hover and drags, AccountsService's
-picture over a real system bus, a package manager installing an application while the shell
-runs, and a monitor short enough that the menu drops a row of pins.
+Not checked: any of it on a real display and GPU, a real pointer's hover and drags,
+AccountsService's picture over a real system bus, a package manager installing an application while
+the shell runs, and a monitor short enough that the menu drops a row of pins.
