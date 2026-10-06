@@ -1,16 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "ext-image-capture-source-v1-client-protocol.h" // before the next, which names its interface
+#define _GNU_SOURCE
+#include "ext-foreign-toplevel-list-v1-client-protocol.h"
+#include "ext-image-capture-source-v1-client-protocol.h" // before the window control's, which names its interface
+#include "ext-image-copy-capture-v1-client-protocol.h"
 #include "shaodesk-window-control-v1-client-protocol.h"
 #include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
 #include <wayland-client.h>
 
 /* A taskbar's view of one window through shaodesk-window-control-v1, for the tests: finds the
  * window titled TITLE through wlr-foreign-toplevel, then prints its state, sends one request,
- * or prints each state the compositor sends until the window closes.
+ * prints each state the compositor sends until the window closes, or captures the window.
  *
  *   window_probe TITLE                   prints "OUTPUT WORKSPACE STATE"
  *   window_probe TITLE watch             prints that line after every done, until it closes
@@ -18,9 +24,20 @@
  *   window_probe TITLE output NAME       move_to_output
  *   window_probe TITLE sticky 0|1        set_sticky or unset_sticky
  *   window_probe TITLE floating 0|1      set_floating or unset_floating
+ *   window_probe TITLE minimize          minimizes it through its wlr-foreign-toplevel handle
+ *   window_probe TITLE capture [watch]   captures it through get_capture_source (version 2)
+ *   window_probe TITLE capture-listed [watch]
+ *                                        captures it through ext-foreign-toplevel-list and
+ *                                        ext-foreign-toplevel-image-capture-source-v1, as screen
+ *                                        sharing does
  *
  * STATE is the flags joined by commas ("floating,tiling"), or "-" for none; OUTPUT is "-" before
- * the window is on one. */
+ * the window is on one.
+ *
+ * A capture copies a frame into shared memory with ext-image-copy-capture-v1 and prints
+ * "WIDTHxHEIGHT TOPLEFT CENTRE": the frame's size and the colours (RRGGBB) of its top-left and
+ * centre pixels. With watch it goes on, printing a line for each frame as the window redraws. It
+ * prints "stopped" when the session stops (an inert source's at once), and then exits. */
 #ifdef __SANITIZE_ADDRESS__
 /* A short-lived test client exits without tearing its protocol objects down. */
 const char *__asan_default_options(void) { return "detect_leaks=0"; }
@@ -31,10 +48,39 @@ struct handle {
     char *title;
     struct handle *next;
 };
+/* The same window's handle in ext-foreign-toplevel-list, which capture sources are made from. */
+struct listed {
+    struct ext_foreign_toplevel_handle_v1 *object;
+    char *title;
+    struct listed *next;
+};
+/* A capture session and the frame it is copying, into one shared-memory buffer made to the
+ * session's constraints. */
+struct capture {
+    struct wl_shm *shm;
+    struct ext_image_copy_capture_session_v1 *session;
+    struct ext_image_copy_capture_frame_v1 *frame; // the one being copied, or NULL
+    /* The constraints the session last sent, the shm format chosen from them (or NO_FORMAT),
+     * whether they changed since the buffer was made, and whether they are complete. */
+    int width, height;
+    uint32_t format;
+    bool changed, done;
+    struct wl_buffer *buffer;
+    int buffer_width, buffer_height;
+    uint32_t *pixels;
+    size_t size;
+    bool watch, stopped, finished;
+};
+#define NO_FORMAT UINT32_MAX
 struct probe {
     struct zwlr_foreign_toplevel_manager_v1 *manager;
     struct shaodesk_window_control_v1 *control;
+    struct ext_foreign_toplevel_list_v1 *list;
+    struct ext_foreign_toplevel_image_capture_source_manager_v1 *sources;
+    struct ext_image_copy_capture_manager_v1 *copy;
+    struct wl_shm *shm;
     struct handle *handles;
+    struct listed *listed;
     bool closed, watch;
     char output[64];
     uint32_t workspace, state;
@@ -123,6 +169,167 @@ static const struct shaodesk_window_v1_listener window_listener = {
     .state = window_state,
     .done = window_done};
 
+static void listed_closed(void *data, struct ext_foreign_toplevel_handle_v1 *object) {
+    struct listed *listed = data;
+    free(listed->title);
+    listed->title = NULL;
+}
+static void listed_done(void *data, struct ext_foreign_toplevel_handle_v1 *object) {}
+static void listed_title(void *data, struct ext_foreign_toplevel_handle_v1 *object,
+                         const char *title) {
+    struct listed *listed = data;
+    free(listed->title);
+    listed->title = strdup(title);
+}
+static void listed_app_id(void *data, struct ext_foreign_toplevel_handle_v1 *object,
+                          const char *app_id) {}
+static void listed_identifier(void *data, struct ext_foreign_toplevel_handle_v1 *object,
+                              const char *identifier) {}
+static const struct ext_foreign_toplevel_handle_v1_listener listed_listener = {
+    .closed = listed_closed,
+    .done = listed_done,
+    .title = listed_title,
+    .app_id = listed_app_id,
+    .identifier = listed_identifier};
+
+static void list_toplevel(void *data, struct ext_foreign_toplevel_list_v1 *list,
+                          struct ext_foreign_toplevel_handle_v1 *object) {
+    struct probe *probe = data;
+    struct listed *listed = calloc(1, sizeof(*listed));
+    if (!listed)
+        die("out of memory");
+    listed->object = object;
+    listed->next = probe->listed;
+    probe->listed = listed;
+    ext_foreign_toplevel_handle_v1_add_listener(object, &listed_listener, listed);
+}
+static void list_finished(void *data, struct ext_foreign_toplevel_list_v1 *list) {}
+static const struct ext_foreign_toplevel_list_v1_listener list_listener = {
+    .toplevel = list_toplevel, .finished = list_finished};
+
+/* The colour of a pixel as RRGGBB; both formats the probe takes are 0xAARRGGBB words. */
+static unsigned colour(const struct capture *capture, int x, int y) {
+    return capture->pixels[(size_t)y * capture->buffer_width + x] & 0xffffff;
+}
+
+/* Makes the buffer again when the constraints changed since it was made. */
+static void make_buffer(struct capture *capture) {
+    if (!capture->changed)
+        return;
+    capture->changed = false;
+    if (capture->buffer) {
+        wl_buffer_destroy(capture->buffer);
+        munmap(capture->pixels, capture->size);
+    }
+    if (capture->format == NO_FORMAT || capture->width < 1 || capture->height < 1)
+        die("the session offers no shared-memory buffer the probe can read");
+    capture->buffer_width = capture->width;
+    capture->buffer_height = capture->height;
+    capture->size = (size_t)capture->width * capture->height * 4;
+    int fd = memfd_create("shaodesk-window-capture", MFD_CLOEXEC);
+    if (fd < 0 || ftruncate(fd, (off_t)capture->size) != 0)
+        die("cannot allocate shm buffer");
+    capture->pixels = mmap(NULL, capture->size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (capture->pixels == MAP_FAILED)
+        die("cannot map shm buffer");
+    struct wl_shm_pool *pool = wl_shm_create_pool(capture->shm, fd, (int)capture->size);
+    capture->buffer = wl_shm_pool_create_buffer(pool, 0, capture->width, capture->height,
+                                                capture->width * 4, capture->format);
+    wl_shm_pool_destroy(pool);
+    close(fd);
+}
+
+static void capture_next(struct capture *capture);
+
+static void frame_transform(void *data, struct ext_image_copy_capture_frame_v1 *frame,
+                            uint32_t transform) {}
+static void frame_damage(void *data, struct ext_image_copy_capture_frame_v1 *frame, int32_t x,
+                         int32_t y, int32_t width, int32_t height) {}
+static void frame_presentation_time(void *data, struct ext_image_copy_capture_frame_v1 *frame,
+                                    uint32_t sec_hi, uint32_t sec_lo, uint32_t nsec) {}
+static void frame_ready(void *data, struct ext_image_copy_capture_frame_v1 *frame) {
+    struct capture *capture = data;
+    ext_image_copy_capture_frame_v1_destroy(frame);
+    capture->frame = NULL;
+    printf("%dx%d %06x %06x\n", capture->buffer_width, capture->buffer_height,
+           colour(capture, 0, 0),
+           colour(capture, capture->buffer_width / 2, capture->buffer_height / 2));
+    fflush(stdout);
+    if (capture->watch)
+        capture_next(capture);
+    else
+        capture->finished = true;
+}
+static void frame_failed(void *data, struct ext_image_copy_capture_frame_v1 *frame,
+                         uint32_t reason) {
+    struct capture *capture = data;
+    ext_image_copy_capture_frame_v1_destroy(frame);
+    capture->frame = NULL;
+    if (reason == EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_STOPPED)
+        capture->stopped = true;
+    else if (reason != EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_BUFFER_CONSTRAINTS)
+        die("capturing a frame failed");
+    else if (capture->done)
+        capture_next(capture); // the new constraints have come: to a buffer made to them
+}
+static const struct ext_image_copy_capture_frame_v1_listener frame_listener = {
+    .transform = frame_transform,
+    .damage = frame_damage,
+    .presentation_time = frame_presentation_time,
+    .ready = frame_ready,
+    .failed = frame_failed};
+
+/* Copies the next frame the window draws into a buffer made to the session's constraints. */
+static void capture_next(struct capture *capture) {
+    make_buffer(capture);
+    capture->frame = ext_image_copy_capture_session_v1_create_frame(capture->session);
+    ext_image_copy_capture_frame_v1_add_listener(capture->frame, &frame_listener, capture);
+    ext_image_copy_capture_frame_v1_attach_buffer(capture->frame, capture->buffer);
+    ext_image_copy_capture_frame_v1_damage_buffer(capture->frame, 0, 0, capture->buffer_width,
+                                                  capture->buffer_height);
+    ext_image_copy_capture_frame_v1_capture(capture->frame);
+}
+
+static void session_buffer_size(void *data, struct ext_image_copy_capture_session_v1 *session,
+                                uint32_t width, uint32_t height) {
+    struct capture *capture = data;
+    // New constraints, complete at the next done.
+    capture->width = (int)width;
+    capture->height = (int)height;
+    capture->format = NO_FORMAT;
+    capture->changed = true;
+    capture->done = false;
+}
+static void session_shm_format(void *data, struct ext_image_copy_capture_session_v1 *session,
+                               uint32_t format) {
+    struct capture *capture = data;
+    if (capture->format == NO_FORMAT &&
+        (format == WL_SHM_FORMAT_ARGB8888 || format == WL_SHM_FORMAT_XRGB8888))
+        capture->format = format;
+}
+static void session_dmabuf_device(void *data, struct ext_image_copy_capture_session_v1 *session,
+                                  struct wl_array *device) {}
+static void session_dmabuf_format(void *data, struct ext_image_copy_capture_session_v1 *session,
+                                  uint32_t format, struct wl_array *modifiers) {}
+static void session_done(void *data, struct ext_image_copy_capture_session_v1 *session) {
+    struct capture *capture = data;
+    capture->done = true;
+    // The first constraints start the capture; later ones apply to the next frame, after the
+    // one in flight has failed for the buffer it has.
+    if (!capture->frame && !capture->buffer)
+        capture_next(capture);
+}
+static void session_stopped(void *data, struct ext_image_copy_capture_session_v1 *session) {
+    ((struct capture *)data)->stopped = true;
+}
+static const struct ext_image_copy_capture_session_v1_listener session_listener = {
+    .buffer_size = session_buffer_size,
+    .shm_format = session_shm_format,
+    .dmabuf_device = session_dmabuf_device,
+    .dmabuf_format = session_dmabuf_format,
+    .done = session_done,
+    .stopped = session_stopped};
+
 static void registry_global(void *data, struct wl_registry *registry, uint32_t name,
                             const char *interface, uint32_t version) {
     struct probe *probe = data;
@@ -131,17 +338,54 @@ static void registry_global(void *data, struct wl_registry *registry, uint32_t n
             wl_registry_bind(registry, name, &zwlr_foreign_toplevel_manager_v1_interface, 3);
         zwlr_foreign_toplevel_manager_v1_add_listener(probe->manager, &manager_listener, probe);
     } else if (!strcmp(interface, shaodesk_window_control_v1_interface.name)) {
-        probe->control = wl_registry_bind(registry, name, &shaodesk_window_control_v1_interface, 1);
+        probe->control = wl_registry_bind(registry, name, &shaodesk_window_control_v1_interface,
+                                          version < 2 ? version : 2);
+    } else if (!strcmp(interface, ext_foreign_toplevel_list_v1_interface.name)) {
+        probe->list = wl_registry_bind(registry, name, &ext_foreign_toplevel_list_v1_interface, 1);
+        ext_foreign_toplevel_list_v1_add_listener(probe->list, &list_listener, probe);
+    } else if (!strcmp(interface,
+                       ext_foreign_toplevel_image_capture_source_manager_v1_interface.name)) {
+        probe->sources = wl_registry_bind(
+            registry, name, &ext_foreign_toplevel_image_capture_source_manager_v1_interface, 1);
+    } else if (!strcmp(interface, ext_image_copy_capture_manager_v1_interface.name)) {
+        probe->copy =
+            wl_registry_bind(registry, name, &ext_image_copy_capture_manager_v1_interface, 1);
+    } else if (!strcmp(interface, wl_shm_interface.name)) {
+        probe->shm = wl_registry_bind(registry, name, &wl_shm_interface, 1);
     }
 }
 static void registry_global_remove(void *data, struct wl_registry *registry, uint32_t name) {}
 static const struct wl_registry_listener registry_listener = {
     .global = registry_global, .global_remove = registry_global_remove};
 
+/* Captures the window through `source`: one frame, or with watch every frame until the session
+ * stops. */
+static void capture(struct probe *probe, struct wl_display *display,
+                    struct ext_image_capture_source_v1 *source, bool watch) {
+    struct capture capture = {.shm = probe->shm, .format = NO_FORMAT, .watch = watch};
+    capture.session = ext_image_copy_capture_manager_v1_create_session(probe->copy, source, 0);
+    ext_image_copy_capture_session_v1_add_listener(capture.session, &session_listener, &capture);
+    while (!capture.finished && !capture.stopped)
+        if (wl_display_dispatch(display) < 0)
+            die("dispatch failed");
+    if (capture.stopped) {
+        puts("stopped");
+        fflush(stdout);
+    }
+    if (capture.frame)
+        ext_image_copy_capture_frame_v1_destroy(capture.frame);
+    ext_image_copy_capture_session_v1_destroy(capture.session);
+    ext_image_capture_source_v1_destroy(source);
+    if (capture.buffer) {
+        wl_buffer_destroy(capture.buffer);
+        munmap(capture.pixels, capture.size);
+    }
+}
+
 int main(int argc, char **argv) {
     if (argc != 2 && argc != 3 && argc != 4)
         die("usage: window_probe TITLE [watch | workspace N | output NAME | sticky 0|1 | "
-            "floating 0|1]");
+            "floating 0|1 | minimize | capture [watch] | capture-listed [watch]]");
     const char *title = argv[1], *command = argc > 2 ? argv[2] : "", *argument = argc > 3 ? argv[3] : "";
     struct probe probe = {.watch = !strcmp(command, "watch")};
     struct wl_display *display = wl_display_connect(NULL);
@@ -186,6 +430,26 @@ int main(int argc, char **argv) {
             shaodesk_window_v1_set_floating(window);
         else
             shaodesk_window_v1_unset_floating(window);
+    } else if (!strcmp(command, "minimize")) {
+        zwlr_foreign_toplevel_handle_v1_set_minimized(found->object);
+    } else if (!strcmp(command, "capture")) {
+        if (shaodesk_window_control_v1_get_version(probe.control) < 2 || !probe.copy || !probe.shm)
+            die("the compositor offers no window capture");
+        capture(&probe, display, shaodesk_window_v1_get_capture_source(window),
+                !strcmp(argument, "watch"));
+    } else if (!strcmp(command, "capture-listed")) {
+        if (!probe.list || !probe.sources || !probe.copy || !probe.shm)
+            die("the compositor offers no window capture");
+        struct listed *listed = NULL;
+        for (struct listed *each = probe.listed; each; each = each->next)
+            if (each->title && !strcmp(each->title, title))
+                listed = each;
+        if (!listed)
+            die("no listed window has that title");
+        capture(&probe, display,
+                ext_foreign_toplevel_image_capture_source_manager_v1_create_source(probe.sources,
+                                                                                   listed->object),
+                !strcmp(argument, "watch"));
     } else {
         die("unknown command");
     }
@@ -200,6 +464,20 @@ int main(int argc, char **argv) {
         free(handle);
     }
     zwlr_foreign_toplevel_manager_v1_destroy(probe.manager);
+    for (struct listed *listed = probe.listed, *next; listed; listed = next) {
+        next = listed->next;
+        ext_foreign_toplevel_handle_v1_destroy(listed->object);
+        free(listed->title);
+        free(listed);
+    }
+    if (probe.list)
+        ext_foreign_toplevel_list_v1_destroy(probe.list);
+    if (probe.sources)
+        ext_foreign_toplevel_image_capture_source_manager_v1_destroy(probe.sources);
+    if (probe.copy)
+        ext_image_copy_capture_manager_v1_destroy(probe.copy);
+    if (probe.shm)
+        wl_shm_destroy(probe.shm);
     wl_registry_destroy(registry);
     wl_display_disconnect(display);
     return 0;
