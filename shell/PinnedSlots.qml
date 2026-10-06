@@ -74,7 +74,7 @@ Repeater {
         }
         property real shiftX: shift
         Behavior on shiftX { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
-        spacing: 4
+        spacing: Theme.spacingS
         z: dragging ? 1 : 0
         // Made with the bar or anew as the pins changed: what is added after comes in.
         property bool settled: false

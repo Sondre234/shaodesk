@@ -9,7 +9,6 @@ Item {
     property string name
     property color color: Theme.text
     property real size: Theme.iconSize
-    readonly property bool known: current.known
     width: size; height: size
     Behavior on color { ColorAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
     // The icon shown, and the one fading out while the new one fades in ("" when none is).
@@ -32,7 +31,6 @@ Item {
         onFinished: fading.leaving = ""
     }
     Icon {
-        id: current
         name: fading.name
         color: fading.color
         size: fading.size

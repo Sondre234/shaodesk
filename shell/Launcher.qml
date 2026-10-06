@@ -35,11 +35,9 @@ PopupCard {
     // By the bar's start, 640 by 720 pixels, or as tall as the output leaves room for.
     implicitWidth: 640
     implicitHeight: 720
-    anchorRect: panel.barAnchor(12 + shell.panelMarginLeft, 0)
+    anchorRect: panel.barAnchor(Theme.spacingL + shell.panelMarginLeft, 0)
     alignment: Qt.AlignLeft
     side: panel.popupSide
-    gap: 10
-    margin: 10
     radius: Theme.radiusLarge
     // The space between the card's edges and what is on it.
     readonly property real padding: Theme.spacingXXL + Theme.spacingL
@@ -362,7 +360,7 @@ PopupCard {
                             powerButton.width, powerButton.height)
         side: Qt.TopEdge
         alignment: Qt.AlignRight
-        gap: 6
+        gap: Theme.spacingS
         bounds: launcher.panel.popupArea
     }
 }

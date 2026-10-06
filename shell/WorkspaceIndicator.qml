@@ -74,7 +74,7 @@ Item {
                     Rectangle {
                         objectName: "workspaceUrgent" + workspaceButton.number
                         visible: workspaceButton.urgent
-                        anchors.right: parent.right; anchors.top: parent.top; anchors.topMargin: 2
+                        anchors.right: parent.right; anchors.top: parent.top; anchors.topMargin: Theme.spacingXS
                         width: 6; height: 6; radius: 3
                         color: Theme.urgent
                         SequentialAnimation on opacity {

@@ -111,8 +111,8 @@ Button {
         Rectangle {
             objectName: "taskUrgent"
             visible: task.shownUrgent
-            anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 2
-            width: 8; height: 8; radius: 4
+            anchors.left: parent.left; anchors.top: parent.top; anchors.margins: Theme.spacingXS
+            width: Theme.spacingM; height: width; radius: width / 2
             color: Theme.urgent
             SequentialAnimation on opacity {
                 running: task.shownUrgent

@@ -644,7 +644,7 @@ Item {
                 // Three swatches of the profile in use: accent, desktop background, text.
                 contentItem: Item {
                     Row {
-                        anchors.centerIn: parent; spacing: 2
+                        anchors.centerIn: parent; spacing: Theme.spacingXS
                         Repeater {
                             model: [shell.accent, shell.background, shell.textColor]
                             // A ring in the text colour keeps a swatch close to the panel's own
