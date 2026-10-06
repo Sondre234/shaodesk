@@ -33,8 +33,6 @@ PopupCard {
         target: launcher.panel
         function onPowerOpenChanged() { if (launcher.open) launcher.takeFocus() }
     }
-    // The keyboard comes back from an application's menu as it closes.
-    onMenuAppChanged: if (menuApp === null && open) takeFocus()
     // By the bar's start, 640 by 720 pixels, or as tall as the output leaves room for.
     implicitWidth: 640
     implicitHeight: 720
@@ -53,6 +51,17 @@ PopupCard {
     // The time the recent applications' "5 min ago" is told from.
     property date now: new Date()
     Timer { interval: 30000; repeat: true; running: launcher.open; onTriggered: launcher.now = new Date() }
+    // The views change with a fade and a slide of this far, once the menu has opened.
+    readonly property bool settled: open && progress === 1
+    readonly property real slide: 2 * Theme.spacingXXL
+    // The menu of an application here: its record (null while it is closed), whether it is of a
+    // pinned tile, which can move to the front, and where it opens, in the popups' coordinates.
+    property var menuApp: null
+    property bool menuTile: false
+    property bool menuByKeyboard: false
+    property rect menuAnchor
+    // The keyboard comes back from an application's menu as it closes.
+    onMenuAppChanged: if (menuApp === null && open) takeFocus()
 
     function launch(id) {
         if (shell.launch(id))
@@ -102,12 +111,6 @@ PopupCard {
             event.accepted = shown.key(event) || event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab
         }
     }
-    // The menu of an application here: its record (null while it is closed), whether it is of a
-    // pinned tile, which can move to the front, and where it opens, in the popups' coordinates.
-    property var menuApp: null
-    property bool menuTile: false
-    property bool menuByKeyboard: false
-    property rect menuAnchor
     // Opens it at (x, y) in `item`, as a right press there does, or by `item`'s bottom-left
     // corner with its first entry highlighted, for the keyboard.
     function openAppMenu(app, item, x, y, tile, byKeyboard) {
@@ -249,8 +252,6 @@ PopupCard {
             NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing }
         }
     }
-    readonly property bool settled: open && progress === 1
-    readonly property real slide: 2 * Theme.spacingXXL
     // The views, between the search field and the footer, across the card's whole width: All
     // apps comes in from the right as the pinned applications leave to the left, and what the
     // search finds rises over either.
