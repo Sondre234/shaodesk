@@ -4,7 +4,6 @@
 #include <QObject>
 #include <QStringList>
 #include <QTemporaryDir>
-#include <QVariantMap>
 #include <memory>
 
 class Audio;
@@ -44,7 +43,6 @@ class PreviewData : public QObject {
     ShellController &controller_;
     std::unique_ptr<QQuickView> surface_;
     QString surfaceName_;
-    QVariantMap surfaceState_;
     bool showSurface(QScreen *screen, const QString &name);
     QTemporaryDir sysfs_;
     std::unique_ptr<Audio> audio_;

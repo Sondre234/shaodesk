@@ -65,9 +65,9 @@ QRect usableArea(const ShellController &controller) {
 QVariantList overviewWindows(const QRect &area) {
     auto window = [&area](int x, int y, int w, int h, const QString &appId, const QString &title,
                           bool urgent = false) {
-        return QVariantMap{{"x", area.x() + x}, {"y", area.y() + y}, {"w", w},
-                           {"h", h},            {"appId", appId},   {"title", title},
-                           {"workspace", 1},    {"urgent", urgent}};
+        return QVariantMap{
+            {"x", area.x() + x}, {"y", area.y() + y}, {"w", w},         {"h", h},
+            {"appId", appId},    {"title", title},    {"workspace", 1}, {"urgent", urgent}};
     };
     return {window(130, 160, 410, 256, "firefox", "Release notes - Mozilla Firefox"),
             window(562, 160, 410, 256, "foot", "~/dev/shaodesk"),
@@ -75,11 +75,15 @@ QVariantList overviewWindows(const QRect &area) {
             window(562, 444, 300, 170, "foot", "htop")};
 }
 QVariantList overviewStrip(const QRect &area) {
+    const int windows[] = {4, 2, 0, 0};
     QVariantList cells;
     for (int i = 0; i < 4; ++i)
-        cells.push_back(QVariantMap{{"x", area.x() + 292 + i * 132}, {"y", area.y() + 48},
-                                    {"w", 120}, {"h", 68}, {"workspace", i + 1},
-                                    {"windows", i == 0 ? 4 : i == 1 ? 2 : 0}});
+        cells.push_back(QVariantMap{{"x", area.x() + 292 + i * 132},
+                                    {"y", area.y() + 48},
+                                    {"w", 120},
+                                    {"h", 68},
+                                    {"workspace", i + 1},
+                                    {"windows", windows[i]}});
     return cells;
 }
 
@@ -188,7 +192,8 @@ void PreviewData::fill(QQuickItem *panel) {
 
 bool PreviewData::open(QQuickItem *panel, const QString &name) {
     if (surfaces().contains(name))
-        return open(panel, "bar") && panel->window() && showSurface(panel->window()->screen(), name);
+        return open(panel, "bar") && panel->window() &&
+               showSurface(panel->window()->screen(), name);
     QVariant opened;
     QMetaObject::invokeMethod(panel, "previewPopup", Q_RETURN_ARG(QVariant, opened),
                               Q_ARG(QVariant, name));
@@ -269,13 +274,14 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
                                {"output", output},       {"workspace", workspace},
                                {"minimized", minimized}, {"urgent", urgent}};
         };
-        properties = {{"screenSize", ShellView::previewSize()},
-                      {"windows", QVariantList{window("firefox", "Release notes - Mozilla Firefox", 1),
-                                               window("foot", "~/dev/shaodesk", 2),
-                                               window("kitty", "Build finished", 2, false, true),
-                                               window("foot", "htop", 2),
-                                               window("org.kde.dolphin", "Downloads - Dolphin", 1, true)}},
-                      {"selected", 1}};
+        properties = {
+            {"screenSize", ShellView::previewSize()},
+            {"windows", QVariantList{window("firefox", "Release notes - Mozilla Firefox", 1),
+                                     window("foot", "~/dev/shaodesk", 2),
+                                     window("kitty", "Build finished", 2, false, true),
+                                     window("foot", "htop", 2),
+                                     window("org.kde.dolphin", "Downloads - Dolphin", 1, true)}},
+            {"selected", 1}};
     } else if (name == "overview") {
         file = "Overview.qml";
         const QRect area = usableArea(controller_);
@@ -347,13 +353,14 @@ QImage PreviewData::withSurface(QImage desktop) const {
     QPainter painter(&desktop);
     if (surfaceName_ == "overview") {
         // What the compositor draws under the shell's text, in its colours: the dimmed backdrop,
-        // the strip's cells with the workspace shown framed, and each window on a card, a plain
-        // stand-in for its picture, the selected one framed.
+        // the strip's cells with the workspace shown framed, and each window on a card
+        // (OVERVIEW_PAD around it), a plain stand-in for its picture, the selected one framed.
         painter.scale(scale, scale);
         painter.fillRect(output, QColor::fromRgbF(0.04f, 0.05f, 0.08f, 0.86f));
         for (const auto &item : overviewStrip(usable)) {
             const auto cell = item.toMap();
-            const QRect rect(cell["x"].toInt(), cell["y"].toInt(), cell["w"].toInt(), cell["h"].toInt());
+            const QRect rect(cell["x"].toInt(), cell["y"].toInt(), cell["w"].toInt(),
+                             cell["h"].toInt());
             const bool viewed = cell["workspace"].toInt() == 1;
             painter.fillRect(rect, viewed ? QColor::fromRgbF(0.22f, 0.25f, 0.31f, 0.95f)
                                           : QColor::fromRgbF(0.12f, 0.13f, 0.16f, 0.95f));
@@ -368,7 +375,8 @@ QImage PreviewData::withSurface(QImage desktop) const {
             const QRect rect(window["x"].toInt(), window["y"].toInt(), window["w"].toInt(),
                              window["h"].toInt());
             const bool dark = window["appId"] != "firefox";
-            painter.fillRect(rect.adjusted(-6, -6, 6, 6), QColor::fromRgbF(0.1f, 0.11f, 0.14f, 0.85f));
+            painter.fillRect(rect.adjusted(-6, -6, 6, 6),
+                             QColor::fromRgbF(0.1f, 0.11f, 0.14f, 0.85f));
             painter.fillRect(rect, dark ? QColor("#1e1f29") : QColor("#eceef3"));
             painter.fillRect(rect.adjusted(0, 0, 0, 14 - rect.height()),
                              dark ? QColor("#2b2d3a") : QColor("#cfd3dd"));
