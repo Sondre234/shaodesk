@@ -980,8 +980,8 @@ int main(int argc, char **argv) {
             profileList = find(view.rootObject(), "profileList");
             return profileList && profileList->isVisible() && findProfile(profileList, "dark") &&
                    findProfile(profileList, "light") &&
-                   findProfile(profileList, "light")->property("current").toBool() &&
-                   !findProfile(profileList, "dark")->property("current").toBool() &&
+                   findProfile(profileList, "light")->property("marked").toBool() &&
+                   !findProfile(profileList, "dark")->property("marked").toBool() &&
                    inPopover(profileList);
         })) {
         std::cerr << "the profile button did not list the profiles\n";
