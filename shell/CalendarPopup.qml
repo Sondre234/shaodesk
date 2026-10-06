@@ -274,19 +274,20 @@ PopupCard {
                 }
             }
             // The year's months; picking one shows its days.
-            Grid {
+            Item {
                 objectName: "calendarMonths"
                 anchors.fill: parent
                 visible: calendar.view === "months"
                 scale: pages.zoomScale; opacity: calendar.zoom * (1 - Math.abs(calendar.shift))
                 transform: Translate { y: calendar.shift * Theme.rowHeight }
-                columns: 4
                 Repeater {
                     model: 12
                     Pick {
                         required property int index
                         readonly property int month: index
                         objectName: "calendarMonth"
+                        // Four to a row, three rows.
+                        x: index % 4 * width; y: Math.floor(index / 4) * height
                         width: pages.width / 4; height: pages.height / 3
                         text: Qt.locale().standaloneMonthName(index, Locale.ShortFormat)
                         current: index === calendar.now.getMonth() && calendar.year === calendar.now.getFullYear()
@@ -300,19 +301,20 @@ PopupCard {
             }
             // The decade's years, with the one before and the one after; picking one shows its
             // months.
-            Grid {
+            Item {
                 objectName: "calendarYears"
                 anchors.fill: parent
                 visible: calendar.view === "years"
                 scale: pages.zoomScale; opacity: calendar.zoom * (1 - Math.abs(calendar.shift))
                 transform: Translate { y: calendar.shift * Theme.rowHeight }
-                columns: 4
                 Repeater {
                     model: 12
                     Pick {
                         required property int index
                         readonly property int year: calendar.decade - 1 + index
                         objectName: "calendarYear"
+                        // Four to a row, three rows.
+                        x: index % 4 * width; y: Math.floor(index / 4) * height
                         width: pages.width / 4; height: pages.height / 3
                         text: String(year)
                         current: year === calendar.now.getFullYear()
