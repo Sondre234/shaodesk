@@ -20,6 +20,7 @@ PopupCard {
         allApps = false
         now = new Date()
         home.reset()
+        allView.reset()
         // Once it is in its place: the first time, it opens while its loader is still making it,
         // and the keyboard would stay with the loader it then leaves.
         Qt.callLater(takeFocus)
@@ -54,6 +55,14 @@ PopupCard {
     function launch(id) {
         if (shell.launch(id))
             panel.closeMenus()
+    }
+    // For a preview (Panel.previewPopup): shows "launcher-all", every application.
+    function preview(name) {
+        if (name === "launcher-all")
+            allApps = true
+        else
+            return false
+        return true
     }
 
     TextField {
@@ -98,10 +107,17 @@ PopupCard {
             inset: launcher.padding - Theme.spacingM
             visible: launcher.view === "home"
         }
+        StartAllApps {
+            id: allView
+            anchors.fill: parent
+            launcher: launcher
+            inset: launcher.padding - Theme.spacingM
+            visible: launcher.view === "all"
+        }
     }
     ListView {
         id: applications
-        visible: launcher.view !== "home"
+        visible: launcher.view === "search"
         anchors.fill: views
         anchors.leftMargin: launcher.padding - Theme.spacingM; anchors.rightMargin: anchors.leftMargin
         clip: true

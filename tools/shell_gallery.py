@@ -32,6 +32,8 @@ import zlib
 POPUPS = ["bar", "launcher", "power", "bar-menu", "bar-submenu", "task-menu", "pin-menu",
           "group", "tray-menu", "tray-submenu", "calendar", "mixer", "outputs", "profiles",
           "wallpapers", "notifications"]
+# The start menu's other views and its menus.
+POPUPS += ["launcher-all"]
 
 # Translucent bars, as appearance profiles often have them.
 THEMES = {
