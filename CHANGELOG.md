@@ -6,6 +6,14 @@ release; the dated sections below it record the work that led up to it, and all 
 
 ## Unreleased
 
+- A window's taskbar menu is headed by its application's icon and name over the window's title,
+  and offers the application's desktop actions and a new window, then minimize or restore,
+  maximize or restore, fullscreen, moving the window to another workspace or monitor, keeping it
+  on all workspaces, floating it where its workspace tiles, pinning, and closing it, with icons
+  and labels that follow the window's state. A stacked button's menu minimizes, moves and closes
+  all its windows, and a pinned application's offers its actions too. The shell names the window
+  to the compositor through `shaodesk-window-control-v1`, a protocol of shaodesk's own, so the
+  menu acts on the window right-clicked even when several share a title, and without focusing it.
 - The taskbar's popups open in a surface of their own over the whole monitor instead of growing
   the bar's, so the bar never resizes and a popup can be as tall as the monitor allows: the
   application menu is now up to 720 pixels tall. They show over fullscreen windows (the
