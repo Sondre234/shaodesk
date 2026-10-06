@@ -23,17 +23,7 @@ FlatButton {
     active: panel.trayMenuKey === key
     Accessible.name: title
     onClicked: panel.trayActivate(trayButton)
-    ToolTip {
-        id: trayTip
-        visible: trayButton.hovered && !trayButton.panel.menuOpen && !trayButton.pressed && text.length > 0
-        delay: 500
-        text: trayButton.toolTip
-        width: Math.min(implicitWidth, 420)
-        // An application's text, shown as it is rather than read as markup.
-        contentItem: Text { text: trayTip.text; textFormat: Text.PlainText; font: trayTip.font; wrapMode: Text.Wrap; color: trayTip.palette.toolTipText }
-        y: trayButton.panel.onTop ? trayButton.height + 6 : -implicitHeight - 6
-        Component.onCompleted: if ("popupType" in trayTip) trayTip.popupType = Popup.Window
-    }
+    BarTip { panel: trayButton.panel; owner: trayButton; text: trayButton.toolTip }
     contentItem: Item {
         Image {
             objectName: "trayIcon"

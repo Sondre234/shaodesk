@@ -17,10 +17,7 @@ FlatButton {
     Layout.preferredWidth: Math.max(40, text.implicitWidth + 16); Layout.preferredHeight: barHeight - 10
     onClicked: { panel.closeMenus(); shell.send("switch_layout next") }
     Accessible.name: description
-    ToolTip.visible: hovered && !pressed && !panel.menuOpen
-    ToolTip.delay: 500
-    ToolTip.text: description + "\nClick: next layout"
-    Component.onCompleted: if ("popupType" in ToolTip.toolTip) ToolTip.toolTip.popupType = Popup.Window
+    BarTip { panel: indicator.panel; owner: indicator; text: indicator.description + "\nClick: next layout" }
     contentItem: Text {
         id: text
         objectName: "keyboardLayoutText"

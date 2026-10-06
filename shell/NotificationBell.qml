@@ -18,10 +18,7 @@ FlatButton {
     Layout.preferredWidth: 40; Layout.preferredHeight: barHeight - 10
     onClicked: panel.toggleAudioPopup("notifications", bell)
     Accessible.name: description
-    ToolTip.visible: hovered && !pressed && !panel.menuOpen
-    ToolTip.delay: 500
-    ToolTip.text: description + "\nRight-click: do not disturb"
-    Component.onCompleted: if ("popupType" in ToolTip.toolTip) ToolTip.toolTip.popupType = Popup.Window
+    BarTip { panel: bell.panel; owner: bell; text: bell.description + "\nRight-click: do not disturb" }
     active: panel.audioPopup === "notifications"
     MouseArea {
         anchors.fill: parent

@@ -44,15 +44,10 @@ Button {
     // The panel's surface is only as tall as the bar, so an in-window tooltip would be
     // squeezed onto the icon and swallow its clicks; a popup window of its own sits above
     // the bar instead. Qt before 6.8 has no popup windows and draws it in the bar.
-    ToolTip {
-        id: tip
+    BarTip {
+        panel: task.panel; owner: task
         visible: shell.iconsOnly && !task.stacked && task.hovered && !task.panel.expanded && !task.pressed
-        delay: 500
         text: task.title
-        // A title is text, not markup; the default content item would read it as either.
-        contentItem: Text { text: tip.text; textFormat: Text.PlainText; font: tip.font; wrapMode: Text.Wrap; color: tip.palette.toolTipText }
-        y: task.panel.onTop ? task.height + 6 : -implicitHeight - 6
-        Component.onCompleted: if ("popupType" in tip) tip.popupType = Popup.Window
     }
     background: Rectangle {
         radius: Theme.radiusSmall
