@@ -313,7 +313,8 @@ int main(int argc, char **argv) {
         // A previewed popup starts the clock when it opens instead.
         if (quitAfter > 0 && !previewData)
             QTimer::singleShot(quitAfter, &app, quit);
-        std::cerr << "shaodesk shell ready: " << views.size() << " surfaces\n";
+        std::cerr << "shaodesk shell ready: " << views.size() << " surfaces, drawn "
+                  << (controller.effects() ? "on the GPU" : "in software") << '\n';
         int result = app.exec();
         signalFd = -1;
         close(pipeFds[0]);

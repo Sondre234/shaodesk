@@ -75,6 +75,12 @@ QQmlEngine *ShellController::engine() {
     }
     return engine_;
 }
+void ShellController::setEffects(bool effects) {
+    if (effects == effects_)
+        return;
+    effects_ = effects;
+    Q_EMIT effectsChanged();
+}
 namespace {
 // Configuration colors are #RRGGBB or CSS-style #RRGGBBAA; Qt reads eight digits as #AARRGGBB.
 QColor color(const std::string &value) {
