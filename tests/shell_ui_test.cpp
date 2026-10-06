@@ -897,6 +897,25 @@ ListModel {
         if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
             return fail("the popover did not close after making the window sticky");
     }
+    // Closing the window comes last, in the danger colour.
+    {
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Close window"); }))
+            return fail("the window's menu did not open to close it");
+        const auto entries = menu->property("entries").value<QJSValue>();
+        const auto last = entries.property(entries.property("length").toUInt() - 1);
+        if (last.property("text").toString() != "Close window" ||
+            !menuItem("Close window")->property("danger").toBool() ||
+            menuItem("Close window")->objectName() != "contextMenuClose")
+            return fail("closing a window is not the last entry of its menu, in the danger colour");
+        click(menuItem("Close window"));
+        if (const auto asked = taskRequests(); asked != "close 7") {
+            std::cerr << "closing from a task's menu asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the popover did not close after closing the window");
+    }
     // The task's window belongs to an installed application, which its menu pins. Pinned, the
     // window takes over the application's slot instead of adding a button; with no window left
     // the slot's launcher returns, and its own menu unpins it. Pins are remembered in the state

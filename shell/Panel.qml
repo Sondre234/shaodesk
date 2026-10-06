@@ -342,8 +342,8 @@ Item {
         // Reading shell.pinned re-evaluates the menu when pins change. Pinning waits until
         // the click is handled: the change rebuilds the menu, destroying the clicked item.
         var pinned = shell.pinned.some(function(app) { return app.appId === appId })
-        return pinned ? { text: "Unpin from taskbar", run: function() { Qt.callLater(function() { shell.unpin(appId) }) } }
-                      : { text: "Pin to taskbar", run: function() { Qt.callLater(function() { shell.pin(appId) }) } }
+        return pinned ? { text: "Unpin from taskbar", icon: "pin-off", run: function() { Qt.callLater(function() { shell.unpin(appId) }) } }
+                      : { text: "Pin to taskbar", icon: "pin", run: function() { Qt.callLater(function() { shell.pin(appId) }) } }
     }
     // Popups open away from the screen edge the bar sits on.
     // Tiling is per monitor: this panel shows and toggles its own.

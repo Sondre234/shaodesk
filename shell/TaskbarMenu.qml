@@ -158,7 +158,9 @@ PopupMenu {
                              launchEntries(record, "New window"),
                              windowEntries(window, tasks),
                              (panel.taskMenuApp ? [panel.pinAction(panel.taskMenuApp)] : [])
-                                 .concat([{ text: "Close window", run: function() { tasks.close(task) } }])])
+                                 .concat([{ text: "Close window", icon: "x", danger: true,
+                                            objectName: "contextMenuClose",
+                                            run: function() { tasks.close(task) } }])])
         }
         // A pinned application without windows.
         var app = panel.pinMenuApp
