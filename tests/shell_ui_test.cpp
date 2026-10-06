@@ -940,6 +940,23 @@ ListModel {
             return fail("a closing window's button did not fade out, or still takes clicks");
         if (!QTest::qWaitFor([&] { return !arriving || !arriving->isVisible(); }))
             return fail("a closed window's button stayed on the bar");
+        // An icon on the bar following a state crossfades to its new shape, as the tiling
+        // button's does.
+        auto *tilingIcon = find(tiling, "tilingIcon");
+        const bool wasTiling = panelTiling();
+        click(tiling);
+        if (!tilingIcon || !QTest::qWaitFor([&] { return panelTiling() != wasTiling; }) ||
+            tilingIcon->property("leaving").toString().isEmpty() ||
+            tilingIcon->property("progress").toReal() == 1)
+            return fail("the tiling button's icon did not crossfade to its new shape");
+        if (!QTest::qWaitFor([&] {
+                return tilingIcon->property("leaving").toString().isEmpty() &&
+                       tilingIcon->property("progress").toReal() == 1;
+            }))
+            return fail("the tiling button's icon did not finish its crossfade");
+        click(tiling);
+        if (!QTest::qWaitFor([&] { return panelTiling() == wasTiling; }))
+            return fail("the tiling button did not toggle tiling back");
         if (!slowMotion(false))
             return fail("the animations did not get their speed back");
     }

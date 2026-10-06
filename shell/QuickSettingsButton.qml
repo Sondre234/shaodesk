@@ -39,7 +39,7 @@ FlatButton {
             id: icons
             anchors.centerIn: parent
             spacing: Theme.spacingM
-            Icon {
+            FadingIcon {
                 visible: button.showNetwork
                 anchors.verticalCenter: parent.verticalCenter
                 name: button.status.networkState === "ethernet" ? "ethernet-port"

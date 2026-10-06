@@ -18,7 +18,7 @@ FlatButton {
     Accessible.name: status.networkText
     BarTip { panel: network.panel; owner: network; text: network.status.networkText }
     contentItem: Item {
-        Icon {
+        FadingIcon {
             anchors.centerIn: parent
             name: network.status.networkState === "ethernet" ? "ethernet-port" : (network.linkDown ? "wifi-off" : "wifi")
             color: network.tint

@@ -673,7 +673,8 @@ Item {
                 BarTip { panel: root; owner: tilingToggle; text: root.tiling ? "Tiling on: click for floating" : "Floating: click to tile" }
                 // On: a split layout in the accent colour. Off: two overlapping windows.
                 contentItem: Item {
-                    Icon {
+                    FadingIcon {
+                        objectName: "tilingIcon"
                         anchors.centerIn: parent
                         name: root.tiling ? "layout-panel-left" : "copy"
                         color: root.tiling ? Theme.accent : Theme.text

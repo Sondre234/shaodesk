@@ -26,7 +26,7 @@ FlatButton {
         onPressed: bell.center.toggleDnd()
     }
     contentItem: Item {
-        Icon {
+        FadingIcon {
             id: glyph
             objectName: "notificationGlyph"
             anchors.centerIn: parent
