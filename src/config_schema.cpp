@@ -245,6 +245,22 @@ const Option options[] = {
      "the top-right. `\"traffic_lights\"`: close, minimize and fullscreen as red, yellow and "
      "green circles at the top-left, grey while the window has no focus, their symbols shown "
      "while the pointer is on one."},
+    {"windows.shadow", "table", "", "", none, none,
+     "A soft shadow under each window that draws none of its own (a client-side frame with a "
+     "shadow keeps that one), following its rounded corners; none under fullscreen and "
+     "maximized windows. It takes no input and is no part of the window's size or place."},
+    {"windows.shadow.enabled", "boolean", "false", "true", none, none,
+     "Draw the shadows."},
+    {"windows.shadow.color", "color", "\"#00000059\"", "\"#00000059\"", none, none,
+     "The shadow under the focused window where it is darkest, `#RRGGBBAA`."},
+    {"windows.shadow.inactive_color", "color", "\"#00000033\"", "\"#00000033\"", none, none,
+     "The shadow under other windows, `#RRGGBBAA`."},
+    {"windows.shadow.blur", "integer", "30", "30", 0, 100,
+     "How soft the shadow's edge is: it fades out over about this many pixels, as CSS's blur "
+     "radius; 0 for a hard edge."},
+    {"windows.shadow.offset", "integer or table", "10", "10", -50, 50,
+     "How far the shadow falls below the window in pixels, or `{ x, y }` to move it sideways "
+     "too (right and down)."},
     {"windows.buttons", "string", "\"appmenu:minimize,maximize,close\"",
      "\"appmenu:minimize,maximize,close\"", none, none,
      "GTK button layout for windows that draw their own frame; lowercase letters, `_`, `,` "

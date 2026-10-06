@@ -342,6 +342,13 @@ struct sh_settings {
     /* windows.controls: enum sh_window_controls, how the controls of the windows the compositor
      * decorates look. */
     int window_controls;
+    /* windows.shadow: a soft shadow under each window that draws none of its own, `shadow_blur`
+     * pixels soft (as CSS's blur radius) and offset by (shadow_x, shadow_y), in shadow_color
+     * under the focused window and shadow_inactive_color under others (premultiplied RGBA). */
+    bool shadow;
+    int shadow_blur;
+    int shadow_x, shadow_y;
+    float shadow_color[4], shadow_inactive_color[4];
     /* power.lock_before_sleep: the screen locks with power.lock_command before the machine
      * sleeps. */
     bool lock_before_sleep;

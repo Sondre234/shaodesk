@@ -108,6 +108,36 @@ int main() {
                 "round = tiling not read");
         rejects("return {windows={round='floating'}}");
         rejects("return {windows={round=true}}");
+        // windows.shadow: off, 30 pixels soft and 10 down, darker under the focused window.
+        require(!defaults.settings.shadow && defaults.settings.shadow_blur == 30 &&
+                    defaults.settings.shadow_x == 0 && defaults.settings.shadow_y == 10 &&
+                    defaults.settings.shadow_color[3] > defaults.settings.shadow_inactive_color[3],
+                "shadow defaults changed");
+        auto shadow = shaodesk::parse_config(
+            "return {windows={shadow={enabled=true,color='#ff000080',inactive_color='#00000010',"
+            "blur=12,offset={-3,4}}}}");
+        require(shadow.settings.shadow && shadow.settings.shadow_blur == 12 &&
+                    shadow.settings.shadow_x == -3 && shadow.settings.shadow_y == 4 &&
+                    shadow.settings.shadow_color[0] > 0.49F && shadow.settings.shadow_color[0] < 0.51F &&
+                    shadow.settings.shadow_inactive_color[3] < 0.07F,
+                "shadow settings not read (premultiplied colors)");
+        auto down = shaodesk::parse_config("return {windows={shadow={offset=7}}}");
+        require(down.settings.shadow_x == 0 && down.settings.shadow_y == 7 && !down.settings.shadow,
+                "a shadow offset of one number is how far down");
+        require(shaodesk::parse_config("return {windows={shadow={offset={x=5,y=-6}}}}")
+                        .settings.shadow_x == 5,
+                "a shadow offset by name");
+        require(shaodesk::parse_config("return {profile='mac',profiles={mac={windows={"
+                                       "shadow={enabled=true}}}}}")
+                    .settings.shadow,
+                "a profile's shadow not applied");
+        rejects("return {windows={shadow=true}}");
+        rejects("return {windows={shadow={blur=101}}}");
+        rejects("return {windows={shadow={offset=51}}}");
+        rejects("return {windows={shadow={offset={1,2,3}}}}");
+        rejects("return {windows={shadow={offset='down'}}}");
+        rejects("return {windows={shadow={color='black'}}}");
+        rejects("return {windows={shadow={spread=3}}}");
         rejects("return {windows={controls='macos'}}");
         rejects("return {windows={controls=true}}");
         std::cout << "Window feature configuration passed\n";

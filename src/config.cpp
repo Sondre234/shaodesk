@@ -771,6 +771,35 @@ void read_magnet(lua_State *L, Config &config) {
     }
     lua_pop(L, 1);
 }
+// `windows.shadow = { enabled, color, inactive_color, blur, offset }`; the offset is pixels down
+// or { x, y }.
+void read_shadow(lua_State *L, Config &config) {
+    lua_getfield(L, -1, "shadow");
+    if (!lua_isnil(L, -1)) {
+        table(L, -1, "windows.shadow");
+        keys(L, -1, "windows.shadow");
+        auto &settings = config.settings;
+        boolean(L, "enabled", "windows.shadow.enabled", settings.shadow);
+        for (auto [key, target] : {std::pair{"color", &settings.shadow_color},
+                                   {"inactive_color", &settings.shadow_inactive_color}}) {
+            lua_getfield(L, -1, key);
+            if (!lua_isnil(L, -1))
+                premultiplied(string(L, -1, key), key, *target);
+            lua_pop(L, 1);
+        }
+        settings.shadow_blur = integer(L, "blur", settings.shadow_blur, 0, 100);
+        lua_getfield(L, -1, "offset");
+        if (lua_istable(L, -1)) {
+            std::tie(settings.shadow_x, settings.shadow_y) =
+                integer_pair(L, "windows.shadow.offset", "x", "y", -50, 50);
+            lua_pop(L, 1);
+        } else {
+            lua_pop(L, 1);
+            settings.shadow_y = integer(L, "offset", settings.shadow_y, -50, 50);
+        }
+    }
+    lua_pop(L, 1);
+}
 void read_windows(lua_State *L, Config &config) {
     if (!section(L, "windows")) {
         lua_pop(L, 1);
@@ -825,6 +854,7 @@ void read_windows(lua_State *L, Config &config) {
     lua_pop(L, 1);
     read_swallow(L, config);
     read_magnet(L, config);
+    read_shadow(L, config);
     lua_getfield(L, -1, "placement");
     if (!lua_isnil(L, -1)) {
         auto name = string(L, -1, "windows.placement");
