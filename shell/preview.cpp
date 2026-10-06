@@ -438,7 +438,7 @@ QImage PreviewData::withSurface(QImage desktop) const {
 }
 
 QImage previewOnDesktop(QImage panel, QImage popover, QImage menuBar, bool panelTop,
-                        const ShellController &controller) {
+                        ShellController &controller) {
     panel.setDevicePixelRatio(1);
     popover.setDevicePixelRatio(1);
     menuBar.setDevicePixelRatio(1);
@@ -456,6 +456,18 @@ QImage previewOnDesktop(QImage panel, QImage popover, QImage menuBar, bool panel
                                        (desktop.height() - size.height()) / 2),
                                 size),
                           wallpaper);
+    } else if (controller.style() == "macos") {
+        // The wallpaper the macOS style draws while none is set, as Desktop.qml shows it, drawn
+        // offscreen for the picture.
+        QQuickView drawn(controller.engine(), nullptr);
+        drawn.setColor(Qt::transparent);
+        drawn.setResizeMode(QQuickView::SizeRootObjectToView);
+        drawn.resize(ShellView::previewSize());
+        drawn.setSource(QUrl("qrc:/shell/ShaodeskShell/DrawnWallpaper.qml"));
+        drawn.create();
+        QImage picture = drawn.grabWindow();
+        picture.setDevicePixelRatio(1);
+        painter.drawImage(desktop.rect(), picture);
     } else {
         QLinearGradient gradient(0, 0, 0, desktop.height());
         gradient.setColorAt(0, controller.background().lighter(145));
