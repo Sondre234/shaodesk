@@ -71,6 +71,7 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     WindowMenu.js
     TrayMenu.qml
     GroupList.qml
+    WindowThumbnails.qml
 
     PowerDialog.qml
     ClockFlyout.qml

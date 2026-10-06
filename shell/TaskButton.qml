@@ -7,7 +7,9 @@ import Shaodesk
 // A window on the taskbar: its icon, with its title beside it unless shell.iconsOnly, else
 // as a tooltip. A pinned slot shows its launcher's icon rather than the window's.
 // With shell.groupWindows the button stands for all its application's windows, `group`:
-// stacked when there are several, it cycles through them and lists them on hover.
+// stacked when there are several, it cycles through them and lists them on hover. With
+// shell.thumbnails, resting on it shows pictures of its windows instead, with their titles, and
+// it has no tooltip.
 Button {
     id: task
     required property int taskId
@@ -41,13 +43,15 @@ Button {
         shell.tasks.activate(stacked ? group.nextTask() : taskId)
     }
     onHoveredChanged: task.panel.hoverGroup(task, hovered)
+    onPressedChanged: if (pressed) task.panel.closeGroup()
     Accessible.name: (stacked ? title + " and " + (windows - 1) + " more" : title) + (shownUrgent ? " (needs attention)" : "")
     // The panel's surface is only as tall as the bar, so an in-window tooltip would be
     // squeezed onto the icon and swallow its clicks; a popup window of its own sits above
     // the bar instead.
     BarTip {
         panel: task.panel; owner: task
-        visible: shell.iconsOnly && !task.stacked && task.hovered && !task.panel.expanded && !task.pressed
+        visible: shell.iconsOnly && !task.stacked && !task.panel.thumbnails && task.hovered && !task.panel.expanded &&
+                 !task.pressed
         text: task.title
     }
     // How far the activity line has come in, from 0 to 1, drawn out from its middle as the
