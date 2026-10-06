@@ -164,7 +164,7 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
 }
 
 QStringList PreviewData::surfaces() {
-    return {"osd-volume", "osd-text", "cards", "power-dialog", "palette"};
+    return {"osd-volume", "osd-text", "cards", "power-dialog", "palette", "switcher"};
 }
 
 bool PreviewData::showSurface(QScreen *screen, const QString &name) {
@@ -226,6 +226,23 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
         controller_.palette()->open(output);
         // A search that finds applications and actions both.
         controller_.palette()->setQuery("fi");
+    } else if (name == "switcher") {
+        file = "Switcher.qml";
+        // The taskbar's stand-in windows, most recently focused first, the one before the
+        // focused one selected as Alt+Tab selects it.
+        auto window = [&output](const QString &appId, const QString &title, int workspace,
+                                bool minimized = false, bool urgent = false) {
+            return QVariantMap{{"appId", appId},         {"title", title},
+                               {"output", output},       {"workspace", workspace},
+                               {"minimized", minimized}, {"urgent", urgent}};
+        };
+        properties = {{"screenSize", ShellView::previewSize()},
+                      {"windows", QVariantList{window("firefox", "Release notes - Mozilla Firefox", 1),
+                                               window("foot", "~/dev/shaodesk", 2),
+                                               window("kitty", "Build finished", 2, false, true),
+                                               window("foot", "htop", 2),
+                                               window("org.kde.dolphin", "Downloads - Dolphin", 1, true)}},
+                      {"selected", 1}};
     } else {
         return false;
     }
@@ -277,6 +294,9 @@ QImage PreviewData::withSurface(QImage desktop) const {
         // PaletteView: centred, a sixth of the output's height down.
         at = QPoint(usable.left() + (usable.width() - size.width()) / 2,
                     usable.top() + output.height() / 6);
+    } else if (surfaceName_ == "switcher") {
+        // SwitcherView: centred.
+        at = usable.center() - QPoint(size.width() / 2, size.height() / 2);
     } else if (surfaceName_ == "cards") {
         // CardsView: in the configured corner.
         const auto *center = controller_.notifications();

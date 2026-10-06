@@ -6,14 +6,16 @@ import QtQuick
 Rectangle {
     id: switcher
     required property size screenSize
-    readonly property var windows: shell.switcherWindows
+    // The compositor's switcher, unless set (as a preview sets them).
+    property var windows: shell.switcherWindows
+    property int selected: shell.switcherSelected
     readonly property int cell: 132
     readonly property int padding: 16
     // As many columns as fit in most of the output's width, and rows up to most of its height;
     // the grid scrolls to the selection past that.
     readonly property int columns: Math.max(1, Math.min(windows.length, Math.floor((screenSize.width * 0.9 - 2 * padding) / cell)))
     readonly property int rows: Math.max(1, Math.min(Math.ceil(windows.length / columns), Math.floor((screenSize.height * 0.8 - 2 * padding - 48) / cell)))
-    readonly property var current: windows[shell.switcherSelected] || ({})
+    readonly property var current: windows[selected] || ({})
     width: columns * cell + 2 * padding
     height: rows * cell + 2 * padding + caption.height + 8
     radius: Theme.radiusLarge
@@ -29,7 +31,7 @@ Rectangle {
         interactive: false
         clip: true
         model: switcher.windows
-        currentIndex: shell.switcherSelected
+        currentIndex: switcher.selected
         highlightMoveDuration: 0
         highlight: Rectangle {
             radius: Theme.radiusMedium
