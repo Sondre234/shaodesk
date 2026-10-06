@@ -14,18 +14,33 @@ Item {
     objectName: "powerDialog"
     readonly property var power: shell.power
     focus: true
-    // How far it has come in, from 0 to 1: the scrim's and the dialog's opacity, and what is left
-    // of the dialog's growth. It goes at once, as the action or the cancelling does.
+    // Set by its view as it shows and cleared as it goes (a preview sets it from the start).
+    // `progress` follows, from 0 to 1: the scrim's and the dialog's opacity, and what is left of
+    // the dialog's growth. It goes quicker than it came.
+    property bool shown: false
     property real progress: 0
     states: State {
         name: "shown"
-        when: root.Window.window !== null && root.Window.window.visible
+        when: root.shown
         PropertyChanges { root.progress: 1 }
     }
-    transitions: Transition {
-        to: "shown"
-        NumberAnimation { property: "progress"; duration: Theme.durationNormal; easing.type: Theme.easing }
-    }
+    transitions: [
+        Transition {
+            to: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationNormal; easing.type: Theme.easing }
+        },
+        Transition {
+            from: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationFast; easing.type: Theme.easingExit }
+        }
+    ]
+    // What it asks about, held as it was while it goes: the question is over by then.
+    property string pending: ""
+    property string pendingTitle: ""
+    property string message: ""
+    Binding on pending { when: root.shown; value: root.power.pending; restoreMode: Binding.RestoreNone }
+    Binding on pendingTitle { when: root.shown; value: root.power.pendingTitle; restoreMode: Binding.RestoreNone }
+    Binding on message { when: root.shown; value: root.power.message; restoreMode: Binding.RestoreNone }
     Keys.onEscapePressed: root.power.cancel()
     Keys.onReturnPressed: cancel.activeFocus ? root.power.cancel() : root.power.confirm()
     Keys.onEnterPressed: cancel.activeFocus ? root.power.cancel() : root.power.confirm()
@@ -86,8 +101,8 @@ Item {
                     color: Theme.dangerSurface
                     Icon {
                         anchors.centerIn: parent
-                        name: root.power.pending === "reboot" ? "rotate-ccw"
-                              : root.power.pending === "logout" ? "log-out" : "power"
+                        name: root.pending === "reboot" ? "rotate-ccw"
+                              : root.pending === "logout" ? "log-out" : "power"
                         size: Theme.iconSizeLarge; color: Theme.danger
                     }
                 }
@@ -96,14 +111,14 @@ Item {
                     spacing: Theme.spacingS
                     Text {
                         Layout.fillWidth: true
-                        text: root.power.pendingTitle
+                        text: root.pendingTitle
                         color: Theme.text
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeTitle; font.weight: Font.DemiBold
                     }
                     Text {
                         objectName: "powerMessage"
                         Layout.fillWidth: true
-                        text: root.power.message
+                        text: root.message
                         wrapMode: Text.WordWrap
                         color: Theme.textMuted
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize
@@ -122,7 +137,7 @@ Item {
                 DialogButton {
                     id: confirm
                     objectName: "powerConfirm"
-                    text: root.power.pendingTitle
+                    text: root.pendingTitle
                     danger: true
                     onClicked: root.power.confirm()
                 }

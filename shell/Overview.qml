@@ -13,40 +13,56 @@ Item {
     property var strip: shell.overviewStrip
     property string filter: shell.overviewFilter
     property rect area: shell.overviewArea
+    // The search box's text and place, held as they were while it goes: the compositor forgets
+    // them as the overview closes.
+    property string shownFilter: ""
+    property rect shownArea
+    Binding on shownFilter { when: overview.shown; value: overview.filter; restoreMode: Binding.RestoreNone }
+    Binding on shownArea { when: overview.shown; value: overview.area; restoreMode: Binding.RestoreNone }
     property int selected: shell.overviewSelected
     property int viewed: shell.overviewViewed
     // The workspaces with a window asking for attention.
     property var urgentWorkspaces: (shell.workspaces[shell.overviewOutput] || ({})).urgent || []
     width: screenSize.width
     height: screenSize.height
-    // It fades in each time its window shows, as the compositor's thumbnails glide to their
-    // places, and goes at once with them.
-    opacity: 0
+    // Set by its view as it shows and cleared as it goes (a preview sets it from the start).
+    // `progress` follows, from 0 to 1, its opacity: it fades in as the compositor's thumbnails
+    // glide to their places. As they glide back the titles and the strip's labels go with them at
+    // once, and the search box and the hint fade out.
+    property bool shown: false
+    property real progress: 0
+    opacity: progress
     states: State {
         name: "shown"
-        when: overview.Window.window !== null && overview.Window.window.visible
-        PropertyChanges { overview.opacity: 1 }
+        when: overview.shown
+        PropertyChanges { overview.progress: 1 }
     }
-    transitions: Transition {
-        to: "shown"
-        NumberAnimation { property: "opacity"; duration: Theme.durationSlow; easing.type: Theme.easing }
-    }
+    transitions: [
+        Transition {
+            to: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationSlow; easing.type: Theme.easing }
+        },
+        Transition {
+            from: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationFast; easing.type: Theme.easingExit }
+        }
+    ]
 
     // The search box, a field as the palette's: what was typed, or what typing does. It keeps to
     // the room the compositor leaves above the strip.
     Rectangle {
         id: search
         anchors.horizontalCenter: parent.horizontalCenter
-        y: overview.area.y + Theme.spacingS
+        y: overview.shownArea.y + Theme.spacingS
         width: Math.min(460, overview.width - 2 * Theme.spacingXL); height: Theme.rowHeight
         radius: Theme.radiusSmall
         color: Theme.surface
-        border.color: overview.filter.length > 0 ? Theme.accent : Theme.border
+        border.color: overview.shownFilter.length > 0 ? Theme.accent : Theme.border
         Icon {
             id: magnifier
             x: Theme.spacingL; anchors.verticalCenter: parent.verticalCenter
             name: "search"; size: Theme.iconSize
-            color: overview.filter.length > 0 ? Theme.text : Theme.textMuted
+            color: overview.shownFilter.length > 0 ? Theme.text : Theme.textMuted
         }
         Text {
             anchors.fill: parent
@@ -54,8 +70,8 @@ Item {
             anchors.rightMargin: Theme.spacingL
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideLeft
-            text: overview.filter.length > 0 ? overview.filter : qsTr("Type to search windows")
-            color: overview.filter.length > 0 ? Theme.text : Theme.textMuted
+            text: overview.shownFilter.length > 0 ? overview.shownFilter : qsTr("Type to search windows")
+            color: overview.shownFilter.length > 0 ? Theme.text : Theme.textMuted
             font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeLarge
         }
     }
@@ -138,7 +154,7 @@ Item {
     // pill of the theme's surface.
     Rectangle {
         anchors.centerIn: parent
-        visible: overview.windows.length === 0
+        visible: overview.shown && overview.windows.length === 0
         width: empty.implicitWidth + 2 * Theme.spacingXL
         height: empty.implicitHeight + 2 * Theme.spacingM
         radius: height / 2
@@ -157,7 +173,7 @@ Item {
     // then what it does.
     Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
-        y: overview.area.y + overview.area.height - height - Theme.spacingXS
+        y: overview.shownArea.y + overview.shownArea.height - height - Theme.spacingXS
         width: hints.implicitWidth + 2 * Theme.spacingL
         height: hints.implicitHeight + 2 * Theme.spacingXS
         radius: height / 2

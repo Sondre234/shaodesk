@@ -17,18 +17,26 @@ Item {
     readonly property var kindLabels: ({ window: "Window", app: "App", workspace: "Workspace", action: "Action", session: "Session" })
     width: card.width + 2 * Theme.shadowMargin
     height: card.height + 2 * Theme.shadowMargin
-    // How far it has come in, from 0 to 1, each time its window shows: the card's opacity, and
-    // what is left of its drop and growth. It goes at once, for what it runs to show.
+    // Set by its view as it shows and cleared as it goes (a preview sets it from the start).
+    // `progress` follows, from 0 to 1: the card's opacity, and what is left of its drop and
+    // growth. It goes quicker than it came, what it ran showing through.
+    property bool shown: false
     property real progress: 0
     states: State {
         name: "shown"
-        when: root.Window.window !== null && root.Window.window.visible
+        when: root.shown
         PropertyChanges { root.progress: 1 }
     }
-    transitions: Transition {
-        to: "shown"
-        NumberAnimation { property: "progress"; duration: Theme.durationNormal; easing.type: Theme.easing }
-    }
+    transitions: [
+        Transition {
+            to: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationNormal; easing.type: Theme.easing }
+        },
+        Transition {
+            from: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationFast; easing.type: Theme.easingExit }
+        }
+    ]
 
     function reset() {
         input.text = shell.palette.query

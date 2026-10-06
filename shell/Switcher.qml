@@ -11,28 +11,43 @@ Item {
     // The compositor's switcher, unless set (as a preview sets them).
     property var windows: shell.switcherWindows
     property int selected: shell.switcherSelected
+    // What it lists, held as it was while it goes: the compositor forgets the windows as the
+    // switcher closes.
+    property var listed: []
+    property int listedSelected: 0
+    Binding on listed { when: switcher.shown; value: switcher.windows; restoreMode: Binding.RestoreNone }
+    Binding on listedSelected { when: switcher.shown; value: switcher.selected; restoreMode: Binding.RestoreNone }
     // A window's cell: its icon over two lines of its title.
     readonly property int cell: Theme.appIconSizeDisplay + 10 * Theme.spacingM
     readonly property int padding: Theme.spacingXL
     // As many columns as fit in most of the output's width, and rows up to most of its height;
     // the grid scrolls to the selection past that.
-    readonly property int columns: Math.max(1, Math.min(windows.length, Math.floor((screenSize.width * 0.9 - 2 * padding) / cell)))
-    readonly property int rows: Math.max(1, Math.min(Math.ceil(windows.length / columns), Math.floor((screenSize.height * 0.8 - 2 * padding - 48) / cell)))
-    readonly property var current: windows[selected] || ({})
+    readonly property int columns: Math.max(1, Math.min(listed.length, Math.floor((screenSize.width * 0.9 - 2 * padding) / cell)))
+    readonly property int rows: Math.max(1, Math.min(Math.ceil(listed.length / columns), Math.floor((screenSize.height * 0.8 - 2 * padding - 48) / cell)))
+    readonly property var current: listed[listedSelected] || ({})
     width: card.width + 2 * Theme.shadowMargin
     height: card.height + 2 * Theme.shadowMargin
-    // How far it has come in, from 0 to 1, each time its window shows: the card's opacity and
-    // growth. It goes at once, as the switch it ends does.
+    // Set by its view as it shows and cleared as it goes (a preview sets it from the start).
+    // `progress` follows, from 0 to 1: the card's opacity and growth. It comes in on the theme's
+    // normal duration and goes on its fast one, quicker than it came, as the switch it ends is
+    // done.
+    property bool shown: false
     property real progress: 0
     states: State {
         name: "shown"
-        when: switcher.Window.window !== null && switcher.Window.window.visible
+        when: switcher.shown
         PropertyChanges { switcher.progress: 1 }
     }
-    transitions: Transition {
-        to: "shown"
-        NumberAnimation { property: "progress"; duration: Theme.durationNormal; easing.type: Theme.easing }
-    }
+    transitions: [
+        Transition {
+            to: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationNormal; easing.type: Theme.easing }
+        },
+        Transition {
+            from: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationFast; easing.type: Theme.easingExit }
+        }
+    ]
 
     Item {
         id: card
@@ -65,8 +80,8 @@ Item {
             cellWidth: switcher.cell; cellHeight: switcher.cell
             interactive: false
             clip: true
-            model: switcher.windows
-            currentIndex: switcher.selected
+            model: switcher.listed
+            currentIndex: switcher.listedSelected
             // The selection glides from window to window, once the switcher has come in.
             highlightMoveDuration: switcher.progress >= 1 ? Theme.durationNormal : 0
             highlight: Item {

@@ -296,10 +296,12 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
     } else if (name == "power-dialog") {
         file = "PowerDialog.qml";
         mode = QQuickView::SizeRootObjectToView;
+        // Shown as its view shows it, as the palette, the switcher and the overview are below.
+        properties = {{"shown", true}};
         controller_.power()->request("poweroff", output);
     } else if (name == "palette" || name == "palette-empty") {
         file = "Palette.qml";
-        properties = {{"screenSize", ShellView::previewSize()}};
+        properties = {{"screenSize", ShellView::previewSize()}, {"shown", true}};
         controller_.palette()->open(output);
         // A search that finds applications and actions both, or one that finds nothing.
         controller_.palette()->setQuery(name == "palette" ? "fi" : "> nothing like this");
@@ -320,7 +322,8 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
                                      window("kitty", "Build finished", 2, false, true),
                                      window("foot", "htop", 2),
                                      window("org.kde.dolphin", "Downloads - Dolphin", 1, true)}},
-            {"selected", 1}};
+            {"selected", 1},
+            {"shown", true}};
     } else if (name == "overview") {
         file = "Overview.qml";
         const QRect area = usableArea(controller_);
@@ -330,7 +333,8 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
                       {"area", area},
                       {"selected", 0},
                       {"viewed", 1},
-                      {"urgentWorkspaces", QVariantList{1}}};
+                      {"urgentWorkspaces", QVariantList{1}},
+                      {"shown", true}};
     } else {
         return false;
     }
