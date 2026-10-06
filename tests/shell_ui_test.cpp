@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
     const auto lua = QString("return {layout={workspace_names={'web','','','mail'}},"
                              "power={countdown=2},"
                              "profile='dark',profiles={dark={},light={shell={accent='#336699'}}},"
-                             "shell={" + barWidgets + "wallpaper='walls/a/one.png',wallpapers=[[%3]],"
+                             "shell={wallpaper='walls/a/one.png'," + barWidgets + "wallpapers=[[%3]],"
                              "launchers={{name='Test app',command={[[%1]],'-E','touch',[[%2]]}}}}}")
                          .arg(QString::fromLocal8Bit(argv[1]), marker, walls);
     file.write(lua.toUtf8());
@@ -223,6 +223,9 @@ int main(int argc, char **argv) {
         shaodesk::save_profile(name.toStdString());
         controller.reload();
     };
+    // A stand-in sound server for the volume control, made before the panel so that it outlives
+    // it: what reads it never finds it gone.
+    FakeAudio audio;
     ShellView view(controller, app.primaryScreen(), false, true);
     if (view.status() != QQuickView::Ready) {
         for (const auto &error : view.errors())
@@ -1397,7 +1400,6 @@ int main(int argc, char **argv) {
     }
     // The volume control, fed by a stand-in sound server. Its popups open above it, inside
     // the panel's own surface.
-    FakeAudio audio;
     audio.update({"speakers",
                   {{"speakers", "Speakers", 50, false}, {"headset", "Headset", 30, false}},
                   {{41, "Music", "audio-x-generic", 80, false},
@@ -2343,11 +2345,16 @@ int main(int argc, char **argv) {
         if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
             return fail("the wallpaper picker did not close");
         view.rootObject()->setProperty("statusSource", QVariant::fromValue(controller.status()));
-        if (!rewrite(lua))
-            return fail("could not restore the configuration");
+        // With nothing placed in it (do-not-disturb, which this test's configuration leaves in
+        // it, switched off), the button goes.
+        if (!rewrite(QString(lua).replace("widgets={", "widgets={notifications=false,")))
+            return fail("could not rewrite the configuration");
         controller.reload();
         if (!QTest::qWaitFor([&] { return !button->isVisible(); }))
             return fail("the Quick Settings button stayed with nothing placed in it");
+        if (!rewrite(lua))
+            return fail("could not restore the configuration");
+        controller.reload();
     }
     // The system tray: hidden while empty, a button for each item shown in the order they came,
     // and clicks and the wheel passed on to the item's application. The items are put in the
