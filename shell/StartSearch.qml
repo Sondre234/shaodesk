@@ -57,10 +57,13 @@ Item {
             button--
             return true
         case Qt.Key_Tab:
-            if (button + 1 < buttons)
+            if (button + 1 < buttons) {
                 button++
-            else
+            } else {
                 current = (current + 1) % count
+                // Back to the card itself when it is the only result.
+                button = -1
+            }
             return true
         case Qt.Key_Backtab:
             if (button >= 0) {
