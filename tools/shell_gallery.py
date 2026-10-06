@@ -186,29 +186,36 @@ def render(shell, env, root, popup, out, wait, icons):
     return problems
 
 
-def run_all(shell, env, root, jobs, wait, args):
+def run_all(shell, env, root, jobs, wait, args, render_one=None):
     """Renders the (popup, out) jobs in parallel; returns {out: problems} for those that had any."""
     for _, path in jobs:
         path.unlink(missing_ok=True)
+    render_one = render_one or (lambda popup, out: render(shell, env, root, popup, out, wait,
+                                                         args.icon_theme))
     with ThreadPoolExecutor(args.jobs) as pool:
-        results = pool.map(lambda job: (job[1], render(shell, env, root, job[0], job[1], wait,
-                                                       args.icon_theme)), jobs)
+        results = pool.map(lambda job: (job[1], render_one(*job)), jobs)
         return {path: problems for path, problems in results if problems}
 
 
 def run_gpu(build, shell, env, root, jobs, args):
-    """The jobs with Qt's default (GPU) renderer, as windows of a private headless compositor."""
+    """The jobs with Qt's default (GPU) renderer, each in a private headless compositor of its
+    own: a window opening beside another takes the focus from it, and a panel that loses the
+    focus closes its popups."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tests"))
     import harness
+    (root / "init.lua").write_text((root / "init.lua").read_text().replace(
+        "    shell = {\n", '    shell = {\n        renderer = "gpu",\n', 1))
     # The compositor makes a runtime directory of its own, short enough for its sockets.
     env = {name: value for name, value in env.items() if name != "XDG_RUNTIME_DIR"}
-    with harness.Compositor(str(build / "shaodesk"), "return { xwayland = false }\n",
-                            env=env, prefix="sd-gal-") as desktop:
-        gpu_env = dict(desktop.env, QT_QPA_PLATFORM="wayland")
-        gpu_env.pop("SHAODESK_SOCKET", None)  # a preview needs no compositor state
-        (root / "init.lua").write_text((root / "init.lua").read_text().replace(
-            "    shell = {\n", '    shell = {\n        renderer = "gpu",\n', 1))
-        return run_all(shell, gpu_env, root, jobs, 600, args)
+
+    def render_one(popup, out):
+        with harness.Compositor(str(build / "shaodesk"), "return { xwayland = false }\n",
+                                env=env, prefix="sd-gal-") as desktop:
+            gpu_env = dict(desktop.env, QT_QPA_PLATFORM="wayland")
+            gpu_env.pop("SHAODESK_SOCKET", None)  # a preview needs no compositor state
+            return render(shell, gpu_env, root, popup, out, 600, args.icon_theme)
+
+    return run_all(shell, env, root, jobs, 600, args, render_one)
 
 
 def main():
