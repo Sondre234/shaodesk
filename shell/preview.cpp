@@ -163,7 +163,7 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
     return opened.toBool();
 }
 
-QStringList PreviewData::surfaces() { return {"osd-volume", "osd-text"}; }
+QStringList PreviewData::surfaces() { return {"osd-volume", "osd-text", "cards"}; }
 
 bool PreviewData::showSurface(QScreen *screen, const QString &name) {
     // What each surface is, as the view in view.cpp that shows it on an output makes it.
@@ -181,6 +181,36 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
             controller_.osd()->show(screen->name(), "Volume", 64, "volume");
         else
             controller_.osd()->show(screen->name(), "Do not disturb", -1, "dnd");
+    } else if (name == "cards") {
+        file = "NotificationCards.qml";
+        properties = {{"outputName", screen->name()}};
+        // Over the stand-ins every preview has: one with a picture, buttons and a timer.
+        QImage picture(96, 96, QImage::Format_ARGB32_Premultiplied);
+        picture.fill(Qt::transparent);
+        {
+            QPainter painter(&picture);
+            painter.setRenderHint(QPainter::Antialiasing);
+            QLinearGradient gradient(0, 0, 96, 96);
+            gradient.setColorAt(0, QColor("#f2a65a"));
+            gradient.setColorAt(1, QColor("#b8456b"));
+            painter.setBrush(gradient);
+            painter.setPen(Qt::NoPen);
+            painter.drawEllipse(picture.rect());
+            QFont font = painter.font();
+            font.setPixelSize(44);
+            font.setBold(true);
+            painter.setFont(font);
+            painter.setPen(Qt::white);
+            painter.drawText(picture.rect(), Qt::AlignCenter, "AL");
+        }
+        Notification message = notification("Thunderbird", "", "Ada Lovelace",
+                                            "Are we still on for the review at three? I pushed "
+                                            "the last fixes this morning.");
+        message.desktopEntry = "thunderbird";
+        message.image = picture;
+        message.actions = {{"default", "Open"}, {"reply", "Reply"}, {"read", "Mark as read"}};
+        message.timeout = 60000;
+        controller_.notifications()->notify(message);
     } else {
         return false;
     }
@@ -214,12 +244,20 @@ QImage PreviewData::withSurface(QImage desktop) const {
     // panel leaves when it keeps clear of it (an exclusive zone of 0), over the whole output when
     // it does not (-1).
     const QRect output(QPoint(0, 0), ShellView::previewSize());
+    const int panel = controller_.panelExtent();
+    const QRect usable = output.adjusted(0, controller_.panelTop() ? panel : 0, 0,
+                                         controller_.panelTop() ? 0 : -panel);
     const QSize size = root.toSize();
     QPoint at;
     if (surfaceName_.startsWith("osd-")) {
         // OsdView: centred, 48 pixels from the bottom edge or from the top.
         at = QPoint((output.width() - size.width()) / 2,
                     controller_.osd()->top() ? 48 : output.height() - 48 - size.height());
+    } else if (surfaceName_ == "cards") {
+        // CardsView: in the configured corner.
+        const auto *center = controller_.notifications();
+        at = QPoint(center->left() ? usable.left() : usable.right() + 1 - size.width(),
+                    center->bottom() ? usable.bottom() + 1 - size.height() : usable.top());
     }
     QPainter painter(&desktop);
     painter.drawImage(QPointF(at) * scale, image);

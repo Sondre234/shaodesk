@@ -68,7 +68,7 @@ int main(int argc, char **argv) {
                       "tray items and notifications: bar (none), launcher, power, bar-menu, "
                       "bar-submenu, task-menu, pin-menu, group, tray-menu, tray-submenu, "
                       "calendar, mixer, outputs, profiles, wallpapers or notifications; or an "
-                      "overlay over the bar: osd-volume or osd-text",
+                      "overlay over the bar: osd-volume, osd-text or cards",
                       "name"});
     parser.addOption(
         {"quit-after",
