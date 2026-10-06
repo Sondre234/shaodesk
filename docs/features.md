@@ -1288,7 +1288,7 @@ ext-image-copy-capture, so `grim` works directly and Discord, OBS, or a browser 
 monitor or a single window through xdg-desktop-portal-wlr. A shared window is drawn on
 its own, without whatever overlaps it, and keeps streaming while minimized or on another
 workspace; the taskbar's pictures of windows are taken the same way. While the screen is
-locked no window can be captured: a program asking is told its capture stopped.
+locked no capture of a window can start: a program asking is told its capture stopped.
 
 ## Application compatibility
 
