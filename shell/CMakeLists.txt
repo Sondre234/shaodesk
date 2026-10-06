@@ -42,6 +42,9 @@ set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_ima
 qt_add_library(shaodesk_shell_qml STATIC)
 # Theme is the design tokens every QML file reads, one instance per engine.
 set_source_files_properties(Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+# The menus that use WindowMenu.js import it by its path, so the module leaves it out of its qmldir,
+# which would evaluate it for every file.
+set_source_files_properties(WindowMenu.js PROPERTIES QT_QML_SKIP_QMLDIR_ENTRY TRUE)
 qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREFIX /shell
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/ShaodeskShell
     NO_PLUGIN NO_GENERATE_QMLTYPES
