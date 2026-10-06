@@ -16,6 +16,7 @@ Item {
     // finds them ready: what the bar shows first does not wait for them.
     property bool warm: false
     Timer { interval: 1500; running: true; onTriggered: root.warm = true }
+    onWarmChanged: if (warm) popover.prepare()
     // The context menu belongs to a task, a pinned application (pinMenuApp), or the bar itself
     // when barMenuOpen is set. A task's menu offers to pin the application it belongs to.
     property int taskMenuId: -1

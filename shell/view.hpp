@@ -59,6 +59,10 @@ class PopoverWindow : public QQuickWindow {
     // Where it takes the pointer: inputRects as a region. Applied to the surface with layer shell
     // only, as a preview's platform may have no input regions.
     QRegion inputRegion() const { return inputRegion_; }
+    // Shows it for a frame, empty and taking nothing, and hides it again: its first real opening
+    // then finds the graphics set up (tens of milliseconds through the GPU) instead of waiting
+    // for them. With layer shell only, and once.
+    Q_INVOKABLE void prepare();
 
   Q_SIGNALS:
     void panelChanged();
@@ -71,7 +75,7 @@ class PopoverWindow : public QQuickWindow {
 
   private:
     ShellView *panel_ = nullptr;
-    bool open_ = false, keyboard_ = false;
+    bool open_ = false, keyboard_ = false, prepared_ = false;
     QVariantList inputRects_;
     QRegion inputRegion_;
     LayerShellQt::Window *layer_ = nullptr;

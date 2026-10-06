@@ -152,6 +152,20 @@ void PopoverWindow::applyOpen() {
         std::cerr << "shaodesk popover hidden on " << output << '\n';
     }
 }
+void PopoverWindow::prepare() {
+    if (!layer_ || prepared_ || isVisible())
+        return;
+    prepared_ = true;
+    applyInput();
+    show();
+    connect(
+        this, &QQuickWindow::frameSwapped, this,
+        [this] {
+            if (!open_)
+                hide();
+        },
+        Qt::ConnectionType(Qt::QueuedConnection | Qt::SingleShotConnection));
+}
 void PopoverWindow::setKeyboard(bool keyboard) {
     if (keyboard == keyboard_)
         return;
