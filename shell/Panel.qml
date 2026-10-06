@@ -73,6 +73,8 @@ Item {
     // output (with PopupCard's margin), but no narrower than 60 % of it. More windows than fit so
     // are listed after all.
     readonly property bool thumbnails: shell.thumbnails && !macos
+    // What shows a button's windows changes with it, and what was shown goes.
+    onThumbnailsChanged: closeGroup()
     readonly property int thumbnailGap: Theme.spacingS
     readonly property int thumbnailPadding: Theme.spacingM
     readonly property real thumbnailWidth: {
