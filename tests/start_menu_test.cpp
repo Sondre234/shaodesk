@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The start menu's model: the launch history.
+// The start menu's model: its pins, the launch history and the applications from A to Z.
 #include "launch_history.hpp"
+#include "start_menu.hpp"
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QLocale>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTimeZone>
@@ -19,11 +21,33 @@ bool write(const QString &path, const QByteArray &text) {
     return file.open(QIODevice::WriteOnly) && file.write(text) == text.size();
 }
 QDateTime at(qint64 seconds) { return QDateTime::fromSecsSinceEpoch(seconds, QTimeZone::UTC); }
+// An application's record, as the controller gives it.
+QVariant app(const QString &id, const QString &name, bool configured = false) {
+    return QVariantMap{{"appId", id}, {"name", name}, {"icon", "x"}, {"configured", configured}};
+}
+QStringList ids(const QVariantList &records) {
+    QStringList list;
+    for (const auto &record : records)
+        list << record.toMap()["appId"].toString();
+    return list;
+}
+const QVariantList someApps{app("pinned:0", "Files", true), app("kate.desktop", "Kate"),
+                            app("foot.desktop", "Foot"), app("gimp.desktop", "GIMP"),
+                            app("mpv.desktop", "mpv")};
 } // namespace
 
 class StartMenuTest : public QObject {
     Q_OBJECT
   private Q_SLOTS:
+    void initTestCase() {
+        // None of the desktop's applications or default handlers: GIO reads these on first use.
+        QVERIFY(home.isValid());
+        qputenv("XDG_DATA_HOME", home.filePath("data").toLocal8Bit());
+        qputenv("XDG_DATA_DIRS", home.filePath("none").toLocal8Bit());
+        qputenv("XDG_CONFIG_HOME", home.filePath("config").toLocal8Bit());
+        qputenv("XDG_CONFIG_DIRS", home.filePath("none").toLocal8Bit());
+        QLocale::setDefault(QLocale(QLocale::English, QLocale::UnitedStates));
+    }
     void recordsLaunches() {
         QTemporaryDir directory;
         const auto path = directory.filePath("state/shaodesk/launches");
@@ -80,6 +104,139 @@ class StartMenuTest : public QObject {
         // What it could not save is still known while the shell runs.
         QCOMPARE(history.find("foot.desktop")->count, 1);
     }
+    void seedsPins() {
+        const QStringList installed{"a", "b", "c", "d", "e", "f", "g", "h"};
+        // The taskbar's pins that are installed, then common applications up to six.
+        QCOMPARE(StartMenu::seed({"b", "gone", "a"}, {"c", "a", "d", "x", "e", "f", "g"}, installed),
+                 (QStringList{"b", "a", "c", "d", "e", "f"}));
+        // Every taskbar pin, however many.
+        QCOMPARE(StartMenu::seed(installed, {"z"}, installed), installed);
+        QCOMPARE(StartMenu::seed({}, {}, installed), QStringList{});
+    }
+    void pinsAreItsOwnOnceChanged() {
+        QTemporaryDir state;
+        const auto file = state.filePath("start-pinned");
+        {
+            StartMenu menu(state.path());
+            // Seeded from the taskbar's pins, and nothing written while they are only the seed.
+            menu.setApps(someApps, {"gimp.desktop", "gone.desktop"});
+            QCOMPARE(ids(menu.pinned()), QStringList{"gimp.desktop"});
+            QVERIFY(!QFile::exists(file));
+            menu.setApps(someApps, {"foot.desktop"});
+            QCOMPARE(ids(menu.pinned()), QStringList{"foot.desktop"});
+            QVERIFY(!QFile::exists(file));
+            // Pinned at the end, and the pins are then its own.
+            menu.pin("kate.desktop");
+            QCOMPARE(read(file), QString("foot.desktop\nkate.desktop\n"));
+            menu.setApps(someApps, {"gimp.desktop"});
+            QCOMPARE(ids(menu.pinned()), (QStringList{"foot.desktop", "kate.desktop"}));
+            // Configured launchers, what is not installed and what is pinned already stay out.
+            menu.pin("pinned:0");
+            menu.pin("gone.desktop");
+            menu.pin("kate.desktop");
+            QCOMPARE(read(file), QString("foot.desktop\nkate.desktop\n"));
+            menu.pin("gimp.desktop");
+            menu.movePin("gimp.desktop", "foot.desktop");
+            QCOMPARE(ids(menu.pinned()), (QStringList{"gimp.desktop", "foot.desktop", "kate.desktop"}));
+            menu.movePin("gimp.desktop", "kate.desktop");
+            QCOMPARE(ids(menu.pinned()), (QStringList{"foot.desktop", "kate.desktop", "gimp.desktop"}));
+            menu.unpin("foot.desktop");
+            QVERIFY(!menu.isPinned("foot.desktop") && menu.isPinned("kate.desktop"));
+            QCOMPARE(read(file), QString("kate.desktop\ngimp.desktop\n"));
+        }
+        // Read back; an application that is not installed keeps its place but is not shown.
+        QVERIFY(write(file, "kate.desktop\nlater.desktop\ngimp.desktop\n"));
+        StartMenu again(state.path());
+        again.setApps(someApps, {"foot.desktop"});
+        QCOMPARE(ids(again.pinned()), (QStringList{"kate.desktop", "gimp.desktop"}));
+        again.setApps(QVariantList(someApps) << app("later.desktop", "Later"), {});
+        QCOMPARE(ids(again.pinned()), (QStringList{"kate.desktop", "later.desktop", "gimp.desktop"}));
+        // Unpinning them all leaves none, rather than the seed again.
+        for (const auto *id : {"kate.desktop", "later.desktop", "gimp.desktop"})
+            again.unpin(id);
+        StartMenu empty(state.path());
+        empty.setApps(someApps, {"foot.desktop"});
+        QVERIFY(empty.pinned().isEmpty());
+    }
+    void listsRecentLaunches() {
+        QTemporaryDir state;
+        StartMenu menu(state.path());
+        menu.setApps(someApps, {});
+        menu.record("kate.desktop", at(1000));
+        menu.record("pinned:0", at(1500));     // a configured launcher
+        menu.record("gone.desktop", at(1600)); // not installed
+        menu.record("mpv.desktop", at(2000));
+        menu.record("kate.desktop", at(3000));
+        const auto recent = menu.recent();
+        QCOMPARE(ids(recent), (QStringList{"kate.desktop", "mpv.desktop"}));
+        QCOMPARE(recent[0].toMap()["launches"].toInt(), 2);
+        QCOMPARE(recent[0].toMap()["launched"].toDateTime(), at(3000));
+        QCOMPARE(recent[0].toMap()["name"].toString(), QString("Kate"));
+        QCOMPARE(read(state.filePath("launches")), QString("kate.desktop\t2\t3000\nmpv.desktop\t1\t2000\n"));
+        // Read again by the next session.
+        StartMenu next(state.path());
+        next.setApps(someApps, {});
+        QCOMPARE(ids(next.recent()), (QStringList{"kate.desktop", "mpv.desktop"}));
+    }
+    void listsAppsByLetter() {
+        QCOMPARE(StartMenu::letterOf("firefox"), QString("F"));
+        QCOMPARE(StartMenu::letterOf("  Émile"), QString("E"));
+        QCOMPARE(StartMenu::letterOf("Ångström"), QString("A"));
+        QCOMPARE(StartMenu::letterOf("0 A.D."), QString("#"));
+        QCOMPARE(StartMenu::letterOf("[Test]"), QString("#"));
+        QCOMPARE(StartMenu::letterOf(""), QString("#"));
+        QTemporaryDir state;
+        StartMenu menu(state.path());
+        menu.setApps({app("z.desktop", "zathura"), app("a.desktop", "Audacity"), app("e.desktop", "Émile"),
+                      app("n.desktop", "2048"), app("b.desktop", "blender"), app("a2.desktop", "ark")},
+                     {});
+        QStringList order, letters;
+        for (const auto &record : menu.apps()) {
+            order << record.toMap()["name"].toString();
+            letters << record.toMap()["letter"].toString();
+        }
+        QCOMPARE(order, (QStringList{"2048", "ark", "Audacity", "blender", "Émile", "zathura"}));
+        QCOMPARE(letters, (QStringList{"#", "A", "A", "B", "E", "Z"}));
+    }
+    void saysHowLongAgo() {
+        QTemporaryDir state;
+        StartMenu menu(state.path());
+        const QDateTime now(QDate(2026, 10, 6), QTime(15, 0));
+        QCOMPARE(menu.ago(now.addSecs(-20), now), QString("Just now"));
+        QCOMPARE(menu.ago(now.addSecs(20), now), QString("Just now")); // a clock set back
+        QCOMPARE(menu.ago(now.addSecs(-150), now), QString("2 min ago"));
+        QCOMPARE(menu.ago(now.addSecs(-3599), now), QString("59 min ago"));
+        QCOMPARE(menu.ago(now.addSecs(-3600), now), QString("1 hour ago"));
+        QCOMPARE(menu.ago(now.addSecs(-5 * 3600), now), QString("5 hours ago"));
+        QCOMPARE(menu.ago(QDateTime(QDate(2026, 10, 5), QTime(23, 30)), now), QString("Yesterday"));
+        QCOMPARE(menu.ago(QDateTime(QDate(2026, 10, 2), QTime(9, 0)), now), QString("Friday"));
+        QCOMPARE(menu.ago(QDateTime(QDate(2026, 9, 12), QTime(9, 0)), now), QString("12 Sep"));
+        QCOMPARE(menu.ago(QDateTime(QDate(2025, 12, 30), QTime(9, 0)), now), QString("30 Dec 2025"));
+    }
+    void previewsInMemory() {
+        QTemporaryDir state;
+        StartMenu menu(state.path());
+        menu.setApps(someApps, {});
+        menu.preview({"mpv.desktop", "foot.desktop"},
+                     {{"foot.desktop", 3, at(500)}, {"gimp.desktop", 1, at(900)}});
+        QCOMPARE(ids(menu.pinned()), (QStringList{"mpv.desktop", "foot.desktop"}));
+        QCOMPARE(ids(menu.recent()), (QStringList{"gimp.desktop", "foot.desktop"}));
+        QCOMPARE(menu.recent()[1].toMap()["launches"].toInt(), 3);
+        // What a preview does is not saved.
+        menu.pin("kate.desktop");
+        menu.record("kate.desktop", at(1000));
+        QCOMPARE(QDir(state.path()).entryList(QDir::Files), QStringList{});
+        menu.setUser("Robin Lee", QUrl());
+        QCOMPARE(menu.userName(), QString("Robin Lee"));
+    }
+    void knowsTheUser() {
+        QTemporaryDir state;
+        StartMenu menu(state.path());
+        QVERIFY(!menu.userName().isEmpty());
+    }
+
+  private:
+    QTemporaryDir home;
 };
 QTEST_APPLESS_MAIN(StartMenuTest)
 #include "start_menu_test.moc"
