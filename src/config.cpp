@@ -350,7 +350,7 @@ void read_shell(lua_State *L, ShellConfig &shell) {
         for (auto [key, target, place] : {Movable{"battery", &shell.widgets.battery, WidgetPlace::Quick},
                                           {"network", &shell.widgets.network, WidgetPlace::Quick},
                                           {"volume", &shell.widgets.volume, WidgetPlace::Quick},
-                                          {"tiling", &shell.widgets.tiling, WidgetPlace::Quick},
+                                          {"tiling", &shell.widgets.tiling, WidgetPlace::Bar},
                                           {"profiles", &shell.widgets.profiles, WidgetPlace::Quick},
                                           {"wallpapers", &shell.widgets.wallpapers, WidgetPlace::Bar},
                                           {"notifications", &shell.widgets.notifications, WidgetPlace::Quick}})

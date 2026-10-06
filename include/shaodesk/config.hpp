@@ -81,7 +81,7 @@ struct ShellWidgets {
     WidgetPlace volume = WidgetPlace::Quick;  // the default output's volume, only with a sound server
     bool clock = true;
     bool calendar = true; // the month calendar in the clock's flyout
-    WidgetPlace tiling = WidgetPlace::Quick;   // tiling on or off for the monitor
+    WidgetPlace tiling = WidgetPlace::Bar;     // tiling on or off for the monitor
     WidgetPlace profiles = WidgetPlace::Quick; // the appearance profiles, only with two or more
     WidgetPlace wallpapers = WidgetPlace::Bar; // the wallpaper picker
     bool keyboard_layout = true; // the active keyboard layout, only with two or more

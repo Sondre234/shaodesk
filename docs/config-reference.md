@@ -326,7 +326,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.widgets.volume` | boolean or string | true | - | The default output's volume, only with a sound server: `"bar"` or `"quick"` (a slider, with the outputs and the applications' volumes). By default in Quick Settings. |
 | `shell.widgets.clock` | boolean | true | - | The clock. |
 | `shell.widgets.calendar` | boolean | true | - | The month calendar in the clock's flyout. |
-| `shell.widgets.tiling` | boolean or string | true | - | Tiling on or off for the monitor: `"bar"` (a button) or `"quick"` (a tile). By default in Quick Settings. |
+| `shell.widgets.tiling` | boolean or string | true | - | Tiling on or off for the monitor: `"bar"` (a button) or `"quick"` (a tile). By default on the bar. |
 | `shell.widgets.profiles` | boolean or string | true | - | The appearance profile picker, which lists `profiles` to switch between; shown only when there are two or more: `"bar"` (a button) or `"quick"` (a tile). By default in Quick Settings. |
 | `shell.widgets.wallpapers` | boolean or string | true | - | The wallpaper picker: thumbnails of the images in `shell.wallpapers`; the one picked replaces `shell.wallpaper` for the profile in use until the configured one changes. `"bar"` (a button) or `"quick"` (a tile that opens the same picker). By default on the bar. |
 | `shell.widgets.keyboard_layout` | boolean | true | - | The active keyboard layout's short name, such as `us`; clicking it switches to the next. Shown only when the keymap has two or more layouts. |
