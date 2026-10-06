@@ -3798,8 +3798,8 @@ ListModel {
             return item->mapRectToScene(QRectF(0, 0, item->width(), item->height()));
         };
         const int barHeight = root->property("menuBarHeight").toInt();
-        // Once the panel has taken its new size.
-        QTest::qWaitFor([&] { return root->height() == view.height(); });
+        if (!QTest::qWaitFor([&] { return root->height() == view.height(); }))
+            return fail("the panel did not take the dock's size");
         const QRectF dockRect = sceneRect(dock);
         if (barHeight < 20 || menuBar->height() != barHeight ||
             menuBar->width() != ShellView::previewSize().width() ||
@@ -3889,6 +3889,14 @@ ListModel {
         if (holes.contains(QPoint(500, barHeight / 2)) || holes.contains(dockInPopover.toPoint()) ||
             !holes.contains(QPoint(10, popover->height() - 10)) || !holes.contains(QPoint(500, 300)))
             return fail("the popover takes presses on the menu bar or the dock");
+        // Launchpad covers both bars, and takes every press.
+        root->setProperty("launcherOpen", true);
+        if (!QTest::qWaitFor([&] { return popover->inputRegion().contains(QPoint(500, barHeight / 2)) &&
+                                          popover->inputRegion().contains(dockInPopover.toPoint()); }))
+            return fail("the popover leaves the bars' strips to them while Launchpad covers them");
+        root->setProperty("launcherOpen", false);
+        if (!openMenu("app"))
+            return fail("the application's menu did not open again after Launchpad");
         if (!chosen("appMenuQuit") || taskRequests() != "close 31|close 33")
             return fail("quitting the application did not close its windows");
         if (!openMenu("app") || !chosen("appMenuHide") || taskRequests() != "minimize 31|minimize 33")
