@@ -409,9 +409,11 @@ struct sh_server {
     double grab_x, grab_y;
     struct wlr_box grab_geobox;
     uint32_t resize_edges;
-    /* Window controls: shared buffers, the window whose controls are hovered (and which
+    /* Window controls: shared buffers by style, focus, hovered and pressed part, drawn at
+     * deco_scale pixels per logical pixel; the window whose controls are hovered (and which
      * button) or revealed, and a button pressed but not yet released. */
-    struct wlr_buffer *deco_buffers[SH_DECO_FULLSCREEN + 1]; // by hovered part
+    struct wlr_buffer *deco_buffers[2 * 2 * (SH_DECO_FULLSCREEN + 1) * (SH_DECO_FULLSCREEN + 1)];
+    int deco_scale;
     /* Peek: 0 to 1, how far windows have faded toward the desktop. It is held by the key with
      * evdev code `peek_keycode` on `peek_keyboard`, or toggled without one. */
     struct sh_fade peek_fade;
@@ -723,6 +725,7 @@ void unpublish_toplevel(struct sh_toplevel *toplevel);
 enum wlr_xdg_toplevel_decoration_v1_mode
 decoration_mode(struct wlr_xdg_toplevel_decoration_v1 *decoration);
 bool wants_decoration(struct sh_toplevel *toplevel);
+enum sh_deco_style deco_style(struct sh_server *server);
 bool in_deco_corner(struct sh_toplevel *toplevel, double x, double y);
 void refresh_decoration(struct sh_toplevel *toplevel);
 void refresh_tabs(struct sh_toplevel *toplevel);

@@ -195,7 +195,7 @@ static struct sh_toplevel *deco_at(struct sh_server *server, double x, double y,
     struct sh_toplevel *toplevel = owner->owner;
     if (!toplevel->deco || &toplevel->deco->node != node)
         return NULL;
-    *part = sh_decoration_part_at(SH_DECO_FLAT, sx, sy);
+    *part = sh_decoration_part_at(deco_style(server), sx, sy);
     return *part == SH_DECO_NONE ? NULL : toplevel;
 }
 
@@ -550,6 +550,7 @@ void server_cursor_button(struct wl_listener *listener, void *data) {
         // A dot acts on release, and only if the pointer is still on it.
         struct sh_toplevel *pressed = server->deco_pressed;
         server->deco_pressed = NULL;
+        refresh_decoration(pressed); // no longer held
         enum sh_deco_part part;
         if (deco_at(server, server->cursor->x, server->cursor->y, &part) == pressed &&
             part == server->deco_pressed_part)
@@ -612,6 +613,7 @@ void server_cursor_button(struct wl_listener *listener, void *data) {
             return;
         server->deco_pressed = decorated;
         server->deco_pressed_part = part;
+        refresh_decoration(decorated);
         return;
     }
     if (event->state == WL_POINTER_BUTTON_STATE_PRESSED) {

@@ -28,23 +28,54 @@ bool wants_decoration(struct sh_toplevel *toplevel) {
 #endif
 }
 
-static struct wlr_buffer *deco_buffer(struct sh_server *server, enum sh_deco_part hovered) {
-    if (!server->deco_buffers[hovered]) {
-        float scale = 1;
-        struct sh_output *output;
-        wl_list_for_each(output, &server->outputs, link) {
-            if (output->wlr_output->scale > scale)
-                scale = output->wlr_output->scale;
-        }
-        struct sh_deco_look look = {SH_DECO_FLAT, true, hovered, SH_DECO_NONE};
-        server->deco_buffers[hovered] = sh_decoration_render((int)ceilf(scale), &look);
+/* Pixels per logical pixel of what the compositor draws itself: enough for the densest output. */
+static int pixel_scale(struct sh_server *server) {
+    float scale = 1;
+    struct sh_output *output;
+    wl_list_for_each(output, &server->outputs, link) {
+        if (output->wlr_output->scale > scale)
+            scale = output->wlr_output->scale;
     }
-    return server->deco_buffers[hovered];
+    return (int)ceilf(scale);
 }
 
-/* The controls' place inside the window's scene tree: its top-right corner. */
-static void deco_position(struct sh_toplevel *toplevel, int *x, int *y) {
+enum sh_deco_style deco_style(struct sh_server *server) {
+    return server_settings(server)->window_controls == SH_CONTROLS_TRAFFIC_LIGHTS
+               ? SH_DECO_TRAFFIC_LIGHTS
+               : SH_DECO_FLAT;
+}
+
+/* The shared buffer for a look of the controls, drawn when first needed and again once an
+ * output's scale asks for more pixels. */
+static struct wlr_buffer *deco_buffer(struct sh_server *server, struct sh_deco_look look) {
+    int scale = pixel_scale(server);
+    if (scale != server->deco_scale) {
+        for (size_t i = 0; i < sizeof(server->deco_buffers) / sizeof(*server->deco_buffers); ++i) {
+            wlr_buffer_drop(server->deco_buffers[i]); // windows showing one keep it till replaced
+            server->deco_buffers[i] = NULL;
+        }
+        server->deco_scale = scale;
+    }
+    if (look.style == SH_DECO_FLAT) // the strip shows neither focus nor a press
+        look.focused = true, look.pressed = SH_DECO_NONE;
+    enum { PARTS = SH_DECO_FULLSCREEN + 1 };
+    size_t index = (((size_t)look.style * 2 + look.focused) * PARTS + look.hovered) * PARTS +
+                   look.pressed;
+    if (!server->deco_buffers[index])
+        server->deco_buffers[index] = sh_decoration_render(scale, &look);
+    return server->deco_buffers[index];
+}
+
+/* The controls' place inside the window's scene tree: the flat strip at its top-right corner,
+ * the traffic lights at its top-left. */
+static void deco_position(struct sh_toplevel *toplevel, enum sh_deco_style style, int *x,
+                          int *y) {
     struct wlr_box geometry = toplevel_geometry(toplevel);
+    if (style == SH_DECO_TRAFFIC_LIGHTS) {
+        *x = geometry.x;
+        *y = geometry.y;
+        return;
+    }
     *x = geometry.x + geometry.width - SH_DECO_MARGIN - SH_DECO_WIDTH;
     if (*x < geometry.x + SH_DECO_MARGIN)
         *x = geometry.x + SH_DECO_MARGIN;
@@ -53,12 +84,20 @@ static void deco_position(struct sh_toplevel *toplevel, int *x, int *y) {
 
 /* The controls sit over the window's content, so they hide until the pointer nears its corner. */
 bool in_deco_corner(struct sh_toplevel *toplevel, double x, double y) {
-    int dx, dy;
-    deco_position(toplevel, &dx, &dy);
+    enum sh_deco_style style = deco_style(toplevel->server);
+    int dx, dy, width, height;
+    deco_position(toplevel, style, &dx, &dy);
+    sh_decoration_size(style, &width, &height);
     double left = toplevel->scene_tree->node.x + dx - SH_DECO_MARGIN;
     double top = toplevel->scene_tree->node.y + dy - SH_DECO_MARGIN;
-    return x >= left && y >= top && x < left + 2 * SH_DECO_MARGIN + SH_DECO_WIDTH &&
-           y < top + 2 * SH_DECO_MARGIN + SH_DECO_HEIGHT;
+    return x >= left && y >= top && x < left + 2 * SH_DECO_MARGIN + width &&
+           y < top + 2 * SH_DECO_MARGIN + height;
+}
+
+/* Traffic lights take the pointer only on and around their circles; between and below them it
+ * reaches the window. */
+static bool lights_accept_input(struct wlr_scene_buffer *buffer, double *sx, double *sy) {
+    return sh_decoration_part_at(SH_DECO_TRAFFIC_LIGHTS, *sx, *sy) != SH_DECO_NONE;
 }
 
 /* Keeps the controls and the border above the window's surfaces. A new node starts on top and
@@ -87,21 +126,31 @@ void refresh_decoration(struct sh_toplevel *toplevel) {
         toplevel->deco = NULL;
         return;
     }
-    enum sh_deco_part hovered =
-        server->deco_hovered == toplevel ? server->deco_hovered_part : SH_DECO_NONE;
-    struct wlr_buffer *buffer = deco_buffer(server, hovered);
+    struct sh_deco_look look = {
+        .style = deco_style(server),
+        .focused = server->focused_toplevel == toplevel,
+        .hovered = server->deco_hovered == toplevel ? server->deco_hovered_part : SH_DECO_NONE,
+    };
+    // A held button looks pressed while the pointer stays on it.
+    if (server->deco_pressed == toplevel && look.hovered == server->deco_pressed_part)
+        look.pressed = server->deco_pressed_part;
+    struct wlr_buffer *buffer = deco_buffer(server, look);
     if (!buffer)
         return;
     if (!toplevel->deco) {
         toplevel->deco = wlr_scene_buffer_create(toplevel->content, buffer);
         if (!toplevel->deco)
             return;
-        wlr_scene_buffer_set_dest_size(toplevel->deco, SH_DECO_WIDTH, SH_DECO_HEIGHT);
     } else if (toplevel->deco->buffer != buffer) {
         wlr_scene_buffer_set_buffer(toplevel->deco, buffer);
     }
+    int width, height;
+    sh_decoration_size(look.style, &width, &height);
+    wlr_scene_buffer_set_dest_size(toplevel->deco, width, height);
+    toplevel->deco->point_accepts_input =
+        look.style == SH_DECO_TRAFFIC_LIGHTS ? lights_accept_input : NULL;
     int x, y;
-    deco_position(toplevel, &x, &y);
+    deco_position(toplevel, look.style, &x, &y);
     wlr_scene_node_set_position(&toplevel->deco->node, x, y);
     raise_frame_node(toplevel, &toplevel->deco->node);
     wlr_scene_node_set_enabled(&toplevel->deco->node, server->deco_revealed == toplevel);
@@ -122,25 +171,19 @@ void refresh_tabs(struct sh_toplevel *toplevel) {
     struct wlr_box g = toplevel_geometry(toplevel);
     int count = group_size(server, toplevel->group), active = group_index(toplevel);
     int hover = server->tabs_hovered == toplevel ? server->tabs_hovered_index : -1;
-    float scale = 1;
-    struct sh_output *output;
-    wl_list_for_each(output, &server->outputs, link) {
-        if (output->wlr_output->scale > scale)
-            scale = output->wlr_output->scale;
-    }
-    int pixel_scale = (int)ceilf(scale);
+    int scale = pixel_scale(server);
     if (g.width < 1)
         return;
     if (!toplevel->tabs || toplevel->tabs_width != g.width || toplevel->tabs_count != count ||
         toplevel->tabs_active != active || toplevel->tabs_hover != hover ||
-        toplevel->tabs_scale != pixel_scale) {
-        size_t pixels = (size_t)g.width * pixel_scale * SH_TABS_HEIGHT * pixel_scale;
+        toplevel->tabs_scale != scale) {
+        size_t pixels = (size_t)g.width * scale * SH_TABS_HEIGHT * scale;
         uint32_t *data = calloc(pixels, sizeof(*data));
         if (!data)
             return;
-        sh_tabs_paint(data, g.width, pixel_scale, count, active, hover);
+        sh_tabs_paint(data, g.width, scale, count, active, hover);
         struct wlr_buffer *buffer =
-            sh_pixel_buffer(data, g.width * pixel_scale, SH_TABS_HEIGHT * pixel_scale);
+            sh_pixel_buffer(data, g.width * scale, SH_TABS_HEIGHT * scale);
         if (!buffer)
             return; // it freed the pixels
         if (!toplevel->tabs)
@@ -154,7 +197,7 @@ void refresh_tabs(struct sh_toplevel *toplevel) {
         toplevel->tabs_count = count;
         toplevel->tabs_active = active;
         toplevel->tabs_hover = hover;
-        toplevel->tabs_scale = pixel_scale;
+        toplevel->tabs_scale = scale;
         wlr_scene_buffer_set_dest_size(toplevel->tabs, g.width, SH_TABS_HEIGHT);
     }
     wlr_scene_node_set_position(&toplevel->tabs->node, g.x, g.y);
