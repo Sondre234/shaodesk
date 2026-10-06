@@ -54,6 +54,9 @@ class ShellController : public QObject {
     Q_PROPERTY(QString fontFamily READ fontFamily NOTIFY configChanged)
     Q_PROPERTY(int fontSize READ fontSize NOTIFY configChanged)
     Q_PROPERTY(bool iconsOnly READ iconsOnly NOTIFY configChanged)
+    // animations.enabled and animations.speed, which the shell's animations follow too.
+    Q_PROPERTY(bool animations READ animations NOTIFY configChanged)
+    Q_PROPERTY(qreal animationSpeed READ animationSpeed NOTIFY configChanged)
     // Whether Qt Quick draws through the GPU, which shader effects such as shadows need; its
     // software renderer cannot draw them. Set from what the views actually use.
     Q_PROPERTY(bool effects READ effects NOTIFY effectsChanged)
@@ -145,6 +148,8 @@ class ShellController : public QObject {
     int fontSize() const { return config_.shell.font_size; }
     bool softwareRenderer() const { return config_.shell.software_renderer; }
     bool iconsOnly() const { return config_.shell.icons_only; }
+    bool animations() const { return config_.settings.animations; }
+    qreal animationSpeed() const { return config_.settings.animation_speed; }
     bool effects() const { return effects_; }
     void setEffects(bool effects);
     bool groupWindows() const { return config_.shell.group_windows; }
