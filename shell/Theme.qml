@@ -27,6 +27,9 @@ QtObject {
     // What is open, current or on: a button whose popup is open, the current workspace.
     readonly property color selected: alpha(text, 0.14)
 
+    // What dims everything behind a dialog.
+    readonly property color scrim: Qt.rgba(0, 0, 0, 0.45)
+
     // Lines: a popup's outline, a separator.
     readonly property color border: alpha(text, 0.14)
     readonly property color divider: alpha(text, 0.12)
