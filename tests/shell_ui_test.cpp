@@ -91,6 +91,21 @@ int main(int argc, char **argv) {
         return fail("no temporary directory");
     auto config = directory.filePath("init.lua");
     auto marker = directory.filePath("launched");
+    // An application with desktop actions: one that runs, and one whose program is missing. It
+    // is written before the controller first reads the applications.
+    const auto actionMarker = directory.filePath("action");
+    QFile actionsFile(screens.filePath("data/applications/shaodesk-test-actions.desktop"));
+    if (!actionsFile.open(QIODevice::WriteOnly) ||
+        actionsFile.write(QString("[Desktop Entry]\nType=Application\nName=Action app\nExec=true\n"
+                                  "Actions=touch;missing;\n\n"
+                                  "[Desktop Action touch]\nName=Touch a file\nIcon=document-new\n"
+                                  "Exec=\"%1\" -E touch \"%2\"\n\n"
+                                  "[Desktop Action missing]\nName=Missing program\n"
+                                  "Exec=/nonexistent/shaodesk-missing-program\n")
+                              .arg(QString::fromLocal8Bit(argv[1]), actionMarker)
+                              .toUtf8()) < 0)
+        return fail("could not write the application with actions");
+    actionsFile.close();
     // Two pictures for the wallpaper picker, in two subfolders.
     const auto walls = directory.filePath("walls");
     for (const auto *name : {"a/one.png", "b/two.png"}) {
@@ -211,6 +226,40 @@ int main(int argc, char **argv) {
         controller.iconFor("org.example.App") != "org.example.App") {
         std::cerr << "a window's app ID can name a file for the icon\n";
         return 1;
+    }
+    // An application's desktop actions are listed in its entry's order with their icons, and run
+    // as the application is started; a failure, or an action that is not there, shows across the
+    // panel.
+    {
+        const auto actions = controller.appActions("shaodesk-test-actions.desktop");
+        if (actions.size() != 2 || actions[0].toMap()["action"] != "touch" ||
+            actions[0].toMap()["name"] != "Touch a file" ||
+            actions[0].toMap()["icon"] != "document-new" ||
+            actions[1].toMap()["action"] != "missing" || actions[1].toMap()["icon"] != "" ||
+            !controller.appActions("shaodesk-test-app.desktop").isEmpty() ||
+            !controller.appActions("pinned:0").isEmpty() ||
+            !controller.appActions("not-installed.desktop").isEmpty()) {
+            std::cerr << "the desktop actions are not listed as the entries give them\n";
+            return 1;
+        }
+        if (!controller.launchAction("shaodesk-test-actions.desktop", "touch") ||
+            !QTest::qWaitFor([&] { return QFile::exists(actionMarker); }) ||
+            !controller.error().isEmpty()) {
+            std::cerr << "a desktop action did not run: " << controller.error().toStdString() << '\n';
+            return 1;
+        }
+        if (controller.launchAction("shaodesk-test-actions.desktop", "missing") ||
+            !controller.error().startsWith("Could not launch Action app: ")) {
+            std::cerr << "a desktop action whose program is missing was not reported: "
+                      << controller.error().toStdString() << '\n';
+            return 1;
+        }
+        if (controller.launchAction("shaodesk-test-actions.desktop", "absent") ||
+            controller.error() != "This action is no longer available.") {
+            std::cerr << "an action the entry does not have was not refused\n";
+            return 1;
+        }
+        controller.clearError();
     }
     view.show();
     if (!QTest::qWaitForWindowExposed(&view))
