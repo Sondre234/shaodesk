@@ -62,7 +62,7 @@ class ShellController : public QObject {
     Q_PROPERTY(bool effects READ effects NOTIFY effectsChanged)
     Q_PROPERTY(bool groupWindows READ groupWindows NOTIFY configChanged)
     // Which panel widgets Lua enables: {workspaces, battery, network, volume, clock, calendar,
-    // tiling, profiles, wallpapers, keyboard_layout, power, tray}.
+    // tiling, profiles, wallpapers, keyboard_layout, power, tray, notifications}.
     Q_PROPERTY(QVariantMap widgets READ widgets NOTIFY configChanged)
     // The compositor's active keyboard layout: {number (from 1), count, short ("us"), name}, or
     // empty without a compositor.

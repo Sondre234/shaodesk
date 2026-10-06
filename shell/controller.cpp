@@ -325,7 +325,8 @@ QVariantMap ShellController::widgets() const {
             {"volume", w.volume},         {"clock", w.clock},     {"calendar", w.calendar},
             {"tiling", w.tiling},         {"profiles", w.profiles},
             {"wallpapers", w.wallpapers}, {"keyboard_layout", w.keyboard_layout},
-            {"power", w.power},           {"tray", w.tray}};
+            {"power", w.power},           {"tray", w.tray},
+            {"notifications", w.notifications}};
 }
 QStringList ShellController::profiles() const {
     QStringList names;

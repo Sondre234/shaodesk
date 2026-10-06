@@ -36,7 +36,8 @@ switched off from Lua: `shell = { widgets = { battery = false, calendar = false 
 `workspaces`, `battery`, `network`, `volume`, `clock`, `calendar` (the clock stays, the
 calendar goes), `tiling`, `profiles` (the appearance profile picker), `keyboard_layout`,
 `power` (the [power button](#power) in the application menu) and `tray` (the [system tray](#system-tray)) all on by
-default. All of them take the panel's `accent`,
+default; `notifications = true` adds a bell for the [notifications](#notifications-and-on-screen-display),
+which the clock otherwise stands for. All of them take the panel's `accent`,
 `panel_color`, `text_color`, `font` and `font_size`: hovering, pressing and what is open or on
 are shown by laying the text color over the panel at a low opacity, which shows on a light
 panel as on a dark one. Popups (the application menu, menus, the mixer, the calendar and the

@@ -2,9 +2,9 @@
 import QtQuick
 import QtQuick.Layouts
 
-// The bell in the panel: opens the clock flyout with the notifications, shows how many have not
-// been seen, and turns into a crossed-out bell while do-not-disturb is on. Right-click toggles
-// do-not-disturb.
+// The bell in the panel (shell.widgets.notifications, off by default: the clock does the same):
+// opens the clock flyout with the notifications, shows how many have not been seen, and turns into
+// a crossed-out bell while do-not-disturb is on. Right-click toggles do-not-disturb.
 FlatButton {
     id: bell
     required property var panel
@@ -13,7 +13,7 @@ FlatButton {
     readonly property var center: shell.notifications
     readonly property string description: (center.dnd ? "Do not disturb, " : "") +
         (center.unread > 0 ? center.unread + " unread notifications" : "No new notifications")
-    visible: center.serving
+    visible: shell.widgets.notifications && center.serving
     Layout.preferredWidth: 40; Layout.preferredHeight: barHeight - 10
     hoverEnabled: true
     onClicked: panel.toggleAudioPopup("clock", bell)

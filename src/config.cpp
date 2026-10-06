@@ -323,7 +323,8 @@ void read_shell(lua_State *L, ShellConfig &shell) {
                                    {"wallpapers", &shell.widgets.wallpapers},
                                    {"keyboard_layout", &shell.widgets.keyboard_layout},
                                    {"power", &shell.widgets.power},
-                                   {"tray", &shell.widgets.tray}})
+                                   {"tray", &shell.widgets.tray},
+                                   {"notifications", &shell.widgets.notifications}})
             boolean(L, key, (std::string("shell.widgets.") + key).c_str(), *target);
     }
     lua_pop(L, 1);

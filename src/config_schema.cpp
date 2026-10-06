@@ -558,6 +558,9 @@ const Option options[] = {
     {"shell.widgets.tray", "boolean", "true", "true", none, none,
      "The system tray: applications' status icons (StatusNotifierItem), shown while there are "
      "any. `false` also leaves the tray's D-Bus names to another program."},
+    {"shell.widgets.notifications", "boolean", "false", "true", none, none,
+     "A bell on the bar that opens the notifications, with their unread count; a right-click "
+     "toggles do-not-disturb. The clock does both either way."},
     {"shell.launchers", "list of tables", "unset", "", none, none,
      "Pinned commands for programs without a desktop file, at most 64."},
     {"shell.launchers[].name", "string", "", "", none, none, "Label, 1 to 128 bytes. Required."},

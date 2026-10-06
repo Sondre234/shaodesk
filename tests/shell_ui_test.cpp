@@ -1829,8 +1829,14 @@ int main(int argc, char **argv) {
             return 1;
         }
         daemon->setServing(true);
+        // The bell is off unless shell.widgets.notifications asks for it: the clock does its work.
+        QTest::qWait(50);
+        if (bell->isVisible() || controller.widgets()["notifications"].toBool() ||
+            !rewrite(QString(lua).replace("shell={", "shell={widgets={notifications=true},")))
+            return fail("the bell showed by default, or the configuration could not be rewritten");
+        controller.reload();
         if (!QTest::qWaitFor([&] { return bell->isVisible() && bell->x() > 0; })) {
-            std::cerr << "the bell did not appear once the daemon served\n";
+            std::cerr << "the bell did not appear once the daemon served and the setting asked\n";
             return 1;
         }
         CardsView cards(controller, app.primaryScreen());
@@ -1987,6 +1993,13 @@ int main(int argc, char **argv) {
         click(find(view.rootObject(), "clockButton"), Qt::RightButton);
         if (!QTest::qWaitFor([&] { return !daemon->dnd() && !clockDnd->isVisible(); })) {
             std::cerr << "right-clicking the clock again did not turn do-not-disturb off\n";
+            return 1;
+        }
+        if (!rewrite(lua))
+            return fail("could not restore the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return !bell->isVisible(); })) {
+            std::cerr << "the bell stayed once the setting was gone\n";
             return 1;
         }
     }
