@@ -86,7 +86,27 @@ PopupMenu {
         if (shell.workspaceCount > 1)
             entries.push({ text: "Move to workspace", icon: "layers", objectName: "contextMenuWorkspaces",
                            submenu: workspaceEntries(windows, tasks) })
+        if (Object.keys(shell.workspaces).length > 1)
+            entries.push({ text: "Move to monitor", icon: "monitor", objectName: "contextMenuOutputs",
+                           submenu: outputEntries(windows, tasks) })
         return entries
+    }
+    // The compositor's outputs from left to right, by connector name ("DP-1") with the monitor's
+    // make and model beside it where the screen says; the one the windows are on marked.
+    function outputEntries(windows, tasks) {
+        var screens = {}
+        Qt.application.screens.forEach(function(screen) { screens[screen.name] = screen })
+        var names = Object.keys(shell.workspaces).sort(function(a, b) {
+            var left = screens[a] ? screens[a].virtualX : 0, right = screens[b] ? screens[b].virtualX : 0
+            return left !== right ? left - right : a.localeCompare(b)
+        })
+        var on = windows.every(function(w) { return w.output === windows[0].output }) ? windows[0].output : ""
+        return names.map(function(name) {
+            var screen = screens[name]
+            return { text: name, toggle: "radio", checked: name === on, objectName: "contextMenuOutput",
+                     secondary: screen ? [screen.manufacturer, screen.model].filter(Boolean).join(" ") : "",
+                     run: function() { windows.forEach(function(w) { tasks.moveToOutput(w.taskId, name) }) } }
+        })
     }
     function workspaceEntries(windows, tasks) {
         // A sticky window is on all of them.

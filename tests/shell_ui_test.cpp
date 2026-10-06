@@ -853,6 +853,25 @@ ListModel {
         editTasks("model.setProperty(0, 'sticky', false)");
         if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
             return fail("the popover did not close after moving the window");
+        // With one monitor there is no other to move it to; with two, its own is marked.
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Move to workspace"); }) ||
+            menuItem("Move to monitor"))
+            return fail("a window's menu offers other monitors with only one");
+        subscriber->write(state(toggled, currentWorkspace) + "output OTHER-1 1 - off\n");
+        if (!QTest::qWaitFor([&] { return menuItem("Move to monitor"); }))
+            return fail("a window's menu does not offer to move it to another monitor");
+        click(menuItem("Move to monitor"));
+        if (!QTest::qWaitFor([&] { return menuItem("OTHER-1") && marked(output); }) || marked("OTHER-1"))
+            return fail("the monitor submenu does not list the monitors, the window's marked");
+        click(menuItem("OTHER-1"));
+        if (const auto asked = taskRequests(); asked != "output 7 OTHER-1") {
+            std::cerr << "moving to a monitor from a task's menu asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        subscriber->write(state(toggled, currentWorkspace));
+        if (!QTest::qWaitFor([&] { return !popover->isVisible() && controller.workspaces().size() == 1; }))
+            return fail("the popover did not close after moving the window to another monitor");
     }
     // The task's window belongs to an installed application, which its menu pins. Pinned, the
     // window takes over the application's slot instead of adding a button; with no window left
