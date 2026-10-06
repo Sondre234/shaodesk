@@ -276,8 +276,14 @@ int main(int argc, char **argv) {
             if (!ok || timeout < 1)
                 throw std::runtime_error("--quit-after must be a positive integer");
             QTimer::singleShot(timeout, &app, [&] {
-                if (parser.isSet("screenshot") &&
-                    !views.front()->grabWindow().save(parser.value("screenshot")))
+                if (!parser.isSet("screenshot")) {
+                    app.quit();
+                    return;
+                }
+                QImage shot = views.front()->grabWindow();
+                if (preview && !parser.isSet("preview-desktop"))
+                    shot = previewOnDesktop(shot, controller);
+                if (!shot.save(parser.value("screenshot")))
                     app.exit(1);
                 else
                     app.quit();

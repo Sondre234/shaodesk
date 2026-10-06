@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include <QImage>
 #include <QObject>
 #include <QTemporaryDir>
 #include <memory>
@@ -34,3 +35,6 @@ class PreviewData : public QObject {
     QObject *tasks_ = nullptr;
 };
 
+// A screenshot of the panel's preview drawn over the desktop under it (the wallpaper, or the
+// background colour), so that a translucent colour shows what it would show there.
+QImage previewOnDesktop(QImage panel, const ShellController &controller);

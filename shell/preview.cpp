@@ -5,6 +5,7 @@
 #include "system_status.hpp"
 #include <QDir>
 #include <QFile>
+#include <QLinearGradient>
 #include <QPainter>
 #include <QQmlComponent>
 #include <QQmlEngine>
@@ -155,4 +156,28 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
     QMetaObject::invokeMethod(panel, "previewPopup", Q_RETURN_ARG(QVariant, opened),
                               Q_ARG(QVariant, name));
     return opened.toBool();
+}
+
+QImage previewOnDesktop(QImage panel, const ShellController &controller) {
+    panel.setDevicePixelRatio(1);
+    QImage desktop(panel.size(), QImage::Format_ARGB32_Premultiplied);
+    QPainter painter(&desktop);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform);
+    const QString file = controller.wallpaperFile();
+    const QImage wallpaper = file.isEmpty() ? QImage() : QImage(file);
+    if (!wallpaper.isNull()) {
+        // Cropped to fill, as Desktop.qml shows it.
+        const QSize size = wallpaper.size().scaled(desktop.size(), Qt::KeepAspectRatioByExpanding);
+        painter.drawImage(QRect(QPoint((desktop.width() - size.width()) / 2,
+                                       (desktop.height() - size.height()) / 2),
+                                size),
+                          wallpaper);
+    } else {
+        QLinearGradient gradient(0, 0, 0, desktop.height());
+        gradient.setColorAt(0, controller.background().lighter(145));
+        gradient.setColorAt(1, controller.background());
+        painter.fillRect(desktop.rect(), gradient);
+    }
+    painter.drawImage(0, 0, panel);
+    return desktop;
 }
