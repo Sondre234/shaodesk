@@ -512,3 +512,21 @@ Not checked: any of it on a real display and GPU (an NVIDIA driver's first frame
 144 or 200 Hz outputs, fractional scaling there), direct scanout of a fullscreen game with the
 popover hidden, two monitors with popups open on both, a real pointer's hover over menus, and
 tooltips over the popover beyond one look at the power button's under a headless compositor.
+
+## Clock flyout and Quick Settings
+
+Added 2026-10-06. The clock's flyout (the notifications by application over the calendar, with
+its month and year pickers) and Quick Settings were looked at in the gallery in both themes and
+both renderers (`calendar`, `notifications`, `clock-empty`, `calendar-years`, `quick-settings`,
+`quick-settings-mixer`, `bar-all`), and the flyout under a top panel in software. `shell_ui`
+checks paging by the arrows and the wheel, the pickers, Today, the grouped history with its
+expander, cross and action buttons, do-not-disturb from the clock, Super + N through the
+compositor's request, the widgets' places on the bar and in Quick Settings, every tile against
+stand-ins (night light through a fake control socket), the volume, outputs and applications, and
+the brightness slider over a fake sysfs backlight. `backlight_dbus_test` checks the call to
+logind's `SetBrightness` against a stand-in on a private bus, and `night_light_smoke` what a
+real compositor tells subscribers.
+
+Not checked: any of it on a real display (a real pointer's hover over days and notifications,
+the slide and zoom animations at 144 or 200 Hz), `SetBrightness` against a real logind and
+backlight, and real applications' notifications with pictures and actions in the history.
