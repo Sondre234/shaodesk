@@ -88,22 +88,24 @@ Button {
         Item {
             id: line
             objectName: "taskLine"
-            readonly property real segment: (task.shownActive ? (shell.iconsOnly ? 18 : 28) / (task.stacked ? 2 : 1)
-                                                              : (task.stacked ? 6 : 10)) * task.reveal
+            readonly property real segment: task.shownActive ? (shell.iconsOnly ? 18 : 28) / (task.stacked ? 2 : 1)
+                                                             : (task.stacked ? 6 : 10)
             property real first: segment
             property real second: task.stacked ? segment : 0
             property real gap: task.stacked ? 3 : 0
             property color tint: task.shownUrgent ? Theme.urgent : task.shownMinimized ? Theme.textDisabled : Theme.accent
-            Behavior on first { enabled: !revealing.running; NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
-            Behavior on second { enabled: !revealing.running; NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
+            Behavior on first { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
+            Behavior on second { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
             Behavior on gap { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
             Behavior on tint { ColorAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
             anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter
-            width: first + gap + second; height: 3
-            Rectangle { width: line.first; height: parent.height; radius: 1; color: line.tint }
+            // Drawn out from the middle by `reveal`, past the easing of its length.
+            width: (first + gap + second) * task.reveal; height: 3
+            Rectangle { width: line.first * task.reveal; height: parent.height; radius: 1; color: line.tint }
             Rectangle {
                 visible: width > 0
-                x: line.first + line.gap; width: line.second; height: parent.height; radius: 1
+                x: (line.first + line.gap) * task.reveal; width: line.second * task.reveal
+                height: parent.height; radius: 1
                 color: line.tint
             }
         }
