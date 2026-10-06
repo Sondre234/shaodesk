@@ -2039,9 +2039,34 @@ int main(int argc, char **argv) {
             std::cerr << "clicking the bell did not open the history and mark it read\n";
             return 1;
         }
+        // One application's notifications, under one heading, a row each.
         auto *list = find(view.rootObject(), "notificationList");
-        if (!list || !QTest::qWaitFor([&] { return list->property("count").toInt() == daemon->history()->count(); })) {
-            std::cerr << "the history does not list the notifications\n";
+        std::function<QList<QQuickItem *>(QQuickItem *, const QString &)> findAll =
+            [&](QQuickItem *item, const QString &name) {
+                QList<QQuickItem *> found;
+                if (item->objectName() == name)
+                    found << item;
+                for (auto *child : item->childItems())
+                    found << findAll(child, name);
+                return found;
+            };
+        auto rows = [&] { return list ? findAll(list, "notificationRow") : QList<QQuickItem *>(); };
+        if (!list || !QTest::qWaitFor([&] {
+                return list->property("count").toInt() == 1 && rows().size() == daemon->history()->count();
+            })) {
+            std::cerr << "the history does not list the notifications by application\n";
+            return 1;
+        }
+        // The pointer over a notification shows its cross, which removes it.
+        QTest::qWait(300); // the flyout's slide in
+        const int kept = daemon->history()->count();
+        QTest::mouseMove(popover, centre(rows().first()));
+        auto *remove = find(rows().first(), "removeNotification");
+        if (!remove || !QTest::qWaitFor([&] { return remove->isVisible(); }))
+            return fail("the pointer over a notification did not show its cross");
+        click(remove);
+        if (!QTest::qWaitFor([&] { return daemon->history()->count() == kept - 1 && rows().size() == kept - 1; })) {
+            std::cerr << "the cross did not remove the notification\n";
             return 1;
         }
         auto *dndSwitch = find(view.rootObject(), "dndSwitch");
@@ -2055,8 +2080,9 @@ int main(int argc, char **argv) {
         }
         daemon->setDnd(false);
         click(find(view.rootObject(), "clearNotifications"));
-        if (!QTest::qWaitFor([&] { return daemon->history()->count() == 0; })) {
-            std::cerr << "Clear did not empty the history\n";
+        auto *empty = find(view.rootObject(), "notificationsEmpty");
+        if (!QTest::qWaitFor([&] { return daemon->history()->count() == 0 && empty && empty->isVisible(); })) {
+            std::cerr << "Clear all did not empty the history and say so\n";
             return 1;
         }
         click(bell); // close the popup
