@@ -2134,6 +2134,55 @@ ListModel {
         if (!QTest::qWaitFor([&] { return requests == QStringList{"toggle_tiling"} && !launcherOpen(); }))
             return fail("Enter did not run the action the start menu found");
         requests.clear();
+        // More pins than a page holds go on pages, which the wheel, the dots beside them and the
+        // keyboard moving past the last row turn.
+        {
+            QStringList extra;
+            for (int i = 0; i < 20; ++i) {
+                extra << QString("shaodesk-test-page%1.desktop").arg(i);
+                QFile entry(screens.filePath("data/applications/" + extra.last()));
+                if (!entry.open(QIODevice::WriteOnly) ||
+                    entry.write(QString("[Desktop Entry]\nType=Application\nName=Page app %1\nExec=true\n")
+                                    .arg(i, 2, 10, QChar('0'))
+                                    .toUtf8()) < 0)
+                    return fail("could not write an application to pin");
+            }
+            auto installed = [&](const QString &id) {
+                const auto apps = controller.apps();
+                return std::any_of(apps.begin(), apps.end(),
+                                   [&](const QVariant &app) { return app.toMap()["appId"] == id; });
+            };
+            if (!QTest::qWaitFor([&] { return installed(extra.last()); }, 10000))
+                return fail("the applications to pin were not found");
+            for (const auto &id : extra)
+                start->pin(id);
+            auto *home = item("startHome");
+            if (!openStart() || !QTest::qWaitFor([&] { return shown("startPage1"); }) ||
+                home->property("page").toInt() != 0)
+                return fail("more pins than a page holds did not go on pages");
+            auto *pinned = item("startPinned");
+            const QPoint over = centre(pinned);
+            QWheelEvent wheel(over, popover->mapToGlobal(over), QPoint(), QPoint(0, -120), Qt::NoButton,
+                              Qt::NoModifier, Qt::NoScrollPhase, false);
+            QCoreApplication::sendEvent(popover, &wheel);
+            if (!QTest::qWaitFor([&] { return home->property("page").toInt() == 1; }))
+                return fail("the wheel did not turn the pins' page");
+            click(item("startPage0"));
+            if (!QTest::qWaitFor([&] { return home->property("page").toInt() == 0; }))
+                return fail("a page's dot did not show its page");
+            for (int row = 0; row < 4; ++row)
+                key(Qt::Key_Down);
+            if (!QTest::qWaitFor([&] { return home->property("page").toInt() == 1; }) ||
+                home->property("current").toInt() != 3 * home->property("columns").toInt())
+                return fail("Down past the last row did not go on to the next page");
+            view.rootObject()->setProperty("launcherOpen", false);
+            for (const auto &id : extra) {
+                start->unpin(id);
+                QFile::remove(screens.filePath("data/applications/" + id));
+            }
+            if (!QTest::qWaitFor([&] { return !installed(extra.last()); }, 10000))
+                return fail("the pinned applications were not removed again");
+        }
         // Along its bottom, the user's name and picture.
         start->setUser("Robin Lee", QUrl::fromLocalFile(walls + "/a/one.png"));
         if (!openStart() || !QTest::qWaitFor([&] { return shown("userPicture"); }) ||

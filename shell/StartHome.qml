@@ -6,6 +6,7 @@ import QtQuick
 // with how long ago. Its content stays `inset` from its sides.
 Item {
     id: home
+    objectName: "startHome"
     required property Item launcher
     property real inset: 0
     readonly property var pins: shell.startMenu.pinned
