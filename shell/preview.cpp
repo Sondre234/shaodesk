@@ -379,9 +379,10 @@ QImage PreviewData::withSurface(QImage desktop) const {
     const QSize size = root.toSize();
     QPoint at;
     if (surfaceName_.startsWith("osd-")) {
-        // OsdView: centred, 48 pixels from the bottom edge or from the top.
+        // OsdView: centred, 48 pixels from the top edge, or ShellController::osdBottom from the
+        // bottom.
         at = QPoint((output.width() - size.width()) / 2,
-                    controller_.osd()->top() ? 48 : output.height() - 48 - size.height());
+                    controller_.osd()->top() ? 48 : output.height() - controller_.osdBottom() - size.height());
     } else if (surfaceName_.startsWith("palette")) {
         // PaletteView: centred, below the bars by ShellController::paletteDrop.
         at = QPoint(usable.left() + (usable.width() - size.width()) / 2,

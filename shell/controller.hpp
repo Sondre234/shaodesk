@@ -175,6 +175,9 @@ class ShellController : public QObject {
     // How far below the bars the command palette opens on an output `height` tall: a sixth of
     // it, or a quarter in the macOS style, where Spotlight opens.
     int paletteDrop(int height) const { return height / (config_.shell.macos_style ? 4 : 6); }
+    // How far from the output's bottom edge the on-screen display stands there: 48 pixels, or
+    // clear of the macOS style's dock.
+    int osdBottom() const { return config_.shell.macos_style ? panelExtent() + 16 : 48; }
     int panelRadius() const { return config_.shell.panel_radius; }
     QString fontFamily() const { return QString::fromStdString(config_.shell.font); }
     int fontSize() const { return config_.shell.font_size; }

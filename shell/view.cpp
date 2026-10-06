@@ -652,7 +652,7 @@ void OsdView::placeLayer() {
 #if SHAODESK_LAYER_SHELL
     using W = LayerShellQt::Window;
     layer_->setAnchors(controller_.osd()->top() ? W::AnchorTop : W::AnchorBottom);
-    layer_->setMargins(QMargins(0, 48, 0, 48));
+    layer_->setMargins(QMargins(0, 48, 0, controller_.osdBottom()));
 #endif
 }
 void OsdView::update() {
