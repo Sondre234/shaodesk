@@ -80,7 +80,10 @@ class Compositor:
         if config is not None:
             self.config.write_text(config)
         self.log = self.root / "compositor.log"
-        self.env = dict(os.environ, XDG_RUNTIME_DIR=str(self.root), WLR_RENDERER="pixman")
+        # State of its own too: the developer's saved appearance profile must not change the
+        # configuration a test runs.
+        self.env = dict(os.environ, XDG_RUNTIME_DIR=str(self.root),
+                        XDG_STATE_HOME=str(self.root / "state"), WLR_RENDERER="pixman")
         for name in ("WAYLAND_DISPLAY", "DISPLAY", "SHAODESK_SOCKET"):
             self.env.pop(name, None)
         self.env.update(env or {})

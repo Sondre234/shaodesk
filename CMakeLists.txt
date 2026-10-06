@@ -54,6 +54,10 @@ if(BUILD_TESTING)
     add_executable(config_tests tests/config_tests.cpp)
     target_link_libraries(config_tests PRIVATE shaodesk_config)
     add_test(NAME config COMMAND config_tests ${EXAMPLE_CONFIG})
+    # Not the developer's saved appearance profile: the example's own `profile` is under test.
+    set(EMPTY_STATE ${CMAKE_CURRENT_BINARY_DIR}/empty-state)
+    file(MAKE_DIRECTORY ${EMPTY_STATE})
+    set_tests_properties(config PROPERTIES ENVIRONMENT "XDG_STATE_HOME=${EMPTY_STATE}")
     add_executable(config_diagnostics_tests tests/config_diagnostics_tests.cpp)
     target_link_libraries(config_diagnostics_tests PRIVATE shaodesk_config)
     add_test(NAME config_diagnostics COMMAND config_diagnostics_tests ${EXAMPLE_CONFIG}
@@ -382,7 +386,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
             PASS_REGULAR_EXPRESSION "^shaodesk ${PROJECT_VERSION}( \\(git [^)]+\\))?\nbuilt with wlroots 0\\.20\\.[0-9]+\n$")
         add_test(NAME default_config COMMAND shaodesk --check-config)
         set_tests_properties(default_config PROPERTIES
-            ENVIRONMENT "HOME=${EMPTY_HOME};XDG_CONFIG_HOME=${EMPTY_HOME};SHAODESK_DEFAULT_CONFIG=${EXAMPLE_CONFIG}"
+            ENVIRONMENT "HOME=${EMPTY_HOME};XDG_CONFIG_HOME=${EMPTY_HOME};XDG_STATE_HOME=${EMPTY_STATE};SHAODESK_DEFAULT_CONFIG=${EXAMPLE_CONFIG}"
             PASS_REGULAR_EXPRESSION "Configuration valid: .*example-config/init.lua")
         add_test(NAME workspaces COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/workspace_smoke.py
