@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
-import QtQuick.Controls.Basic
 
 // The power menu: lock, suspend and the rest, as far as the compositor says they may run. Up and
 // Down choose, Enter runs. Restart, power off and log out ask first (PowerDialog.qml).

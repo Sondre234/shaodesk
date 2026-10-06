@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
-import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
 // The active keyboard layout's short name ("us", "no"), shown while the keymap has more than

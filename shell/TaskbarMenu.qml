@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
-import QtQuick.Controls.Basic
 
 // The context menu of a window's button (its pinned application's too), of a pinned
 // application's button, or of the bar itself, whose appearance entry lists the profiles in its

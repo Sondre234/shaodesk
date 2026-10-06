@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
-import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
 // The network: ascending bars for Wi-Fi, a plug for a wired link, dimmed and struck through

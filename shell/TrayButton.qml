@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
-import QtQuick.Controls.Basic
 
 // An application's status icon in the tray (a StatusNotifierItem), its attention icon while
 // it needs attention. Left-click activates the application (or opens the menu of an item that
