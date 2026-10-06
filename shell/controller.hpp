@@ -44,6 +44,8 @@ class ShellController : public QObject {
     // findWallpapers(), and the folder they come from.
     Q_PROPERTY(QVariantList wallpapers READ wallpapers NOTIFY wallpapersChanged)
     Q_PROPERTY(QString wallpaperFolder READ wallpaperFolder NOTIFY configChanged)
+    // How the shell is laid out (shell.style): "taskbar" or "macos".
+    Q_PROPERTY(QString style READ style NOTIFY configChanged)
     Q_PROPERTY(int panelHeight READ panelHeight NOTIFY configChanged)
     Q_PROPERTY(bool panelTop READ panelTop NOTIFY configChanged)
     Q_PROPERTY(int panelMarginTop READ panelMarginTop NOTIFY configChanged)
@@ -151,6 +153,7 @@ class ShellController : public QObject {
     // Shows `path` as the wallpaper of the profile in use, remembered across sessions until the
     // configured wallpaper changes; an empty path goes back to the configured one.
     Q_INVOKABLE void pickWallpaper(const QString &path);
+    QString style() const { return config_.shell.macos_style ? "macos" : "taskbar"; }
     int panelHeight() const { return config_.shell.panel_height; }
     bool panelTop() const { return config_.shell.panel_top; }
     int panelMarginTop() const { return config_.shell.panel_margin[0]; }

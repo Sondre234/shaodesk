@@ -165,6 +165,8 @@ return {
     -- terminal = { "foot" },
     shell = {
         enabled = true,
+        -- style = "taskbar", -- or "macos": a menu bar along the top and a dock at the bottom,
+        --                      the panel settings below applying to the dock
         -- panel_height = 52,
         -- panel_position = "bottom", -- or "top"
         -- panel_margin = 0, -- or { top = 8, right = 12, bottom = 0, left = 12 } to float

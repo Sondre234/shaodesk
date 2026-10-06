@@ -534,6 +534,11 @@ int main(int argc, char **argv) {
                     shaodesk::parse_config("return {shell={renderer='software'}}")
                         .shell.software_renderer,
                 "renderer not parsed");
+        require(!even.shell.macos_style, "the shell is a taskbar by default");
+        require(shaodesk::parse_config("return {shell={style='macos'}}").shell.macos_style &&
+                    !shaodesk::parse_config("return {shell={style='taskbar'}}").shell.macos_style,
+                "style not parsed");
+        rejects("return {shell={style='gnome'}}");
         rejects("return {shell={renderer='vulkan'}}");
         rejects("return {shell={workspaces_shown=11}}");
         rejects("return {shell={renderer=true}}");

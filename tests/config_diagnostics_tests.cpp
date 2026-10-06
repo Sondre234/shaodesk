@@ -71,7 +71,7 @@ void unknown_settings() {
            "did you mean 'icon'?");
     expect("return {shell={panel_margin={tp=1}}}", "did you mean 'top'?");
     // Nothing close: list what is valid.
-    expect("return {shell={zzzzzzzz=1}}", "expected one of: enabled, panel_height");
+    expect("return {shell={zzzzzzzz=1}}", "expected one of: enabled, style, panel_height");
     require(error_of("return {shell={zzzzzzzz=1}}").find("did you mean") == std::string::npos,
             "a far-off name got a suggestion");
 }

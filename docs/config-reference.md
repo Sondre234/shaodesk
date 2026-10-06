@@ -301,6 +301,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | --- | --- | --- | --- | --- |
 | `shell` | table | - | - | The desktop shell: panel, wallpaper, launchers. |
 | `shell.enabled` | boolean | true | - | Start the shell with the compositor. |
+| `shell.style` | enum | "taskbar" | - | How the shell is laid out: `"taskbar"` (one bar with a start menu, as on Windows) or `"macos"` (a menu bar along the top and a dock at the bottom, the panel settings applying to the dock). |
 | `shell.panel_height` | integer | 52 | 24 to 100 | Panel height in pixels. |
 | `shell.panel_position` | enum | "bottom" | - | `"top"` or `"bottom"`. |
 | `shell.panel_margin` | integer or table | 0 | - | Pixels around the panel, 0 to 200: one number, or `{ top, right, bottom, left }` by name, to make it float. |
