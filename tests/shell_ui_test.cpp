@@ -576,6 +576,15 @@ int main(int argc, char **argv) {
             return 1;
         }
     }
+    // The compositor says whether night light is on and who decides.
+    if (controller.nightLight() || !controller.nightLightMode().isEmpty())
+        return fail("night light is known before the compositor says");
+    subscriber->write("night-light on auto\n");
+    if (!QTest::qWaitFor([&] { return controller.nightLight() && controller.nightLightMode() == "auto"; }))
+        return fail("the night light the compositor reports was not read");
+    subscriber->write("night-light off off\n");
+    if (!QTest::qWaitFor([&] { return !controller.nightLight() && controller.nightLightMode() == "off"; }))
+        return fail("a change of night light was not read");
     // Battery and network widgets show what a (fake) sysfs reports, and only where it exists.
     {
         QDir sys(screens.filePath("sys"));

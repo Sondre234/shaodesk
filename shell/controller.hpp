@@ -67,6 +67,10 @@ class ShellController : public QObject {
     // The compositor's active keyboard layout: {number (from 1), count, short ("us"), name}, or
     // empty without a compositor.
     Q_PROPERTY(QVariantMap keyboardLayout READ keyboardLayout NOTIFY keyboardLayoutChanged)
+    // The compositor's night light: whether it warms the screen now, and who decides: "auto"
+    // (the schedule), "on" or "off" (an override), or "" without a compositor.
+    Q_PROPERTY(bool nightLight READ nightLight NOTIFY nightLightChanged)
+    Q_PROPERTY(QString nightLightMode READ nightLightMode NOTIFY nightLightChanged)
     Q_PROPERTY(QVariantList pinned READ pinned NOTIFY appsChanged)
     Q_PROPERTY(QVariantList apps READ apps NOTIFY appsChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
@@ -162,6 +166,10 @@ class ShellController : public QObject {
     Q_INVOKABLE void pickProfile(const QString &name) { send("profile " + name); }
     QVariantMap widgets() const;
     QVariantMap keyboardLayout() const { return keyboardLayout_; }
+    bool nightLight() const { return nightLight_; }
+    QString nightLightMode() const { return nightLightMode_; }
+    // What the compositor says of night light; the preview's stand-in says it too.
+    void setNightLight(bool on, const QString &mode);
     QVariantList pinned() const;
     QVariantList apps() const;
     QString error() const { return error_; }
@@ -266,6 +274,7 @@ class ShellController : public QObject {
     void focusedOutputChanged();
     void cardsOutputChanged();
     void keyboardLayoutChanged();
+    void nightLightChanged();
     // The compositor asked for the notification history on `output`.
     void notificationsRequested(const QString &output);
     // The compositor asked for the power menu on `output`.
@@ -295,6 +304,8 @@ class ShellController : public QObject {
                          qEnvironmentVariableIsSet("SHAODESK_SYSFS") ? 100 : 0};
     QString focusedOutput_, cardsOutput_;
     QVariantMap keyboardLayout_;
+    bool nightLight_ = false;
+    QString nightLightMode_;
     QObject *notificationService_ = nullptr;
     TrayModel tray_;
     QObject *trayHost_ = nullptr;

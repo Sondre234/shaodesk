@@ -592,6 +592,12 @@ void ShellController::subscribe() {
                     Q_EMIT keyboardLayoutChanged();
                 }
                 continue;
+            } else if (line.startsWith("night-light ")) {
+                // night-light ACTIVE MODE
+                const auto words = line.split(' ');
+                if (words.size() == 3)
+                    setNightLight(words[1] == "on", words[2]);
+                continue;
             } else if (line.startsWith("dnd ")) {
                 handleDnd(line.sliced(4));
                 continue;
@@ -740,6 +746,7 @@ void ShellController::subscribe() {
             Q_EMIT keyboardLayoutChanged();
         }
         power_.setAvailable("-");
+        setNightLight(false, {});
         if (urgentCount_ != 0 || !urgentWindows_.isEmpty()) {
             urgentCount_ = 0;
             urgentWindows_.clear();
@@ -755,6 +762,13 @@ void ShellController::subscribe() {
         clearOverview();
     });
     state_->connectToServer(path);
+}
+void ShellController::setNightLight(bool on, const QString &mode) {
+    if (on == nightLight_ && mode == nightLightMode_)
+        return;
+    nightLight_ = on;
+    nightLightMode_ = mode;
+    Q_EMIT nightLightChanged();
 }
 QString ShellController::overlayOutput() const {
     const auto screens = QGuiApplication::screens();
