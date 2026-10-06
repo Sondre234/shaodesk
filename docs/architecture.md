@@ -93,7 +93,7 @@ window as large as `ShellView::previewSize()`, and a preview's screenshot draws 
 | `PinnedSlots.qml`, `TaskList.qml`, `TaskButton.qml`, `TrayButton.qml`, `WorkspaceIndicator.qml`, `VolumeButton.qml`, `ClockButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `BarTip.qml` | Parts of the bar: widgets, and the tooltip for things on it. |
 | `ClockFlyout.qml`, `AudioMixer.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
 | `CalendarPopup.qml`, `NotificationHistory.qml` | The clock flyout's cards: the month calendar, and the notifications grouped by application. |
-| `Icon.qml`, `SpeakerIcon.qml` | Line icons (Lucide), drawn as vectors in any colour, and the loudspeaker for a volume. |
+| `Icon.qml`, `SpeakerIcon.qml`, `BatteryIcon.qml` | Line icons (Lucide), drawn as vectors in any colour, the loudspeaker for a volume, and a battery filled to its charge. |
 | `FlatButton.qml` | The frameless button of the bar and of menus, showing the hover, pressed and active states. |
 | `PopupCard.qml` | A popup's card: surface, outline, corners, a shadow through the GPU, the open and close animation, and its place beside what it belongs to. |
 | `PopupMenu.qml`, `MenuRow.qml` | A menu of plain entries on popup cards, with cascading submenus and keyboard navigation, and one row of it. |
