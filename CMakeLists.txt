@@ -352,6 +352,15 @@ if(SHAODESK_BUILD_COMPOSITOR)
         target_include_directories(output_management_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
         target_link_libraries(output_management_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
         target_compile_options(output_management_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        # A taskbar's window menu through shaodesk-window-control-v1, for window_control_smoke.
+        add_executable(window_probe tests/window_probe.c
+            ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c)
+        target_include_directories(window_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        target_link_libraries(window_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
+        target_compile_options(window_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
         add_test(NAME output_management COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_management_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:output_management_probe>)
@@ -404,6 +413,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(sticky_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME window_control_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_control_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>)
+        set_tests_properties(window_control_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME workspace_back_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/workspace_back_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
