@@ -209,6 +209,11 @@ if(BUILD_TESTING)
         ${PROJECT_SOURCE_DIR}/tests/shell_preview.py $<TARGET_FILE:shaodesk-shell>
         ${EXAMPLE_CONFIG})
     set_tests_properties(shell_preview PROPERTIES TIMEOUT 90)
+    # Every popup of tools/shell_gallery.py renders without a QML warning.
+    add_test(NAME shell_gallery COMMAND ${Python3_EXECUTABLE}
+        ${PROJECT_SOURCE_DIR}/tests/shell_gallery.py ${PROJECT_SOURCE_DIR}/tools/shell_gallery.py
+        ${PROJECT_BINARY_DIR} software)
+    set_tests_properties(shell_gallery PROPERTIES TIMEOUT 120)
     add_test(NAME shell_version COMMAND shaodesk-shell --version)
     set_tests_properties(shell_version PROPERTIES PASS_REGULAR_EXPRESSION "^shaodesk-shell ${PROJECT_VERSION}( \\(git [^)]+\\))?\n$")
     if(NOT SHAODESK_SHELL_PREVIEW_ONLY)
@@ -221,6 +226,16 @@ if(BUILD_TESTING)
             ${PROJECT_SOURCE_DIR}/tests/overview_shell_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(overview_shell_smoke PROPERTIES TIMEOUT 60)
+        # A few of the gallery's popups through the GPU (Mesa's software OpenGL, in a private
+        # compositor), where effects are drawn. Not under the sanitizers: now and then Qt's
+        # Wayland platform leaks a surface of a preview that quits soon after showing.
+        if(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize")
+            add_test(NAME shell_gallery_gpu COMMAND ${Python3_EXECUTABLE}
+                ${PROJECT_SOURCE_DIR}/tests/shell_gallery.py
+                ${PROJECT_SOURCE_DIR}/tools/shell_gallery.py ${PROJECT_BINARY_DIR} gpu
+                bar launcher tray-menu notifications)
+            set_tests_properties(shell_gallery_gpu PROPERTIES TIMEOUT 120)
+        endif()
         find_program(GRIM grim)
         # A missing grim is an empty argument, which the tests take as leaving out their
         # pixel checks (GRIM itself would be GRIM-NOTFOUND).

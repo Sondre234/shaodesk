@@ -229,7 +229,7 @@ def main():
         print("no compositor in the build directory: the GPU renderer is left out",
               file=sys.stderr)
         renderers.remove("gpu")
-    failures = {}
+    failures, written = {}, 0
     with tempfile.TemporaryDirectory(prefix="shaodesk-gal-") as directory:
         for theme in args.theme or list(THEMES):
             root = Path(directory) / theme
@@ -245,9 +245,10 @@ def main():
                                             root, jobs, 400, args))
                 else:
                     failures.update(run_gpu(build, shell, env, root, jobs, args))
+                written += sum(path.exists() for _, path in jobs)
     for path, problems in sorted(failures.items()):
         print(f"{path.name}:", *problems, sep="\n    ", file=sys.stderr)
-    print(f"{len(list(out.glob('*.png')))} pictures in {out}"
+    print(f"{written} pictures in {out}"
           + (f"; {len(failures)} with problems" if failures else ""))
     return 1 if failures else 0
 
