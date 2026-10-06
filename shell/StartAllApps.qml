@@ -41,6 +41,8 @@ Item {
     onCurrentChanged: if (current >= 0) list.positionViewAtIndex(current, ListView.Contain)
     readonly property var currentApp: current >= 0 && current < entries.length ? entries[current] : null
 
+    // The row the keyboard is at, or null.
+    function currentItem() { return current < 0 ? null : list.itemAtIndex(current) }
     function reset() {
         lettersOpen = false
         current = -1
@@ -133,6 +135,7 @@ Item {
                 }
             }
             StartRow {
+                id: appRow
                 visible: !entry.header
                 objectName: entry.header ? "" : "startApp:" + entry.modelData.appId
                 anchors.fill: parent
@@ -141,6 +144,7 @@ Item {
                 title: entry.header ? "" : entry.modelData.name
                 current: all.current === entry.index
                 onClicked: all.launcher.launch(entry.modelData.appId)
+                onMenuRequested: (x, y) => all.launcher.openAppMenu(entry.modelData, appRow, x, y, false)
             }
         }
     }

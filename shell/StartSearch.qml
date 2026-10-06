@@ -20,6 +20,10 @@ Item {
     readonly property var currentResult: results[current] || null
     readonly property var headings: ({ best: "Best match", apps: "Apps", windows: "Open windows", actions: "Actions" })
 
+    // The result the keyboard is at, or null.
+    function currentItem() { return list.itemAtIndex(current) }
+    // An application's record, when the keyboard is at one.
+    readonly property var currentApp: currentResult && currentResult.kind === "app" ? currentResult : null
     // Down and Tab, Up and Backtab move through every result, wrapping; Page Down and Page Up
     // move a few. Returns whether the key moved.
     function key(event) {
@@ -75,6 +79,7 @@ Item {
                 onHoveredChanged: if (hovered) found.current = result.index
             }
             StartRow {
+                id: row
                 visible: !result.best
                 objectName: "startResult:" + result.modelData.title
                 width: parent.width; height: visible ? implicitHeight : 0
@@ -85,6 +90,10 @@ Item {
                 current: found.current === result.index
                 onHoveredChanged: if (hovered) found.current = result.index
                 onClicked: found.launcher.run(result.modelData)
+                onMenuRequested: (x, y) => {
+                    if (result.modelData.kind === "app")
+                        found.launcher.openAppMenu(result.modelData, row, x, y, false)
+                }
             }
         }
     }

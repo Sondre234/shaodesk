@@ -33,7 +33,7 @@ POPUPS = ["bar", "launcher", "power", "bar-menu", "bar-submenu", "task-menu", "p
           "group", "tray-menu", "tray-submenu", "calendar", "mixer", "outputs", "profiles",
           "wallpapers", "notifications"]
 # The start menu's other views and its menus.
-POPUPS += ["launcher-all", "launcher-search"]
+POPUPS += ["launcher-all", "launcher-search", "launcher-menu"]
 
 # Translucent bars, as appearance profiles often have them.
 THEMES = {

@@ -13,8 +13,15 @@ AbstractButton {
     property string trailing
     property real iconSize: Theme.appIconSizeLarge
     property bool current: false
+    // A right press, for the application's menu, where it was.
+    signal menuRequested(real x, real y)
     focusPolicy: Qt.NoFocus
     hoverEnabled: true
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.RightButton
+        onPressed: (mouse) => row.menuRequested(mouse.x, mouse.y)
+    }
     implicitHeight: Math.max(iconSize, titleText.implicitHeight + (subtitle ? subtitleText.implicitHeight : 0)) +
                     2 * Theme.spacingM
     Accessible.name: title

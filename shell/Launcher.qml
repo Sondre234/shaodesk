@@ -21,6 +21,7 @@ PopupCard {
         now = new Date()
         home.reset()
         allView.reset()
+        menuApp = null
         // Once it is in its place: the first time, it opens while its loader is still making it,
         // and the keyboard would stay with the loader it then leaves.
         Qt.callLater(takeFocus)
@@ -33,6 +34,8 @@ PopupCard {
         target: launcher.panel
         function onPowerOpenChanged() { if (launcher.open) launcher.takeFocus() }
     }
+    // The keyboard comes back from an application's menu as it closes.
+    onMenuAppChanged: if (menuApp === null && open) takeFocus()
     // By the bar's start, 640 by 720 pixels, or as tall as the output leaves room for.
     implicitWidth: 640
     implicitHeight: 720
@@ -90,21 +93,93 @@ PopupCard {
             else if (shown !== searchView && shown.currentApp)
                 launch(shown.currentApp.appId)
             event.accepted = true
+        } else if (event.key === Qt.Key_Menu || (event.key === Qt.Key_F10 && (event.modifiers & Qt.ShiftModifier))) {
+            var item = shown.currentItem()
+            if (shown.currentApp && item)
+                openAppMenu(shown.currentApp, item, 0, item.height, shown === home && home.current < home.pins.length, true)
+            event.accepted = true
         } else {
             // Tab stays in the menu, whatever there is to move through.
             event.accepted = shown.key(event) || event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab
         }
     }
-    // For a preview (Panel.previewPopup): shows "launcher-all", every application, or
-    // "launcher-search", what a search finds.
+    // The menu of an application here: its record (null while it is closed), whether it is of a
+    // pinned tile, which can move to the front, and where it opens, in the popups' coordinates.
+    property var menuApp: null
+    property bool menuTile: false
+    property bool menuByKeyboard: false
+    property rect menuAnchor
+    // Opens it at (x, y) in `item`, as a right press there does, or by `item`'s bottom-left
+    // corner with its first entry highlighted, for the keyboard.
+    function openAppMenu(app, item, x, y, tile, byKeyboard) {
+        var at = item.mapToItem(panel.popupLayer, x, y)
+        menuAnchor = Qt.rect(at.x, at.y, 0, 0)
+        menuTile = tile
+        menuByKeyboard = !!byKeyboard
+        menuApp = app
+    }
+    // Open, what its desktop entry offers besides (New Window, ...), then pinning it to the start
+    // menu or the taskbar, or unpinning it, and a pinned tile's Move to front. A configured
+    // launcher is only opened: the configuration pins it to the taskbar.
+    function appMenuEntries(app, tile) {
+        if (!app)
+            return []
+        var id = app.appId
+        var entries = [{ text: "Open", icon: "app-window", objectName: "startMenu:open",
+                         run: function() { launcher.launch(id) } }]
+        if (app.configured)
+            return entries
+        entries = entries.concat(shell.appActions(id).map(function(action) {
+            return { text: action.name, icon: action.icon, objectName: "startMenu:action:" + action.action,
+                     run: function() { launcher.launchAction(id, action.action) } }
+        }))
+        // Reading the pins makes the entries follow them. Pinning waits until the click is
+        // handled: the change rebuilds the menu, destroying the clicked row.
+        var pins = shell.startMenu.pinned
+        var pinned = pins.some(function(pin) { return pin.appId === id })
+        entries.push({ separator: true })
+        entries.push(pinned
+            ? { text: "Unpin from Start", icon: "pin-off", objectName: "startMenu:unpin",
+                run: function() { Qt.callLater(function() { shell.startMenu.unpin(id) }) } }
+            : { text: "Pin to Start", icon: "pin", objectName: "startMenu:pin",
+                run: function() { Qt.callLater(function() { shell.startMenu.pin(id) }) } })
+        if (tile && pinned && pins[0].appId !== id) {
+            var first = pins[0].appId
+            entries.push({ text: "Move to front", icon: "arrow-up-to-line", objectName: "startMenu:front",
+                           run: function() { Qt.callLater(function() { shell.startMenu.movePin(id, first) }) } })
+        }
+        var taskbar = panel.pinAction(id)
+        var onTaskbar = shell.pinned.some(function(pin) { return pin.appId === id })
+        taskbar.icon = onTaskbar ? "pin-off" : "pin"
+        taskbar.objectName = "startMenu:taskbar"
+        entries.push(taskbar)
+        return entries
+    }
+    // For a preview (Panel.previewPopup): shows "launcher-all", every application,
+    // "launcher-search", what a search finds, or "launcher-menu", a pinned tile's menu.
     function preview(name) {
-        if (name === "launcher-all")
+        if (name === "launcher-all") {
             allApps = true
-        else if (name === "launcher-search")
+        } else if (name === "launcher-search") {
             search.text = "fi"
-        else
+        } else if (name === "launcher-menu") {
+            // The fourth tile's, which can move to the front, once the tiles are laid out.
+            home.current = Math.min(3, home.pins.length - 1)
+            if (!home.currentApp)
+                return false
+            previewMenu.start()
+        } else {
             return false
+        }
         return true
+    }
+    Timer {
+        id: previewMenu
+        interval: 50
+        onTriggered: {
+            var tile = home.currentItem()
+            launcher.openAppMenu(home.currentApp, tile, tile.width / 2, tile.height / 2, true)
+        }
     }
 
     TextField {
@@ -209,12 +284,31 @@ PopupCard {
             }
         }
     }
-    // While the power menu is open, a press anywhere else in the launcher closes it.
+    // While the power menu or an application's is open, a press anywhere else in the launcher
+    // closes it, and only it.
     MouseArea {
         anchors.fill: parent
         z: 1
-        visible: panel.powerOpen
-        onPressed: panel.powerOpen = false
+        visible: panel.powerOpen || launcher.menuApp !== null
+        acceptedButtons: Qt.AllButtons
+        onPressed: { panel.powerOpen = false; launcher.menuApp = null }
+    }
+    // An application's menu, where it was asked for, over the launcher.
+    PopupMenu {
+        id: appMenu
+        objectName: "startAppMenu"
+        entryName: "startMenuEntry"
+        parent: launcher.panel.popupLayer
+        z: 1
+        open: launcher.open && launcher.menuApp !== null
+        entries: launcher.appMenuEntries(launcher.menuApp, launcher.menuTile)
+        anchorRect: launcher.menuAnchor
+        side: Qt.BottomEdge
+        alignment: Qt.AlignLeft
+        gap: 0
+        bounds: launcher.panel.popupArea
+        initialIndex: launcher.menuByKeyboard ? 0 : -1
+        onDismissed: launcher.menuApp = null
     }
     // The power menu, above the power button and ending where it ends, over the launcher.
     PowerMenu {

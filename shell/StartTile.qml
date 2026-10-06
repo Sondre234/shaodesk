@@ -8,10 +8,17 @@ AbstractButton {
     id: tile
     required property var app
     property bool current: false
+    // A right press, for the application's menu, where it was.
+    signal menuRequested(real x, real y)
     objectName: "startTile:" + app.appId
     focusPolicy: Qt.NoFocus
     hoverEnabled: true
     Accessible.name: app.name
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.RightButton
+        onPressed: (mouse) => tile.menuRequested(mouse.x, mouse.y)
+    }
     background: Rectangle {
         radius: Theme.radiusMedium
         color: tile.pressed ? Theme.pressed : tile.current ? Theme.selected

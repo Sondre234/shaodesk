@@ -1680,6 +1680,74 @@ int main(int argc, char **argv) {
         click(item("startBack"));
         if (!QTest::qWaitFor([&] { return shown("startTile:shaodesk-test-app.desktop"); }))
             return fail("Back did not show the pinned applications again");
+        // An application's menu, from a right press on its tile or row: Open, its desktop
+        // actions, pinning to the start menu and the taskbar, and a tile's Move to front.
+        auto *appMenu = item("startAppMenu");
+        auto menuFor = [&](const QString &name) {
+            click(item(name), Qt::RightButton);
+            return QTest::qWaitFor([&] { return inPopover(appMenu) && shown("startMenu:open"); });
+        };
+        auto choose = [&](const QString &entry) {
+            if (!shown(entry))
+                return false;
+            click(item(entry));
+            return QTest::qWaitFor([&] { return !appMenu->isVisible(); });
+        };
+        auto startPins = [&] {
+            QFile file(screens.filePath("state/shaodesk/start-pinned"));
+            return file.open(QIODevice::ReadOnly) ? QString::fromUtf8(file.readAll()) : QString();
+        };
+        if (!appMenu || !menuFor("startTile:shaodesk-test-other.desktop") || !shown("startMenu:unpin") ||
+            !shown("startMenu:front") || item("startMenu:taskbar")->property("text") != "Pin to taskbar" ||
+            shown("startMenu:pin"))
+            return fail("a pinned tile's menu does not offer to unpin it, move it to the front and pin it to the taskbar");
+        if (!choose("startMenu:taskbar") || !QTest::qWaitFor([&] { return controller.isPinned("shaodesk-test-other.desktop"); }) ||
+            !launcherOpen() || !search->hasActiveFocus())
+            return fail("Pin to taskbar from the start menu did not pin it, or closed more than the menu");
+        if (!menuFor("startTile:shaodesk-test-other.desktop") ||
+            item("startMenu:taskbar")->property("text") != "Unpin from taskbar" || !choose("startMenu:taskbar") ||
+            !QTest::qWaitFor([&] { return !controller.isPinned("shaodesk-test-other.desktop"); }))
+            return fail("Unpin from taskbar from the start menu did not unpin it");
+        if (!menuFor("startTile:shaodesk-test-other.desktop") || !choose("startMenu:front") ||
+            !QTest::qWaitFor([&] {
+                return startPins() == "shaodesk-test-other.desktop\nshaodesk-test-app.desktop\n"
+                                      "shaodesk-test-actions.desktop\n";
+            }))
+            return fail(("Move to front did not move the tile first: " + startPins().toStdString()).c_str());
+        if (!menuFor("startTile:shaodesk-test-other.desktop") || shown("startMenu:front") ||
+            !choose("startMenu:unpin") ||
+            !QTest::qWaitFor([&] { return !item("startTile:shaodesk-test-other.desktop"); }) ||
+            startPins() != "shaodesk-test-app.desktop\nshaodesk-test-actions.desktop\n")
+            return fail("Unpin from Start did not remove the tile and forget it");
+        // A row of All apps pins to the start menu; a configured launcher is only opened.
+        click(item("startAllApps"));
+        if (!QTest::qWaitFor([&] { return shown("startApp:shaodesk-test-other.desktop"); }) ||
+            !menuFor("startApp:shaodesk-test-other.desktop") || shown("startMenu:unpin") || shown("startMenu:front") ||
+            !choose("startMenu:pin") ||
+            !QTest::qWaitFor([&] { return startPins().endsWith("shaodesk-test-other.desktop\n"); }))
+            return fail("Pin to Start from All apps did not pin it at the end");
+        if (!menuFor("startApp:pinned:0") || shown("startMenu:pin") || shown("startMenu:taskbar"))
+            return fail("a configured launcher's menu offers to pin it");
+        key(Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !appMenu->isVisible() && search->hasActiveFocus(); }) || !launcherOpen())
+            return fail("Escape in an application's menu did not close only the menu");
+        click(item("startBack"));
+        // The menu key opens the menu of what the keyboard is at, its first entry highlighted;
+        // a desktop action runs from it.
+        key(Qt::Key_Down);
+        key(Qt::Key_Right);
+        QTest::keyClick(popover, Qt::Key_Menu);
+        if (!QTest::qWaitFor([&] {
+                return inPopover(appMenu) && shown("startMenu:action:touch") &&
+                       item("startMenu:open")->property("highlighted").toBool();
+            }))
+            return fail("the menu key did not open the menu of the tile the keyboard was at");
+        QFile::remove(actionMarker);
+        if (!choose("startMenu:action:touch") || !QTest::qWaitFor([&] { return QFile::exists(actionMarker); }) ||
+            !QTest::qWaitFor([&] { return !launcherOpen(); }))
+            return fail("a desktop action from the start menu did not run, or the menu stayed");
+        if (!openStart())
+            return fail("the start menu did not open after a desktop action");
         // A search groups what it finds: the best match first, then applications, windows and
         // actions; the keyboard moves through them all and Enter runs the one it is at.
         editTasks("model.append({ taskId: 42, title: 'Quarterly report', appId: 'shaodesk-test-other', "

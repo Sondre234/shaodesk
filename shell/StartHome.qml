@@ -37,6 +37,11 @@ Item {
         page = 0
         current = -1
     }
+    // The tile or row the keyboard is at, or null.
+    function currentItem() {
+        return current < 0 ? null : current < pins.length ? tiles.itemAt(current)
+                                                          : recentRepeater.itemAt(current - pins.length)
+    }
     // Moves through the pins as they are laid out, on to the recent list under them and back;
     // Tab and Backtab go one by one. Returns whether the key moved.
     function key(event) {
@@ -117,8 +122,10 @@ Item {
             y: -home.page * pinnedArea.height
             Behavior on y { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
             Repeater {
+                id: tiles
                 model: home.pins
                 delegate: StartTile {
+                    id: tile
                     required property var modelData
                     required property int index
                     readonly property int place: index % home.perPage
@@ -128,6 +135,7 @@ Item {
                     y: (Math.floor(index / home.perPage) * home.rows + Math.floor(place / home.columns)) * home.cellHeight
                     width: home.cellWidth; height: home.cellHeight
                     onClicked: home.launcher.launch(modelData.appId)
+                    onMenuRequested: (x, y) => home.launcher.openAppMenu(modelData, tile, x, y, true)
                 }
             }
         }
@@ -194,8 +202,10 @@ Item {
         width: home.width - 2 * home.inset
         columns: 2
         Repeater {
+            id: recentRepeater
             model: home.recent
             delegate: StartRow {
+                id: recentRow
                 required property var modelData
                 required property int index
                 objectName: "startRecent:" + modelData.appId
@@ -205,6 +215,7 @@ Item {
                 title: modelData.name
                 subtitle: shell.startMenu.ago(modelData.launched, home.launcher.now)
                 onClicked: home.launcher.launch(modelData.appId)
+                onMenuRequested: (x, y) => home.launcher.openAppMenu(modelData, recentRow, x, y, false)
             }
         }
     }

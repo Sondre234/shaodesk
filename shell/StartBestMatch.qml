@@ -20,6 +20,13 @@ AbstractButton {
     implicitHeight: topPadding + bottomPadding + head.height + Theme.spacingL + buttons.height
     Accessible.name: result.title
     onClicked: launcher.run(result)
+    // An application's menu on a right press.
+    MouseArea {
+        anchors.fill: parent
+        enabled: card.app
+        acceptedButtons: Qt.RightButton
+        onPressed: (mouse) => card.launcher.openAppMenu(card.result, card, mouse.x, mouse.y, false)
+    }
     background: Rectangle {
         radius: Theme.radiusMedium
         color: card.pressed ? Theme.mix(Theme.surfaceRaisedHover, Theme.text, 0.05)
