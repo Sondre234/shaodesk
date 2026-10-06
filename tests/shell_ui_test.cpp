@@ -280,13 +280,15 @@ int main(int argc, char **argv) {
         // The panel's popups are in the popover's window.
         return item == view.rootObject() ? find(popover->contentItem(), name) : nullptr;
     };
-    // Whether a popup is open and lies inside the popover, off the bar along its bottom edge, the
-    // bar's own surface keeping its size. A menu's first card stands for it.
+    // Whether a popup is open, done sliding in, and lies inside the popover, off the bar along its
+    // bottom edge, the bar's own surface keeping its size. A menu's first card stands for it.
     auto inPopover = [&](QQuickItem *popup) {
         if (auto *card = popup->property("card").value<QQuickItem *>())
             popup = card;
         const QRectF area = popup->mapRectToScene(QRectF(0, 0, popup->width(), popup->height()));
-        return popup->isVisible() && popup->window() == popover && popover->isVisible() &&
+        const QVariant progress = popup->property("progress");
+        return popup->isVisible() && (!progress.isValid() || progress.toReal() == 1) &&
+               popup->window() == popover && popover->isVisible() &&
                area.top() >= 0 && area.left() >= 0 &&
                area.bottom() <= popover->height() - view.height() &&
                area.right() <= popover->width() && view.height() == controller.panelExtent();
