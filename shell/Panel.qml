@@ -67,6 +67,8 @@ Item {
     // the rectangle barAnchor gives: from `x`, `width` wide, and across the bar.
     readonly property int popupSide: onTop ? Qt.BottomEdge : Qt.TopEdge
     function barAnchor(x, width) { return Qt.rect(x, barTop, width, bar.height) }
+    // The output but the bar's strip, where popups stay (PopupCard's bounds).
+    readonly property rect popupArea: Qt.rect(0, onTop ? height : 0, popover.width, popover.height - height)
     onLauncherOpenChanged: {
         if (launcherOpen) { taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; trayMenuKey = "" }
         else powerOpen = false
@@ -336,7 +338,7 @@ Item {
         panel: root.shellView
         keyboard: root.menuOpen
         inputRects: root.menuOpen
-            ? [Qt.rect(0, root.onTop ? root.height : 0, popover.width, popover.height - root.height)]
+            ? [root.popupArea]
             : root.groupOpen && groupListLoader.item
             ? [Qt.rect(groupListLoader.item.x, groupListLoader.item.y, groupListLoader.item.width,
                        groupListLoader.item.height)]
