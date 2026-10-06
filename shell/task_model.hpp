@@ -32,15 +32,18 @@ class TaskModel : public QAbstractListModel {
     void disconnected();
 
   private:
+    // What a window is, as the compositor last said.
+    struct State {
+        QString title, appId;
+        bool active = false, minimized = false, maximized = false, urgent = false;
+    };
     struct Task {
         TaskModel *model;
         zwlr_foreign_toplevel_handle_v1 *handle;
         int id;
-        QString title, appId;
-        bool active = false, minimized = false, maximized = false, urgent = false;
+        State state;
         // What the model last announced; a `done` that changes none of it announces nothing.
-        QString shownTitle, shownAppId;
-        bool shownActive = false, shownMinimized = false, shownMaximized = false, shownUrgent = false;
+        State shown;
     };
     std::vector<std::unique_ptr<Task>> tasks_;
     wl_display *display_ = nullptr;

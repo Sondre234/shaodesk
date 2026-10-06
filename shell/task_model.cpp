@@ -61,21 +61,22 @@ QVariant TaskModel::data(const QModelIndex &index, int role) const {
     if (!index.isValid() || index.row() < 0 || index.row() >= rowCount())
         return {};
     const auto &task = *tasks_[index.row()];
+    const auto &state = task.state;
     switch (role) {
     case TaskId:
         return task.id;
     case Title:
-        return task.title.isEmpty() ? task.appId : task.title;
+        return state.title.isEmpty() ? state.appId : state.title;
     case AppId:
-        return task.appId;
+        return state.appId;
     case Active:
-        return task.active;
+        return state.active;
     case Minimized:
-        return task.minimized;
+        return state.minimized;
     case Maximized:
-        return task.maximized;
+        return state.maximized;
     case Urgent:
-        return task.urgent;
+        return state.urgent;
     default:
         return {};
     }
@@ -95,7 +96,7 @@ void TaskModel::activate(int id) {
     auto *task = find(id);
     if (!task || !seat_)
         return;
-    if (task->active && !task->minimized)
+    if (task->state.active && !task->state.minimized)
         zwlr_foreign_toplevel_handle_v1_set_minimized(task->handle);
     else {
         zwlr_foreign_toplevel_handle_v1_unset_minimized(task->handle);
@@ -110,7 +111,7 @@ void TaskModel::minimize(int id) {
 }
 void TaskModel::maximize(int id) {
     if (auto *task = find(id)) {
-        if (task->maximized)
+        if (task->state.maximized)
             zwlr_foreign_toplevel_handle_v1_unset_maximized(task->handle);
         else
             zwlr_foreign_toplevel_handle_v1_set_maximized(task->handle);
@@ -152,9 +153,10 @@ void TaskModel::matchUrgent(const Task *except) {
     for (const auto &[appId, title] : urgent_) {
         for (auto &task : tasks_) {
             // The compositor cuts a very long title short.
-            const bool sameTitle = task->title == title ||
-                                   (title.toUtf8().size() >= 250 && task->title.startsWith(title));
-            if (task->appId == appId && sameTitle && !claimed.contains(task.get())) {
+            const auto &state = task->state;
+            const bool sameTitle = state.title == title ||
+                                   (title.toUtf8().size() >= 250 && state.title.startsWith(title));
+            if (state.appId == appId && sameTitle && !claimed.contains(task.get())) {
                 claimed.push_back(task.get());
                 break;
             }
@@ -162,40 +164,34 @@ void TaskModel::matchUrgent(const Task *except) {
     }
     for (int i = 0; i < rowCount(); ++i) {
         auto &task = *tasks_[i];
-        task.urgent = claimed.contains(&task);
-        if (&task == except || task.urgent == task.shownUrgent)
+        task.state.urgent = claimed.contains(&task);
+        if (&task == except || task.state.urgent == task.shown.urgent)
             continue;
-        task.shownUrgent = task.urgent;
+        task.shown.urgent = task.state.urgent;
         Q_EMIT dataChanged(index(i), index(i), {Urgent});
     }
 }
 void TaskModel::changed(Task *task) {
     // A window is found by its app id and title, so either changing may mark or unmark it.
-    if (!urgent_.isEmpty() && (task->title != task->shownTitle || task->appId != task->shownAppId))
+    const auto &state = task->state, &shown = task->shown;
+    if (!urgent_.isEmpty() && (state.title != shown.title || state.appId != shown.appId))
         matchUrgent(task);
     for (int i = 0; i < rowCount(); ++i)
         if (tasks_[i].get() == task) {
             QList<int> roles;
-            if (task->title != task->shownTitle)
-                roles.push_back(Title);
-            if (task->appId != task->shownAppId)
-                roles.push_back(AppId);
-            if (task->active != task->shownActive)
-                roles.push_back(Active);
-            if (task->minimized != task->shownMinimized)
-                roles.push_back(Minimized);
-            if (task->maximized != task->shownMaximized)
-                roles.push_back(Maximized);
-            if (task->urgent != task->shownUrgent)
-                roles.push_back(Urgent);
+            auto compare = [&](auto field, Role role) {
+                if (state.*field != shown.*field)
+                    roles.push_back(role);
+            };
+            compare(&State::title, Title);
+            compare(&State::appId, AppId);
+            compare(&State::active, Active);
+            compare(&State::minimized, Minimized);
+            compare(&State::maximized, Maximized);
+            compare(&State::urgent, Urgent);
             if (roles.isEmpty())
                 return;
-            task->shownTitle = task->title;
-            task->shownAppId = task->appId;
-            task->shownActive = task->active;
-            task->shownMinimized = task->minimized;
-            task->shownMaximized = task->maximized;
-            task->shownUrgent = task->urgent;
+            task->shown = task->state;
             Q_EMIT dataChanged(index(i), index(i), roles);
             return;
         }
@@ -243,20 +239,20 @@ void TaskModel::finished(void *data, zwlr_foreign_toplevel_manager_v1 *) {
     Q_EMIT static_cast<TaskModel *>(data)->disconnected();
 }
 void TaskModel::title(void *data, zwlr_foreign_toplevel_handle_v1 *, const char *value) {
-    static_cast<Task *>(data)->title = QString::fromUtf8(value);
+    static_cast<Task *>(data)->state.title = QString::fromUtf8(value);
 }
 void TaskModel::appId(void *data, zwlr_foreign_toplevel_handle_v1 *, const char *value) {
-    static_cast<Task *>(data)->appId = QString::fromUtf8(value);
+    static_cast<Task *>(data)->state.appId = QString::fromUtf8(value);
 }
 void TaskModel::output(void *, zwlr_foreign_toplevel_handle_v1 *, wl_output *) {}
 void TaskModel::state(void *data, zwlr_foreign_toplevel_handle_v1 *, wl_array *states) {
-    auto &task = *static_cast<Task *>(data);
-    task.active = task.minimized = task.maximized = false;
+    auto &state = static_cast<Task *>(data)->state;
+    state.active = state.minimized = state.maximized = false;
     const auto *values = static_cast<const uint32_t *>(states->data);
     for (size_t i = 0; i < states->size / sizeof(uint32_t); ++i) {
-        task.active |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_ACTIVATED;
-        task.minimized |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MINIMIZED;
-        task.maximized |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MAXIMIZED;
+        state.active |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_ACTIVATED;
+        state.minimized |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MINIMIZED;
+        state.maximized |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MAXIMIZED;
     }
 }
 void TaskModel::done(void *data, zwlr_foreign_toplevel_handle_v1 *) {
