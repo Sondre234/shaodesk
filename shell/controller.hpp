@@ -22,6 +22,7 @@
 #include <vector>
 
 typedef struct _GAppInfo GAppInfo;
+class QFileSystemWatcher;
 class QQmlEngine;
 class ShellController : public QObject {
     Q_OBJECT
@@ -81,6 +82,9 @@ class ShellController : public QObject {
     // Configured launchers and installed applications, as {appId, name, icon, pinned (to the
     // taskbar), configured, genericName, keywords, description}.
     Q_PROPERTY(QVariantList apps READ apps NOTIFY appsChanged)
+    // Whether the user's trash holds anything, for the dock's Trash: watched once the style is
+    // macOS, which has a dock.
+    Q_PROPERTY(bool trashFull READ trashFull NOTIFY trashChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
     // What is wrong with the configuration while the default one stands in for it; "" when it
     // loaded.
@@ -243,6 +247,10 @@ class ShellController : public QObject {
     QRect overviewArea() const { return overviewArea_; }
     int overviewSelected() const { return overviewSelected_; }
     Q_INVOKABLE bool launch(const QString &id);
+    bool trashFull() const { return trashFull_; }
+    // Opens the trash in the file manager, as `gio open trash:///` does, or its folder where
+    // nothing opens trash:///; a failure shows across the panel.
+    Q_INVOKABLE bool openTrash();
     // What an installed application's desktop entry offers besides starting it (its [Desktop
     // Action …] groups, such as "New window"), in the entry's order, as {action, name, icon}:
     // icon is the action's own icon name or path, "" when it has none. Empty for a configured
@@ -292,6 +300,7 @@ class ShellController : public QObject {
     void cardsOutputChanged();
     void keyboardLayoutChanged();
     void nightLightChanged();
+    void trashChanged();
     // The compositor asked for the notification history on `output`.
     void notificationsRequested(const QString &output);
     // The compositor asked for the power menu on `output`.
@@ -331,6 +340,11 @@ class ShellController : public QObject {
     QObject *notificationService_ = nullptr;
     TrayModel tray_;
     QObject *trayHost_ = nullptr;
+    QFileSystemWatcher *trashWatcher_ = nullptr;
+    bool trashFull_ = false;
+    // Reads whether the trash holds anything and watches it for a change, from the first time
+    // the style is macOS on.
+    void watchTrash();
     bool serveTray_ = false, trayNoBusReported_ = false;
     void updateTrayHost();
     bool serveNotifications_ = false, noBusReported_ = false;

@@ -12,6 +12,7 @@
 #include <QStandardPaths>
 #include <QFile>
 #include <QFileInfo>
+#include <QFileSystemWatcher>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QSaveFile>
@@ -31,6 +32,7 @@
 ShellController::ShellController(std::filesystem::path path, QObject *parent)
     : QObject(parent), path_(std::move(path)), tasks_(this) {
     loadConfig();
+    watchTrash();
     QFile pins(pinsPath());
     if (pins.open(QIODevice::ReadOnly | QIODevice::Text))
         for (const auto &line : QString::fromUtf8(pins.readAll()).split('\n', Qt::SkipEmptyParts))
@@ -406,6 +408,54 @@ bool ShellController::launch(const QString &id) {
     clearError();
     return true;
 }
+namespace {
+// The user's trash, where the freedesktop.org specification has it: its items are in files/.
+QString trashFolder() {
+    return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/Trash";
+}
+} // namespace
+void ShellController::watchTrash() {
+    if (!trashWatcher_) {
+        if (!config_.shell.macos_style)
+            return;
+        trashWatcher_ = new QFileSystemWatcher(this);
+        connect(trashWatcher_, &QFileSystemWatcher::directoryChanged, this, &ShellController::watchTrash);
+    }
+    // The folder of its items, or the nearest above it until that is made.
+    QString watched = trashFolder() + "/files";
+    while (!QFileInfo(watched).isDir() && QFileInfo(watched).path() != watched)
+        watched = QFileInfo(watched).path();
+    if (trashWatcher_->directories() != QStringList{watched}) {
+        if (!trashWatcher_->directories().isEmpty())
+            trashWatcher_->removePaths(trashWatcher_->directories());
+        trashWatcher_->addPath(watched);
+    }
+    const bool full = !QDir(trashFolder() + "/files").isEmpty(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden);
+    if (full != trashFull_) {
+        trashFull_ = full;
+        Q_EMIT trashChanged();
+    }
+}
+bool ShellController::openTrash() {
+    GAppLaunchContext *context = g_app_launch_context_new();
+    g_app_launch_context_unsetenv(context, "QT_WAYLAND_SHELL_INTEGRATION");
+    GError *error = nullptr;
+    bool success = g_app_info_launch_default_for_uri("trash:///", context, nullptr);
+    if (!success) {
+        QDir().mkpath(trashFolder() + "/files");
+        const QByteArray folder = QUrl::fromLocalFile(trashFolder() + "/files").toEncoded();
+        success = g_app_info_launch_default_for_uri(folder.constData(), context, &error);
+    }
+    g_object_unref(context);
+    if (!success) {
+        report("Could not open the Trash: " + QString::fromUtf8(error ? error->message : "unknown error"));
+        if (error)
+            g_error_free(error);
+        return false;
+    }
+    clearError();
+    return true;
+}
 bool ShellController::start(GAppInfo *info, const QString &name) {
     // The shell's own platform settings are not the application's.
     GAppLaunchContext *context = g_app_launch_context_new();
@@ -514,6 +564,7 @@ bool ShellController::launchAction(const QString &id, const QString &action) {
 void ShellController::reload() {
     try {
         loadConfig();
+        watchTrash();
         notifications_.configure(config_.notifications);
         osd_.configure(config_.osd);
         power_.setCountdown(config_.power.countdown);
