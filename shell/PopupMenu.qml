@@ -8,6 +8,9 @@ import QtQuick.Controls.Basic
 //   { text, icon, secondary, toggle, checked, enabled, danger, run, submenu, objectName }
 //   { separator: true }     a line between groups
 //   { header: "Name" }      a section's heading
+//   { title: "Name", icon, secondary }   the menu's own heading, above its entries: the icon
+//                           large, the name, and the secondary text under it (a window's title),
+//                           elided to the width the entries need rather than widening the menu
 //
 // - text: the label. icon: a line icon Icon.qml draws ("power"), else a theme icon's name
 //   ("window-new") or an image's URL. secondary: muted text at the end of the row, such as a
@@ -156,7 +159,7 @@ Item {
 
         function selectable(index) {
             var e = entries[index]
-            return !!e && !e.separator && !e.header && e.enabled !== false
+            return !!e && !e.separator && !e.header && !e.title && e.enabled !== false
         }
         function hasSubmenu(index) { return selectable(index) && !!entries[index].submenu }
         function move(step) {
@@ -264,7 +267,15 @@ Item {
 
         FontMetrics { id: labelFont; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
         FontMetrics { id: smallFont; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily }
-        readonly property bool iconColumn: entries.some(function(e) { return !e.separator && !e.header && (e.icon || e.toggle) })
+        FontMetrics {
+            id: titleFont
+            font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily; font.weight: Font.DemiBold
+        }
+        readonly property bool iconColumn: entries.some(function(e) { return !e.separator && !e.header && !e.title && (e.icon || e.toggle) })
+        // A title row: its large icon, or its name over its secondary text, with a margin above and
+        // below.
+        readonly property real titleHeight: Math.max(Theme.appIconSizeLarge, titleFont.height + smallFont.height) +
+                                            2 * Theme.spacingM
         // As wide as its widest row wants, within the menu's bounds.
         readonly property real naturalWidth: {
             var label = 0, secondary = 0, submenu = false
@@ -274,6 +285,12 @@ Item {
                     continue
                 if (e.header) {
                     label = Math.max(label, smallFont.advanceWidth(e.header))
+                    continue
+                }
+                if (e.title) {
+                    // Its large icon in place of the icon column; its secondary text is elided.
+                    label = Math.max(label, Theme.appIconSizeLarge + Theme.spacingL + titleFont.advanceWidth(e.title) -
+                                     (iconColumn ? Theme.iconSizeSmall + Theme.spacingL : 0))
                     continue
                 }
                 label = Math.max(label, labelFont.advanceWidth(e.text || ""))
@@ -289,7 +306,8 @@ Item {
             var sum = 0
             for (var i = 0; i < entries.length; ++i)
                 sum += entries[i].separator ? 2 * Theme.spacingS + 1
-                     : entries[i].header ? Theme.headingHeight : level.menu.rowHeight
+                     : entries[i].header ? Theme.headingHeight
+                     : entries[i].title ? titleHeight : level.menu.rowHeight
             return Math.max(level.menu.rowHeight, sum)
         }
         implicitWidth: Math.min(level.menu.maximumWidth, Math.max(level.menu.minimumWidth, naturalWidth + 2 * padding))
@@ -307,6 +325,7 @@ Item {
             delegate: MenuRow {
                 width: ListView.view.width
                 rowHeight: level.menu.rowHeight
+                titleHeight: level.titleHeight
                 iconColumn: level.iconColumn
                 objectName: modelData.objectName || (modelData.separator ? level.menu.separatorName : level.menu.entryName)
                 highlighted: level.current === index

@@ -124,8 +124,9 @@ if(SHAODESK_BUILD_COMPOSITOR)
     find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
     set(WLR_PROTOCOL_HEADERS)
     set(WLR_CLIENT_PROTOCOL_SOURCES)
+    # wlroots implements the wlr protocols; shaodesk-window-control-v1 is the compositor's own.
     foreach(PROTOCOL wlr-layer-shell-unstable-v1 wlr-foreign-toplevel-management-unstable-v1
-            wlr-output-management-unstable-v1)
+            wlr-output-management-unstable-v1 shaodesk-window-control-v1)
         add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-protocol.h
             COMMAND ${WAYLAND_SCANNER} server-header
             ${CMAKE_CURRENT_SOURCE_DIR}/protocols/${PROTOCOL}.xml
@@ -182,11 +183,16 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/switcher.c
         src/compositor/tiling.c
         src/compositor/toplevel.c
+        src/compositor/window_control.c
         src/compositor/workspace.c
         src/compositor/xwayland.c
     )
     add_executable(shaodesk src/main.cpp ${SHAODESK_COMPOSITOR_SOURCES} src/decoration.c src/animation.c src/effects_scene.c src/sleep.c src/login1.c
         ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.h ${WLR_PROTOCOL_HEADERS})
+    # The compositor's own protocol names a taskbar handle, whose interface wlroots keeps to
+    # itself: both interfaces are compiled in here.
+    target_sources(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c
+        ${CMAKE_CURRENT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c)
     target_sources(shaodesk PRIVATE src/overview_scene.c)
     target_include_directories(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_compile_definitions(shaodesk PRIVATE WLR_USE_UNSTABLE)
@@ -346,6 +352,15 @@ if(SHAODESK_BUILD_COMPOSITOR)
         target_include_directories(output_management_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
         target_link_libraries(output_management_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
         target_compile_options(output_management_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        # A taskbar's window menu through shaodesk-window-control-v1, for window_control_smoke.
+        add_executable(window_probe tests/window_probe.c
+            ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c)
+        target_include_directories(window_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        target_link_libraries(window_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
+        target_compile_options(window_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
         add_test(NAME output_management COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_management_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:output_management_probe>)
@@ -398,6 +413,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(sticky_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME window_control_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_control_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>)
+        set_tests_properties(window_control_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME workspace_back_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/workspace_back_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)

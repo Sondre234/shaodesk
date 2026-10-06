@@ -160,7 +160,9 @@ QVariantList fuzzy::rank(const QVariantList &entries, const QString &rawQuery, i
     for (const auto &item : found) {
         if (results.size() >= limit)
             break;
-        results.push_back(item.entry);
+        auto entry = item.entry.toMap();
+        entry["score"] = item.value;
+        results.push_back(entry);
     }
     return results;
 }

@@ -58,10 +58,35 @@ all. In short:
 | `lock.c` | Session lock and idle/sleep inhibitors. |
 | `power.c` | The power actions: suspend, hibernate, reboot and power off through logind (`src/login1.c`), locking first, closing windows first, log out. |
 | `foreign_toplevel.c` | Window lists for taskbars and single-window capture. |
+| `window_control.c` | The shell's window menu: shaodesk-window-control-v1, which names a window by its taskbar handle. |
 
 A function used by one file is `static`; one used by several is declared in `server.h` under
 the file that defines it. The build warns (`-Wmissing-prototypes`) about one that is neither.
 Code that only exists with XWayland is inside `#if WLR_HAS_XWAYLAND`.
+
+### Naming a window from the shell
+
+The shell knows windows only as wlr-foreign-toplevel handles, which carry a title and an app id
+but no name the control socket could be asked about, and two windows may share both. Its window
+menu reaches the compositor through a protocol of shaodesk's own,
+`protocols/shaodesk-window-control-v1.xml`, whose requests name a window by the handle the shell
+already holds, on the same Wayland connection. `shaodesk_window_control_v1.get_window(handle)`
+gives a `shaodesk_window_v1` that sends the window's `output` (connector name), `workspace` (from
+1) and `state` (sticky, floating, tiled, and whether its workspace tiles), then `done`, at once and
+again after each change, and takes `move_to_workspace`, `move_to_output`, `set_sticky` /
+`unset_sticky` and `set_floating` / `unset_floating`.
+
+`window_control.c` finds the window by looking for the handle among the resources of each
+window's `wlr_foreign_toplevel_handle_v1`, so a handle that is gone names nothing and its object
+is inert; `unpublish_toplevel` makes a window's objects inert as its handles close. The requests
+call what the actions do for the focused window (`move_toplevel_to_workspace`,
+`move_toplevel_to_output`, `set_sticky`, `set_floating`), so they neither focus nor raise it,
+and do nothing while the session is locked. A change reaches the objects through
+`window_objects_changed`, which `notify_subscribers` and the tiling call: it sends what changed
+from an idle callback, once the change is over. Like the foreign-toplevel manager, the global is
+offered to every client; it lets a client do nothing to a window a taskbar cannot already do.
+`tests/window_probe.c` is a client of it for `window_control_smoke`, and `TaskModel` the
+shell's.
 
 ## The shell (`shell/`)
 
@@ -98,6 +123,7 @@ window as large as `ShellView::previewSize()`, and a preview's screenshot draws 
 | `PopupCard.qml` | A popup's card: surface, outline, corners, a shadow through the GPU, the open and close animation, and its place beside what it belongs to. |
 | `PopupMenu.qml`, `MenuRow.qml` | A menu of plain entries on popup cards, with cascading submenus and keyboard navigation, and one row of it. |
 | `AudioSlider.qml`, `MuteButton.qml` | Controls the mixer uses. |
+| `StartHome.qml`, `StartAllApps.qml`, `StartSearch.qml`, `StartBestMatch.qml`, `StartTile.qml`, `StartRow.qml`, `StartButton.qml`, `UserAvatar.qml` | Parts of the start menu (`Launcher.qml`): its pinned and recent applications, every application from A to Z, what its search finds and the best match of it, a pinned application, a row of its lists, its small buttons, the user's picture. |
 | `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |
 | `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |
 
@@ -106,6 +132,13 @@ The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `t
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
 `power.cpp`, `palette.cpp`. `preview.cpp` has stand-ins for all of them for
 `--preview-popup`.
+
+The start menu (`Launcher.qml` and its `Start*.qml` parts) reads `shell.startMenu`, a `StartMenu`
+(`start_menu.cpp`): its own pins, seeded from the taskbar's; the applications launched lately
+(`launch_history.cpp`, which the controller tells of every launch); every application by letter;
+its search, which takes the palette's windows, workspaces and actions from `Palette::entries` and
+runs them with `Palette::run`; and the user's name and picture. It tells the controller to read
+the applications again when GIO's monitor says they changed.
 
 ### Popups and menus
 
@@ -130,9 +163,12 @@ the card, for a surface that places it itself.
     { text, icon, secondary, toggle, checked, enabled, danger, run, submenu, objectName }
     { separator: true }
     { header: "Section" }
+    { title: "Name", icon, secondary }
 
 `icon` is a Lucide name `Icon.qml` knows, else a theme icon's name or an image's URL; `secondary`
-is muted text at the row's end (a shortcut, the value in use); `toggle` is `"check"` or `"radio"`
+is muted text at the row's end (a shortcut, the value in use). A `title` is the menu's own heading
+above its entries: the icon large, the name, and the secondary text under it, elided to the width
+the entries need; `toggle` is `"check"` or `"radio"`
 with `checked`; `enabled: false` greys an entry out and `danger: true` draws it in the danger
 colour. `run` is called when the entry is chosen, and the menu then emits `dismissed()` unless it
 returns `true`; `triggered(entry)` comes first. `submenu` is an array of entries, or a function
@@ -187,7 +223,11 @@ is a `BarTip`, a popup is a `PopupCard` and a menu a `PopupMenu`.
 
 `shaodesk-shell --config FILE --preview-popup NAME --screenshot OUT.png --quit-after 400`
 renders the taskbar offscreen with one popup open, on stand-in windows, sound, tray items and
-notifications, over the configured wallpaper (`--preview-popup` lists the names).
+notifications, over the configured wallpaper (`--preview-popup` lists the names). The overlay
+surfaces have names there too (`osd-volume`, `osd-text`, `cards`, `power-dialog`, `palette`,
+`palette-empty`, `switcher`, `overview`): `PreviewData` in `preview.cpp` shows one in a window of its own over the
+bar alone, with stand-ins for what the compositor would tell it, and the screenshot draws it where
+its layer surface would be (the overview over stand-ins for the compositor's thumbnails).
 `tools/shell_gallery.py BUILD_DIR OUT_DIR` does that for every popup in a light and a dark
 theme, both with the software renderer (`light-launcher.png`) and through the GPU
 (`light-launcher-gpu.png`: Qt's OpenGL on Mesa's software implementation, in a private headless
@@ -237,7 +277,10 @@ following `dnd` or `osd`.
 Create the global in `sh_run` in `server.c`, keep its pointer and `wl_listener`s in
 `struct sh_server` (`server.h`), and put the handlers in the module the protocol belongs to,
 declaring the ones `server.c` connects in `server.h`. Add the `#include` for its wlroots
-header to `server.h`.
+header to `server.h`. A protocol of shaodesk's own is an XML file in `protocols/`, named in the
+list `CMakeLists.txt` runs wayland-scanner on (server header and code for the compositor,
+client header and code for the shell and the test probes), its global made with
+`wl_global_create`, as `window_control.c` does.
 
 ### Telling the shell something
 

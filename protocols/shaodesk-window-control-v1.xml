@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="shaodesk_window_control_v1">
+  <copyright>
+    SPDX-License-Identifier: GPL-3.0-or-later
+
+    Part of shaodesk. This protocol is private to shaodesk and its shell, and may change with
+    them.
+  </copyright>
+
+  <description summary="workspaces, outputs and tiling of a taskbar's windows">
+    The window menu of shaodesk's taskbar moves a window to another workspace or output, keeps
+    it on every workspace, or takes it out of the tiling. The taskbar knows its windows as
+    zwlr_foreign_toplevel_handle_v1 objects, which have no requests for that and no name a
+    compositor could be asked about elsewhere; this protocol names a window by such a handle.
+
+    It gives a client nothing a foreign-toplevel client cannot already do to the window (close
+    it, minimize it, make it fullscreen), and the compositor offers it as it offers
+    zwlr_foreign_toplevel_manager_v1.
+  </description>
+
+  <interface name="shaodesk_window_control_v1" version="1">
+    <description summary="controls windows named by their taskbar handles">
+      A global for getting the shaodesk_window_v1 of a window, from the
+      zwlr_foreign_toplevel_handle_v1 the client holds for it.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the window control">
+        The shaodesk_window_v1 objects made through it keep working.
+      </description>
+    </request>
+
+    <request name="get_window">
+      <description summary="the window a taskbar handle stands for">
+        Creates a shaodesk_window_v1 for the window `handle` stands for, which sends the
+        window's state at once (output, workspace, state, then done) and again whenever it
+        changes. A handle whose window is gone (one the client was sent closed for) gives an
+        inert object, which sends nothing and whose requests do nothing.
+      </description>
+      <arg name="id" type="new_id" interface="shaodesk_window_v1"/>
+      <arg name="handle" type="object" interface="zwlr_foreign_toplevel_handle_v1"/>
+    </request>
+  </interface>
+
+  <interface name="shaodesk_window_v1" version="1">
+    <description summary="one window's workspace, output and tiling">
+      Where a window is and how it is placed, and requests that move it. It becomes inert when
+      the window's taskbar handle is sent closed; the client then destroys it.
+
+      None of the requests focuses or raises the window. While the session is locked they do
+      nothing.
+    </description>
+
+    <enum name="state" bitfield="true">
+      <entry name="sticky" value="1" summary="shown on every workspace of its output"/>
+      <entry name="floating" value="2"
+             summary="kept out of the tiling: floated by the user, sticky, or a dialog"/>
+      <entry name="tiled" value="4" summary="a tile of its output's tiling"/>
+      <entry name="tiling" value="8"
+             summary="the workspace it is on tiles windows automatically"/>
+    </enum>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the object">
+        The window is not affected.
+      </description>
+    </request>
+
+    <request name="move_to_workspace">
+      <description summary="move the window to a workspace of its output">
+        Moves the window to workspace `number` (from 1) of the output it is on, as the
+        move_to_workspace action does for the focused window: a sticky window stops being
+        sticky, a tile joins the tiling there or floats where that workspace does not tile, and
+        a focused window that leaves the workspace shown passes the focus on. A number past the
+        configured workspaces does nothing.
+      </description>
+      <arg name="number" type="uint" summary="the workspace, from 1"/>
+    </request>
+
+    <request name="move_to_output">
+      <description summary="move the window to another output">
+        Moves the window onto the workspace output `name` (its connector name, as the output
+        event gives it) shows: a floating window keeps its place relative to the output's
+        usable area, a maximized one is maximized there, and a tile joins the tiling there or
+        floats where that does not tile. A sticky window stays sticky. An output that is not
+        connected, or the one the window is on, does nothing.
+      </description>
+      <arg name="name" type="string" summary="the output's connector name"/>
+    </request>
+
+    <request name="set_sticky">
+      <description summary="show the window on every workspace">
+        As the toggle_sticky action: the window floats and shows on every workspace of its
+        output. Does nothing while features.sticky is off.
+      </description>
+    </request>
+
+    <request name="unset_sticky">
+      <description summary="show the window on one workspace again">
+        The window stays on the workspace its output shows, and tiles again if it was a tile.
+      </description>
+    </request>
+
+    <request name="set_floating">
+      <description summary="take the window out of the tiling">
+        A tile floats where it was before it tiled; a floating window stays out of the tiling
+        when its workspace starts tiling.
+      </description>
+    </request>
+
+    <request name="unset_floating">
+      <description summary="let the window tile">
+        The window joins the tiling of its workspace when that tiles; a sticky one stops being
+        sticky to do so.
+      </description>
+    </request>
+
+    <event name="output">
+      <description summary="the output the window is on">
+        The connector name of the output the window belongs to, "" before it is placed on one.
+        The output may be gone: a window keeps its output while it waits for it to return.
+      </description>
+      <arg name="name" type="string"/>
+    </event>
+
+    <event name="workspace">
+      <description summary="the workspace the window is on">
+        The workspace of its output the window is on, from 1. A sticky window's follows the one
+        its output shows.
+      </description>
+      <arg name="number" type="uint"/>
+    </event>
+
+    <event name="state">
+      <description summary="how the window is placed">
+        A bitfield of the state enum.
+      </description>
+      <arg name="state" type="uint" enum="state"/>
+    </event>
+
+    <event name="done">
+      <description summary="the state is complete">
+        Sent after the output, workspace and state events that describe one state of the
+        window, so that the client applies them together. Only what changed is sent before it.
+      </description>
+    </event>
+  </interface>
+</protocol>

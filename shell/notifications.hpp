@@ -152,6 +152,9 @@ class NotificationCenter : public QObject {
     Q_INVOKABLE void openLink(const QString &url);
     // Milliseconds a card with this timeout and urgency stays, 0 for until dismissed.
     int lifetime(const Notification &notification) const;
+    // The lifetime of the card with that id, from when it came or was last replaced: what its
+    // countdown runs down. 0 for one that stays, or for no such card.
+    Q_INVOKABLE int cardLifetime(uint id) const;
     bool timerRunning(uint id) const;
   Q_SIGNALS:
     void closed(uint id, uint reason);

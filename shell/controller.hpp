@@ -7,6 +7,7 @@
 #include "palette.hpp"
 #include "power.hpp"
 #include "shaodesk/config.hpp"
+#include "start_menu.hpp"
 #include "system_status.hpp"
 #include "task_model.hpp"
 #include "tray.hpp"
@@ -61,6 +62,8 @@ class ShellController : public QObject {
     // software renderer cannot draw them. Set from what the views actually use.
     Q_PROPERTY(bool effects READ effects NOTIFY effectsChanged)
     Q_PROPERTY(bool groupWindows READ groupWindows NOTIFY configChanged)
+    // features.sticky: whether a window can be shown on every workspace of its monitor.
+    Q_PROPERTY(bool stickyWindows READ stickyWindows NOTIFY configChanged)
     // Which panel widgets Lua enables: {workspaces, battery, network, volume, clock, calendar,
     // tiling, profiles, wallpapers, keyboard_layout, power, tray, notifications}.
     Q_PROPERTY(QVariantMap widgets READ widgets NOTIFY configChanged)
@@ -68,6 +71,8 @@ class ShellController : public QObject {
     // empty without a compositor.
     Q_PROPERTY(QVariantMap keyboardLayout READ keyboardLayout NOTIFY keyboardLayoutChanged)
     Q_PROPERTY(QVariantList pinned READ pinned NOTIFY appsChanged)
+    // Configured launchers and installed applications, as {appId, name, icon, pinned (to the
+    // taskbar), configured, genericName, keywords, description}.
     Q_PROPERTY(QVariantList apps READ apps NOTIFY appsChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
     // What is wrong with the configuration while the default one stands in for it; "" when it
@@ -105,6 +110,8 @@ class ShellController : public QObject {
     Q_PROPERTY(Palette *palette READ palette CONSTANT)
     // The power menu: what may run of lock, suspend, hibernate and the rest.
     Q_PROPERTY(Power *power READ power CONSTANT)
+    // The start menu's pins, launch history, applications by letter, search and user.
+    Q_PROPERTY(StartMenu *startMenu READ startMenu CONSTANT)
     // The compositor's overview: the output showing it, empty while closed; its thumbnails as
     // {x, y, w, h, appId, title, workspace, urgent} and workspace strip cells as {x, y, w, h,
     // workspace, windows}, in the output's coordinates; the selected thumbnail, the workspace
@@ -155,6 +162,7 @@ class ShellController : public QObject {
     bool effects() const { return effects_; }
     void setEffects(bool effects);
     bool groupWindows() const { return config_.shell.group_windows; }
+    bool stickyWindows() const { return config_.settings.sticky; }
     bool enabled() const { return config_.shell.enabled; }
     QStringList profiles() const;
     QString profile() const { return QString::fromStdString(config_.profile); }
@@ -170,6 +178,7 @@ class ShellController : public QObject {
     Audio *audio() { return audio_.get(); }
     Palette *palette() { return &palette_; }
     Power *power() { return &power_; }
+    StartMenu *startMenu() { return &startMenu_; }
     // Sends the compositor a request (an action, or "session restore NAME"), as `shaodesk msg`
     // would; `done` gets its whole reply. Without a session, `done` is not called.
     void ask(const QByteArray &line, std::function<void(const QByteArray &)> done);
@@ -278,6 +287,10 @@ class ShellController : public QObject {
         GAppInfo *info = nullptr;
         bool pinned = false;
         QString wmClass;
+        // What else a search finds it by: its desktop entry's GenericName, Keywords and Comment.
+        QString genericName = {};
+        QStringList keywords = {};
+        QString description = {};
     };
     // Loads the configuration, or the default one with configError_ set when it has an error.
     void loadConfig();
@@ -286,6 +299,7 @@ class ShellController : public QObject {
     TaskModel tasks_;
     Palette palette_{*this};
     Power power_{*this};
+    StartMenu startMenu_{{}, this};
     std::unique_ptr<Audio> audio_ = makeAudio();
     SystemStatus status_{"/sys", nullptr, true};
     NotificationCenter notifications_;

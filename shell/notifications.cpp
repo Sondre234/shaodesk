@@ -316,6 +316,10 @@ int NotificationCenter::lifetime(const Notification &notification) const {
         return 0;
     return notification.timeout < 0 ? config_.timeout : notification.timeout;
 }
+int NotificationCenter::cardLifetime(uint id) const {
+    const Notification *card = cards_.find(id);
+    return card ? lifetime(*card) : 0;
+}
 bool NotificationCenter::timerRunning(uint id) const {
     const auto found = timers_.find(id);
     return found != timers_.end() && found->timer && found->timer->isActive();

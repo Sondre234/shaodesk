@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Render every popup of the taskbar as a PNG, in a light and a dark theme.
+"""Render every popup of the taskbar and every overlay surface as a PNG, in a light and a dark
+theme.
 
 usage: tools/shell_gallery.py BUILD_DIR OUT_DIR [--renderer software|gpu|both]
                               [--theme light|dark] [--popup NAME] [--scale FACTOR]
                               [--icon-theme NAME] [--jobs N]
 
 Each picture is `shaodesk-shell --preview-popup NAME --screenshot`: the taskbar with that popup
-open, on stand-in windows, sound, tray items and notifications, over a wallpaper made for the
-purpose. They are written as OUT_DIR/THEME-NAME.png, and OUT_DIR/THEME-NAME-gpu.png for the GPU
+open, or with that overlay (the on-screen display, the cards, the switcher, ...) over it, on
+stand-in windows, sound, tray items and notifications, over a wallpaper made for the purpose. They are written as OUT_DIR/THEME-NAME.png, and OUT_DIR/THEME-NAME-gpu.png for the GPU
 renderer. The software renderer runs offscreen; the GPU one (Qt's OpenGL, on Mesa's software
 implementation here) needs a display, so it runs against a private headless compositor from
 BUILD_DIR. Nothing touches a real session: no display, session bus, configuration or state of
@@ -29,9 +30,14 @@ import tempfile
 import zlib
 
 # The names previewPopup in shell/Panel.qml knows.
-POPUPS = ["bar", "launcher", "power", "bar-menu", "bar-submenu", "task-menu", "pin-menu",
-          "group", "tray-menu", "tray-submenu", "calendar", "mixer", "outputs", "profiles",
-          "wallpapers", "notifications", "clock-empty", "calendar-years"]
+POPUPS = ["bar", "launcher", "power", "bar-menu", "bar-submenu", "task-menu", "stack-menu",
+          "pin-menu", "group", "tray-menu", "tray-submenu", "calendar", "mixer", "outputs",
+          "profiles", "wallpapers", "notifications", "clock-empty", "calendar-years"]
+# The overlay surfaces, each shown over the bar alone (PreviewData::surfaces in shell/preview.cpp).
+POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switcher",
+           "overview", "palette-empty"]
+# The start menu's other views and its menus.
+POPUPS += ["launcher-all", "launcher-search", "launcher-menu"]
 
 # Translucent bars, as appearance profiles often have them.
 THEMES = {
@@ -57,6 +63,45 @@ ACTIONS = {
     "foot": [("server", "Foot Server", "")],
     "thunderbird": [("compose", "Write New Message", "mail-message-new"),
                     ("contacts", "Open Address Book", "x-office-address-book")],
+}
+
+# More of them, so that the start menu's pages of pins and its list from A to Z look as on a
+# desktop in use (the preview pins some of them).
+APPS += [("code", "Visual Studio Code", "code"), ("libreoffice-writer", "LibreOffice Writer",
+                                                  "libreoffice-writer"),
+         ("libreoffice-calc", "LibreOffice Calc", "libreoffice-calc"),
+         ("spotify", "Spotify", "spotify"), ("obsidian", "Obsidian", "obsidian"),
+         ("systemsettings", "System Settings", "preferences-system"),
+         ("discord", "Discord", "discord"), ("inkscape", "Inkscape", "inkscape"),
+         ("keepassxc", "KeePassXC", "keepassxc"), ("obs", "OBS Studio", "obs"),
+         ("blender", "Blender", "blender"), ("krita", "Krita", "krita"),
+         ("org.kde.okular", "Okular", "okular"), ("org.kde.gwenview", "Gwenview", "gwenview"),
+         ("chromium", "Chromium", "chromium"), ("vlc", "VLC media player", "vlc"),
+         ("signal-desktop", "Signal", "signal-desktop"), ("htop", "htop", "htop"),
+         ("org.gnome.SystemMonitor", "System Monitor", "org.gnome.SystemMonitor")]
+
+# What a search finds some of them by besides their names: desktop id, then the generic name,
+# comment and keywords.
+DETAILS = {
+    "firefox": ("Web Browser", "Browse the World Wide Web", "Internet;WWW;Browser;Web;Explorer;"),
+    "chromium": ("Web Browser", "Access the Internet", "browser;web;"),
+    "foot": ("Terminal", "A Wayland native terminal emulator", "shell;prompt;command;commandline;"),
+    "kitty": ("Terminal emulator", "Fast, feature-rich, GPU based terminal", "shell;prompt;command;"),
+    "org.kde.dolphin": ("File Manager", "Browse and manage your files", "files;folders;explorer;"),
+    "thunderbird": ("Mail Client", "Send and receive mail with Thunderbird", "Email;E-mail;Calendar;"),
+    "code": ("Text Editor", "Code Editing. Redefined.", "vscode;ide;"),
+    "org.kde.kate": ("Advanced Text Editor", "Edit text files", "text;editor;"),
+    "gimp": ("Image Editor", "Create images and edit photographs", "photo;paint;"),
+    "libreoffice-writer": ("Word Processor", "Create and edit text and graphics in letters, "
+                           "reports, documents and Web pages", "Text;Letter;Fax;Document;"),
+    "libreoffice-calc": ("Spreadsheet", "Perform calculations, analyze information and manage "
+                         "lists in spreadsheets", "Accounting;Stats;Spreadsheet;"),
+    "systemsettings": ("System Settings", "Configure the system", "settings;preferences;"),
+    "org.gnome.Calculator": ("Calculator", "Perform arithmetic, scientific or financial "
+                             "calculations", "calculation;arithmetic;scientific;"),
+    "mpv": ("Multimedia player", "Play movies and songs", "mpv;media;player;video;audio;"),
+    "vlc": ("Media player", "Read, capture, broadcast your multimedia streams", "Player;Video;"),
+    "steam": ("Game Store", "Application for managing and playing games on Steam", "Games;"),
 }
 
 # A line of the shell's output that is a QML warning or error.
@@ -151,12 +196,17 @@ def prepare(root, theme_name):
     for desktop_id, name, icon in APPS:
         actions = ACTIONS.get(desktop_id, [])
         entry = f"[Desktop Entry]\nType=Application\nName={name}\nIcon={icon}\nExec=true\n"
+        if desktop_id in DETAILS:
+            entry += "GenericName={}\nComment={}\nKeywords={}\n".format(*DETAILS[desktop_id])
         if actions:
             entry += "Actions=" + "".join(f"{action};" for action, _, _ in actions) + "\n"
         for action, title, action_icon in actions:
             entry += f"\n[Desktop Action {action}]\nName={title}\nExec=true\n"
             entry += f"Icon={action_icon}\n" if action_icon else ""
         (data / "applications" / f"{desktop_id}.desktop").write_text(entry)
+    # One of them pinned from the shell, without a window, so that pin-menu has actions to show.
+    (root / "state" / "shaodesk").mkdir(parents=True)
+    (root / "state" / "shaodesk" / "pinned").write_text("thunderbird.desktop\n")
     # The applications are the ones above, but the icons are the desktop's: the user's and the
     # system's icon folders are linked into the private data folders.
     home = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share")
