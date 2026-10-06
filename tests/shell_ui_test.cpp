@@ -1271,6 +1271,8 @@ int main(int argc, char **argv) {
     audio.requests.clear();
     // On the output, the bar's surface along the popover's bottom edge.
     auto above = [&](QQuickItem *popup) {
+        if (auto *card = popup->property("card").value<QQuickItem *>())
+            popup = card;
         auto box = popup->mapRectToScene(QRectF(0, 0, popup->width(), popup->height()));
         auto widget = volume->mapRectToScene(QRectF(0, 0, volume->width(), volume->height()))
                           .translated(0, popover->height() - view.height());
