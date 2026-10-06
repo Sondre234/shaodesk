@@ -720,12 +720,12 @@ Item {
             anchors.fill: parent; anchors.margins: 4
             color: Theme.dangerSurface; radius: Theme.radiusSmall
             Text { anchors.left: parent.left; anchors.right: dismiss.left; anchors.verticalCenter: parent.verticalCenter; anchors.margins: 10; text: shell.error; color: Theme.text; elide: Text.ElideRight; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
-            FlatButton {
+            CloseButton {
                 id: dismiss
-                anchors.right: parent.right; height: parent.height; width: 40
+                anchors.right: parent.right; anchors.rightMargin: Theme.spacingS
+                anchors.verticalCenter: parent.verticalCenter
                 Accessible.name: "Dismiss"
                 onClicked: shell.clearError()
-                contentItem: Text { text: "×"; color: Theme.text; font.pixelSize: Theme.fontSizeLarge; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
             }
         }
     }

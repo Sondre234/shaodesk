@@ -69,15 +69,13 @@ PopupCard {
                         color: groupWindow.urgent ? Theme.urgent : groupWindow.minimized ? Theme.textMuted : Theme.text
                         font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
                     }
-                    Button {
-                        id: closeWindow
+                    CloseButton {
                         objectName: "groupWindowClose"
                         visible: groupWindow.hovered || hovered
-                        Layout.preferredWidth: 24; Layout.preferredHeight: 24
+                        danger: true
+                        Layout.preferredWidth: size; Layout.preferredHeight: size
                         Accessible.name: "Close " + groupWindow.title
                         onClicked: shell.tasks.close(groupWindow.taskId)
-                        background: Rectangle { radius: Theme.radiusSmall; color: closeWindow.hovered ? Theme.dangerFill : "transparent" }
-                        contentItem: Text { text: "\u2715"; color: closeWindow.hovered ? Theme.textOnDanger : Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 12 }
                     }
                 }
                 MouseArea {

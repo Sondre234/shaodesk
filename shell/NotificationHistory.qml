@@ -257,19 +257,16 @@ PopupCard {
                                             font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily
                                         }
                                         // Shown in the time's place while the pointer is over it.
-                                        FlatButton {
+                                        CloseButton {
                                             objectName: "removeNotification"
                                             Layout.alignment: Qt.AlignTop
-                                            Layout.preferredWidth: Theme.iconSize + Theme.spacingS
-                                            Layout.preferredHeight: Theme.iconSize + Theme.spacingS
+                                            Layout.preferredWidth: size; Layout.preferredHeight: size
                                             Layout.topMargin: -Theme.spacingXS
                                             opacity: rowHover.hovered ? 1 : 0
                                             visible: opacity > 0
+                                            Behavior on opacity { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
                                             Accessible.name: "Dismiss"
                                             onClicked: history.center.removeFromHistory(row.n.notificationId)
-                                            contentItem: Item {
-                                                Icon { anchors.centerIn: parent; name: "x"; size: Theme.iconSizeSmall; color: Theme.textMuted }
-                                            }
                                         }
                                     }
                                     Text {

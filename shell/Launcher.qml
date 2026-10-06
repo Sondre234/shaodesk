@@ -211,20 +211,15 @@ PopupCard {
         }
         Keys.onPressed: (event) => launcher.key(event)
         // Clears the search, the keyboard staying in the field.
-        FlatButton {
+        CloseButton {
             id: clear
             objectName: "startClear"
             visible: search.text !== ""
             anchors.right: parent.right; anchors.rightMargin: Theme.spacingS
             anchors.verticalCenter: parent.verticalCenter
-            width: parent.height - 2 * Theme.spacingS; height: width
-            radius: width / 2
-            focusPolicy: Qt.NoFocus
+            size: parent.height - 2 * Theme.spacingS
             Accessible.name: "Clear the search"
             onClicked: search.text = ""
-            contentItem: Item {
-                Icon { anchors.centerIn: parent; name: "x"; size: Theme.iconSizeSmall; color: Theme.textMuted }
-            }
         }
     }
     // A view, shown or not: it fades in sliding from `away` (a horizontal and a vertical

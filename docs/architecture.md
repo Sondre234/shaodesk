@@ -122,6 +122,7 @@ window as large as `ShellView::previewSize()`, and a preview's screenshot draws 
 | `Icon.qml`, `FadingIcon.qml`, `SpeakerIcon.qml`, `BatteryIcon.qml` | Line icons (Lucide), drawn as vectors in any colour; one that crossfades as the state it shows changes, the loudspeaker for a volume, and a battery filled to its charge. |
 | `FlatButton.qml`, `ButtonFill.qml` | The frameless button of the bar and of menus, and its background, which fades between the hover, pressed and active states. |
 | `PushButton.qml` | A framed button with text: raised, or filled for what a click mostly does or for a destructive action, with a ring for the keyboard; a dialog's, a notification's, the start menu's. |
+| `CloseButton.qml` | The round cross that closes a card, a notification or a window in a stack's list, or clears the search. |
 | `PopupCard.qml` | A popup's card: surface, outline, corners, a shadow through the GPU, the open and close animation, and its place beside what it belongs to. |
 | `PopupMenu.qml`, `MenuRow.qml` | A menu of plain entries on popup cards, with cascading submenus and keyboard navigation, and one row of it. |
 | `AudioSlider.qml`, `MuteButton.qml` | Controls the mixer uses. |

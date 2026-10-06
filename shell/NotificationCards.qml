@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
-import QtQuick.Controls.Basic
 import QtQuick.Effects
 import QtQuick.Layouts
 
@@ -207,28 +206,13 @@ Item {
                             textFormat: Text.PlainText; elide: Text.ElideRight
                         }
                         // Dismisses the card; it shows while the pointer is on the card.
-                        AbstractButton {
-                            id: close
+                        CloseButton {
                             objectName: "notificationClose"
-                            Layout.preferredWidth: Theme.iconSize + Theme.spacingS
-                            Layout.preferredHeight: Theme.iconSize + Theme.spacingS
+                            Layout.preferredWidth: size; Layout.preferredHeight: size
                             opacity: hover.hovered ? 1 : 0
-                            Behavior on opacity { NumberAnimation { duration: Theme.durationFast } }
-                            hoverEnabled: true
-                            focusPolicy: Qt.NoFocus
+                            Behavior on opacity { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
                             Accessible.name: "Dismiss"
                             onClicked: cards.center.dismiss(entry.notificationId)
-                            background: Rectangle {
-                                radius: height / 2
-                                color: close.pressed ? Theme.pressed : close.hovered ? Theme.hover : "transparent"
-                            }
-                            contentItem: Item {
-                                Icon {
-                                    anchors.centerIn: parent
-                                    name: "x"; size: Theme.iconSizeSmall
-                                    color: close.hovered ? Theme.text : Theme.textMuted
-                                }
-                            }
                         }
                     }
                     // What it says, the summary over the body, beside its picture.
