@@ -3959,6 +3959,15 @@ ListModel {
         if (!QTest::qWaitFor([&] { return controller.palette()->output().isEmpty(); }))
             return fail("the search button did not close the command palette");
 
+        // A failure shows across the menu bar until dismissed.
+        controller.launch("not-installed.desktop");
+        auto *error = inBar("menuBarError");
+        if (!error || !QTest::qWaitFor([&] { return error->isVisible(); }))
+            return fail("a failure did not show across the menu bar");
+        controller.clearError();
+        if (!QTest::qWaitFor([&] { return !error->isVisible(); }))
+            return fail("a failure dismissed stayed on the menu bar");
+
         // The dock: the applications button, the pinned applications (the configured launcher),
         // each running application once with a dot under it, a line, and the Trash.
         editTasks("model.setProperty(0, 'minimized', false); model.setProperty(2, 'minimized', false)");

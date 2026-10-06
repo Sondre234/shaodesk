@@ -203,4 +203,27 @@ Rectangle {
         }
         ClockButton { id: clockButton; panel: menuBar.panel }
     }
+
+    // What failed (an application that did not start, ...), across the bar until dismissed, as
+    // the taskbar shows it.
+    Rectangle {
+        objectName: "menuBarError"
+        visible: shell.error.length > 0
+        anchors.fill: parent; anchors.margins: Theme.spacingXS
+        color: Theme.dangerSurface; radius: Theme.menuBarRadius
+        Text {
+            anchors.left: parent.left; anchors.right: dismiss.left; anchors.verticalCenter: parent.verticalCenter
+            anchors.margins: Theme.spacingL
+            text: shell.error; textFormat: Text.PlainText; color: Theme.text; elide: Text.ElideRight
+            font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+        }
+        CloseButton {
+            id: dismiss
+            anchors.right: parent.right; anchors.rightMargin: Theme.spacingXS
+            anchors.verticalCenter: parent.verticalCenter
+            size: parent.height - Theme.spacingXS
+            Accessible.name: "Dismiss"
+            onClicked: shell.clearError()
+        }
+    }
 }
