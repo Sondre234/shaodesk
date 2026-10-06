@@ -63,13 +63,14 @@ THEMES = {
               "background": "#c3cde4"},
     "dark": {"panel_color": "#0c1131c7", "text_color": "#f2f4ff", "accent": "#7f9bff",
              "background": "#1b2238"},
-    # The macOS style, as config/init.lua's macos-light and macos-dark profiles have it.
+    # The macOS style, as config/init.lua's macos-light and macos-dark profiles have it but for
+    # their widgets' places, which would override the variants'.
     "macos-light": {"panel_color": "#f6f6f8bf", "text_color": "#1d1d1f", "accent": "#007aff",
-                    "background": "#8fb3e6",
+                    "background": "#9dbbe6",
                     "shell": 'style = "macos", font_size = 13, panel_height = 64, '
                              'panel_margin = { bottom = 6 }, panel_radius = 20'},
     "macos-dark": {"panel_color": "#232326bf", "text_color": "#f5f5f7", "accent": "#0a84ff",
-                   "background": "#1b2a4a",
+                   "background": "#1b2440",
                    "shell": 'style = "macos", font_size = 13, panel_height = 64, '
                             'panel_margin = { bottom = 6 }, panel_radius = 20'},
 }

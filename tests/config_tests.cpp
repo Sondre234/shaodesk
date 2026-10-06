@@ -2,7 +2,9 @@
 #include "shaodesk/config.hpp"
 #include <cmath>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <xkbcommon/xkbcommon-keysyms.h>
 
@@ -26,9 +28,21 @@ int main(int argc, char **argv) {
         require(config.binding(SH_ALT, XKB_KEY_Tab)->action == SH_SWITCHER_NEXT &&
                     config.binding(SH_ALT | SH_SHIFT, XKB_KEY_Tab)->action == SH_SWITCHER_PREV,
                 "example window switcher bindings missing");
-        require(config.shell.enabled && config.shell.panel_height == 52 &&
-                    config.shell.launchers.empty(),
-                "example shell settings missing");
+        // The example starts in the macOS style; its `default` profile is the taskbar.
+        require(config.profile == "macos-light" && config.shell.macos_style &&
+                    config.shell.enabled && config.shell.panel_height == 64 &&
+                    config.shell.launchers.empty() && config.window_buttons == "close,minimize,maximize:",
+                "example does not start in the macOS style");
+        std::ifstream example(argv[1]);
+        std::stringstream example_source;
+        example_source << example.rdbuf();
+        auto taskbar = shaodesk::parse_config(example_source.str(), argv[1],
+                                              std::filesystem::path(argv[1]).parent_path(),
+                                              "default");
+        require(taskbar.profile == "default" && !taskbar.shell.macos_style &&
+                    taskbar.shell.panel_height == 52 &&
+                    taskbar.window_buttons == "appmenu:minimize,maximize,close",
+                "example's default profile is not the taskbar");
         auto pinnedCommand = shaodesk::parse_config(
             "return {shell={launchers={{name='Home',icon='user-home',command={'xdg-open','.'}}}}}");
         require(pinnedCommand.shell.launchers.size() == 1 &&
@@ -207,7 +221,8 @@ int main(int argc, char **argv) {
                         .screenshots.directory == "/tmp/x",
                 "absolute screenshot directory not parsed");
         rejects("return {screenshots={directory='Shots'}}");
-        require(config.window_buttons == "appmenu:minimize,maximize,close",
+        require(shaodesk::parse_config("return {}").window_buttons ==
+                    "appmenu:minimize,maximize,close",
                 "default window buttons changed");
         require(shaodesk::parse_config("return {windows={buttons='close'}}").window_buttons ==
                         "close" &&

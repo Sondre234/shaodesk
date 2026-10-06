@@ -10,8 +10,10 @@ import harness
 
 compositor, shell, probe, example = (str(Path(p).resolve()) for p in sys.argv[1:])
 
-# The example leaves the bar's look to theme.lua; spell it out so it can be edited here.
-source = Path(example).read_text()
+# The example leaves the bar's look to theme.lua; spell it out so it can be edited here. It
+# starts in the macOS style, whose profile sets the panel itself; this tests the taskbar's.
+source = Path(example).read_text().replace('profile = "macos-light"', 'profile = "default"')
+assert 'profile = "default"' in source
 for setting in ("panel_height", "panel_position", "panel_margin", "panel_radius"):
     source = source.replace(f"-- {setting} =", f"{setting} =")
 
@@ -111,7 +113,9 @@ with harness.Compositor(compositor, source, start=False) as desktop:
     desktop.wait_for(lambda: "shaodesk configuration error shown on" in shell_log.read_text(),
                      "configuration error banner")
     assert "panel_height" in shell_log.read_text()
-    check_panel(52)
+    # The shipped configuration starts in the macOS style: a dock 64 pixels tall 6 above the
+    # bottom edge, and the menu bar's 28 along the top.
+    check_panel(64 + 6 + 28)
     config.write_text(source.replace("enabled = true", "enabled = false"))
     panels.send_signal(signal.SIGHUP)
     assert desktop.reap(panels) == 0, shell_log.read_text()
