@@ -17,8 +17,8 @@ Rectangle {
     width: 280; height: 12 + groupWindows.count * rowHeight + Math.max(0, groupWindows.count - 1) * 2
     x: Math.max(8, Math.min(panel.groupX - width / 2, panel.width - width - 8))
     y: panel.onTop ? barItem.y + barItem.height + 8 : barItem.y - height - 8
-    color: shell.panelColor; radius: 10
-    border.color: Qt.lighter(shell.panelColor, 1.6)
+    color: Theme.surface; radius: Theme.radiusMedium
+    border.color: Theme.border
     HoverHandler {
         id: groupHover
         onHoveredChanged: groupList.panel.hoverGroupList(hovered)
@@ -49,10 +49,10 @@ Rectangle {
                 // Closing the list destroys this row, so it goes last.
                 onClicked: { shell.tasks.activate(taskId); panel.groupOpen = false }
                 background: Rectangle {
-                    radius: 6
-                    color: groupWindow.hovered ? Qt.lighter(shell.panelColor, 1.5) : (groupWindow.active ? Qt.lighter(shell.panelColor, 1.3) : "transparent")
-                    Rectangle { visible: groupWindow.active; x: 0; anchors.verticalCenter: parent.verticalCenter; width: 3; height: 16; radius: 1; color: shell.accent }
-                    Rectangle { objectName: "groupWindowUrgent"; visible: groupWindow.urgent; x: 0; anchors.verticalCenter: parent.verticalCenter; width: 3; height: 16; radius: 1; color: shell.urgentColor }
+                    radius: Theme.radiusSmall
+                    color: groupWindow.hovered ? Theme.selected : (groupWindow.active ? Theme.hover : "transparent")
+                    Rectangle { visible: groupWindow.active; x: 0; anchors.verticalCenter: parent.verticalCenter; width: 3; height: 16; radius: 1; color: Theme.accent }
+                    Rectangle { objectName: "groupWindowUrgent"; visible: groupWindow.urgent; x: 0; anchors.verticalCenter: parent.verticalCenter; width: 3; height: 16; radius: 1; color: Theme.urgent }
                 }
                 contentItem: RowLayout {
                     spacing: 8
@@ -65,8 +65,8 @@ Rectangle {
                     Text {
                         Layout.fillWidth: true
                         text: groupWindow.title; textFormat: Text.PlainText; elide: Text.ElideRight
-                        color: groupWindow.urgent ? shell.urgentColor : groupWindow.minimized ? Qt.darker(shell.textColor, 1.4) : shell.textColor
-                        font.pixelSize: shell.fontSize; font.family: panel.uiFont
+                        color: groupWindow.urgent ? Theme.urgent : groupWindow.minimized ? Theme.textMuted : Theme.text
+                        font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
                     }
                     Button {
                         id: closeWindow
@@ -75,8 +75,8 @@ Rectangle {
                         Layout.preferredWidth: 24; Layout.preferredHeight: 24
                         Accessible.name: "Close " + groupWindow.title
                         onClicked: shell.tasks.close(groupWindow.taskId)
-                        background: Rectangle { radius: 5; color: closeWindow.hovered ? "#c4443c" : "transparent" }
-                        contentItem: Text { text: "\u2715"; color: shell.textColor; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 12 }
+                        background: Rectangle { radius: Theme.radiusSmall; color: closeWindow.hovered ? Theme.dangerFill : "transparent" }
+                        contentItem: Text { text: "\u2715"; color: closeWindow.hovered ? Theme.textOnDanger : Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 12 }
                     }
                 }
                 MouseArea {

@@ -26,14 +26,14 @@ Rectangle {
             sum += entries[i].separator ? 9 : rowHeight
         return Math.max(rowHeight, sum)
     }
-    FontMetrics { id: menuFont; font.pixelSize: shell.fontSize; font.family: panel.uiFont }
+    FontMetrics { id: menuFont; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
     visible: panel.trayMenuKey !== ""
     width: Math.min(panel.width - 16, Math.max(180, widest + 80))
     height: Math.min(panel.height - shell.panelExtent - 20, 12 + listHeight)
     x: Math.max(8, Math.min(panel.trayMenuX - width / 2, panel.width - width - 8))
     y: panel.onTop ? barItem.y + barItem.height + 8 : barItem.y - height - 8
-    color: shell.panelColor; radius: 10
-    border.color: Qt.lighter(shell.panelColor, 1.6)
+    color: Theme.surface; radius: Theme.radiusMedium
+    border.color: Theme.border
     MouseArea { anchors.fill: parent }
     ListView {
         id: trayEntryList
@@ -54,13 +54,13 @@ Rectangle {
             Accessible.name: modelData.label + (modelData.toggle !== "" ? (modelData.checked ? ", checked" : ", not checked") : "")
             onClicked: panel.trayMenuPick(modelData)
             background: Rectangle {
-                radius: 6
-                color: trayEntry.hovered && trayEntry.enabled ? Qt.lighter(shell.panelColor, 1.5) : "transparent"
+                radius: Theme.radiusSmall
+                color: trayEntry.hovered && trayEntry.enabled ? Theme.hover : "transparent"
                 Rectangle {
                     visible: trayEntry.modelData.separator
                     anchors.verticalCenter: parent.verticalCenter
                     x: 8; width: parent.width - 16; height: 1
-                    color: Qt.lighter(shell.panelColor, 1.8)
+                    color: Theme.divider
                 }
             }
             contentItem: RowLayout {
@@ -74,19 +74,19 @@ Rectangle {
                         visible: trayEntry.modelData.toggle === "radio"
                         anchors.centerIn: parent
                         width: 10; height: 10; radius: 5
-                        color: trayEntry.modelData.checked ? shell.accent : "transparent"
-                        border.color: trayEntry.modelData.checked ? shell.accent : Qt.lighter(shell.panelColor, 2.2)
+                        color: trayEntry.modelData.checked ? Theme.accent : "transparent"
+                        border.color: trayEntry.modelData.checked ? Theme.accent : Theme.textMuted
                     }
                     Rectangle {
                         visible: trayEntry.modelData.toggle === "checkmark"
                         anchors.centerIn: parent
                         width: 13; height: 13; radius: 3
-                        color: trayEntry.modelData.checked ? shell.accent : "transparent"
-                        border.color: trayEntry.modelData.checked ? shell.accent : Qt.lighter(shell.panelColor, 2.2)
+                        color: trayEntry.modelData.checked ? Theme.accent : "transparent"
+                        border.color: trayEntry.modelData.checked ? Theme.accent : Theme.textMuted
                         Text {
                             visible: trayEntry.modelData.checked
                             anchors.centerIn: parent
-                            text: "\u2713"; color: shell.panelColor; font.pixelSize: 10; font.bold: true
+                            text: "\u2713"; color: Theme.textOnAccent; font.pixelSize: 10; font.bold: true
                         }
                     }
                     Image {
@@ -100,11 +100,11 @@ Rectangle {
                 Text {
                     Layout.fillWidth: true
                     text: trayEntry.modelData.label; textFormat: Text.PlainText; elide: Text.ElideRight
-                    color: shell.textColor; font.pixelSize: shell.fontSize; font.family: panel.uiFont
+                    color: Theme.text; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
                 }
                 Text {
                     visible: trayEntry.modelData.submenu
-                    text: "\u203a"; color: shell.textColor; font.pixelSize: shell.fontSize + 4
+                    text: "\u203a"; color: Theme.text; font.pixelSize: Theme.fontSize + 4
                 }
             }
         }
@@ -112,7 +112,7 @@ Rectangle {
             anchors.centerIn: parent
             visible: trayMenu.entries.length === 0
             text: "No entries"
-            color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize - 1; font.family: panel.uiFont
+            color: Theme.textMuted; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
         }
     }
 }
