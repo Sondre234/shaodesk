@@ -441,7 +441,7 @@ Item {
         anchors.top: root.onTop ? parent.top : undefined
         anchors.bottomMargin: shell.panelMarginBottom; anchors.topMargin: shell.panelMarginTop
         height: shell.panelHeight
-        color: shell.panelColor
+        color: Theme.bar
         radius: shell.panelRadius
         // A floating bar gets an outline; a docked one a line along its inner edge.
         border.width: root.floating ? 1 : 0
