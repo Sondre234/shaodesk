@@ -161,14 +161,13 @@ Item {
             }
         }
     }
-    Text {
+    EmptyState {
         objectName: "startNothing"
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: Theme.spacingXXL
+        x: found.inset; y: Theme.spacingXXL
+        width: found.width - 2 * found.inset
         visible: found.query !== "" && found.results.length === 0
-        text: "Nothing found for “" + found.query + "”"
-        textFormat: Text.PlainText
-        color: Theme.textMuted
-        font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+        icon: "search"
+        title: "Nothing found for “" + found.query + "”"
+        hint: "Start with > for actions, @ for windows or # for workspaces"
     }
 }

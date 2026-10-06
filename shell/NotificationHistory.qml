@@ -118,21 +118,13 @@ PopupCard {
             objectName: "notificationsEmpty"
             visible: history.center.history.count === 0
             Layout.fillWidth: true; Layout.fillHeight: true
-            implicitHeight: emptyColumn.implicitHeight + 2 * Theme.spacingXL
-            Column {
-                id: emptyColumn
-                anchors.centerIn: parent
-                spacing: Theme.spacingM
-                Icon {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    name: "bell"; size: Theme.appIconSizeLarge; color: Theme.textDisabled
-                }
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "No new notifications"
-                    color: Theme.textMuted
-                    font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
-                }
+            implicitHeight: emptyState.implicitHeight + 2 * Theme.spacingS
+            EmptyState {
+                id: emptyState
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width
+                icon: "bell"
+                title: "No new notifications"
             }
         }
         // The list, its edges fading into the card where it goes on past them, so that a card

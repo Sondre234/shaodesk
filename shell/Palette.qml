@@ -181,32 +181,15 @@ Item {
             }
         }
         // What to try when nothing matches: the prefixes that narrow a search.
-        Column {
+        EmptyState {
             id: empty
             objectName: "paletteEmpty"
             visible: list.count === 0
             x: root.padding; y: input.y + input.height + root.padding
             width: card.width - 2 * root.padding
-            topPadding: Theme.spacingL; bottomPadding: Theme.spacingL
-            spacing: Theme.spacingS
-            Icon {
-                anchors.horizontalCenter: parent.horizontalCenter
-                name: "search"; size: Theme.iconSizeLarge; color: Theme.textMuted
-            }
-            Text {
-                width: parent.width
-                text: "Nothing matches"
-                color: Theme.text
-                font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeLarge; font.weight: Font.Medium
-                horizontalAlignment: Text.AlignHCenter
-            }
-            Text {
-                width: parent.width
-                text: "Start with > for actions, @ for windows, # for workspaces or % for sessions"
-                color: Theme.textMuted
-                font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall
-                horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap
-            }
+            icon: "search"
+            title: "Nothing matches"
+            hint: "Start with > for actions, @ for windows, # for workspaces or % for sessions"
         }
     }
 }
