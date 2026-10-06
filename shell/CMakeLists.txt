@@ -132,6 +132,15 @@ if(BUILD_TESTING)
     target_compile_options(palette_test PRIVATE -Wall -Wextra -Wpedantic)
     target_link_libraries(palette_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME palette COMMAND palette_test)
+    # The start menu's model: its pins, the launch history and its search.
+    add_executable(start_menu_test ${PROJECT_SOURCE_DIR}/tests/start_menu_test.cpp
+        launch_history.cpp launch_history.hpp)
+    set_target_properties(start_menu_test PROPERTIES AUTOMOC ON)
+    target_include_directories(start_menu_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(start_menu_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(start_menu_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(start_menu_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME start_menu COMMAND start_menu_test)
     add_executable(task_model_test ${PROJECT_SOURCE_DIR}/tests/task_model_test.cpp
         task_model.cpp task_model.hpp
         ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
