@@ -56,7 +56,11 @@ Item {
         "log-out": "M16 17l5-5-5-5 M21 12H9 M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4",
         // The power menu's locking and hibernating.
         "lock": "M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z M7 11V7a5 5 0 0 1 10 0v4",
-        "snowflake": "M2 12h20 M12 2v20 M20 16l-4-4 4-4 M4 8l4 4-4 4 M16 4l-4 4-4-4 M8 20l4-4 4 4"
+        "snowflake": "M2 12h20 M12 2v20 M20 16l-4-4 4-4 M4 8l4 4-4 4 M16 4l-4 4-4-4 M8 20l4-4 4 4",
+        // The macOS style's menu bar: the system menu's spiral, and Quick Settings' two switches
+        // (drawn in Lucide's manner, not one of its icons).
+        "shell": "M14 11a2 2 0 1 1-4 0 4 4 0 0 1 8 0 6 6 0 0 1-12 0 8 8 0 0 1 16 0 10 10 0 1 1-20 0 11.93 11.93 0 0 1 2.42-7.22 2 2 0 1 1 3.16 2.44",
+        "toggles": "M7 3h10a4 4 0 0 1 0 8H7a4 4 0 0 1 0-8z M6 7a1 1 0 1 0 2 0a1 1 0 1 0-2 0 M7 13h10a4 4 0 0 1 0 8H7a4 4 0 0 1 0-8z M16 17a1 1 0 1 0 2 0a1 1 0 1 0-2 0"
     })
 
     Shape {
