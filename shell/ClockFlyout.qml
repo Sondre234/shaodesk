@@ -18,6 +18,7 @@ Item {
     // The bar's right end, which the cards line up with.
     readonly property rect barEnd: panel.barAnchor(barItem.x + barItem.width, 0)
     readonly property Item calendar: calendar
+    readonly property Item notifications: notifications
 
     CalendarPopup {
         id: calendar
@@ -26,6 +27,7 @@ Item {
         anchorRect: flyout.barEnd
     }
     NotificationHistory {
+        id: notifications
         panel: flyout.panel
         open: flyout.open && flyout.showNotifications
         implicitWidth: calendar.implicitWidth

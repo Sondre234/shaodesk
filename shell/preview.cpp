@@ -121,6 +121,17 @@ PreviewData::PreviewData(ShellController &controller)
     center->notify(notification("Mail", "mail-unread", "Re: the panel's popups",
                                 "Looks good to me. Merge it once the gallery is green, and send "
                                 "the screenshots around."));
+    // Two more mails, which the history lists under the first, and a message with the sender's
+    // picture and buttons for its actions.
+    center->notify(notification("Mail", "mail-unread", "Build #418 passed",
+                                "All 115 tests passed in 46 seconds."));
+    center->notify(notification("Mail", "mail-unread", "Lunch on Friday?",
+                                "The usual place at noon, if that suits everyone."));
+    Notification message = notification("Chat", "user-available", "Alex",
+                                         "Sent a picture: <i>harbour at dusk</i>. Coming tonight?");
+    message.image = trayIcon(QColor("#7a5cc4"), "A");
+    message.actions = {{"default", "Open"}, {"reply", "Reply"}, {"later", "Remind me later"}};
+    center->notify(message);
 
     controller.power()->setAvailable("lock,suspend,hibernate,reboot,poweroff,logout");
 

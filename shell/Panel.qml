@@ -218,7 +218,9 @@ Item {
             toggleAudioPopup("wallpapers", wallpapersButton)
             return wallpapersButton.visible
         case "notifications":
+            // The flyout with the mail application's notifications expanded.
             toggleAudioPopup("clock", clockButton)
+            Qt.callLater(function() { clockFlyoutLoader.item.notifications.expanded = { "Mail": true } })
             return shell.notifications.serving
         }
         return false
