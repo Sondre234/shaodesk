@@ -10,7 +10,7 @@ The shell has pinned desktop shortcuts (double-click to launch), a taskbar with
 window activation/minimization (clicking a window's button focuses it, or minimizes it when it
 is focused already, as on Windows, from any monitor's bar) and a right-click window menu (maximize/restore,
 minimize, pin to taskbar, close), middle-click to close a window, a right-click menu on empty bar space (tiling,
-applications, show desktop), an application
+applications, show desktop, and the appearance profiles in a submenu), an application
 search menu, a tiling on/off button for its monitor, a workspace indicator, battery and network status,
 the default output's volume, a clock, a [system tray](#system-tray), and a show-desktop button. Buttons show a tooltip
 on hover. Installed applications are read
@@ -41,7 +41,17 @@ default. All of them take the panel's `accent`,
 are shown by laying the text color over the panel at a low opacity, which shows on a light
 panel as on a dark one. Popups (the application menu, menus, the mixer, the calendar and the
 rest) are drawn in the panel color made opaque, even when the bar is translucent: nothing is
-blurred behind them, and a window showing through would make them hard to read. The shell
+blurred behind them, and a window showing through would make them hard to read. They open in a
+surface of their own over the whole monitor, above fullscreen windows too, so the application
+menu Super + R opens shows over a video; they fade in with a short slide from the bar and fade
+out (instant with `animations.enabled = false`), and cast a soft shadow when the shell draws
+through the GPU. While one is open, the keyboard is in it and a press anywhere but on the bar or
+the popup closes it without reaching what is under it; a press on another bar button opens that
+one's popup at once. The overview, the window switcher and the command palette close it. Menus
+(the bar's, a window's, the tray's, the power menu) take the keyboard: Up and Down (wrapping),
+Home and End move, Enter or Space chooses, Right opens a submenu and Left or Escape closes it,
+and Escape closes the menu; resting the pointer on an entry with a submenu opens it beside the
+entry, the menu staying open. The shell
 draws through the GPU; `renderer = "software"` draws on the CPU instead, for a weak machine: it
 starts faster and uses less memory, but cannot draw effects such as shadows. In a nested
 session, applications that reuse an existing process or D-Bus service can open
@@ -785,7 +795,7 @@ profiles = {
 Pick one from the panel: the profile button beside the tiling button (three swatches of the
 current accent, background and text colours) lists them, the one in use marked, whenever there
 are two or more (`shell.widgets.profiles = false` hides it). Right-clicking empty bar space and
-choosing **Appearance: NAME …** lists them too (the one in use is ticked). The command palette (Super + P) lists them as
+pointing at **Appearance** lists them too, beside the menu (the one in use is marked). The command palette (Super + P) lists them as
 **Appearance: NAME** too, and scripts and hot corners can use `shaodesk msg profile NAME`, or
 `profile next` and `profile prev` to step through them in name order. A pick is saved in
 `$XDG_STATE_HOME/shaodesk/profile` (`~/.local/state/shaodesk/profile`) and reloads the
@@ -876,10 +886,11 @@ none is left. Hovering an icon shows its tooltip.
   only a menu opens its menu instead, and so does one that cannot be activated, as Ayatana's
   (nm-applet's, for one) cannot.
 - Right-click opens the item's menu above the icon (below it on a top panel), in the style of the
-  panel's own menus: separators, check boxes, radio buttons, icons, greyed-out entries, and
-  submenus, whose entries take the menu's place with a "‹ Back" entry first. Clicking an entry runs
-  it and closes the menu; so do a click elsewhere, Escape, and another right-click on the icon. An
-  item without a menu is asked to show its own.
+  panel's own menus: separators, check marks, radio buttons, icons, greyed-out entries, and
+  submenus, which open beside their entries, the menu staying open. The application hears of each
+  level as it opens and closes, so one that fills a submenu in when asked can. Clicking an entry
+  runs it and closes the menu; so do a click elsewhere, Escape, and another right-click on the
+  icon. An item without a menu is asked to show its own.
 - Middle-click is the item's secondary action, and the wheel scrolls it a notch at a time, which
   some applications use for the volume or to switch between things.
 
@@ -984,7 +995,7 @@ Restart, Power off and Log out ask first: a dialog in the middle of the monitor 
 Enter, while Escape, Cancel or a click beside it gives up. The actions themselves, bound to keys
 or sent with `shaodesk msg`, do not ask. The `power_menu` action opens the application menu
 with the power menu up on the monitor under the pointer, with the keyboard in it: Up and Down
-choose, Enter runs, Escape closes.
+choose, Enter runs, Escape closes the power menu.
 
 The `suspend`, `hibernate`, `poweroff` and `reboot` actions ask logind (systemd-logind or
 elogind, on the system bus) to suspend, hibernate, power off or restart the machine, letting it
