@@ -167,6 +167,139 @@ void refresh_decoration(struct sh_toplevel *toplevel) {
     wlr_scene_node_set_enabled(&toplevel->deco->node, server->deco_revealed == toplevel);
 }
 
+static bool no_input(struct wlr_scene_buffer *buffer, double *sx, double *sy) { return false; }
+
+static bool same_look(const struct sh_shadow *a, const struct sh_shadow *b) {
+    return a->radius == b->radius && a->blur == b->blur && a->offset_x == b->offset_x &&
+           a->offset_y == b->offset_y && !memcmp(a->color, b->color, sizeof(a->color));
+}
+
+/* The shadow image of a look for windows of `width` by `height` (sh_shadow_image_size's) at
+ * the scale the outputs ask for, painted when first needed. */
+static struct sh_shadow_image *shadow_image(struct sh_server *server, const struct sh_shadow *look,
+                                            int width, int height) {
+    int scale = pixel_scale(server);
+    struct sh_shadow_image *images = server->shadow_images, *oldest = &images[0];
+    size_t count = sizeof(server->shadow_images) / sizeof(*server->shadow_images);
+    for (size_t i = 0; i < count; ++i) {
+        struct sh_shadow_image *image = &images[i];
+        if (image->buffer && image->scale == scale && image->width == width &&
+            image->height == height && same_look(&image->look, look)) {
+            image->used = ++server->shadow_uses;
+            return image;
+        }
+        if (oldest->buffer && (!image->buffer || image->used < oldest->used))
+            oldest = image;
+    }
+    struct sh_shadow_layout layout;
+    sh_shadow_layout(look, &layout);
+    int pixel_width = (layout.left + width + layout.right) * scale;
+    int pixel_height = (layout.top + height + layout.bottom) * scale;
+    uint32_t *pixels = malloc((size_t)pixel_width * pixel_height * sizeof(*pixels));
+    if (!pixels || !sh_shadow_paint(pixels, look, width, height, scale)) {
+        free(pixels);
+        return NULL;
+    }
+    struct wlr_buffer *buffer = sh_pixel_buffer(pixels, pixel_width, pixel_height);
+    if (!buffer)
+        return NULL; // it freed the pixels
+    wlr_buffer_drop(oldest->buffer); // windows showing it keep it until they change
+    *oldest = (struct sh_shadow_image){*look, width, height, scale, buffer, ++server->shadow_uses};
+    return oldest;
+}
+
+static void remove_shadow(struct sh_toplevel *toplevel) {
+    if (toplevel->shadow)
+        wlr_scene_node_destroy(&toplevel->shadow->node);
+    toplevel->shadow = NULL;
+    memset(toplevel->shadow_slices, 0, sizeof(toplevel->shadow_slices));
+    toplevel->shadow_image = NULL;
+}
+
+/* The shadow under a window whose frame reaches `outset` past its geometry (its border) with
+ * corners of `radius`: slices of a shared image laid out around the frame, in a tree at the
+ * bottom of the window's, which takes no input and is in no one's sums of the window's size.
+ * The tree has a clip of its own as large as the shadow, since the one rounding the window
+ * would hide it (only the nearest clip applies). Laid out again only when the frame's size or
+ * the image changes, so a running animation keeps what it set. */
+static void refresh_shadow(struct sh_toplevel *toplevel, bool on, int outset, int radius) {
+    struct sh_server *server = toplevel->server;
+    const struct sh_settings *settings = server_settings(server);
+    struct wlr_box g = toplevel_geometry(toplevel);
+    int width = g.width + 2 * outset, height = g.height + 2 * outset;
+    if (!on || width < 1 || height < 1) {
+        remove_shadow(toplevel);
+        return;
+    }
+    struct sh_shadow look = {
+        .radius = radius > 0 ? radius + outset : 0,
+        .blur = settings->shadow_blur,
+        .offset_x = settings->shadow_x,
+        .offset_y = settings->shadow_y,
+    };
+    bool focused = server->focused_toplevel == toplevel;
+    memcpy(look.color, focused ? settings->shadow_color : settings->shadow_inactive_color,
+           sizeof(look.color));
+    struct sh_shadow_layout layout;
+    sh_shadow_layout(&look, &layout);
+    int image_width, image_height;
+    sh_shadow_image_size(&layout, width, height, &image_width, &image_height);
+    struct sh_shadow_image *image = shadow_image(server, &look, image_width, image_height);
+    if (!image)
+        return;
+    if (!toplevel->shadow) {
+        toplevel->shadow = wlr_scene_tree_create(toplevel->content);
+        if (!toplevel->shadow)
+            return;
+        wlr_scene_node_lower_to_bottom(&toplevel->shadow->node);
+        for (int i = 0; i < SH_SHADOW_SLICES; ++i) {
+            struct wlr_scene_buffer *slice = wlr_scene_buffer_create(toplevel->shadow, NULL);
+            if (!slice) {
+                remove_shadow(toplevel);
+                return;
+            }
+            slice->point_accepts_input = no_input;
+            wlr_scene_buffer_set_opacity(slice, toplevel->opacity);
+            toplevel->shadow_slices[i] = slice;
+        }
+    }
+    wlr_scene_node_set_position(&toplevel->shadow->node, -outset, -outset);
+    toplevel->shadow_box = (struct wlr_box){-outset - layout.left, -outset - layout.top,
+                                            layout.left + width + layout.right,
+                                            layout.top + height + layout.bottom};
+    toplevel->shadow_alpha = look.color[3];
+#ifdef SHAODESK_ROUNDED_CORNERS
+    wlr_scene_tree_set_rounded_clip(toplevel->shadow,
+                                    &(struct wlr_box){-layout.left, -layout.top,
+                                                      toplevel->shadow_box.width,
+                                                      toplevel->shadow_box.height},
+                                    0);
+#endif
+    if (toplevel->shadow_image == image->buffer && toplevel->shadow_width == width &&
+        toplevel->shadow_height == height)
+        return;
+    toplevel->shadow_image = image->buffer;
+    toplevel->shadow_width = width;
+    toplevel->shadow_height = height;
+    struct sh_shadow_slice slices[SH_SHADOW_SLICES];
+    sh_shadow_slices(&layout, image_width, image_height, width, height, slices);
+    for (int i = 0; i < SH_SHADOW_SLICES; ++i) {
+        struct wlr_scene_buffer *slice = toplevel->shadow_slices[i];
+        const struct sh_shadow_slice *s = &slices[i];
+        wlr_scene_node_set_enabled(&slice->node, s->width > 0);
+        if (s->width <= 0)
+            continue;
+        if (slice->buffer != image->buffer)
+            wlr_scene_buffer_set_buffer(slice, image->buffer);
+        int scale = image->scale;
+        wlr_scene_buffer_set_source_box(slice, &(struct wlr_fbox){s->x * scale, s->y * scale,
+                                                                  s->width * scale,
+                                                                  s->height * scale});
+        wlr_scene_buffer_set_dest_size(slice, s->to_width, s->to_height);
+        wlr_scene_node_set_position(&slice->node, s->to_x, s->to_y);
+    }
+}
+
 /* The tab strip of a group's shown window: one segment per member, the shown one lit. */
 void refresh_tabs(struct sh_toplevel *toplevel) {
     struct sh_server *server = toplevel->server;
@@ -320,6 +453,12 @@ void refresh_frame(struct sh_toplevel *toplevel) {
     radius = 0;
 #endif
     toplevel->corner_radius = radius;
+    // A shadow under every window that has none of its own, or whose own the clip cut away;
+    // none under a fullscreen or maximized one.
+    refresh_shadow(toplevel,
+                   settings->shadow && mapped && !frameless(toplevel, output) &&
+                       (radius > 0 || !draws_own_shadow(toplevel)),
+                   shown && !inset ? b : 0, radius);
 
     // xdg-shell windows keep their scene tree while unmapped; the border must not.
     for (int i = 0; i < 4; ++i) {

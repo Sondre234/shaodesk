@@ -526,6 +526,8 @@ finish:
     wlr_scene_node_destroy(&server.scene->tree.node);
     for (size_t i = 0; i < sizeof(server.deco_buffers) / sizeof(*server.deco_buffers); ++i)
         wlr_buffer_drop(server.deco_buffers[i]);
+    for (size_t i = 0; i < sizeof(server.shadow_images) / sizeof(*server.shadow_images); ++i)
+        wlr_buffer_drop(server.shadow_images[i].buffer);
     wlr_buffer_drop(server.black);
     wlr_xcursor_manager_destroy(server.cursor_mgr);
     wlr_cursor_destroy(server.cursor);

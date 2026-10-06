@@ -191,7 +191,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/workspace.c
         src/compositor/xwayland.c
     )
-    add_executable(shaodesk src/main.cpp ${SHAODESK_COMPOSITOR_SOURCES} src/decoration.c src/animation.c src/effects_scene.c src/sleep.c src/login1.c
+    add_executable(shaodesk src/main.cpp ${SHAODESK_COMPOSITOR_SOURCES} src/decoration.c src/shadow.c src/animation.c src/effects_scene.c src/sleep.c src/login1.c
         ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.h ${WLR_PROTOCOL_HEADERS})
     # The compositor's own protocol names a taskbar handle, whose interface wlroots keeps to
     # itself: both interfaces are compiled in here.
