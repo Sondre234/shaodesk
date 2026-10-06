@@ -12,7 +12,8 @@ AbstractButton {
     required property Item launcher
     property bool current: false
     readonly property bool app: result.kind === "app"
-    readonly property var actions: app && !result.configured ? shell.appActions(result.appId) : []
+    // Read from its desktop entry only while it shows.
+    readonly property var actions: visible && app && !result.configured ? shell.appActions(result.appId) : []
     objectName: "startBestMatch"
     focusPolicy: Qt.NoFocus
     hoverEnabled: true

@@ -17,29 +17,15 @@ Item {
         return query === "" ? [] : shell.startMenu.search(query, shell.palette.entries(launcher.panel.taskSource))
     }
     onResultsChanged: current = 0
-    // The pointer chooses the result it moves onto. Results appearing under a pointer that rests
-    // there do not: the best match stays chosen, for Enter.
-    property point pointer: Qt.point(-1, -1)
-    HoverHandler {
-        onPointChanged: {
-            var at = point.scenePosition
-            if (!hovered || (at.x === found.pointer.x && at.y === found.pointer.y))
-                return
-            var moved = found.pointer.x >= 0
-            found.pointer = at
-            var local = list.mapFromItem(null, at.x, at.y)
-            var index = list.indexAt(local.x + list.contentX, local.y + list.contentY)
-            if (moved && index >= 0)
-                found.current = index
-        }
-    }
     readonly property var currentResult: results[current] || null
+    // An application's record, when the keyboard is at one.
+    readonly property var currentApp: currentResult && currentResult.kind === "app" ? currentResult : null
     readonly property var headings: ({ best: "Best match", apps: "Apps", windows: "Open windows", actions: "Actions" })
+    // Where the pointer was last seen over the results.
+    property point pointer: Qt.point(-1, -1)
 
     // The result the keyboard is at, or null.
     function currentItem() { return list.itemAtIndex(current) }
-    // An application's record, when the keyboard is at one.
-    readonly property var currentApp: currentResult && currentResult.kind === "app" ? currentResult : null
     // Down and Tab, Up and Backtab move through every result, wrapping; Page Down and Page Up
     // move a few. Returns whether the key moved.
     function key(event) {
@@ -57,6 +43,21 @@ Item {
         return false
     }
 
+    // The pointer chooses the result it moves onto. Results appearing under a pointer that rests
+    // there do not: the best match stays chosen, for Enter.
+    HoverHandler {
+        onPointChanged: {
+            var at = point.scenePosition
+            if (!hovered || (at.x === found.pointer.x && at.y === found.pointer.y))
+                return
+            var moved = found.pointer.x >= 0
+            found.pointer = at
+            var local = list.mapFromItem(null, at.x, at.y)
+            var index = list.indexAt(local.x + list.contentX, local.y + list.contentY)
+            if (moved && index >= 0)
+                found.current = index
+        }
+    }
     ListView {
         id: list
         objectName: "startResults"
@@ -96,7 +97,7 @@ Item {
             StartRow {
                 id: row
                 visible: !result.best
-                objectName: "startResult:" + result.modelData.title
+                objectName: result.best ? "" : "startResult:" + result.modelData.title
                 width: parent.width; height: visible ? implicitHeight : 0
                 iconName: result.modelData.icon || ""
                 iconSize: Theme.appIconSize
