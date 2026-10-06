@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
-/* What the compositor draws on and around a window: its border, opacity and rounded corners,
- * the window controls (and the xdg-decoration requests that ask for them), and a group's tab
- * strip. */
+/* What the compositor draws on and around a window: its border, opacity, rounded corners and
+ * shadow, the window controls (and the xdg-decoration requests that ask for them), and a
+ * group's tab strip. */
 #include "server.h"
 
 static void fade_update(void *data);
