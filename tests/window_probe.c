@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "ext-image-capture-source-v1-client-protocol.h" // before the next, which names its interface
 #include "shaodesk-window-control-v1-client-protocol.h"
 #include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
 #include <stdbool.h>
