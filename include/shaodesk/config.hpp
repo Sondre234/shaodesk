@@ -94,6 +94,7 @@ struct ShellWidgets {
 
 struct ShellConfig {
     bool enabled = true;
+    bool macos_style = false;           // style = "macos": a menu bar and a dock
     int panel_height = 52;
     bool panel_top = false;             // panel_position = "top"
     int panel_margin[4] = {0, 0, 0, 0}; // top, right, bottom, left: a floating bar

@@ -252,7 +252,7 @@ surfaces have names there too (`osd-volume`, `osd-text`, `cards`, `power-dialog`
 bar alone, with stand-ins for what the compositor would tell it, and the screenshot draws it where
 its layer surface would be (the overview over stand-ins for the compositor's thumbnails).
 `tools/shell_gallery.py BUILD_DIR OUT_DIR` does that for every popup in a light and a dark
-theme, both with the software renderer (`light-launcher.png`) and through the GPU
+theme of each style (`light`, `dark`, `macos-light`, `macos-dark`), both with the software renderer (`light-launcher.png`) and through the GPU
 (`light-launcher-gpu.png`: Qt's OpenGL on Mesa's software implementation, in a private headless
 compositor), in about ten seconds; `--renderer`, `--theme` and `--popup` narrow it down. Nothing
 touches the session it runs in. The `shell_gallery` test runs it and fails on any QML warning.

@@ -291,6 +291,14 @@ void read_shell(lua_State *L, ShellConfig &shell) {
         return;
     }
     boolean(L, "enabled", "shell.enabled", shell.enabled);
+    lua_getfield(L, -1, "style");
+    if (!lua_isnil(L, -1)) {
+        auto style = string(L, -1, "style");
+        if (style != "taskbar" && style != "macos")
+            fail("style must be \"taskbar\" or \"macos\"");
+        shell.macos_style = style == "macos";
+    }
+    lua_pop(L, 1);
     shell.panel_height = integer(L, "panel_height", 52, 24, 100);
     lua_getfield(L, -1, "panel_position");
     if (!lua_isnil(L, -1)) {

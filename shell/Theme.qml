@@ -11,6 +11,10 @@ import QtQuick
 // at a low opacity. That shows on a light panel as on a dark one, where lightening the panel
 // colour does nothing to a near-white one.
 QtObject {
+    // The macOS style (shell.style): a menu bar along the top and a dock at the bottom instead
+    // of the taskbar, and popups drawn as macOS draws them.
+    readonly property bool macos: shell.style === "macos"
+
     // Surfaces. The bar keeps the configured colour, translucency included. Popups are opaque:
     // nothing is blurred behind them, and a window showing through makes text hard to read.
     readonly property color bar: shell.panelColor
