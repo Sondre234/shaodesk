@@ -6,88 +6,139 @@ and every Lua setting, with its type, default and range, is in the
 
 ## Shell
 
-The shell has pinned desktop shortcuts (double-click to launch), a taskbar with
-window activation/minimization (clicking a window's button focuses it, or minimizes it when it
-is focused already, as on Windows, from any monitor's bar) and a right-click [window menu](#taskbar-menus)
-(its application's actions, minimize, maximize, fullscreen, another workspace or monitor, sticky,
-floating, pin to taskbar, close), middle-click to close a window, a right-click menu on empty bar space (tiling,
-applications, show desktop, and the appearance profiles in a submenu), a
-[start menu](#start-menu), a workspace indicator, a wallpaper picker, a [system tray](#system-tray), Quick
-Settings (the network, the volume, the battery, tiling for its monitor, the appearance profiles,
-night light and do-not-disturb), a clock, and a show-desktop button. Buttons show a tooltip
-on hover. Installed applications are read
-from desktop entries through GIO. Lua configures the panel's height, top or
-bottom placement (`panel_position`), margins that make it float (`panel_margin`, one
-number or `{ top, right, bottom, left }`), corner radius, font and text size, colors
-(`#RRGGBB`, or `#RRGGBBAA` for a translucent panel), wallpaper, and pinned commands. Pinned commands run from your home directory. Installed applications can also be
-pinned to the taskbar from a window's menu or the application menu, and unpinned
-by right-clicking their button; those pins are kept in
-`$XDG_STATE_HOME/shaodesk/pinned` (`~/.local/state/shaodesk/pinned`), one desktop id per
-line, and stay off the desktop. An application's windows share one taskbar button, stacked
-with a count when there are several: clicking it cycles through them, and hovering lists them
-to pick or close one. `group_windows = false` gives every window its own button. The workspace indicator lists the monitor's workspaces (click one to switch, scroll to page
-through them). The battery shows the charge of the first battery in `/sys/class/power_supply`
-(red when nearly empty, accent-coloured while charging) and is left out on machines without
-one; the network icon shows Wi-Fi, a wired link, or a dimmed struck-through icon when the
-interface is down, read from `/sys/class/net` (physical interfaces only, wired preferred), and
-is left out without any interface. Both refresh every five seconds. With two or more
-[keyboard layouts](#keyboard-layouts), the active one's short name (`us`, `no`) sits beside the
-clock, and clicking it switches every keyboard to the next. Beside the time, the clock shows
-how many notifications have not been seen, muted (and a crossed-out bell) while do-not-disturb is
-on, which a right-click on it toggles. Clicking the clock opens its flyout at the bar's right end,
-as on Windows 11: the [notifications](#notifications-and-on-screen-display) on one card, and under
-it a calendar with the time and today's date over the month, today marked and the weeks starting
-on the locale's first day. The arrows or the mouse wheel page through the months, each sliding
-in; the title zooms out to the year's months and then to a decade's years, where a pick zooms back
-in; Today returns to this month.
+`shaodesk-shell` draws the desktop, a taskbar on every monitor with its [start menu](#start-menu),
+[Quick Settings](#quick-settings), the [clock's flyout](#clock-and-calendar) and the
+[system tray](#system-tray), and the overlays the compositor asks for: the
+[window switcher](#window-switcher), the [overview](#overview)'s text, the
+[command palette](#command-palette), the [power](#power) dialog, and the
+[notification cards and on-screen display](#notifications-and-on-screen-display). The desktop
+shows the wallpaper and the configured launchers as shortcuts, which open on a double-click; a
+right click on it offers Show desktop and the appearance profiles. Installed applications are read
+from desktop entries through GIO, and again as soon as one is installed or removed.
+
+### Taskbar
+
+Along the bar, from the left: the start button, the pinned applications and a button for each
+open window, the workspace indicator, the widgets placed on the bar, the tray, the Quick Settings
+button, the clock, and a sliver at the end that shows the desktop. Every button shows a tooltip
+when the pointer rests on it. Lua configures the panel's height, top or bottom placement
+(`panel_position`), margins that make it float (`panel_margin`, one number or
+`{ top, right, bottom, left }`), corner radius, font and text size, colors (`#RRGGBB`, or
+`#RRGGBBAA` for a translucent panel), wallpaper, and pinned commands, which run from your home
+directory.
+
+Clicking a window's button focuses it, or minimizes it when it is focused already, as on Windows,
+from any monitor's bar; a middle click closes the window, a right click opens its
+[menu](#taskbar-menus), and dragging the button moves it along the bar. An application's windows
+share one button, stacked with a count when there are several: clicking it cycles through them,
+and hovering lists them to pick one, close it with its cross or a middle click, or open its menu
+(`group_windows = false` gives every window its own button). A line under a button marks its
+window: long in the accent colour for the focused one, short for the others, dimmed while
+minimized; a window asking for attention tints its button in the urgent colour. Installed
+applications can be pinned to the taskbar from a window's menu or the start menu, and unpinned
+from their button's menu; those pins are kept in `$XDG_STATE_HOME/shaodesk/pinned`
+(`~/.local/state/shaodesk/pinned`), one desktop id per line, and stay off the desktop. A pinned
+application's windows take its button's place, keeping its icon, and dragging the button moves the
+pin.
+
+The workspace indicator lists the monitor's workspaces, the current one on a pill, with a dot
+under those with windows: click one to switch to it, or scroll anywhere on the bar to page through
+them. A right click on the bar's empty space opens its menu: tiling on or off, the start menu,
+show desktop, and the appearance profiles beside their entry.
+
+The bar moves with what happens on it, briefly and without holding anything up: a button's fill
+fades in under the pointer and out after it, an application's icon shrinks a little while it is
+pressed, a window's button fades and grows in as the window opens and shrinks away as it closes
+while the others slide over, an application just pinned grows into a slot that opens for it, the
+line under a button eases to its new length and colour, the workspace pill slides to the workspace
+shown, a count grows in and pops as it goes up, and an icon that follows a state (the network, the
+volume, do-not-disturb, tiling) crossfades as the state changes.
+
+### Clock and calendar
+
+Beside the time, the clock shows how many notifications have not been seen, muted (with a
+crossed-out bell) while do-not-disturb is on, which a right click on it toggles. Clicking the clock
+opens its flyout at the bar's right end, as on Windows 11: the
+[notifications](#notifications-and-on-screen-display) on one card, and under it a calendar with
+the time and today's date over the month, today marked and the weeks starting on the locale's
+first day. The arrows or the mouse wheel page through the months, each sliding in; the title zooms
+out to the year's months and then to a decade's years, where a pick zooms back in; Today returns
+to this month. On a monitor too short for both cards, the calendar leaves out the time and the
+date for the notifications, whose list scrolls in what room is left, fading out at the edge where
+it goes on.
+
+### Quick Settings
 
 Left of the clock, as on Windows 11, the Quick Settings button shows the network, the volume and
 the battery in small icons; its wheel changes the volume and a middle click mutes. Clicking it
 opens Quick Settings at the bar's right end: tiles for do-not-disturb, night light (on or off
-against its schedule, through the compositor), tiling on this monitor, the appearance profile
-(listing the profiles under it), the wallpaper (opening the same picker as the bar's button) and
-the network (its state only: Wi-Fi, wired or down, and the interface; shaodesk does not manage
-connections); a brightness slider where the screen has a backlight (set through logind's
-`SetBrightness`, so no privileges are needed); the volume with its mute, the outputs to play
-through and each application's volume a click away; and the battery's charge along the foot.
+against its schedule, through the compositor), tiling on this monitor (greyed out where tiling is
+not available), the appearance profile (listing the profiles under it) and the wallpaper (opening
+the same picker as the bar's button), and the network's state on a disc rather than a tile, as it
+is only shown (Wi-Fi, wired or down, and the interface; shaodesk does not manage connections); a
+brightness slider where the screen has a backlight (set through logind's `SetBrightness`, so no
+privileges are needed); the volume with its mute, the outputs to play through and each
+application's volume a click away; and the battery's charge along the foot.
+
+### Where the widgets go
 
 Each widget is switched off from Lua: `shell = { widgets = { battery = false, calendar = false } }`,
 with `workspaces`, `battery`, `network`, `volume`, `clock`, `calendar` (the clock stays, the
 calendar goes), `tiling`, `profiles` (the appearance profile picker), `wallpapers`,
 `notifications` (do-not-disturb), `keyboard_layout`, `power` (the [power button](#power) in the
-application menu) and `tray` (the [system tray](#system-tray)) all on by default. Those that can
-move sit on the bar with `"bar"` or in Quick Settings with `"quick"`, and `true` leaves them in
-their default place: `network`, `battery`, `volume`, `tiling`, `profiles` and `notifications`
-are in Quick Settings and `wallpapers` on the bar. Placed on the bar, each has its button there
-as before (`notifications = "bar"` is a bell with the unread count, which the clock otherwise
-stands for), and the Quick Settings button goes once nothing is placed in it:
+start menu) and `tray` (the [system tray](#system-tray)) all on by default. Those that can move sit
+on the bar with `"bar"` or in Quick Settings with `"quick"`, and `true` leaves them in their default
+place: `network`, `battery`, `volume`, `tiling`, `profiles` and `notifications` are in Quick
+Settings and `wallpapers` on the bar. Placed on the bar, each has its button there
+(`notifications = "bar"` is a bell with the unread count, which the clock otherwise stands for),
+and the Quick Settings button goes once nothing is placed in it:
 
 ```lua
 shell = { widgets = { volume = "bar", network = "bar", battery = "bar", tiling = "bar",
                       profiles = "bar", notifications = "bar", wallpapers = "quick" } },
 ```
 
-All of them take the panel's `accent`,
-`panel_color`, `text_color`, `font` and `font_size`: hovering, pressing and what is open or on
-are shown by laying the text color over the panel at a low opacity, which shows on a light
-panel as on a dark one. Popups (the application menu, menus, the mixer, the calendar and the
-rest) are drawn in the panel color made opaque, even when the bar is translucent: nothing is
-blurred behind them, and a window showing through would make them hard to read. They open in a
-surface of their own over the whole monitor, above fullscreen windows too, so the application
-menu Super + R opens shows over a video; they fade in with a short slide from the bar and fade
-out (instant with `animations.enabled = false`), and cast a soft shadow when the shell draws
-through the GPU. While one is open, the keyboard is in it and a press anywhere but on the bar or
-the popup closes it without reaching what is under it; a press on another bar button opens that
-one's popup at once. The overview, the window switcher and the command palette close it. Menus
-(the bar's, a window's, the tray's, the power menu) take the keyboard: Up and Down (wrapping),
-Home and End move, Enter or Space chooses, Right opens a submenu and Left or Escape closes it,
-and Escape closes the menu; resting the pointer on an entry with a submenu opens it beside the
-entry, the menu staying open, and moving the pointer towards an open submenu across other entries
-keeps it open. The shell
-draws through the GPU; `renderer = "software"` draws on the CPU instead, for a weak machine: it
-starts faster and uses less memory, but cannot draw effects such as shadows. In a nested
-session, applications that reuse an existing process or D-Bus service can open
-in the host session instead.
+On the bar, the volume shows the default output's level (its wheel changes it, a middle click
+mutes, a click lists each application's volume and a right click the outputs); the battery shows
+the charge of the first battery in `/sys/class/power_supply` (red when nearly empty,
+accent-coloured while charging) and is left out on machines without one; the network shows Wi-Fi,
+a wired link, or a dimmed struck-through icon when the interface is down, read from
+`/sys/class/net` (physical interfaces only, wired preferred), and is left out without any
+interface. Both follow the kernel's notices of changes as they come. With two or more
+[keyboard layouts](#keyboard-layouts), the active one's short name (`us`, `no`) sits beside the
+clock, and clicking it switches every keyboard to the next.
+
+### Look and feel
+
+Everything takes the panel's `accent`, `panel_color`, `text_color`, `font` and `font_size`:
+hovering, pressing and what is open or on are shown by laying the text color over the panel at a
+low opacity, which shows on a light panel as on a dark one. Popups (the start menu, menus, the
+mixer, the flyouts and the rest) are drawn in the panel color made opaque, even when the bar is
+translucent: nothing is blurred behind them, and a window showing through would make them hard to
+read. They open in a surface of their own over the whole monitor, above fullscreen windows too, so
+the start menu Super + R opens shows over a video; they fade in with a short slide from the bar and
+fade out, and cast a soft shadow when the shell draws through the GPU. While one is open, the
+keyboard is in it and a press anywhere but on the bar or the popup closes it without reaching what
+is under it; a press on another bar button opens that one's popup at once. The overview, the
+window switcher and the command palette close it.
+
+Menus (the bar's, a window's, the tray's, the power menu, the desktop's) take the keyboard: Up and
+Down (wrapping), Home and End move, Enter or Space chooses, Right opens a submenu and Left or
+Escape closes it, and Escape closes the menu; resting the pointer on an entry with a submenu opens
+it beside the entry, the menu staying open, and moving the pointer towards an open submenu across
+other entries keeps it open. Buttons, search fields, crosses and empty lists look the same
+wherever they are, and a ring in the accent colour shows the button the keyboard is at.
+
+The overlays (the switcher, the palette, the power dialog and the overview) come in each time they
+show and fade out quicker as they close: the pointer and the keyboard go to what is under them at
+once, so nothing waits for the fade. All the shell's motion is short and eases out; it follows
+`animations.enabled` (off makes every change instant) and `animations.speed`, and nothing moves,
+or wakes the shell, while nothing changes.
+
+The shell draws through the GPU; `renderer = "software"` draws on the CPU instead, for a weak
+machine: it starts faster and uses less memory, but cannot draw effects such as shadows. In a
+nested session, applications that reuse an existing process or D-Bus service can open in the host
+session instead.
 
 ### Taskbar menus
 
@@ -133,14 +184,15 @@ comment, and open windows, workspaces and actions as the [command palette](#comm
 (its `>`, `@` and `#` too), grouped under Best match, Apps, Open windows and Actions. The best
 match is on a card of its own, with an application's desktop actions ("New Private Window") as
 buttons beside Open. Among equal matches, what is launched more often comes first; what matches
-far worse than the best match is left out.
+far worse than the best match is left out. A search that finds nothing says so, with the prefixes
+that narrow one.
 
 The arrows, Tab and Page Up and Page Down move through the tiles, the lists and the results, and
 Enter opens what the keyboard is at (the best match, as the search starts); at the best match,
 Right and Tab move on to its buttons (Open, then its desktop actions) and Left back, Enter
-pressing the one ringed. Escape clears the search, then closes the menu. Right-clicking an application, or the menu key, gives its menu:
-Open, its desktop actions, Pin to Start or Unpin from Start, a tile's Move to front, and Pin to
-taskbar or Unpin from taskbar.
+pressing the one ringed. Escape clears the search, then closes the menu. Right-clicking an
+application, or the menu key, gives its menu: Open, its desktop actions, Pin to Start or Unpin
+from Start, a tile's Move to front, and Pin to taskbar or Unpin from taskbar.
 
 The start menu's pins are its own, as on Windows, kept in `$XDG_STATE_HOME/shaodesk/start-pinned`,
 a desktop id per line. Until they are first changed they are the taskbar's pins, then common
@@ -707,8 +759,9 @@ sets the slide as a share of the monitor's width (default 0.08, 0 only fades). S
 stay put.
 When focus moves, a window's opacity and border color fade to their new values (the `focus`
 kind) instead of switching.
-The shell's own animations (taskbar buttons sliding aside, notification cards, the on-screen
-display, the switcher, the palette and the power dialog coming in) follow `enabled` and `speed`
+The shell's own motion (the taskbar's buttons coming, going and sliding aside, its fills, lines,
+counts and icons, the popups, the notification cards, the on-screen display, and the switcher,
+the palette, the power dialog and the overview coming in and going) follows `enabled` and `speed`
 too.
 
 ## Effects
@@ -1071,7 +1124,7 @@ that sends `subscribe` keeps its connection and receives `tiling on|off` and
 (as in `get workspaces`), and `keyboard-layout N COUNT SHORT NAME` (the active
 [keyboard layout](#keyboard-layouts), from 1, of how many, as in `get keyboard`) after every
 change, plus `launcher OUTPUT` when the `launcher` action
-(Super + R) asks the panel on that monitor to open or close its application menu; the panel uses this. The window switcher sends `switcher OUTPUT SELECTED COUNT` followed by
+(Super + R) asks the panel on that monitor to open or close its start menu; the panel uses this. The window switcher sends `switcher OUTPUT SELECTED COUNT` followed by
 COUNT lines `switcher-window APP_ID TITLE OUTPUT WORKSPACE MINIMIZED URGENT` (tab-separated) when it
 opens or a listed window closes, `switcher-select N` as the selection moves (both counting
 from 0), and `switcher-close`. The state ends with `power ACTIONS`, the power actions that may
@@ -1097,16 +1150,16 @@ This needs sd-bus from libsystemd, libelogind, or basu at build time.
 
 ## Power
 
-The power button in the bottom-right corner of the application menu, as in the Windows start
-menu, opens a menu above it of what may run now: Lock screen (with a locker installed),
+The power button in the bottom-right corner of the start menu, as on Windows, opens a menu above
+it of what may run now, each with its icon: Lock screen (with a locker installed),
 Suspend, Hibernate, Restart, Power off (as logind allows them) and Log out; the button is left
-out when nothing may. A click elsewhere in the application menu closes only the power menu. Its entries, and what is refused, come from the
+out when nothing may. A click elsewhere in the start menu closes only the power menu. Its entries, and what is refused, come from the
 compositor, which also reports across the panel an action that fails or is cancelled later.
 Restart, Power off and Log out ask first: a dialog in the middle of the monitor counts down
 `power.countdown` seconds (10; 0 waits for a click) and then goes ahead, as do its button and
 Enter, while Escape, Cancel or a click beside it gives up. The keyboard starts on the action's
 button, ringed, and Tab moves it to Cancel, where Enter gives up. The actions themselves, bound to keys
-or sent with `shaodesk msg`, do not ask. The `power_menu` action opens the application menu
+or sent with `shaodesk msg`, do not ask. The `power_menu` action opens the start menu
 with the power menu up on the monitor under the pointer, with the keyboard in it: Up and Down
 choose, Enter runs, Escape closes the power menu.
 

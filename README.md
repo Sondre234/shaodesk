@@ -31,7 +31,7 @@ taskbar, launcher and notifications, and a Lua configuration that reloads when y
   and a niri/PaperWM-style scrolling layout.
 - **Per-monitor workspaces**, a scratchpad, sticky windows, tab groups, window rules,
   terminal swallowing, and saved sessions you can restore.
-- **A Qt Quick shell** on every monitor: taskbar, application menu, workspace indicator,
+- **A Qt Quick shell** on every monitor: taskbar, start menu, workspace indicator,
   Quick Settings (network, volume, brightness, battery, night light, tiling, appearance; each
   can sit on the bar instead), keyboard layout, a clock with the notifications and a calendar,
   a system tray, a notification daemon with history and do-not-disturb, an on-screen display,
@@ -157,7 +157,7 @@ started a D-Bus session bus, as is usual without systemd, it starts one with `db
 notifications, the tray and portals need one.
 
 Without `~/.config/shaodesk/init.lua`, the installed [config/init.lua](config/init.lua) is
-used. Super + R opens the application menu, Super + Q opens a terminal, Super + C closes the
+used. Super + R opens the start menu, Super + Q opens a terminal, Super + C closes the
 focused window, and Super + M quits; [Default bindings](#default-bindings) lists the rest. The
 terminal is `$TERMINAL` when that is set, else the first one installed (kitty, foot, alacritty,
 ...). To choose it, write a configuration that extends the default:
