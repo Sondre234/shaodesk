@@ -38,6 +38,17 @@ PopupCard {
         id: content
         anchors.fill: parent; anchors.margins: calendar.padding
         spacing: Theme.spacingM
+        // A wheel notch pages one month: down or right to the next.
+        WheelHandler {
+            property real travel: 0
+            onWheel: (event) => {
+                travel += event.angleDelta.y !== 0 ? event.angleDelta.y : -event.angleDelta.x
+                var steps = travel > 0 ? Math.floor(travel / 120) : Math.ceil(travel / 120)
+                travel -= steps * 120
+                if (steps !== 0)
+                    calendar.step(-steps)
+            }
+        }
         // The time, large, and today's date under it.
         ColumnLayout {
             Layout.fillWidth: true; Layout.leftMargin: Theme.spacingS

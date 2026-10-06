@@ -666,6 +666,22 @@ int main(int argc, char **argv) {
             std::cerr << "the calendar did not page to the next month\n";
             return 1;
         }
+        // A wheel notch down pages to the next month, one up back again.
+        auto wheelOn = [&](QQuickItem *item, int delta) {
+            QWheelEvent event(centre(item), item->window()->mapToGlobal(centre(item)), {}, {0, delta},
+                              Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+            QCoreApplication::sendEvent(item->window(), &event);
+        };
+        wheelOn(grid, -120);
+        if (!QTest::qWaitFor([&] { return calendar->property("month").toInt() == (month + 2) % 12; })) {
+            std::cerr << "the wheel did not page the calendar to the next month\n";
+            return 1;
+        }
+        wheelOn(grid, 120);
+        if (!QTest::qWaitFor([&] { return calendar->property("month").toInt() == (month + 1) % 12; })) {
+            std::cerr << "the wheel did not page the calendar back\n";
+            return 1;
+        }
         auto *today = find(view.rootObject(), "calendarToday");
         if (!today || !today->isEnabled())
             return fail("the calendar has no Today button, or it does nothing on another month");
