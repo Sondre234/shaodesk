@@ -24,15 +24,15 @@ Rectangle {
                      30 + 2 * 26 + rowHeight + Math.max(1, streamList.count) * rowHeight + 10)
     x: Math.max(8, Math.min(panel.audioPopupX - width / 2, panel.width - width - 8))
     y: panel.onTop ? barItem.y + barItem.height + 8 : barItem.y - height - 8
-    color: shell.panelColor; radius: 12
-    border.color: Qt.lighter(shell.panelColor, 1.6)
+    color: Theme.surface; radius: Theme.radiusLarge
+    border.color: Theme.border
     MouseArea { anchors.fill: parent }
     ColumnLayout {
         anchors.fill: parent; anchors.margins: 14; spacing: 0
         Text {
             Layout.fillWidth: true; Layout.preferredHeight: 26
             text: audioMixer.outputName; elide: Text.ElideRight
-            color: shell.textColor; font.pixelSize: shell.fontSize; font.weight: Font.DemiBold; font.family: panel.uiFont
+            color: Theme.text; font.pixelSize: Theme.fontSize; font.weight: Font.DemiBold; font.family: Theme.fontFamily
         }
         RowLayout {
             Layout.fillWidth: true; Layout.preferredHeight: audioMixer.rowHeight
@@ -49,12 +49,12 @@ Rectangle {
                 value: panel.audioSource.volume; muted: panel.audioSource.muted
                 onMoved: panel.audioSource.setVolume(Math.round(value))
             }
-            Text { text: panel.audioSource.volume + "%"; color: shell.textColor; font.pixelSize: shell.fontSize - 1; font.family: panel.uiFont; Layout.preferredWidth: 38; horizontalAlignment: Text.AlignRight }
+            Text { text: panel.audioSource.volume + "%"; color: Theme.text; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily; Layout.preferredWidth: 38; horizontalAlignment: Text.AlignRight }
         }
         Text {
             Layout.fillWidth: true; Layout.preferredHeight: 26
             text: "Applications"; verticalAlignment: Text.AlignBottom
-            color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize - 1; font.family: panel.uiFont
+            color: Theme.textMuted; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
         }
         ListView {
             id: streamList
@@ -75,7 +75,7 @@ Rectangle {
                 Image { source: "image://icons/" + streamRow.icon; sourceSize: Qt.size(24, 24); Layout.preferredWidth: 24; Layout.preferredHeight: 24; Layout.leftMargin: 4; Layout.rightMargin: 4 }
                 ColumnLayout {
                     Layout.fillWidth: true; spacing: 0
-                    Text { Layout.fillWidth: true; text: streamRow.name; elide: Text.ElideRight; color: shell.textColor; font.pixelSize: shell.fontSize - 1; font.family: panel.uiFont }
+                    Text { Layout.fillWidth: true; text: streamRow.name; elide: Text.ElideRight; color: Theme.text; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily }
                     AudioSlider {
                         objectName: "audioStreamSlider"
                         Layout.fillWidth: true; Layout.preferredHeight: 24
@@ -89,7 +89,7 @@ Rectangle {
                     onClicked: panel.audioSource.toggleStreamMute(streamRow.streamId)
                 }
             }
-            Text { anchors.centerIn: parent; visible: streamList.count === 0; text: "No applications are playing sound"; color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize - 1; font.family: panel.uiFont }
+            Text { anchors.centerIn: parent; visible: streamList.count === 0; text: "No applications are playing sound"; color: Theme.textMuted; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily }
         }
     }
 }
