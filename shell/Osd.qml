@@ -3,19 +3,38 @@ import QtQuick
 import QtQuick.Effects
 import QtQuick.Layouts
 
-// The on-screen display: a pill with an icon, a label and a level, fading away when its time is up.
+// The on-screen display: a pill with an icon, a label and a level, rising into view from the edge
+// it is by and fading away when its time is up.
 Item {
     id: osd
     required property string outputName
     readonly property var model: shell.osd
     readonly property bool mine: model.active && model.output === outputName
+    // How far it is shown, from 0 to 1: its opacity, and what is left of its rise and growth. It
+    // comes quickly and goes slowly, both at once with animations off.
+    property real progress: 0
     // True while it is visible, including the fade out; the view hides the surface after that.
-    readonly property bool visibleNow: mine || pill.opacity > 0
+    readonly property bool visibleNow: mine || progress > 0
     readonly property bool hasLevel: model.percent >= 0
     // The room around the pill, which its shadow takes when there is one.
     readonly property int margin: Math.max(Theme.spacingL, Theme.shadowMargin)
     width: pill.width + 2 * margin
     height: pill.height + 2 * margin
+    states: State {
+        name: "shown"
+        when: osd.mine
+        PropertyChanges { osd.progress: 1 }
+    }
+    transitions: [
+        Transition {
+            to: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationNormal; easing.type: Theme.easing }
+        },
+        Transition {
+            from: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationSlow; easing.type: Theme.easingExit }
+        }
+    ]
 
     Item {
         id: pill
@@ -24,8 +43,9 @@ Item {
         // With a level it keeps its width as the level changes; a message alone fits its text.
         width: osd.hasLevel ? 300 : Math.min(300, row.implicitWidth + row.anchors.leftMargin + row.anchors.rightMargin)
         height: Theme.rowHeight + 2 * Theme.spacingM
-        opacity: osd.mine ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: Theme.duration(osd.mine ? 90 : 320); easing.type: Theme.easing } }
+        opacity: osd.progress
+        scale: 0.94 + 0.06 * osd.progress
+        transform: Translate { y: (1 - osd.progress) * Theme.spacingM * (osd.model.top ? -1 : 1) }
         Loader {
             anchors.fill: parent
             active: Theme.effects
