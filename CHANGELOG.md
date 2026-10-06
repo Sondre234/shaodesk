@@ -84,8 +84,8 @@ menus and overlays, and motion throughout.
   do-not-disturb, night light, tiling on the monitor, the appearance profiles and the wallpaper
   picker, the network's state on a disc of its own (it is only shown), a brightness slider where
   there is a backlight (through logind), the volume with its outputs and the applications'
-  volumes, and the battery. The network, battery, volume, tiling, profiles and do-not-disturb are
-  in it by default and the wallpaper picker on the bar; `shell.widgets.NAME = "bar"` or `"quick"`
+  volumes, and the battery. The network, battery, volume, profiles and do-not-disturb are in it
+  by default and the tiling button and the wallpaper picker on the bar; `shell.widgets.NAME = "bar"` or `"quick"`
   places each, `true` leaving it where it goes by default, so configurations with `true` and
   `false` keep working. `shell.widgets.notifications = "bar"` is the bell.
 

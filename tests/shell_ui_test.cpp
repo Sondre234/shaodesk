@@ -3002,8 +3002,9 @@ ListModel {
     // Quick Settings: with the widgets placed in it, a button left of the clock shows their state,
     // and its flyout holds a tile for each beside night light; the bar keeps none of their own.
     {
-        // By default, but for the wallpapers.
-        const QString quickLua = QString(lua).replace(barWidgets, "widgets={wallpapers='quick'},");
+        // By default, but for the wallpapers and tiling.
+        const QString quickLua =
+            QString(lua).replace(barWidgets, "widgets={wallpapers='quick',tiling='quick'},");
         if (!rewrite(quickLua))
             return fail("could not rewrite the configuration");
         controller.reload();

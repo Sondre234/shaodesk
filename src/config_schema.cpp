@@ -548,7 +548,7 @@ const Option options[] = {
      "The month calendar in the clock's flyout."},
     {"shell.widgets.tiling", "boolean or string", "true", "\"quick\"", none, none,
      "Tiling on or off for the monitor: `\"bar\"` (a button) or `\"quick\"` (a tile). By "
-     "default in Quick Settings."},
+     "default on the bar."},
     {"shell.widgets.profiles", "boolean or string", "true", "\"quick\"", none, none,
      "The appearance profile picker, which lists `profiles` to switch between; shown only when "
      "there are two or more: `\"bar\"` (a button) or `\"quick\"` (a tile). By default in "

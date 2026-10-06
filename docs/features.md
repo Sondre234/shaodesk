@@ -89,13 +89,13 @@ calendar goes), `tiling`, `profiles` (the appearance profile picker), `wallpaper
 `notifications` (do-not-disturb), `keyboard_layout`, `power` (the [power button](#power) in the
 start menu) and `tray` (the [system tray](#system-tray)) all on by default. Those that can move sit
 on the bar with `"bar"` or in Quick Settings with `"quick"`, and `true` leaves them in their default
-place: `network`, `battery`, `volume`, `tiling`, `profiles` and `notifications` are in Quick
-Settings and `wallpapers` on the bar. Placed on the bar, each has its button there
+place: `network`, `battery`, `volume`, `profiles` and `notifications` are in Quick Settings and
+`tiling` and `wallpapers` on the bar. Placed on the bar, each has its button there
 (`notifications = "bar"` is a bell with the unread count, which the clock otherwise stands for),
 and the Quick Settings button goes once nothing is placed in it:
 
 ```lua
-shell = { widgets = { volume = "bar", network = "bar", battery = "bar", tiling = "bar",
+shell = { widgets = { volume = "bar", network = "bar", battery = "bar",
                       profiles = "bar", notifications = "bar", wallpapers = "quick" } },
 ```
 
