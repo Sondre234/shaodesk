@@ -187,6 +187,14 @@ void ShellController::refreshApps() {
         apps_.push_back({id, QString::fromUtf8(g_app_info_get_display_name(info)), icon, {},
                          G_APP_INFO(g_object_ref(info)), userPins_.contains(id),
                          QString::fromUtf8(wmClass ? wmClass : "")});
+        auto &app = apps_.back();
+        if (G_IS_DESKTOP_APP_INFO(info)) {
+            auto *entry = G_DESKTOP_APP_INFO(info);
+            app.genericName = QString::fromUtf8(g_desktop_app_info_get_generic_name(entry));
+            for (auto *keyword = g_desktop_app_info_get_keywords(entry); keyword && *keyword; ++keyword)
+                app.keywords.push_back(QString::fromUtf8(*keyword));
+        }
+        app.description = QString::fromUtf8(g_app_info_get_description(info));
     }
     g_list_free_full(list, g_object_unref);
     sortApps();
@@ -311,7 +319,10 @@ QVariantMap ShellController::record(const App &app) {
             {"name", app.name},
             {"icon", app.icon},
             {"pinned", app.pinned},
-            {"configured", !app.command.empty()}};
+            {"configured", !app.command.empty()},
+            {"genericName", app.genericName},
+            {"keywords", app.keywords},
+            {"description", app.description}};
 }
 QVariantList ShellController::apps() const {
     QVariantList list;

@@ -68,6 +68,8 @@ class ShellController : public QObject {
     // empty without a compositor.
     Q_PROPERTY(QVariantMap keyboardLayout READ keyboardLayout NOTIFY keyboardLayoutChanged)
     Q_PROPERTY(QVariantList pinned READ pinned NOTIFY appsChanged)
+    // Configured launchers and installed applications, as {appId, name, icon, pinned (to the
+    // taskbar), configured, genericName, keywords, description}.
     Q_PROPERTY(QVariantList apps READ apps NOTIFY appsChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
     // What is wrong with the configuration while the default one stands in for it; "" when it
@@ -278,6 +280,10 @@ class ShellController : public QObject {
         GAppInfo *info = nullptr;
         bool pinned = false;
         QString wmClass;
+        // What else a search finds it by: its desktop entry's GenericName, Keywords and Comment.
+        QString genericName = {};
+        QStringList keywords = {};
+        QString description = {};
     };
     // Loads the configuration, or the default one with configError_ set when it has an error.
     void loadConfig();

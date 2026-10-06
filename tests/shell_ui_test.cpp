@@ -97,6 +97,8 @@ int main(int argc, char **argv) {
     QFile actionsFile(screens.filePath("data/applications/shaodesk-test-actions.desktop"));
     if (!actionsFile.open(QIODevice::WriteOnly) ||
         actionsFile.write(QString("[Desktop Entry]\nType=Application\nName=Action app\nExec=true\n"
+                                  "GenericName=File toucher\nKeywords=stamp;mark;\n"
+                                  "Comment=Leaves a file behind\n"
                                   "Actions=touch;missing;\n\n"
                                   "[Desktop Action touch]\nName=Touch a file\nIcon=document-new\n"
                                   "Exec=\"%1\" -E touch \"%2\"\n\n"
@@ -260,6 +262,17 @@ int main(int argc, char **argv) {
             return 1;
         }
         controller.clearError();
+    }
+    // An installed application's record says what else a search finds it by.
+    {
+        QVariantMap record;
+        for (const auto &app : controller.apps())
+            if (app.toMap()["appId"] == "shaodesk-test-actions.desktop")
+                record = app.toMap();
+        if (record["genericName"] != "File toucher" ||
+            record["keywords"].toStringList() != QStringList{"stamp", "mark"} ||
+            record["description"] != "Leaves a file behind")
+            return fail("an application's generic name, keywords and comment are not in its record");
     }
     view.show();
     if (!QTest::qWaitForWindowExposed(&view))
