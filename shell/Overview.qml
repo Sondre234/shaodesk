@@ -122,19 +122,51 @@ Item {
         }
     }
 
-    Text {
+    // What is said over the compositor's backdrop, which is dark whatever the theme, stands on a
+    // pill of the theme's surface.
+    Rectangle {
         anchors.centerIn: parent
         visible: overview.windows.length === 0
-        text: overview.filter.length > 0 ? qsTr("No window matches") : qsTr("No windows here")
-        color: Theme.textMuted
-        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeTitle
+        width: empty.implicitWidth + 2 * Theme.spacingXL
+        height: empty.implicitHeight + 2 * Theme.spacingM
+        radius: height / 2
+        color: Theme.surface
+        border.color: Theme.border
+        Text {
+            id: empty
+            anchors.centerIn: parent
+            text: overview.filter.length > 0 ? qsTr("No window matches") : qsTr("No windows here")
+            color: Theme.text
+            font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeTitle
+        }
     }
 
-    Text {
+    // How to work it, along the bottom in the gap below the thumbnails: each key or gesture,
+    // then what it does.
+    Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
-        y: overview.area.y + overview.area.height - height - 4
-        text: qsTr("Enter picks · Esc closes · middle click closes a window · drag a window onto a workspace to move it")
-        color: Theme.textMuted
-        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall
+        y: overview.area.y + overview.area.height - height - Theme.spacingXS
+        width: hints.implicitWidth + 2 * Theme.spacingL
+        height: hints.implicitHeight + 2 * Theme.spacingXS
+        radius: height / 2
+        color: Theme.surface
+        Row {
+            id: hints
+            anchors.centerIn: parent
+            spacing: Theme.spacingL
+            Repeater {
+                model: [{ "key": qsTr("Enter"), "does": qsTr("picks") },
+                        { "key": qsTr("Esc"), "does": qsTr("closes") },
+                        { "key": qsTr("Middle click"), "does": qsTr("closes a window") },
+                        { "key": qsTr("Drag"), "does": qsTr("a window onto a workspace to move it") }]
+                delegate: Text {
+                    required property var modelData
+                    text: "<b>" + modelData.key + "</b> " + modelData.does
+                    textFormat: Text.StyledText
+                    color: Theme.textMuted
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall
+                }
+            }
+        }
     }
 }
