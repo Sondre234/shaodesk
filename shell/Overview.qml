@@ -19,6 +19,18 @@ Item {
     property var urgentWorkspaces: (shell.workspaces[shell.overviewOutput] || ({})).urgent || []
     width: screenSize.width
     height: screenSize.height
+    // It fades in each time its window shows, as the compositor's thumbnails glide to their
+    // places, and goes at once with them.
+    opacity: 0
+    states: State {
+        name: "shown"
+        when: overview.Window.window !== null && overview.Window.window.visible
+        PropertyChanges { overview.opacity: 1 }
+    }
+    transitions: Transition {
+        to: "shown"
+        NumberAnimation { property: "opacity"; duration: Theme.durationSlow; easing.type: Theme.easing }
+    }
 
     // The search box, a field as the palette's: what was typed, or what typing does. It keeps to
     // the room the compositor leaves above the strip.
