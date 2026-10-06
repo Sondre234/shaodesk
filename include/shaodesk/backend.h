@@ -267,6 +267,9 @@ struct sh_settings {
     int border_width;
     /* Radius of the corners of tiled windows and their border; 0 keeps them square. */
     int corner_radius;
+    /* windows.round = "always": windows are rounded on outputs without tiling too, but for
+     * those that draw a shadow of their own. */
+    bool round_always;
     float border_active[4], border_inactive[4]; /* premultiplied RGBA */
     /* Pointer devices (libinput only). A negative value keeps the device's own default. */
     double pointer_speed; /* -1 to 1; used when pointer_speed_set */
@@ -336,6 +339,16 @@ struct sh_settings {
     /* windows.drag_strip: how many pixels along the top of a window without a title bar move
      * it when dragged. */
     int drag_strip;
+    /* windows.controls: enum sh_window_controls, how the controls of the windows the compositor
+     * decorates look. */
+    int window_controls;
+    /* windows.shadow: a soft shadow under each window that draws none of its own, `shadow_blur`
+     * pixels soft (as CSS's blur radius) and offset by (shadow_x, shadow_y), in shadow_color
+     * under the focused window and shadow_inactive_color under others (premultiplied RGBA). */
+    bool shadow;
+    int shadow_blur;
+    int shadow_x, shadow_y;
+    float shadow_color[4], shadow_inactive_color[4];
     /* power.lock_before_sleep: the screen locks with power.lock_command before the machine
      * sleeps. */
     bool lock_before_sleep;
@@ -497,6 +510,9 @@ enum sh_activation {
     SH_ACTIVATION_FOCUS,
     SH_ACTIVATION_IGNORE,
 };
+/* The window controls of the windows the compositor decorates: FLAT buttons on a dark strip
+ * at the top-right corner, or TRAFFIC_LIGHTS, three coloured circles at the top-left. */
+enum sh_window_controls { SH_CONTROLS_FLAT, SH_CONTROLS_TRAFFIC_LIGHTS };
 enum sh_scroll_follow {
     SH_SCROLL_FOLLOW_CENTER, /* the focused column is always centered */
     SH_SCROLL_FOLLOW_EDGE,   /* the view moves only as far as needed to show it */

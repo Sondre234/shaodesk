@@ -111,7 +111,8 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | --- | --- | --- | --- | --- |
 | `windows` | table | - | - | Window borders, opacity, and rules. |
 | `windows.border_width` | integer | 0 | 0 to 20 | Border in pixels around each window; tiles shrink to keep it in their slot. |
-| `windows.corner_radius` | integer | 10 | 0 to 40 | Radius in pixels of the corners of windows on a monitor with tiling on, floating ones included, and of their border; 0 keeps them square. Needs wlroots built with shaodesk's rounded-corners patch. |
+| `windows.corner_radius` | integer | 10 | 0 to 40 | Radius in pixels of the corners of windows (which ones, `round` says) and of their border; 0 keeps them square. Needs wlroots built with shaodesk's rounded-corners patch. |
+| `windows.round` | enum | "tiling" | - | Which windows get rounded corners: `"tiling"`, those on a monitor with tiling on, floating ones included; `"always"`, every window, but for one on a monitor without tiling that draws a shadow of its own around it (a client-side frame, as GTK's), which keeps its own corners. Fullscreen and maximized windows stay square. |
 | `windows.border_color` | color | "#7da8ff" | - | Focused window border, `#RRGGBB` or `#RRGGBBAA`. |
 | `windows.border_inactive_color` | color | "#404a5c" | - | Other windows' border, `#RRGGBB` or `#RRGGBBAA`. |
 | `windows.opacity` | number | 1.0 | 0.05 to 1 | Focused window opacity. |
@@ -132,6 +133,13 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `windows.magnet.bypass` | enum | "Shift" | - | Holding this modifier while dragging turns the magnetism off: `Shift`, `Ctrl`, `Alt`, `Super`, or `none`. |
 | `windows.placement` | enum | "cascade" | - | Where a new floating window opens (tiles go where the layout puts them, and rules with a `position` win): `"cascade"` steps each one 32 pixels down and right, `"center"` opens it in the middle of the screen's free area, `"smart"` where it covers the other windows least, centered in the largest gap that holds it, and cascading when nothing is free. |
 | `windows.drag_strip` | integer | 6 | 0 to 100 | Pixels along the top of a window without a title bar (kitty, X11 applications) that move it when dragged, as a title bar would; they no longer reach the application. 0 turns this off. |
+| `windows.controls` | enum | "flat" | - | How the controls of the windows shaodesk decorates look; they show while the pointer is near their corner. `"flat"`: minimize, fullscreen and close buttons on a dark strip at the top-right. `"traffic_lights"`: close, minimize and fullscreen as red, yellow and green circles at the top-left, grey while the window has no focus, their symbols shown while the pointer is on one. |
+| `windows.shadow` | table | - | - | A soft shadow under each window that draws none of its own (a client-side frame with a shadow keeps that one), following its rounded corners; none under fullscreen and maximized windows. It takes no input and is no part of the window's size or place. |
+| `windows.shadow.enabled` | boolean | false | - | Draw the shadows. |
+| `windows.shadow.color` | color | "#00000059" | - | The shadow under the focused window where it is darkest, `#RRGGBBAA`. |
+| `windows.shadow.inactive_color` | color | "#00000033" | - | The shadow under other windows, `#RRGGBBAA`. |
+| `windows.shadow.blur` | integer | 30 | 0 to 100 | How soft the shadow's edge is: it fades out over about this many pixels, as CSS's blur radius; 0 for a hard edge. |
+| `windows.shadow.offset` | integer or table | 10 | -50 to 50 | How far the shadow falls below the window in pixels, or `{ x, y }` to move it sideways too (right and down). |
 | `windows.buttons` | string | "appmenu:minimize,maximize,close" | - | GTK button layout for windows that draw their own frame; lowercase letters, `_`, `,` and `:` only. Restart to change. |
 | `windows.rules` | list of tables | unset | - | Per-application rules, at most 256. Opacity comes from the first matching rule that sets it; actions apply as a window opens, every matching rule in order, later ones winning. A rule needs `app_id` or `title`. |
 | `windows.rules[].app_id` | regex | any | - | ECMAScript regular expression searched in the application ID (X11: the class). |

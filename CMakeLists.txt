@@ -191,7 +191,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/workspace.c
         src/compositor/xwayland.c
     )
-    add_executable(shaodesk src/main.cpp ${SHAODESK_COMPOSITOR_SOURCES} src/decoration.c src/animation.c src/effects_scene.c src/sleep.c src/login1.c
+    add_executable(shaodesk src/main.cpp ${SHAODESK_COMPOSITOR_SOURCES} src/decoration.c src/shadow.c src/animation.c src/effects_scene.c src/sleep.c src/login1.c
         ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.h ${WLR_PROTOCOL_HEADERS})
     # The compositor's own protocol names a taskbar handle, whose interface wlroots keeps to
     # itself: both interfaces are compiled in here.
@@ -596,6 +596,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_style_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(window_style_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME window_round_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_round_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(window_round_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME window_rules_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_rules_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
@@ -614,6 +618,12 @@ if(SHAODESK_BUILD_COMPOSITOR)
         target_link_libraries(animation_tests PRIVATE shaodesk_config PkgConfig::WLROOTS
             PkgConfig::WAYLAND m)
         add_test(NAME animation COMMAND animation_tests)
+        add_executable(decoration_tests tests/decoration_tests.c src/decoration.c src/shadow.c)
+        target_compile_definitions(decoration_tests PRIVATE WLR_USE_UNSTABLE)
+        target_compile_options(decoration_tests PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        target_include_directories(decoration_tests PRIVATE include)
+        target_link_libraries(decoration_tests PRIVATE PkgConfig::WLROOTS m)
+        add_test(NAME decoration COMMAND decoration_tests)
         add_test(NAME animation_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/animation_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
@@ -638,6 +648,16 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/urgent_border_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")
         set_tests_properties(urgent_border_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME window_controls_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_controls_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>
+            "${GRIM_ARGUMENT}")
+        set_tests_properties(window_controls_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME window_shadow_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_shadow_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>
+            "${GRIM_ARGUMENT}")
+        set_tests_properties(window_shadow_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME peek_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/peek_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")

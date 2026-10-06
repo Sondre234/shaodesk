@@ -169,8 +169,13 @@ const Option options[] = {
     {"windows.border_width", "integer", "0", "0", 0, 20,
      "Border in pixels around each window; tiles shrink to keep it in their slot."},
     {"windows.corner_radius", "integer", "10", "10", 0, 40,
-     "Radius in pixels of the corners of windows on a monitor with tiling on, floating ones "
-     "included, and of their border; 0 keeps them square. Needs wlroots built with shaodesk's rounded-corners patch."},
+     "Radius in pixels of the corners of windows (which ones, `round` says) and of their "
+     "border; 0 keeps them square. Needs wlroots built with shaodesk's rounded-corners patch."},
+    {"windows.round", "enum", "\"tiling\"", "\"always\"", none, none,
+     "Which windows get rounded corners: `\"tiling\"`, those on a monitor with tiling on, "
+     "floating ones included; `\"always\"`, every window, but for one on a monitor without "
+     "tiling that draws a shadow of its own around it (a client-side frame, as GTK's), which "
+     "keeps its own corners. Fullscreen and maximized windows stay square."},
     {"windows.border_color", "color", "\"#7da8ff\"", "\"#7da8ff\"", none, none,
      "Focused window border, `#RRGGBB` or `#RRGGBBAA`."},
     {"windows.border_inactive_color", "color", "\"#404a5c\"", "\"#404a5c\"", none, none,
@@ -234,6 +239,28 @@ const Option options[] = {
      "Pixels along the top of a window without a title bar (kitty, X11 applications) that move "
      "it when dragged, as a title bar would; they no longer reach the application. 0 turns "
      "this off."},
+    {"windows.controls", "enum", "\"flat\"", "\"traffic_lights\"", none, none,
+     "How the controls of the windows shaodesk decorates look; they show while the pointer is "
+     "near their corner. `\"flat\"`: minimize, fullscreen and close buttons on a dark strip at "
+     "the top-right. `\"traffic_lights\"`: close, minimize and fullscreen as red, yellow and "
+     "green circles at the top-left, grey while the window has no focus, their symbols shown "
+     "while the pointer is on one."},
+    {"windows.shadow", "table", "", "", none, none,
+     "A soft shadow under each window that draws none of its own (a client-side frame with a "
+     "shadow keeps that one), following its rounded corners; none under fullscreen and "
+     "maximized windows. It takes no input and is no part of the window's size or place."},
+    {"windows.shadow.enabled", "boolean", "false", "true", none, none,
+     "Draw the shadows."},
+    {"windows.shadow.color", "color", "\"#00000059\"", "\"#00000059\"", none, none,
+     "The shadow under the focused window where it is darkest, `#RRGGBBAA`."},
+    {"windows.shadow.inactive_color", "color", "\"#00000033\"", "\"#00000033\"", none, none,
+     "The shadow under other windows, `#RRGGBBAA`."},
+    {"windows.shadow.blur", "integer", "30", "30", 0, 100,
+     "How soft the shadow's edge is: it fades out over about this many pixels, as CSS's blur "
+     "radius; 0 for a hard edge."},
+    {"windows.shadow.offset", "integer or table", "10", "10", -50, 50,
+     "How far the shadow falls below the window in pixels, or `{ x, y }` to move it sideways "
+     "too (right and down)."},
     {"windows.buttons", "string", "\"appmenu:minimize,maximize,close\"",
      "\"appmenu:minimize,maximize,close\"", none, none,
      "GTK button layout for windows that draw their own frame; lowercase letters, `_`, `,` "

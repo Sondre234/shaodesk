@@ -19,7 +19,7 @@ covers branches, building, testing and committing; [features.md](features.md) de
 | Where | Language | What |
 | --- | --- | --- |
 | `src/compositor/` | C | The compositor proper, on wlroots. Shares one private header, `server.h`. |
-| `src/*.c`, `include/shaodesk/*.h` | C | Pieces the compositor uses that stand on their own: animations, decorations and tab strips (pixels), effect arithmetic, overview thumbnails, session files, the logind client. Several are unit tested. |
+| `src/*.c`, `include/shaodesk/*.h` | C | Pieces the compositor uses that stand on their own: animations, window controls, shadows and tab strips (pixels), effect arithmetic, overview thumbnails, session files, the logind client. Several are unit tested. |
 | `src/config.cpp`, `src/config_schema.cpp` | C++ | The Lua configuration: parsing, validation, the action table and the settings schema. |
 | `src/tiling.cpp`, `src/layout.cpp`, `src/window_placement.cpp`, `src/overview_layout.cpp` | C++ | Pure geometry (tiling layouts, snapping, placement, the overview grid), with a C interface in `backend.h` and unit tests. |
 | `src/import/` | C++ | `shaodesk import` from Hyprland and Waybar. |
@@ -47,7 +47,7 @@ all. In short:
 | `focus.c` | Keyboard focus and urgent windows. |
 | `toplevel.c` | Windows: xdg-shell toplevels and popups, opening by window rules, maximize, fullscreen, minimize. |
 | `xwayland.c` | X11 windows and the XWM waker. |
-| `frame.c` | Borders, opacity, rounded corners, window controls, tab strips. |
+| `frame.c` | Borders, opacity, rounded corners, window controls, shadows, tab strips. |
 | `placement.c` | Snapping, maximizing, reflowing, moving and resizing by keyboard. |
 | `tiling.c` | Glue between windows and the layouts in `src/tiling.cpp`. |
 | `workspace.c` | Workspaces per output, sticky windows. |
