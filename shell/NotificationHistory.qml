@@ -14,8 +14,9 @@ Rectangle {
     objectName: "notificationHistory"
     parent: panel
     visible: panel.audioPopup === "notifications"
-    // Looking at the list is reading it.
+    // Looking at the list is reading it, also when it was made open.
     onVisibleChanged: if (visible) center.markAllRead()
+    Component.onCompleted: if (visible) center.markAllRead()
     Connections { target: history.center; function onUnreadChanged() { if (history.visible) history.center.markAllRead() } }
     function ago(time) {
         var seconds = (Date.now() - time.getTime()) / 1000
