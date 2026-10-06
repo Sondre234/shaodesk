@@ -3,8 +3,9 @@ import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
-// The application menu: a search field over the installed applications, which pin and unpin
-// from here, and the power button in its bottom-right corner with its menu.
+// The start menu, after Windows 11's: a search field on top, the applications under it, and
+// along the bottom who is logged in and the power button, in the bottom-right corner, with its
+// menu. The applications are read again as they are installed and removed.
 PopupCard {
     id: launcher
     required property var panel
@@ -23,8 +24,8 @@ PopupCard {
         target: launcher.panel
         function onPowerOpenChanged() { if (launcher.open) launcher.takeFocus() }
     }
-    // By the bar's start, up to 720 pixels tall as the output leaves room for.
-    implicitWidth: 460
+    // By the bar's start, 640 by 720 pixels, or as tall as the output leaves room for.
+    implicitWidth: 640
     implicitHeight: 720
     anchorRect: panel.barAnchor(12 + shell.panelMarginLeft, 0)
     alignment: Qt.AlignLeft
@@ -32,105 +33,106 @@ PopupCard {
     gap: 10
     margin: 10
     radius: Theme.radiusLarge
-    ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 20
-        spacing: 14
-        RowLayout {
-            Layout.fillWidth: true
-            Text { text: "Applications"; color: Theme.text; font.pixelSize: Theme.fontSizeDisplay; font.weight: Font.DemiBold; font.family: Theme.fontFamily }
-            Item { Layout.fillWidth: true }
-            FlatButton {
-                text: "Refresh"
-                onClicked: shell.refreshApps()
-                palette.buttonText: Theme.text
-                font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+    // The space between the card's edges and what is on it.
+    readonly property real padding: Theme.spacingXXL + Theme.spacingL
+
+    TextField {
+        id: search
+        objectName: "applicationSearch"
+        x: launcher.padding; y: launcher.padding
+        width: launcher.width - 2 * launcher.padding
+        height: Theme.rowHeight + Theme.spacingS
+        leftPadding: Theme.spacingL + Theme.iconSizeSmall + Theme.spacingM
+        rightPadding: Theme.spacingL
+        placeholderText: "Search apps, windows and actions"
+        placeholderTextColor: Theme.textMuted
+        color: Theme.text
+        selectByMouse: true
+        verticalAlignment: TextInput.AlignVCenter
+        font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+        background: Rectangle {
+            radius: height / 2
+            color: Theme.surfaceRaised
+            border.color: search.activeFocus ? Theme.accent : Theme.border
+            Icon {
+                x: Theme.spacingL; anchors.verticalCenter: parent.verticalCenter
+                name: "search"; size: Theme.iconSizeSmall; color: Theme.textMuted
             }
         }
-        TextField {
-            id: search
-            objectName: "applicationSearch"
-            Layout.fillWidth: true
-            Layout.preferredHeight: 42
-            placeholderText: "Search applications"
-            placeholderTextColor: Theme.textMuted
+        onAccepted: {
+            if (applications.count > 0 && shell.launch(applications.model[0].appId)) panel.closeMenus()
+        }
+        Keys.onEscapePressed: panel.closeMenus()
+    }
+    ListView {
+        id: applications
+        anchors.left: parent.left; anchors.right: parent.right
+        anchors.top: search.bottom; anchors.bottom: footer.top
+        anchors.leftMargin: launcher.padding - Theme.spacingM; anchors.rightMargin: anchors.leftMargin
+        anchors.topMargin: Theme.spacingXL; anchors.bottomMargin: Theme.spacingM
+        clip: true
+        spacing: 3
+        model: shell.apps.filter(function(app) {
+            return (app.name + " " + app.appId).toLowerCase().indexOf(search.text.toLowerCase()) >= 0
+        })
+        ScrollBar.vertical: ScrollBar {}
+        delegate: FlatButton {
+            required property var modelData
+            width: ListView.view.width - 10
+            height: 48
+            onClicked: { if (shell.launch(modelData.appId)) panel.closeMenus() }
+            contentItem: RowLayout {
+                spacing: 12
+                Image { source: "image://icons/" + modelData.icon; sourceSize: Qt.size(Theme.appIconSizeLarge, Theme.appIconSizeLarge); Layout.preferredWidth: Theme.appIconSizeLarge; Layout.preferredHeight: Theme.appIconSizeLarge }
+                Text { text: modelData.name; textFormat: Text.PlainText; color: Theme.text; font.pixelSize: Theme.fontSizeLarge; elide: Text.ElideRight; Layout.fillWidth: true; font.family: Theme.fontFamily }
+            }
+        }
+        Text { anchors.centerIn: parent; visible: applications.count === 0; text: "No matching applications"; color: Theme.textMuted; font.family: Theme.fontFamily }
+    }
+    // Along the bottom, in a shade of its own: who is logged in, and the power button.
+    Rectangle {
+        id: footer
+        anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+        // Inside the card's outline.
+        anchors.margins: 1
+        height: 2 * Theme.rowHeight - Theme.spacingM
+        color: Theme.surfaceRaised
+        bottomLeftRadius: launcher.radius - 1; bottomRightRadius: launcher.radius - 1
+        Rectangle { width: parent.width; height: 1; color: Theme.divider }
+        UserAvatar {
+            id: avatar
+            x: launcher.padding; anchors.verticalCenter: parent.verticalCenter
+            size: Theme.appIconSizeLarge
+            backdrop: footer.color
+        }
+        Text {
+            objectName: "userName"
+            anchors.left: avatar.right; anchors.leftMargin: Theme.spacingL
+            anchors.right: powerButton.left; anchors.rightMargin: Theme.spacingL
+            anchors.verticalCenter: parent.verticalCenter
+            text: shell.startMenu.userName; textFormat: Text.PlainText
+            elide: Text.ElideRight
             color: Theme.text
-            selectByMouse: true
-            leftPadding: 12
-            font.pixelSize: Theme.fontSizeLarge; font.family: Theme.fontFamily
-            background: Rectangle {
-                radius: Theme.radiusSmall
-                color: Theme.surfaceRaised
-                border.color: search.activeFocus ? Theme.accent : Theme.border
-            }
-            onAccepted: {
-                if (applications.count > 0 && shell.launch(applications.model[0].appId)) panel.closeMenus()
-            }
-            Keys.onEscapePressed: panel.closeMenus()
+            font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
         }
-        ListView {
-            id: applications
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            clip: true
-            spacing: 3
-            model: shell.apps.filter(function(app) {
-                return (app.name + " " + app.appId).toLowerCase().indexOf(search.text.toLowerCase()) >= 0
-            })
-            ScrollBar.vertical: ScrollBar {}
-            delegate: FlatButton {
-                required property var modelData
-                width: ListView.view.width - 10
-                height: 48
-                onClicked: { if (shell.launch(modelData.appId)) panel.closeMenus() }
-                contentItem: RowLayout {
-                    spacing: 12
-                    Image { source: "image://icons/" + modelData.icon; sourceSize: Qt.size(Theme.appIconSizeLarge, Theme.appIconSizeLarge); Layout.preferredWidth: Theme.appIconSizeLarge; Layout.preferredHeight: Theme.appIconSizeLarge }
-                    Text { text: modelData.name; textFormat: Text.PlainText; color: Theme.text; font.pixelSize: Theme.fontSizeLarge; elide: Text.ElideRight; Layout.fillWidth: true; font.family: Theme.fontFamily }
-                    Text { visible: modelData.configured; text: "Pinned"; color: Theme.accent; font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily }
-                    // Installed applications pin and unpin here; shown while hovered or pinned.
-                    Button {
-                        id: pinToggle
-                        objectName: "pinToggle"
-                        visible: !modelData.configured && (modelData.pinned || parent.parent.hovered || hovered)
-                        text: modelData.pinned ? "Unpin" : "Pin"
-                        Accessible.name: (modelData.pinned ? "Unpin " : "Pin ") + modelData.name + (modelData.pinned ? " from" : " to") + " taskbar"
-                        onClicked: modelData.pinned ? shell.unpin(modelData.appId) : shell.pin(modelData.appId)
-                        Layout.preferredHeight: 26
-                        font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
-                        palette.buttonText: modelData.pinned ? Theme.accent : Theme.text
-                        background: Rectangle { radius: Theme.radiusSmall; color: pinToggle.hovered ? Theme.hover : "transparent"; border.color: Theme.border }
-                    }
-                }
+        // Lock, suspend and the rest, as far as the compositor says they may run.
+        FlatButton {
+            id: powerButton
+            objectName: "powerButton"
+            visible: shell.widgets.power && shell.power.available.length > 0
+            anchors.right: parent.right; anchors.rightMargin: launcher.padding - Theme.spacingM
+            anchors.verticalCenter: parent.verticalCenter
+            width: Theme.rowHeight; height: Theme.rowHeight
+            active: launcher.panel.powerOpen
+            onClicked: panel.powerOpen = !panel.powerOpen
+            Accessible.name: "Power"
+            BarTip {
+                panel: launcher.panel; owner: powerButton
+                visible: powerButton.hovered && !launcher.panel.powerOpen
+                text: "Lock, suspend, power off"
             }
-            Text { anchors.centerIn: parent; visible: applications.count === 0; text: "No matching applications"; color: Theme.textMuted; font.family: Theme.fontFamily }
-        }
-        RowLayout {
-            id: launcherFooter
-            Layout.fillWidth: true
-            Text {
-                Layout.fillWidth: true
-                text: "shaodesk"
-                color: Theme.textMuted
-                font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
-            }
-            // Lock, suspend and the rest, as far as the compositor says they may run.
-            FlatButton {
-                id: powerButton
-                objectName: "powerButton"
-                visible: shell.widgets.power && shell.power.available.length > 0
-                Layout.preferredWidth: 36; Layout.preferredHeight: 36
-                active: launcher.panel.powerOpen
-                onClicked: panel.powerOpen = !panel.powerOpen
-                Accessible.name: "Power"
-                BarTip {
-                    panel: launcher.panel; owner: powerButton
-                    visible: powerButton.hovered && !launcher.panel.powerOpen
-                    text: "Lock, suspend, power off"
-                }
-                contentItem: Item {
-                    Icon { anchors.centerIn: parent; name: "power"; color: panel.powerOpen ? Theme.accent : Theme.text }
-                }
+            contentItem: Item {
+                Icon { anchors.centerIn: parent; name: "power"; color: panel.powerOpen ? Theme.accent : Theme.text }
             }
         }
     }
@@ -141,15 +143,13 @@ PopupCard {
         visible: panel.powerOpen
         onPressed: panel.powerOpen = false
     }
-    // The power menu, above the power button and ending where it ends, over the launcher. The
-    // button is the footer's last item, in the corner the layout's margins leave.
+    // The power menu, above the power button and ending where it ends, over the launcher.
     PowerMenu {
         id: powerMenu
         panel: launcher.panel
         parent: launcher.panel.popupLayer
         z: 1
-        anchorRect: Qt.rect(launcher.x + launcher.width - 20 - powerButton.width,
-                            launcher.y + launcher.height - 20 - powerButton.height,
+        anchorRect: Qt.rect(launcher.x + footer.x + powerButton.x, launcher.y + footer.y + powerButton.y,
                             powerButton.width, powerButton.height)
         side: Qt.TopEdge
         alignment: Qt.AlignRight

@@ -54,6 +54,7 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     ProfileList.qml
     WallpaperPicker.qml
     Launcher.qml
+    UserAvatar.qml
     PowerMenu.qml
     TaskbarMenu.qml
     TrayMenu.qml
