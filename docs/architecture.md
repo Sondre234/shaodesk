@@ -66,19 +66,36 @@ Code that only exists with XWayland is inside `#if WLR_HAS_XWAYLAND`.
 ## The shell (`shell/`)
 
 `ShellController` (`controller.cpp`) loads the configuration, keeps the compositor's state from
-its control socket and holds the models; QML reaches it as the context property `shell`.
+its control socket and holds the models; QML reaches it as the context property `shell`. It
+starts applications: `shell.launch(id)`, and `shell.appActions(id)` with
+`shell.launchAction(id, action)` for the actions a desktop entry offers besides starting it
+(`[Desktop Action …]`, listed as `{action, name, icon}`), each failure shown across the panel.
 `view.cpp` makes one Qt Quick window per surface and output (a layer surface each), all in one
 QML engine. The QML is compiled into the binary (`qt_add_qml_module` in `shell/CMakeLists.txt`,
 which lists every file).
 
+The taskbar's popups are drawn in a surface of their own, a `PopoverWindow` (`view.cpp`) that
+`Panel.qml` declares, so they stay in the panel's QML tree and state while the bar's surface
+keeps its size. It is an overlay layer surface covering the output (exclusive zone -1, so its
+coordinates are the output's), above fullscreen windows too, and hidden while nothing is open.
+While a menu or popup is open it holds the keyboard and takes every press but those on the bar's
+strip, where `inputRects` leaves a hole: a press on another bar button still switches popups in
+one press, and a press beside the popups closes them. The windows of a stacked button, shown on
+hover, take only the pointer over their list and down to the bar (`hoverArea`), and leave the
+keyboard where it is. Losing the keyboard while it holds it (`dismissed`)
+closes the popups. Without layer shell (`--preview-popup`, `shell_ui_test`) it is an ordinary
+window as large as `ShellView::previewSize()`, and a preview's screenshot draws it over the bar.
+
 | File | Covers |
 | --- | --- |
 | `Theme.qml` | The design tokens (colours, type, radii, spacing, icon sizes, motion, whether effects can be drawn), derived from the appearance profile. A singleton: every file reads `Theme.surface`, `Theme.hover`, ... instead of colours and sizes of its own. |
-| `Panel.qml` | The taskbar: which popup is open and where, the bar and its smaller buttons, and a loader for each popup. The popups are drawn in the bar's own surface, which `view.cpp` grows while one is open. Every part below takes the panel as `panel` (and the bar's height, or the bar as `barItem`) and reaches its state and functions through it. |
+| `Panel.qml` | The taskbar: which popup is open and where, the bar and its smaller buttons, and the popover with a loader for each popup. Every part below takes the panel as `panel` (and the bar's height, or the bar as `barItem`) and reaches its state and functions through it; a popup is placed in `panel.popupLayer`, by the bar's edges there (`panel.barTop`, `panel.barBottom`). |
 | `PinnedSlots.qml`, `TaskList.qml`, `TaskButton.qml`, `TrayButton.qml`, `WorkspaceIndicator.qml`, `VolumeButton.qml`, `ClockButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `BarTip.qml` | Parts of the bar: widgets, and the tooltip for things on it. |
 | `NotificationHistory.qml`, `AudioMixer.qml`, `CalendarPopup.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
 | `Icon.qml`, `SpeakerIcon.qml` | Line icons (Lucide), drawn as vectors in any colour, and the loudspeaker for a volume. |
 | `FlatButton.qml` | The frameless button of the bar and of menus, showing the hover, pressed and active states. |
+| `PopupCard.qml` | A popup's card: surface, outline, corners, a shadow through the GPU, the open and close animation, and its place beside what it belongs to. |
+| `PopupMenu.qml`, `MenuRow.qml` | A menu of plain entries on popup cards, with cascading submenus and keyboard navigation, and one row of it. |
 | `AudioSlider.qml`, `MuteButton.qml` | Controls the mixer uses. |
 | `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |
 | `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |
@@ -88,6 +105,64 @@ The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `t
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
 `power.cpp`, `palette.cpp`. `preview.cpp` has stand-ins for all of them for
 `--preview-popup`.
+
+### Popups and menus
+
+A popup is a `PopupCard`; a menu is a `PopupMenu` of plain entries. Both place themselves beside
+an anchor rectangle, so a popup of the bar only says what it belongs to.
+
+`PopupCard` draws the card (`Theme.surface`, outline, `radius`, a shadow when `Theme.effects`) and
+fades in with a few pixels' slide from its anchor while `open`, out again when it is cleared,
+staying visible until it has; `progress` is how far open it is. Its content goes inside it and
+fills it. It places itself beside `anchorRect` (in its parent's coordinates) on the anchor's
+`side` (`Qt.TopEdge`, `Qt.BottomEdge`, `Qt.LeftEdge`, `Qt.RightEdge`), `gap` away, lined up by
+`alignment` (`Qt.AlignHCenter`, `Qt.AlignLeft`, `Qt.AlignRight`, or the vertical ones beside the
+anchor); it flips to the other side when that one has more room (`placedSide` says where it went),
+and stays `margin` inside `bounds`. Its size is its `implicitWidth` and `implicitHeight`, cut to
+`availableWidth` and `availableHeight`. `opened()` is emitted once each time it opens and shows,
+when its content resets, and `initialFocus` (the card, unless set; `null` for none) then takes the
+keyboard. Presses on it stay with it until it starts closing. With `anchored: false` it is only
+the card, for a surface that places it itself.
+
+`PopupMenu` fills its parent and draws its levels on popup cards. Its `entries` are objects:
+
+    { text, icon, secondary, toggle, checked, enabled, danger, run, submenu, objectName }
+    { separator: true }
+    { header: "Section" }
+
+`icon` is a Lucide name `Icon.qml` knows, else a theme icon's name or an image's URL; `secondary`
+is muted text at the row's end (a shortcut, the value in use); `toggle` is `"check"` or `"radio"`
+with `checked`; `enabled: false` greys an entry out and `danger: true` draws it in the danger
+colour. `run` is called when the entry is chosen, and the menu then emits `dismissed()` unless it
+returns `true`; `triggered(entry)` comes first. `submenu` is an array of entries, or a function
+returning one that is read as it opens and again when what it read changes. Placement is the
+card's: `anchorRect`, `side`, `alignment`, `gap`, `bounds`; `minimumWidth`, `maximumWidth` and
+`rowHeight` size the rows. A submenu opens beside its entry after the pointer rests there for
+`submenuDelay` milliseconds, on a click, or with Right, Enter or Space; Up, Down, Home and End
+move, Left or Escape closes a submenu and Escape in the first level emits `dismissed()`.
+`initialIndex` highlights an entry as it opens (-1, none, for a menu opened with the pointer).
+`openEntries` lists the entries whose submenus are open, `openSubmenu(index)` opens one,
+`closeSubmenus()` closes them, and `card` is the first level's card. Rows are `MenuRow`s, named
+`entryName` (`separatorName` for separators) unless an entry gives its `objectName`.
+
+### A new popup of the taskbar
+
+1. In `Panel.qml`, a property saying whether it is open (or a value of `audioPopup`), part of
+   `menuOpen` if it takes the keyboard, cleared by `closeMenus()`, and a function that opens it
+   by a bar item as `toggleAudioPopup` does: noting where (`audioPopupX`) and closing the others.
+2. Its file: a `PopupCard` or `PopupMenu` with `required property var panel` and
+   `required property Item barItem`, `parent: panel.popupLayer`, `open:` that property,
+   `anchorRect: panel.barAnchor(x, width)`, `side: panel.popupSide` and
+   `bounds: panel.popupArea` (the output but the bar), so that it opens away from the bar on a
+   top panel as on a bottom one. A menu's `onDismissed` clears the property.
+3. A `Loader` for it in the popover in `Panel.qml`, like the others: made when first opened or a
+   moment after startup (`root.warm`), kept once made.
+4. The file in `QML_FILES` in `shell/CMakeLists.txt` and in the table above; a name in
+   `previewPopup` (`Panel.qml`), `--preview-popup`'s help (`main.cpp`) and `POPUPS`
+   (`tools/shell_gallery.py`), and a look at the gallery's pictures.
+5. Tests in `shell_ui_test`: `find(view.rootObject(), NAME)` finds the popover's items too,
+   `click(item)` clicks one in its own window, `inPopover(popup)` says it is open, settled and
+   inside the popover, and keys go to `popover`.
 
 ### Drawing something in the shell
 
@@ -99,11 +174,13 @@ states; `border` and `divider`; `text`, `textMuted` and `textDisabled`; `accent`
 `fontSizeCaption`, `fontSizeSmall`, `fontSizeLarge`, `fontSizeTitle` and `fontSizeDisplay`;
 shapes `radiusSmall`, `radiusMedium` and `radiusLarge`; spacing `spacingXS` to `spacingXXL`
 (2, 4, 8, 12, 16, 20); icons `iconSizeSmall`, `iconSize`, `appIconSize` and
-`appIconSizeLarge`. Animations use `durationFast`, `durationNormal`, `durationSlow` or
-`duration(ms)` with `easing` or `easingExit`, all 0 while `animations.enabled` is off.
-`effects` says whether shader effects (shadows) can be drawn: only through the GPU, so draw
-them only when it is true. `alpha()` and `mix()` derive a colour from these. A button without a
-frame of its own is a `FlatButton`, and a tooltip for something on the bar is a `BarTip`.
+`appIconSizeLarge`; rows of menus and lists `rowHeight`, their headings `headingHeight`.
+Animations use `durationFast`, `durationNormal`, `durationSlow` or `duration(ms)` with `easing`
+or `easingExit`, all 0 while `animations.enabled` is off. `effects` says whether shader effects
+(shadows) can be drawn: only through the GPU, so draw them only when it is true, as a popup's
+`shadow` colour, `shadowBlur` and `shadowOffset` are. `alpha()` and `mix()` derive a colour from
+these. A button without a frame of its own is a `FlatButton`, a tooltip for something on the bar
+is a `BarTip`, a popup is a `PopupCard` and a menu a `PopupMenu`.
 
 ### Seeing a change
 

@@ -1,4 +1,4 @@
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Network Qml Quick)
+find_package(Qt6 6.9 REQUIRED COMPONENTS Core Gui Network Qml Quick)
 pkg_check_modules(GIO REQUIRED IMPORTED_TARGET gio-unix-2.0)
 pkg_check_modules(SHELL_WAYLAND REQUIRED IMPORTED_TARGET wayland-client)
 # PulseAudio's client library (PipeWire serves it too) drives the panel's volume control.
@@ -16,7 +16,7 @@ option(SHAODESK_TRAY "Show applications' status icons (StatusNotifierItem) in th
 set(SHAODESK_DBUS OFF)
 set(SHAODESK_TRAY_DBUS OFF)
 if(SHAODESK_NOTIFICATIONS OR SHAODESK_TRAY)
-    find_package(Qt6 6.5 QUIET COMPONENTS DBus)
+    find_package(Qt6 6.9 QUIET COMPONENTS DBus)
     if(Qt6DBus_FOUND)
         set(SHAODESK_DBUS ${SHAODESK_NOTIFICATIONS})
         set(SHAODESK_TRAY_DBUS ${SHAODESK_TRAY})
@@ -42,7 +42,7 @@ set_source_files_properties(Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREFIX /shell
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/ShaodeskShell
     NO_PLUGIN NO_GENERATE_QMLTYPES
-    QML_FILES Theme.qml FlatButton.qml Panel.qml Icon.qml Desktop.qml Switcher.qml Palette.qml Overview.qml NotificationCards.qml Osd.qml ConfigError.qml NotificationBell.qml NotificationHistory.qml
+    QML_FILES Theme.qml FlatButton.qml PopupCard.qml PopupMenu.qml MenuRow.qml Panel.qml Icon.qml Desktop.qml Switcher.qml Palette.qml Overview.qml NotificationCards.qml Osd.qml ConfigError.qml NotificationBell.qml NotificationHistory.qml
     KeyboardLayout.qml BarTip.qml TaskButton.qml TaskList.qml PinnedSlots.qml TrayButton.qml
     WorkspaceIndicator.qml VolumeButton.qml ClockButton.qml BatteryWidget.qml NetworkWidget.qml SpeakerIcon.qml AudioSlider.qml MuteButton.qml
     AudioMixer.qml
@@ -94,7 +94,7 @@ endif()
 target_link_libraries(shaodesk-shell PRIVATE shaodesk_shell_qml)
 if(BUILD_TESTING)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
-    find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
+    find_package(Qt6 6.9 REQUIRED COMPONENTS Test)
     add_executable(shell_ui_test ${PROJECT_SOURCE_DIR}/tests/shell_ui_test.cpp
         ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp view.cpp view.hpp task_model.cpp task_model.hpp
         task_filter.cpp task_filter.hpp icons.cpp icons.hpp wallpapers.cpp wallpapers.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
@@ -257,6 +257,11 @@ if(BUILD_TESTING)
             ${PROJECT_SOURCE_DIR}/tests/urgent_shell_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")
         set_tests_properties(urgent_shell_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME popover_smoke COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/popover_smoke.py $<TARGET_FILE:shaodesk>
+            $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>
+            "${GRIM_ARGUMENT}")
+        set_tests_properties(popover_smoke PROPERTIES TIMEOUT 90)
         if(SHAODESK_DBUS)
             add_test(NAME notifications_smoke COMMAND ${Python3_EXECUTABLE}
                 ${PROJECT_SOURCE_DIR}/tests/notifications_smoke.py $<TARGET_FILE:shaodesk>

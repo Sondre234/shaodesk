@@ -16,7 +16,8 @@ ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop,
     setColor(Qt::transparent);
     setResizeMode(QQuickView::SizeRootObjectToView);
     setFlags(Qt::FramelessWindowHint);
-    static const int registered = qmlRegisterType<TaskFilter>("Shaodesk", 1, 0, "TaskFilter");
+    static const int registered = qmlRegisterType<TaskFilter>("Shaodesk", 1, 0, "TaskFilter") +
+                                  qmlRegisterType<PopoverWindow>("Shaodesk", 1, 0, "PopoverWindow");
     Q_UNUSED(registered);
     // Known as soon as the window exists, so before any QML asks: every view of the shell draws
     // the same way.
@@ -57,10 +58,9 @@ ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop,
             QMetaObject::invokeMethod(rootObject(), "togglePowerMenu");
     });
     connect(screen, &QScreen::geometryChanged, this, [this] { resizeForContent(); });
-    connect(this, &QWindow::activeChanged, this, [this] {
-        if (!isActive() && expanded_ && rootObject())
-            QMetaObject::invokeMethod(rootObject(), "closeMenus");
-    });
+}
+PopoverWindow *ShellView::popover() const {
+    return rootObject() ? rootObject()->findChild<PopoverWindow *>() : nullptr;
 }
 // The panel's surface spans the output's width and the bar's margins; the bar is drawn inset.
 void ShellView::placeLayer() {
@@ -80,30 +80,132 @@ void ShellView::placeLayer() {
 #endif
 }
 void ShellView::resizeForContent() {
-    int width = preview_ ? 1100 : screen()->geometry().width();
+    int width = preview_ ? previewSize().width() : screen()->geometry().width();
     int height = desktop_ ? (preview_ ? 680 : screen()->geometry().height())
-                          : (expanded_ ? std::min(560, screen()->geometry().height())
-                                       : controller_.panelExtent());
+                          : controller_.panelExtent();
     resize(width, height);
 #if SHAODESK_LAYER_SHELL
     if (layer_)
         layer_->setDesiredSize(QSize(0, desktop_ ? 0 : height));
 #endif
 }
-void ShellView::setExpanded(bool expanded, bool keyboard) {
-    if (desktop_)
+
+PopoverWindow::PopoverWindow(QWindow *parent) : QQuickWindow(parent) {
+    setTitle("shaodesk popover");
+    setColor(Qt::transparent);
+    setFlags(Qt::FramelessWindowHint);
+    // Losing the keyboard while holding it means something else was chosen.
+    connect(this, &QWindow::activeChanged, this, [this] {
+        if (!isActive() && open_ && keyboard_)
+            Q_EMIT dismissed();
+    });
+}
+void PopoverWindow::setPanel(QQuickWindow *panel) {
+    auto *view = qobject_cast<ShellView *>(panel);
+    if (!view || panel_)
         return;
-    expanded_ = expanded;
-    keyboard = expanded && keyboard;
+    panel_ = view;
+    QScreen *screen = view->outputScreen();
+    setScreen(screen);
+#if SHAODESK_LAYER_SHELL
+    if (view->layerShell()) {
+        using W = LayerShellQt::Window;
+        layer_ = W::get(this);
+        layer_->setScreen(screen);
+        layer_->setScope("shaodesk-popover");
+        // Over the panels and the windows, fullscreen ones too: the launcher asked for with
+        // Super + R must show over a video.
+        layer_->setLayer(W::LayerOverlay);
+        layer_->setAnchors(W::Anchors(W::AnchorTop | W::AnchorBottom | W::AnchorLeft | W::AnchorRight));
+        // The whole output, the bar's strip included: a popup is placed by the bar. The
+        // compositor sizes it to the output.
+        layer_->setExclusiveZone(-1);
+        layer_->setDesiredSize(QSize(0, 0));
+        layer_->setKeyboardInteractivity(W::KeyboardInteractivityNone);
+        layer_->setActivateOnShow(false);
+    }
+#endif
+    fit();
+    connect(screen, &QScreen::geometryChanged, this, &PopoverWindow::fit);
+    Q_EMIT panelChanged();
+    applyOpen();
+}
+void PopoverWindow::fit() {
+    resize(layer_ ? panel_->outputScreen()->geometry().size() : ShellView::previewSize());
+}
+void PopoverWindow::setOpen(bool open) {
+    if (open == open_)
+        return;
+    open_ = open;
+    Q_EMIT openChanged();
+    applyOpen();
+}
+void PopoverWindow::applyOpen() {
+    if (!panel_)
+        return;
+    const auto output = panel_->outputScreen()->name().toStdString();
+    if (open_ && !isVisible()) {
+        applyInput();
+        show();
+        applyKeyboard();
+        std::cerr << "shaodesk popover shown on " << output << '\n';
+    } else if (!open_ && isVisible()) {
+        hide();
+        std::cerr << "shaodesk popover hidden on " << output << '\n';
+    }
+}
+void PopoverWindow::prepare() {
+    if (!layer_ || prepared_ || isVisible())
+        return;
+    prepared_ = true;
+    applyInput();
+    show();
+    connect(
+        this, &QQuickWindow::frameSwapped, this,
+        [this] {
+            if (!open_)
+                hide();
+        },
+        Qt::ConnectionType(Qt::QueuedConnection | Qt::SingleShotConnection));
+}
+void PopoverWindow::setKeyboard(bool keyboard) {
+    if (keyboard == keyboard_)
+        return;
+    keyboard_ = keyboard;
+    Q_EMIT keyboardChanged();
+    applyKeyboard();
+}
+void PopoverWindow::applyKeyboard() {
 #if SHAODESK_LAYER_SHELL
     if (layer_)
-        layer_->setKeyboardInteractivity(keyboard
-                                             ? LayerShellQt::Window::KeyboardInteractivityExclusive
-                                             : LayerShellQt::Window::KeyboardInteractivityNone);
+        layer_->setKeyboardInteractivity(keyboard_ ? LayerShellQt::Window::KeyboardInteractivityExclusive
+                                                   : LayerShellQt::Window::KeyboardInteractivityNone);
 #endif
-    resizeForContent();
-    if (keyboard)
+    if (keyboard_ && isVisible())
         requestActivate();
+}
+void PopoverWindow::setInputRects(const QVariantList &rects) {
+    if (rects == inputRects_)
+        return;
+    inputRects_ = rects;
+    Q_EMIT inputRectsChanged();
+    applyInput();
+}
+void PopoverWindow::applyInput() {
+    inputRegion_ = QRegion();
+    for (const auto &rect : std::as_const(inputRects_))
+        inputRegion_ += rect.toRectF().toAlignedRect();
+    if (!layer_)
+        return;
+    // An empty mask would be no mask, the whole surface; nothing takes no input instead.
+    if (inputRegion_.isEmpty()) {
+        setFlag(Qt::WindowTransparentForInput, true);
+    } else {
+        setMask(inputRegion_);
+        setFlag(Qt::WindowTransparentForInput, false);
+    }
+    // The region is the surface's state, sent with its next frame.
+    update();
 }
 OverviewView::OverviewView(ShellController &controller, QScreen *screen)
     : QQuickView(controller.engine(), nullptr), controller_(controller), outputScreen_(screen) {

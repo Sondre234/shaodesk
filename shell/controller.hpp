@@ -219,6 +219,14 @@ class ShellController : public QObject {
     QRect overviewArea() const { return overviewArea_; }
     int overviewSelected() const { return overviewSelected_; }
     Q_INVOKABLE bool launch(const QString &id);
+    // What an installed application's desktop entry offers besides starting it (its [Desktop
+    // Action …] groups, such as "New window"), in the entry's order, as {action, name, icon}:
+    // icon is the action's own icon name or path, "" when it has none. Empty for a configured
+    // launcher or an id that is not installed.
+    Q_INVOKABLE QVariantList appActions(const QString &id) const;
+    // Runs one of an application's actions as launch() starts the application, a failure shown
+    // across the panel the same way; returns whether it started.
+    Q_INVOKABLE bool launchAction(const QString &id, const QString &action);
     Q_INVOKABLE void refreshApps();
     // Pins an installed application to the taskbar, remembered across sessions. Configured
     // launchers stay pinned; unpinning them means editing the configuration.
@@ -329,6 +337,9 @@ class ShellController : public QObject {
     void report(const QString &message);
     void clearApps();
     void sortApps();
+    // Starts an installed application's `info` with the environment every launch gets, showing a
+    // failure across the panel as one of the application called `name`.
+    bool start(GAppInfo *info, const QString &name);
     static QString pinsPath();
     void savePins();
     // Wallpapers picked from the panel, by profile: the one picked, and shell.wallpaper as it

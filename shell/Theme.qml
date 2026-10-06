@@ -83,6 +83,10 @@ QtObject {
     readonly property int spacingXL: 16
     readonly property int spacingXXL: 20
 
+    // A row of a menu or a list, and a section's heading over rows.
+    readonly property int rowHeight: 36
+    readonly property int headingHeight: 30
+
     // Line icons in menus, line icons on the bar, applications' icons on the bar and in lists,
     // and in the launcher.
     readonly property int iconSizeSmall: 16
@@ -103,6 +107,11 @@ QtObject {
 
     // Whether shader effects (shadows) can be drawn: only through the GPU.
     readonly property bool effects: shell.effects
+    // The shadow under a popup (PopupCard), drawn only with effects: how dark, how soft and how
+    // far down. A light profile needs less of it to show.
+    readonly property color shadow: Qt.rgba(0, 0, 0, light ? 0.3 : 0.6)
+    readonly property int shadowBlur: 20
+    readonly property int shadowOffset: 6
 
     // `milliseconds` at the animation speed, 0 with animations off.
     function duration(milliseconds) { return Math.round(milliseconds * motionScale) }

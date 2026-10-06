@@ -66,8 +66,8 @@ int main(int argc, char **argv) {
     parser.addOption({"preview-popup",
                       "Preview the taskbar with one popup open, on stand-in windows, sound, "
                       "tray items and notifications: bar (none), launcher, power, bar-menu, "
-                      "profile-menu, task-menu, pin-menu, group, tray-menu, calendar, mixer, "
-                      "outputs, profiles, wallpapers or notifications",
+                      "bar-submenu, task-menu, pin-menu, group, tray-menu, tray-submenu, "
+                      "calendar, mixer, outputs, profiles, wallpapers or notifications",
                       "name"});
     parser.addOption(
         {"quit-after",
@@ -146,8 +146,13 @@ int main(int argc, char **argv) {
                 return;
             }
             QImage shot = views.front()->grabWindow();
-            if (preview && !parser.isSet("preview-desktop"))
-                shot = previewOnDesktop(shot, controller);
+            if (preview && !parser.isSet("preview-desktop")) {
+                auto *popover = views.front()->popover();
+                shot = previewOnDesktop(shot,
+                                        popover && popover->isVisible() ? popover->grabWindow()
+                                                                        : QImage(),
+                                        controller.panelTop(), controller);
+            }
             if (!shot.save(parser.value("screenshot")))
                 app.exit(1);
             else

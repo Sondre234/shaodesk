@@ -359,37 +359,126 @@ bool ShellController::launch(const QString &id) {
         report("This application is no longer available.");
         return false;
     }
-    if (!it->command.empty()) {
-        QProcess process;
-        auto env = QProcessEnvironment::systemEnvironment();
-        env.remove("QT_WAYLAND_SHELL_INTEGRATION");
-        process.setProcessEnvironment(env);
-        process.setWorkingDirectory(QDir::homePath());
-        process.setProgram(QString::fromStdString(it->command.front()));
-        QStringList arguments;
-        for (size_t i = 1; i < it->command.size(); ++i)
-            arguments << QString::fromStdString(it->command[i]);
-        process.setArguments(arguments);
-        if (!process.startDetached()) {
-            report("Could not launch " + it->name + ": " + process.errorString());
-            return false;
-        }
-    } else {
-        GAppLaunchContext *context = g_app_launch_context_new();
-        g_app_launch_context_unsetenv(context, "QT_WAYLAND_SHELL_INTEGRATION");
-        GError *error = nullptr;
-        bool success = g_app_info_launch(it->info, nullptr, context, &error);
-        g_object_unref(context);
-        if (!success) {
-            report("Could not launch " + it->name + ": " +
-                   QString::fromUtf8(error ? error->message : "unknown error"));
-            if (error)
-                g_error_free(error);
-            return false;
-        }
+    if (it->command.empty())
+        return start(it->info, it->name);
+    QProcess process;
+    auto env = QProcessEnvironment::systemEnvironment();
+    env.remove("QT_WAYLAND_SHELL_INTEGRATION");
+    process.setProcessEnvironment(env);
+    process.setWorkingDirectory(QDir::homePath());
+    process.setProgram(QString::fromStdString(it->command.front()));
+    QStringList arguments;
+    for (size_t i = 1; i < it->command.size(); ++i)
+        arguments << QString::fromStdString(it->command[i]);
+    process.setArguments(arguments);
+    if (!process.startDetached()) {
+        report("Could not launch " + it->name + ": " + process.errorString());
+        return false;
     }
     clearError();
     return true;
+}
+bool ShellController::start(GAppInfo *info, const QString &name) {
+    // The shell's own platform settings are not the application's.
+    GAppLaunchContext *context = g_app_launch_context_new();
+    g_app_launch_context_unsetenv(context, "QT_WAYLAND_SHELL_INTEGRATION");
+    GError *error = nullptr;
+    const bool success = g_app_info_launch(info, nullptr, context, &error);
+    g_object_unref(context);
+    if (!success) {
+        report("Could not launch " + name + ": " +
+               QString::fromUtf8(error ? error->message : "unknown error"));
+        if (error)
+            g_error_free(error);
+        return false;
+    }
+    clearError();
+    return true;
+}
+namespace {
+// The key file of an installed application's desktop entry, for what GIO does not read from it;
+// nullptr when it cannot be read. Freed with g_key_file_unref.
+GKeyFile *desktopEntry(GDesktopAppInfo *info) {
+    const char *path = g_desktop_app_info_get_filename(info);
+    GKeyFile *file = g_key_file_new();
+    if (path && g_key_file_load_from_file(file, path, G_KEY_FILE_KEEP_TRANSLATIONS, nullptr))
+        return file;
+    g_key_file_unref(file);
+    return nullptr;
+}
+bool hasAction(GDesktopAppInfo *info, const QByteArray &action) {
+    for (auto *name = g_desktop_app_info_list_actions(info); name && *name; ++name)
+        if (action == *name)
+            return true;
+    return false;
+}
+} // namespace
+QVariantList ShellController::appActions(const QString &id) const {
+    QVariantList list;
+    auto it = std::find_if(apps_.begin(), apps_.end(),
+                           [&id](const App &app) { return app.id == id && app.info; });
+    if (it == apps_.end() || !G_IS_DESKTOP_APP_INFO(it->info))
+        return list;
+    auto *info = G_DESKTOP_APP_INFO(it->info);
+    const gchar *const *actions = g_desktop_app_info_list_actions(info);
+    if (!actions || !*actions)
+        return list;
+    // GIO gives an action's name but not its icon, which is in the action's own group.
+    GKeyFile *file = desktopEntry(info);
+    for (auto *action = actions; *action; ++action) {
+        char *name = g_desktop_app_info_get_action_name(info, *action);
+        const QByteArray group = QByteArray("Desktop Action ") + *action;
+        char *icon = file ? g_key_file_get_string(file, group.constData(), "Icon", nullptr) : nullptr;
+        list.push_back(QVariantMap{{"action", QString::fromUtf8(*action)},
+                                   {"name", QString::fromUtf8(name ? name : *action)},
+                                   {"icon", QString::fromUtf8(icon ? icon : "")}});
+        g_free(name);
+        g_free(icon);
+    }
+    if (file)
+        g_key_file_unref(file);
+    return list;
+}
+bool ShellController::launchAction(const QString &id, const QString &action) {
+    auto it = std::find_if(apps_.begin(), apps_.end(),
+                           [&id](const App &app) { return app.id == id && app.info; });
+    const QByteArray name = action.toUtf8();
+    if (it == apps_.end() || !G_IS_DESKTOP_APP_INFO(it->info) ||
+        !hasAction(G_DESKTOP_APP_INFO(it->info), name)) {
+        report("This action is no longer available.");
+        return false;
+    }
+    auto *info = G_DESKTOP_APP_INFO(it->info);
+    // An application started over D-Bus is asked to run the action itself, and reports its own
+    // failures.
+    if (g_desktop_app_info_get_boolean(info, "DBusActivatable")) {
+        GAppLaunchContext *context = g_app_launch_context_new();
+        g_app_launch_context_unsetenv(context, "QT_WAYLAND_SHELL_INTEGRATION");
+        g_desktop_app_info_launch_action(info, name.constData(), context);
+        g_object_unref(context);
+        clearError();
+        return true;
+    }
+    // GIO would start any other action with nowhere to say that it failed. Started as an entry of
+    // its own whose command is the action's, it runs the same way and a missing program is
+    // reported as launch() reports one.
+    GDesktopAppInfo *entry = nullptr;
+    if (GKeyFile *file = desktopEntry(info)) {
+        const QByteArray group = "Desktop Action " + name;
+        if (char *exec = g_key_file_get_string(file, group.constData(), "Exec", nullptr)) {
+            g_key_file_set_string(file, G_KEY_FILE_DESKTOP_GROUP, G_KEY_FILE_DESKTOP_KEY_EXEC, exec);
+            g_free(exec);
+            entry = g_desktop_app_info_new_from_keyfile(file);
+        }
+        g_key_file_unref(file);
+    }
+    if (!entry) {
+        report("Could not launch " + it->name + ": its desktop entry gives no command for this");
+        return false;
+    }
+    const bool started = start(G_APP_INFO(entry), it->name);
+    g_object_unref(entry);
+    return started;
 }
 void ShellController::reload() {
     try {

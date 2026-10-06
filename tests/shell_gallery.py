@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Every popup of tools/shell_gallery.py renders in both of its themes without a QML warning,
-and each picture with a popup is taller than the bar alone, the surface having grown for it."""
+each picture is the whole output a preview stands for, and each one with a popup differs from the
+bar alone, the popup drawn over it."""
 import importlib.util
 from pathlib import Path
 import struct
@@ -21,15 +22,16 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-gallery-") as directory:
     result = subprocess.run(command, capture_output=True, text=True, timeout=240)
     assert result.returncode == 0, result.stdout + result.stderr
     suffix = "-gpu" if renderer == "gpu" else ""
-    sizes = {}
+    pictures = {}
     for theme in gallery.THEMES:
         for popup in popups:
             picture = Path(directory) / f"{theme}-{popup}{suffix}.png"
             data = picture.read_bytes()
             assert data[:8] == b"\x89PNG\r\n\x1a\n", f"{picture.name} is no PNG"
-            sizes[theme, popup] = struct.unpack(">II", data[16:24])
-    for (theme, popup), (width, height) in sizes.items():
-        assert width >= 640, f"{theme}-{popup} is {width} pixels wide"
-        if popup != "bar" and (theme, "bar") in sizes:
-            assert height > sizes[theme, "bar"][1], f"{theme}-{popup} did not grow the surface"
-print(f"{len(sizes)} popups rendered ({renderer})")
+            pictures[theme, popup] = data
+    for (theme, popup), data in pictures.items():
+        width, height = struct.unpack(">II", data[16:24])
+        assert width >= 640 and height >= 600, f"{theme}-{popup} is {width}x{height} pixels"
+        if popup != "bar" and (theme, "bar") in pictures:
+            assert data != pictures[theme, "bar"], f"{theme}-{popup} shows no popup"
+print(f"{len(pictures)} popups rendered ({renderer})")

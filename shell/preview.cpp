@@ -3,6 +3,7 @@
 #include "audio.hpp"
 #include "controller.hpp"
 #include "system_status.hpp"
+#include "view.hpp"
 #include <QDir>
 #include <QFile>
 #include <QLinearGradient>
@@ -158,9 +159,13 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
     return opened.toBool();
 }
 
-QImage previewOnDesktop(QImage panel, const ShellController &controller) {
+QImage previewOnDesktop(QImage panel, QImage popover, bool panelTop,
+                        const ShellController &controller) {
     panel.setDevicePixelRatio(1);
-    QImage desktop(panel.size(), QImage::Format_ARGB32_Premultiplied);
+    popover.setDevicePixelRatio(1);
+    // As large as the output a preview stands for, in the bar's pixels.
+    const QSize output = ShellView::previewSize() * (panel.width() / qreal(ShellView::previewSize().width()));
+    QImage desktop(output, QImage::Format_ARGB32_Premultiplied);
     QPainter painter(&desktop);
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
     const QString file = controller.wallpaperFile();
@@ -178,6 +183,10 @@ QImage previewOnDesktop(QImage panel, const ShellController &controller) {
         gradient.setColorAt(1, controller.background());
         painter.fillRect(desktop.rect(), gradient);
     }
-    painter.drawImage(0, 0, panel);
+    painter.drawImage(0, panelTop ? 0 : desktop.height() - panel.height(), panel);
+    // Along the bar's edge, as the popups are placed by it, should a compositor have made the
+    // window smaller.
+    if (!popover.isNull())
+        painter.drawImage(0, panelTop ? 0 : desktop.height() - popover.height(), popover);
     return desktop;
 }

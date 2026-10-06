@@ -4,11 +4,11 @@ import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
 // The clock's popup: a month calendar with today marked, paged by month.
-Rectangle {
+PopupCard {
     id: calendar
     required property var panel
     required property Item barItem
-    parent: panel
+    parent: panel.popupLayer
     objectName: "calendar"
     property int month: new Date().getMonth()
     property int year: new Date().getFullYear()
@@ -17,14 +17,12 @@ Rectangle {
         year = d.getFullYear(); month = d.getMonth()
     }
     function today() { var d = new Date(); year = d.getFullYear(); month = d.getMonth() }
-    visible: panel.audioPopup === "calendar"
-    onVisibleChanged: if (visible) today()
-    width: 288; height: 330
-    x: Math.max(8, Math.min(panel.audioPopupX - width / 2, panel.width - width - 8))
-    y: panel.onTop ? barItem.y + barItem.height + 8 : barItem.y - height - 8
-    color: Theme.surface; radius: Theme.radiusLarge
-    border.color: Theme.border
-    MouseArea { anchors.fill: parent }
+    open: panel.audioPopup === "calendar"
+    onOpened: today()
+    implicitWidth: 288; implicitHeight: 330
+    anchorRect: panel.barAnchor(panel.audioPopupX, 0)
+    side: panel.popupSide
+    radius: Theme.radiusLarge
     ColumnLayout {
         anchors.fill: parent; anchors.margins: 14; spacing: 6
         RowLayout {

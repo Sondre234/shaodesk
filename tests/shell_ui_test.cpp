@@ -91,6 +91,21 @@ int main(int argc, char **argv) {
         return fail("no temporary directory");
     auto config = directory.filePath("init.lua");
     auto marker = directory.filePath("launched");
+    // An application with desktop actions: one that runs, and one whose program is missing. It
+    // is written before the controller first reads the applications.
+    const auto actionMarker = directory.filePath("action");
+    QFile actionsFile(screens.filePath("data/applications/shaodesk-test-actions.desktop"));
+    if (!actionsFile.open(QIODevice::WriteOnly) ||
+        actionsFile.write(QString("[Desktop Entry]\nType=Application\nName=Action app\nExec=true\n"
+                                  "Actions=touch;missing;\n\n"
+                                  "[Desktop Action touch]\nName=Touch a file\nIcon=document-new\n"
+                                  "Exec=\"%1\" -E touch \"%2\"\n\n"
+                                  "[Desktop Action missing]\nName=Missing program\n"
+                                  "Exec=/nonexistent/shaodesk-missing-program\n")
+                              .arg(QString::fromLocal8Bit(argv[1]), actionMarker)
+                              .toUtf8()) < 0)
+        return fail("could not write the application with actions");
+    actionsFile.close();
     // Two pictures for the wallpaper picker, in two subfolders.
     const auto walls = directory.filePath("walls");
     for (const auto *name : {"a/one.png", "b/two.png"}) {
@@ -212,19 +227,71 @@ int main(int argc, char **argv) {
         std::cerr << "a window's app ID can name a file for the icon\n";
         return 1;
     }
+    // An application's desktop actions are listed in its entry's order with their icons, and run
+    // as the application is started; a failure, or an action that is not there, shows across the
+    // panel.
+    {
+        const auto actions = controller.appActions("shaodesk-test-actions.desktop");
+        if (actions.size() != 2 || actions[0].toMap()["action"] != "touch" ||
+            actions[0].toMap()["name"] != "Touch a file" ||
+            actions[0].toMap()["icon"] != "document-new" ||
+            actions[1].toMap()["action"] != "missing" || actions[1].toMap()["icon"] != "" ||
+            !controller.appActions("shaodesk-test-app.desktop").isEmpty() ||
+            !controller.appActions("pinned:0").isEmpty() ||
+            !controller.appActions("not-installed.desktop").isEmpty()) {
+            std::cerr << "the desktop actions are not listed as the entries give them\n";
+            return 1;
+        }
+        if (!controller.launchAction("shaodesk-test-actions.desktop", "touch") ||
+            !QTest::qWaitFor([&] { return QFile::exists(actionMarker); }) ||
+            !controller.error().isEmpty()) {
+            std::cerr << "a desktop action did not run: " << controller.error().toStdString() << '\n';
+            return 1;
+        }
+        if (controller.launchAction("shaodesk-test-actions.desktop", "missing") ||
+            !controller.error().startsWith("Could not launch Action app: ")) {
+            std::cerr << "a desktop action whose program is missing was not reported: "
+                      << controller.error().toStdString() << '\n';
+            return 1;
+        }
+        if (controller.launchAction("shaodesk-test-actions.desktop", "absent") ||
+            controller.error() != "This action is no longer available.") {
+            std::cerr << "an action the entry does not have was not refused\n";
+            return 1;
+        }
+        controller.clearError();
+    }
     view.show();
     if (!QTest::qWaitForWindowExposed(&view))
         return fail("the panel never showed");
+    // The popups' window, as large as the output, with the bar's along its bottom edge.
+    PopoverWindow *popover = view.popover();
+    if (!popover || popover->size() != ShellView::previewSize() || popover->isVisible())
+        return fail("the panel has no popover the size of its output, or it shows at start");
     // Loader items, Repeater items and the like are found through the item tree rather than as
     // QObject children.
     std::function<QQuickItem *(QQuickItem *, const QString &)> find =
-        [&find](QQuickItem *item, const QString &name) -> QQuickItem * {
+        [&](QQuickItem *item, const QString &name) -> QQuickItem * {
         if (item->objectName() == name)
             return item;
         for (auto *child : item->childItems())
             if (auto *found = find(child, name))
                 return found;
-        return nullptr;
+        // The panel's popups are in the popover's window.
+        return item == view.rootObject() ? find(popover->contentItem(), name) : nullptr;
+    };
+    // Whether a popup is open, done sliding in, and lies inside the popover, off the bar along its
+    // bottom edge, the bar's own surface keeping its size. A menu's first card stands for it.
+    auto inPopover = [&](QQuickItem *popup) {
+        if (auto *card = popup->property("card").value<QQuickItem *>())
+            popup = card;
+        const QRectF area = popup->mapRectToScene(QRectF(0, 0, popup->width(), popup->height()));
+        const QVariant progress = popup->property("progress");
+        return popup->isVisible() && (!progress.isValid() || progress.toReal() == 1) &&
+               popup->window() == popover && popover->isVisible() &&
+               area.top() >= 0 && area.left() >= 0 &&
+               area.bottom() <= popover->height() - view.height() &&
+               area.right() <= popover->width() && view.height() == controller.panelExtent();
     };
     // The popups are made on first use, not with the panel.
     for (const char *popup : {"audioMixer", "calendar", "audioOutputs", "contextMenu", "groupList",
@@ -247,8 +314,8 @@ int main(int argc, char **argv) {
         return 1;
     }
     for (Qt::Key key : {Qt::Key_T, Qt::Key_E, Qt::Key_S, Qt::Key_T})
-        QTest::keyClick(&view, key);
-    QTest::keyClick(&view, Qt::Key_Return);
+        QTest::keyClick(search->window(), key);
+    QTest::keyClick(search->window(), Qt::Key_Return);
     if (!QTest::qWaitFor([&] { return QFile::exists(marker); })) {
         std::cerr << "search and Enter did not launch the configured command\n";
         return 1;
@@ -303,7 +370,11 @@ int main(int argc, char **argv) {
     auto centre = [&](QQuickItem *item) {
         return item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint();
     };
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(workspace(3)));
+    // A click in the middle of an item, in the window it is in.
+    auto click = [&](QQuickItem *item, Qt::MouseButton button = Qt::LeftButton, int delay = -1) {
+        QTest::mouseClick(item->window(), button, Qt::NoModifier, centre(item), delay);
+    };
+    click(workspace(3));
     if (!QTest::qWaitFor([&] { return workspace(3)->property("current").toBool(); }) ||
         switches != QStringList{"output " + output + " workspace 3"}) {
         std::cerr << "clicking a workspace did not switch to it\n";
@@ -431,6 +502,35 @@ int main(int argc, char **argv) {
         std::cerr << "the switcher did not close\n";
         return 1;
     }
+    // The switcher, the overview and the command palette opening on this output close what is
+    // open here: the popover would be over them.
+    {
+        auto openLauncher = [&] {
+            view.rootObject()->setProperty("launcherOpen", true);
+            return QTest::qWaitFor([&] { return popover->isVisible(); });
+        };
+        auto closed = [&] {
+            return QTest::qWaitFor([&] { return !view.rootObject()->property("menuOpen").toBool(); });
+        };
+        if (!openLauncher())
+            return fail("the launcher did not open");
+        subscriber->write(("switcher " + output + " 0 0\n").toUtf8());
+        if (!closed())
+            return fail("the window switcher opening did not close the launcher");
+        subscriber->write("switcher-close\n");
+        if (!openLauncher())
+            return fail("the launcher did not open again");
+        subscriber->write(("overview " + output + " 0 0 1 0 0 0 1100 668 -\n").toUtf8());
+        if (!closed())
+            return fail("the overview opening did not close the launcher");
+        subscriber->write("overview-close\n");
+        if (!openLauncher())
+            return fail("the launcher did not open a third time");
+        controller.palette()->open(output);
+        if (!closed())
+            return fail("the command palette opening did not close the launcher");
+        controller.palette()->close();
+    }
     // The keyboard layout indicator: the active layout's short name while there are two or
     // more; clicking it asks for the next; shell.widgets.keyboard_layout = false hides it.
     {
@@ -454,7 +554,7 @@ int main(int argc, char **argv) {
             std::cerr << "the keyboard layout indicator does not show the active layout\n";
             return 1;
         }
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(layout));
+        click(layout);
         if (!QTest::qWaitFor([&] { return label->property("text").toString() == "no"; }) ||
             layoutSwitches != 1 || controller.keyboardLayout()["number"].toInt() != 2) {
             std::cerr << "clicking the keyboard layout did not switch to the next\n";
@@ -538,7 +638,7 @@ int main(int argc, char **argv) {
             std::cerr << "calendar missing or open at start\n";
             return 1;
         }
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(clock));
+        click(clock);
         if (!QTest::qWaitFor([&] { return calendar->isVisible(); })) {
             std::cerr << "clicking the clock did not open the calendar\n";
             return 1;
@@ -561,19 +661,17 @@ int main(int argc, char **argv) {
             return 1;
         }
         const int month = calendar->property("month").toInt();
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier,
-                          centre(find(view.rootObject(), "calendarNext")));
+        click(find(view.rootObject(), "calendarNext"));
         if (!QTest::qWaitFor([&] { return calendar->property("month").toInt() == (month + 1) % 12; })) {
             std::cerr << "the calendar did not page to the next month\n";
             return 1;
         }
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier,
-                          centre(find(view.rootObject(), "calendarTitle")));
+        click(find(view.rootObject(), "calendarTitle"));
         if (!QTest::qWaitFor([&] { return calendar->property("month").toInt() == month; })) {
             std::cerr << "the calendar title did not return to this month\n";
             return 1;
         }
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(clock));
+        click(clock);
         if (!QTest::qWaitFor([&] { return !calendar->isVisible(); })) {
             std::cerr << "clicking the clock again did not close the calendar\n";
             return 1;
@@ -645,12 +743,8 @@ int main(int argc, char **argv) {
         return nullptr;
     };
     auto menuItem = [&](const QString &text) { return findMenuItem(menu, text); };
-    // The whole menu must lie inside the panel surface, which grows to make room for it.
-    auto menuShown = [&] {
-        QRectF area = menu->mapRectToScene(QRectF(0, 0, menu->width(), menu->height()));
-        return menu->isVisible() && view.height() > controller.panelExtent() && area.top() >= 0 &&
-               area.bottom() <= view.height();
-    };
+    // The whole menu must lie inside the popover.
+    auto menuShown = [&] { return inPopover(menu); };
     const QPoint entry = centre(task);
     // Held past the long-press time, which once swallowed the right click.
     QTest::mousePress(&view, Qt::RightButton, Qt::NoModifier, entry);
@@ -663,9 +757,9 @@ int main(int argc, char **argv) {
         std::cerr << "right-clicking a task did not show its menu\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(menuItem("Minimize")));
+    click(menuItem("Minimize"));
     if (!QTest::qWaitFor([&] { return !view.rootObject()->property("menuOpen").toBool(); }) ||
-        !QTest::qWaitFor([&] { return view.height() == controller.panelExtent(); })) {
+        !QTest::qWaitFor([&] { return !popover->isVisible(); })) {
         std::cerr << "choosing a task menu item did not close the menu\n";
         return 1;
     }
@@ -679,12 +773,12 @@ int main(int argc, char **argv) {
     };
     auto pinned = [&] { return find(view.rootObject(), "pinned:shaodesk-test-app.desktop"); };
     auto pinnedTask = [&] { return find(view.rootObject(), "pinnedTask:shaodesk-test-app.desktop"); };
-    QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, centre(task));
+    click(task, Qt::RightButton);
     if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Pin to taskbar"); })) {
         std::cerr << "a task's menu did not offer to pin its application\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(menuItem("Pin to taskbar")));
+    click(menuItem("Pin to taskbar"));
     if (!QTest::qWaitFor([&] { return pinned() != nullptr; }) ||
         !controller.isPinned("shaodesk-test-app.desktop") ||
         readPins() != "shaodesk-test-app.desktop\n") {
@@ -698,8 +792,8 @@ int main(int argc, char **argv) {
         std::cerr << "a pinned application's window did not take over its slot\n";
         return 1;
     }
-    if (!QTest::qWaitFor([&] { return view.height() == controller.panelExtent(); })) {
-        std::cerr << "the panel did not shrink after pinning\n";
+    if (!QTest::qWaitFor([&] { return !popover->isVisible(); })) {
+        std::cerr << "the popover did not close after pinning\n";
         return 1;
     }
     // Dragging a pinned slot's window onto another pinned slot moves the pin there.
@@ -734,21 +828,20 @@ int main(int argc, char **argv) {
         std::cerr << "a pinned slot did not show its launcher again once its window closed\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, centre(pinned()));
+    click(pinned(), Qt::RightButton);
     if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Unpin from taskbar"); }) ||
         !menuItem("Open Fake app")) {
         std::cerr << "a pinned application's menu did not offer to unpin it\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier,
-                      centre(menuItem("Unpin from taskbar")));
+    click(menuItem("Unpin from taskbar"));
     if (!QTest::qWaitFor([&] { return pinned() == nullptr; }) || !readPins().isEmpty() ||
         controller.isPinned("shaodesk-test-app.desktop")) {
         std::cerr << "unpinning did not remove and forget the taskbar button\n";
         return 1;
     }
-    if (!QTest::qWaitFor([&] { return view.height() == controller.panelExtent(); })) {
-        std::cerr << "the panel did not shrink after unpinning\n";
+    if (!QTest::qWaitFor([&] { return !popover->isVisible(); })) {
+        std::cerr << "the popover did not close after unpinning\n";
         return 1;
     }
     editTasks("model.append({ taskId: 7, title: 'Fake', appId: 'fake', active: false, "
@@ -765,26 +858,74 @@ int main(int argc, char **argv) {
         std::cerr << "right-clicking empty bar space did not show the bar menu\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(menuItem("Turn tiling off")));
+    // While a menu is open the popover holds the keyboard and takes the pointer everywhere but
+    // over the bar, whose buttons stay reachable: another one opens its popup in one press. A
+    // press beside the popups closes them, and the popover goes, taking nothing any more.
+    {
+        const QRegion outsideBar(0, 0, popover->width(), popover->height() - view.height());
+        if (!popover->keyboard() || popover->inputRegion() != outsideBar) {
+            std::cerr << "an open menu does not take the keyboard and the pointer beside the bar\n";
+            return 1;
+        }
+        auto *calendar = find(view.rootObject(), "calendar");
+        click(find(view.rootObject(), "clockButton"));
+        if (!QTest::qWaitFor([&] { return calendar && inPopover(calendar); }) ||
+            view.rootObject()->property("barMenuOpen").toBool() || !popover->isVisible()) {
+            std::cerr << "a press on the clock while the bar menu was open did not switch to the calendar\n";
+            return 1;
+        }
+        QTest::mouseClick(popover, Qt::LeftButton, Qt::NoModifier, QPoint(5, 5));
+        if (!QTest::qWaitFor([&] { return !calendar->isVisible() && !popover->isVisible(); }) ||
+            view.rootObject()->property("menuOpen").toBool() || popover->keyboard() ||
+            !popover->inputRegion().isEmpty()) {
+            std::cerr << "a press beside the calendar did not close it and the popover\n";
+            return 1;
+        }
+        QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, empty);
+        if (!QTest::qWaitFor([&] { return view.rootObject()->property("barMenuOpen").toBool() && menuShown(); }))
+            return fail("the bar menu did not open again");
+    }
+    click(menuItem("Turn tiling off"));
     if (!QTest::qWaitFor([&] { return !toggled && !panelTiling(); }) ||
         view.rootObject()->property("menuOpen").toBool()) {
         std::cerr << "the bar menu did not toggle tiling off\n";
         return 1;
     }
-    // The bar menu's appearance entry lists the profiles in its place; picking one switches.
+    // The bar menu's appearance entry opens the profiles beside it, the one in use marked, and
+    // the menu stays; picking one switches.
     QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, empty);
-    if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Appearance: dark …"); })) {
+    if (!QTest::qWaitFor([&] {
+            return menuShown() && menuItem("Appearance") &&
+                   menuItem("Appearance")->property("modelData").toMap()["secondary"] == "dark";
+        })) {
         std::cerr << "the bar menu lacks the appearance profiles\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(menuItem("Appearance: dark …")));
+    // The card a row is on, and whether one card lies right of another.
+    auto cardOf = [](QQuickItem *row) {
+        while (row && !row->property("anchorRect").isValid())
+            row = row->parentItem();
+        return row;
+    };
+    auto beside = [](QQuickItem *left, QQuickItem *right) {
+        const QRectF a = left->mapRectToScene(QRectF(0, 0, left->width(), left->height()));
+        const QRectF b = right->mapRectToScene(QRectF(0, 0, right->width(), right->height()));
+        return b.left() >= a.right() - 1 && b.top() < a.bottom() && b.bottom() > a.top();
+    };
+    click(menuItem("Appearance"));
     if (!QTest::qWaitFor([&] {
-            return menuShown() && menuItem("‹ Back") && menuItem("✓ dark") && menuItem("light");
-        }) || menuItem("Applications")) {
-        std::cerr << "the appearance entry did not list the profiles\n";
+            return menuShown() && menuItem("dark") && menuItem("light") && menuItem("Applications") &&
+                   menuItem("dark")->property("marked").toBool() &&
+                   !menuItem("light")->property("marked").toBool() &&
+                   menuItem("Appearance")->property("expanded").toBool() &&
+                   cardOf(menuItem("dark")) != cardOf(menuItem("Applications")) &&
+                   beside(cardOf(menuItem("Applications")), cardOf(menuItem("dark"))) &&
+                   inPopover(cardOf(menuItem("dark")));
+        })) {
+        std::cerr << "the appearance entry did not open the profiles beside the menu\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(menuItem("light")));
+    click(menuItem("light"));
     if (!QTest::qWaitFor([&] {
             return requests == QStringList{"profile light"} && controller.profile() == "light" &&
                    controller.accent() == QColor("#336699") &&
@@ -796,12 +937,87 @@ int main(int argc, char **argv) {
     }
     requests.clear();
     QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, empty);
-    if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Appearance: light …"); }) ||
-        menuItem("‹ Back")) {
-        std::cerr << "the bar menu did not open on its own entries with the new profile\n";
+    if (!QTest::qWaitFor([&] {
+            return menuShown() && menuItem("Appearance") && !menuItem("dark") &&
+                   menuItem("Appearance")->property("modelData").toMap()["secondary"] == "light";
+        })) {
+        std::cerr << "the bar menu did not open without its submenu, with the new profile\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(menuItem("Show desktop")));
+    // The keyboard: nothing is highlighted after a right click; Down and Up move, wrapping and
+    // skipping nothing that can be chosen; End and Home go to the ends; Right opens a submenu at
+    // its first entry, Left closes it; Escape closes a submenu, then the menu. The pointer rests
+    // away from the menu, where it would select what opens under it.
+    QTest::mouseMove(popover, QPoint(5, 5));
+    {
+        auto highlighted = [&] {
+            QStringList rows;
+            std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
+                for (auto *child : item->childItems()) {
+                    if (child->objectName() == "contextMenuItem" && child->isVisible() &&
+                        child->property("highlighted").toBool())
+                        rows << child->property("text").toString();
+                    walk(child);
+                }
+            };
+            walk(menu);
+            return rows.join("|");
+        };
+        auto key = [&](Qt::Key key, const QString &expected) {
+            QTest::keyClick(popover, key);
+            return QTest::qWaitFor([&] { return highlighted() == expected; });
+        };
+        if (!highlighted().isEmpty() || !key(Qt::Key_Down, "Turn tiling on") ||
+            !key(Qt::Key_Up, "Appearance") || !key(Qt::Key_Up, "Show desktop") ||
+            !key(Qt::Key_Home, "Turn tiling on") || !key(Qt::Key_End, "Appearance") ||
+            !key(Qt::Key_Down, "Turn tiling on")) {
+            std::cerr << "the arrows, Home and End did not move through the bar menu: "
+                      << highlighted().toStdString() << '\n';
+            return 1;
+        }
+        if (!key(Qt::Key_End, "Appearance") || !key(Qt::Key_Right, "Appearance|dark") ||
+            !key(Qt::Key_Down, "Appearance|light") || !key(Qt::Key_Down, "Appearance|dark") ||
+            !key(Qt::Key_Left, "Appearance") || menuItem("dark")) {
+            std::cerr << "Right and Left did not open and close the submenu: "
+                      << highlighted().toStdString() << '\n';
+            return 1;
+        }
+        if (!key(Qt::Key_Return, "Appearance|dark") || !key(Qt::Key_Escape, "Appearance") ||
+            !view.rootObject()->property("barMenuOpen").toBool()) {
+            std::cerr << "Enter did not open the submenu, or Escape closed more than it: "
+                      << highlighted().toStdString() << " "
+                      << view.rootObject()->property("barMenuOpen").toBool() << '\n';
+            return 1;
+        }
+        QTest::keyClick(popover, Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !view.rootObject()->property("menuOpen").toBool(); })) {
+            std::cerr << "Escape did not close the bar menu\n";
+            return 1;
+        }
+    }
+    // The pointer resting on a submenu's entry opens it, and resting on another closes it; the
+    // pointer crossing other entries on its way into the submenu leaves it open.
+    QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, empty);
+    if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Appearance") && !menuItem("dark"); }))
+        return fail("the bar menu did not open again");
+    QTest::mouseMove(popover, centre(menuItem("Appearance")));
+    if (!QTest::qWaitFor([&] { return menuItem("dark") && menuItem("dark")->isVisible(); })) {
+        std::cerr << "resting on the appearance entry did not open its submenu\n";
+        return 1;
+    }
+    QTest::mouseMove(popover, centre(menuItem("Show desktop")));
+    QTest::mouseMove(popover, centre(menuItem("light")));
+    QTest::qWait(400);
+    if (!menuItem("light") || !menuItem("Appearance")->property("expanded").toBool()) {
+        std::cerr << "crossing another entry into the submenu closed it\n";
+        return 1;
+    }
+    QTest::mouseMove(popover, centre(menuItem("Show desktop")));
+    if (!QTest::qWaitFor([&] { return !menuItem("light"); })) {
+        std::cerr << "resting on another entry did not close the submenu\n";
+        return 1;
+    }
+    click(menuItem("Show desktop"));
     // The profile button on the bar lists the profiles, the one in use marked, and switches.
     auto *profilesButton = find(view.rootObject(), "profilesButton");
     if (!QTest::qWaitFor([&] { return !view.rootObject()->property("menuOpen").toBool(); }) ||
@@ -809,7 +1025,7 @@ int main(int argc, char **argv) {
         std::cerr << "the bar lacks the profile button\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(profilesButton));
+    click(profilesButton);
     std::function<QQuickItem *(QQuickItem *, const QString &)> findProfile =
         [&](QQuickItem *parent, const QString &name) -> QQuickItem * {
         for (auto *item : parent->childItems()) {
@@ -825,15 +1041,14 @@ int main(int argc, char **argv) {
             profileList = find(view.rootObject(), "profileList");
             return profileList && profileList->isVisible() && findProfile(profileList, "dark") &&
                    findProfile(profileList, "light") &&
-                   findProfile(profileList, "light")->property("current").toBool() &&
-                   !findProfile(profileList, "dark")->property("current").toBool() &&
-                   view.height() >= profileList->height() + controller.panelExtent();
+                   findProfile(profileList, "light")->property("marked").toBool() &&
+                   !findProfile(profileList, "dark")->property("marked").toBool() &&
+                   inPopover(profileList);
         })) {
         std::cerr << "the profile button did not list the profiles\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier,
-                      centre(findProfile(profileList, "dark")));
+    click(findProfile(profileList, "dark"));
     if (!QTest::qWaitFor([&] {
             return requests == QStringList{"profile dark"} && controller.profile() == "dark" &&
                    !profileList->isVisible();
@@ -849,7 +1064,7 @@ int main(int argc, char **argv) {
         std::cerr << "the bar lacks the wallpaper button\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(wallpapersButton));
+    click(wallpapersButton);
     std::function<void(QQuickItem *, QList<QQuickItem *> &)> wallpaperItems =
         [&](QQuickItem *parent, QList<QQuickItem *> &found) {
             for (auto *item : parent->childItems()) {
@@ -872,15 +1087,14 @@ int main(int argc, char **argv) {
             picker = find(view.rootObject(), "wallpaperPicker");
             return picker && picker->isVisible() && wallpaperItem("one") && wallpaperItem("two") &&
                    wallpaperItem("one")->property("current").toBool() &&
-                   !wallpaperItem("two")->property("current").toBool() &&
-                   view.height() >= picker->height() + controller.panelExtent();
+                   !wallpaperItem("two")->property("current").toBool() && inPopover(picker);
         })) {
         std::cerr << "the wallpaper button did not show the pictures: " << (picker ? picker->isVisible() : -1)
                   << " " << controller.wallpapers().size() << " " << !!wallpaperItem("one") << !!wallpaperItem("two")
-                  << " " << (picker ? picker->height() : 0) << " " << view.height() << '\n';
+                  << " " << (picker ? picker->height() : 0) << " " << popover->height() << '\n';
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(wallpaperItem("two")));
+    click(wallpaperItem("two"));
     const auto picked = screens.filePath("state/shaodesk/wallpapers");
     auto pickedText = [&picked] {
         QFile f(picked);
@@ -906,7 +1120,7 @@ int main(int argc, char **argv) {
         std::cerr << "clearing the picked wallpaper did not go back to the configured one\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(wallpapersButton));
+    click(wallpapersButton);
     if (!QTest::qWaitFor([&] { return !picker->isVisible(); })) {
         std::cerr << "the wallpaper button did not close the picker\n";
         return 1;
@@ -989,17 +1203,29 @@ int main(int argc, char **argv) {
     };
     QTest::mouseMove(&view, centre(stack));
     if (!groupList || !QTest::qWaitFor([&] {
-            auto box =
-                groupList->mapRectToScene(QRectF(0, 0, groupList->width(), groupList->height()));
-            return groupList->isVisible() && groupRows() == 2 && box.top() >= 0 &&
-                   view.height() > controller.panelExtent() &&
+            return inPopover(groupList) && groupRows() == 2 && !popover->keyboard() &&
                    !view.rootObject()->property("menuOpen").toBool();
         })) {
         std::cerr << "hovering a stacked task did not list its windows "
                   << stack->property("hovered").toBool()
                   << view.rootObject()->property("groupOpen").toBool() << groupRows()
-                  << groupList->isVisible() << view.height() << "\n";
+                  << groupList->isVisible() << popover->isVisible() << "\n";
         return 1;
+    }
+    // The popover takes the pointer over the list alone, and between it and the bar.
+    {
+        // Once it has slid into place.
+        auto box = [&] {
+            QRectF area = groupList->mapRectToScene(QRectF(0, 0, groupList->width(), groupList->height()));
+            area.setBottom(popover->height() - view.height());
+            return area;
+        };
+        if (!QTest::qWaitFor([&] { return popover->inputRegion() == QRegion(box().toAlignedRect()); })) {
+            std::cerr << "the popover takes the pointer elsewhere than over the list: "
+                      << QDebug::toString(popover->inputRegion()).toStdString() << " for "
+                      << QDebug::toString(box()).toStdString() << '\n';
+            return 1;
+        }
     }
     // The pointer can cross from the button to the list without it closing, and choosing a
     // window there closes it.
@@ -1012,9 +1238,12 @@ int main(int argc, char **argv) {
         }
         return nullptr;
     };
+    // The pointer leaves the bar's surface and comes into the popover's.
     const QPoint row = centre(firstRow(groupList));
+    QEvent leaveBar(QEvent::Leave);
+    QCoreApplication::sendEvent(&view, &leaveBar);
     for (int step = 1; step <= 5; ++step) {
-        QTest::mouseMove(&view, centre(stack) + (row - centre(stack)) * step / 5);
+        QTest::mouseMove(popover, row + QPoint(0, 30 * (5 - step) / 5));
         QTest::qWait(10);
     }
     QTest::qWait(600);
@@ -1022,21 +1251,21 @@ int main(int argc, char **argv) {
         std::cerr << "moving from a stacked task to its windows hid them\n";
         return 1;
     }
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, row);
-    if (!QTest::qWaitFor(
-            [&] { return !groupList->isVisible() && view.height() == controller.panelExtent(); })) {
+    QTest::mouseClick(popover, Qt::LeftButton, Qt::NoModifier, row);
+    if (!QTest::qWaitFor([&] { return !groupList->isVisible() && !popover->isVisible(); })) {
         std::cerr << "choosing one of a stacked task's windows did not hide them\n";
         return 1;
     }
     // Hovered again, the list goes once the pointer leaves.
+    QEvent leavePopover(QEvent::Leave);
+    QCoreApplication::sendEvent(popover, &leavePopover);
     QTest::mouseMove(&view, centre(stack));
     if (!QTest::qWaitFor([&] { return groupList->isVisible(); })) {
         std::cerr << "hovering a stacked task again did not list its windows\n";
         return 1;
     }
     QTest::mouseMove(&view, empty);
-    if (!QTest::qWaitFor(
-            [&] { return !groupList->isVisible() && view.height() == controller.panelExtent(); })) {
+    if (!QTest::qWaitFor([&] { return !groupList->isVisible() && !popover->isVisible(); })) {
         std::cerr << "leaving a stacked task did not hide its windows\n";
         return 1;
     }
@@ -1103,15 +1332,19 @@ int main(int argc, char **argv) {
         return 1;
     }
     audio.requests.clear();
+    // On the output, the bar's surface along the popover's bottom edge.
     auto above = [&](QQuickItem *popup) {
+        if (auto *card = popup->property("card").value<QQuickItem *>())
+            popup = card;
         auto box = popup->mapRectToScene(QRectF(0, 0, popup->width(), popup->height()));
-        auto widget = volume->mapRectToScene(QRectF(0, 0, volume->width(), volume->height()));
-        return popup->isVisible() && box.bottom() <= widget.top() &&
+        auto widget = volume->mapRectToScene(QRectF(0, 0, volume->width(), volume->height()))
+                          .translated(0, popover->height() - view.height());
+        return inPopover(popup) && box.bottom() <= widget.top() &&
                box.left() <= widget.center().x() && box.right() >= widget.center().x();
     };
     auto *outputs = find(view.rootObject(), "audioOutputs");
     auto *mixer = find(view.rootObject(), "audioMixer");
-    QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, centre(volume));
+    click(volume, Qt::RightButton);
     if (!outputs || !QTest::qWaitFor([&] { return above(outputs); }) ||
         !view.rootObject()->property("menuOpen").toBool()) {
         std::cerr << "right-clicking the volume control did not show the outputs above it\n";
@@ -1130,7 +1363,7 @@ int main(int argc, char **argv) {
     auto *headset = findNamed(outputs, "audioOutputItem", "Headset");
     if (!headset)
         return fail("the headset is not listed among the audio outputs");
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(headset));
+    click(headset);
     if (!QTest::qWaitFor([&] { return !view.rootObject()->property("menuOpen").toBool(); }) ||
         audio.requests != QStringList{"output headset 2"} || audio.output() != "headset") {
         std::cerr << "choosing an output did not switch to it: "
@@ -1138,7 +1371,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     audio.requests.clear();
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(volume));
+    click(volume);
     if (!mixer || !QTest::qWaitFor([&] { return above(mixer); })) {
         std::cerr << "clicking the volume control did not show the mixer above it\n";
         return 1;
@@ -1150,7 +1383,7 @@ int main(int argc, char **argv) {
     // The first application's slider, clicked three quarters along.
     const auto track =
         streamSlider->mapRectToScene(QRectF(0, 0, streamSlider->width(), streamSlider->height()));
-    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier,
+    QTest::mouseClick(popover, Qt::LeftButton, Qt::NoModifier,
                       QPointF(track.left() + track.width() * 0.75, track.center().y()).toPoint());
     if (audio.requests.size() != 1 || !audio.requests[0].startsWith("stream 41 ") ||
         std::abs(audio.requests[0].section(' ', 2).toInt() - 75) > 5 || !mixer->isVisible()) {
@@ -1167,8 +1400,8 @@ int main(int argc, char **argv) {
         std::cerr << "an update rebuilt the mixer's sliders\n";
         return 1;
     }
-    QTest::keyClick(&view, Qt::Key_Escape);
-    if (!QTest::qWaitFor([&] { return view.height() == controller.panelExtent(); })) {
+    QTest::keyClick(mixer->window(), Qt::Key_Escape);
+    if (!QTest::qWaitFor([&] { return !popover->isVisible(); })) {
         std::cerr << "the mixer did not close\n";
         return 1;
     }
@@ -1359,11 +1592,9 @@ int main(int argc, char **argv) {
         auto openMenu = [&] {
             if (!openLauncher())
                 return false;
-            QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(button));
+            click(button);
             return QTest::qWaitFor([&] {
-                const auto area = menu->mapRectToScene(QRectF(0, 0, menu->width(), menu->height()));
-                return menu->isVisible() && view.height() > controller.panelExtent() &&
-                       area.top() >= 0 && area.bottom() <= view.height();
+                return inPopover(menu);
             });
         };
         if (!openMenu() || !item("lock") || !item("suspend") || item("hibernate")) {
@@ -1371,19 +1602,19 @@ int main(int argc, char **argv) {
             return 1;
         }
         // A press beside the menu closes it and leaves the launcher open; the button toggles it.
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(find(view.rootObject(), "applicationSearch")));
+        click(find(view.rootObject(), "applicationSearch"));
         if (!QTest::qWaitFor([&] { return !menu->isVisible(); }) ||
             !view.rootObject()->property("launcherOpen").toBool())
             return fail("a press beside the power menu did not close only the power menu");
         if (!openMenu())
             return fail("the power menu did not open again");
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(button));
+        click(button);
         if (!QTest::qWaitFor([&] { return !menu->isVisible(); }))
             return fail("the power button did not close its menu");
         if (!openMenu())
             return fail("the power menu did not open a third time");
         requests.clear();
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(item("suspend")));
+        click(item("suspend"));
         if (!QTest::qWaitFor([&] {
                 return requests == QStringList{"suspend"} && !menu->isVisible() &&
                        !view.rootObject()->property("launcherOpen").toBool();
@@ -1405,7 +1636,7 @@ int main(int argc, char **argv) {
         auto ask = [&](const QString &action) {
             if (!openMenu() || !item(action))
                 return false;
-            QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(item(action)));
+            click(item(action));
             return QTest::qWaitFor([&] {
                 return dialog.isVisible() && power->pending() == action && !menu->isVisible();
             });
@@ -1538,10 +1769,10 @@ int main(int argc, char **argv) {
         subscriber->write(("power-menu " + output + "\n").toUtf8());
         if (!QTest::qWaitFor([&] { return menu->isVisible() && menu->hasActiveFocus(); }))
             return fail("the power menu did not open from the compositor");
-        QTest::keyClick(&view, Qt::Key_Down);
-        QTest::keyClick(&view, Qt::Key_Down);
-        QTest::keyClick(&view, Qt::Key_Up);
-        QTest::keyClick(&view, Qt::Key_Return);
+        QTest::keyClick(menu->window(), Qt::Key_Down);
+        QTest::keyClick(menu->window(), Qt::Key_Down);
+        QTest::keyClick(menu->window(), Qt::Key_Up);
+        QTest::keyClick(menu->window(), Qt::Key_Return);
         if (!QTest::qWaitFor([&] { return requests == QStringList{"suspend"} && !menu->isVisible(); })) {
             std::cerr << "the keyboard did not run the chosen power action: "
                       << requests.join("|").toStdString() << '\n';
@@ -1551,7 +1782,7 @@ int main(int argc, char **argv) {
         powerRefusal = "no screen locker: power.lock_command is not set";
         if (!openMenu())
             return fail("the power menu did not open for the refusal");
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(item("lock")));
+        click(item("lock"));
         if (!QTest::qWaitFor([&] {
                 return controller.error() ==
                        "Lock screen: no screen locker: power.lock_command is not set";
@@ -1708,7 +1939,7 @@ int main(int argc, char **argv) {
         }
         make("Kept one", false);
         make("Kept two", false);
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(bell));
+        click(bell);
         if (!QTest::qWaitFor([&] { return history->isVisible(); }) || daemon->unread() != 0) {
             std::cerr << "clicking the bell did not open the history and mark it read\n";
             return 1;
@@ -1720,22 +1951,22 @@ int main(int argc, char **argv) {
         }
         auto *dndSwitch = find(view.rootObject(), "dndSwitch");
         QTest::qWait(300);
-        QTest::mouseMove(&view, centre(dndSwitch));
+        QTest::mouseMove(dndSwitch->window(), centre(dndSwitch));
         QTest::qWait(50);
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(dndSwitch), 80);
+        click(dndSwitch, Qt::LeftButton, 80);
         if (!QTest::qWaitFor([&] { return daemon->dnd(); })) {
             std::cerr << "the do-not-disturb switch did nothing\n";
             return 1;
         }
         daemon->setDnd(false);
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(find(view.rootObject(), "clearNotifications")));
+        click(find(view.rootObject(), "clearNotifications"));
         if (!QTest::qWaitFor([&] { return daemon->history()->count() == 0; })) {
             std::cerr << "Clear did not empty the history\n";
             return 1;
         }
         // Right-clicking the bell toggles do-not-disturb.
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(bell)); // close the popup
-        QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, centre(bell));
+        click(bell); // close the popup
+        click(bell, Qt::RightButton);
         if (!QTest::qWaitFor([&] { return daemon->dnd(); })) {
             std::cerr << "right-clicking the bell did not turn do-not-disturb on\n";
             return 1;
@@ -1849,8 +2080,9 @@ int main(int argc, char **argv) {
             std::cerr << "a passive tray item stayed\n";
             return 1;
         }
-        // An item's menu opens on a right press, by the item and inside the grown surface; a
-        // submenu's entries take its place with a way back, and picking an entry closes it.
+        // An item's menu opens on a right press, above the item in the popover; a submenu opens
+        // beside its entry, the menu staying, and picking an entry closes it. The application
+        // hears of each level as it opens and closes.
         auto menuEntry = [](QVariantMap properties, std::vector<int> children = {}) {
             TrayMenuEntry entry;
             entry.properties = std::move(properties);
@@ -1916,9 +2148,7 @@ int main(int argc, char **argv) {
             return nullptr;
         };
         auto trayMenuShown = [&] {
-            const QRectF area = trayMenu->mapRectToScene(QRectF(0, 0, trayMenu->width(), trayMenu->height()));
-            return trayMenu->isVisible() && view.height() > controller.panelExtent() && area.top() >= 0 &&
-                   area.bottom() <= view.height();
+            return inPopover(trayMenu);
         };
         auto menuOpen = [&] { return view.rootObject()->property("menuOpen").toBool(); };
         const QPoint menuAt = centre(trayButton("menu"));
@@ -1935,26 +2165,28 @@ int main(int argc, char **argv) {
                       << trayLabels().join("|").toStdString() << '\n';
             return 1;
         }
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(trayEntry("Disabled")));
+        click(trayEntry("Disabled"));
         QTest::qWait(100);
         if (!picked.isEmpty() || !trayMenuShown()) {
             std::cerr << "a disabled tray menu entry could be picked\n";
             return 1;
         }
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(trayEntry("More")));
+        click(trayEntry("More"));
         if (!QTest::qWaitFor([&] {
-                return trayLabels() == QStringList{"‹ Back", "Deep", "Radio"} && opened.size() == 2 &&
-                       closed.size() == 1;
+                return trayEntry("Deep") && trayEntry("Radio") && trayEntry("Open") &&
+                       trayEntry("More")->property("expanded").toBool() && opened.size() == 2;
             }) ||
-            opened[1] != QVariantList{"menu", 3} || closed[0] != QVariantList{"menu", 0} ||
+            opened[1] != QVariantList{"menu", 3} || !closed.isEmpty() ||
             !trayEntry("Deep")->property("modelData").toMap()["checked"].toBool() ||
             trayEntry("Radio")->property("modelData").toMap()["checked"].toBool()) {
-            std::cerr << "a tray submenu did not open in place: " << trayLabels().join("|").toStdString() << '\n';
+            std::cerr << "a tray submenu did not open beside its entry: " << trayLabels().join("|").toStdString() << '\n';
             return 1;
         }
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(trayEntry("‹ Back")));
-        if (!QTest::qWaitFor([&] { return trayLabels() == QStringList{"Open", "More", "Disabled"} && opened.size() == 3; })) {
-            std::cerr << "going back in a tray menu did not show its top\n";
+        QTest::keyClick(popover, Qt::Key_Left);
+        if (!QTest::qWaitFor([&] { return !trayEntry("Deep") && closed.size() == 1; }) ||
+            closed[0] != QVariantList{"menu", 3} || !trayMenuShown() ||
+            trayLabels() != QStringList{"Open", "More", "Disabled"}) {
+            std::cerr << "closing a tray submenu did not tell its application, or closed the menu\n";
             return 1;
         }
         // The application changing the menu while it is open shows at once.
@@ -1966,11 +2198,15 @@ int main(int argc, char **argv) {
             std::cerr << "a tray menu did not follow its application's change\n";
             return 1;
         }
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(trayEntry("Reopen")));
+        // Picked with a submenu open, both levels close, the deeper first.
+        click(trayEntry("More"));
+        if (!QTest::qWaitFor([&] { return trayEntry("Deep") && opened.size() == 3; }))
+            return fail("the tray submenu did not open again");
+        click(trayEntry("Reopen"));
         if (!QTest::qWaitFor([&] { return picked.size() == 1 && !menuOpen(); }) ||
             picked[0] != QVariantList{"menu", 1} ||
-            !QTest::qWaitFor([&] { return view.height() == controller.panelExtent() && closed.size() == 3; }) ||
-            closed.last() != QVariantList{"menu", 0}) {
+            !QTest::qWaitFor([&] { return !popover->isVisible() && closed.size() == 3; }) ||
+            closed[1] != QVariantList{"menu", 3} || closed[2] != QVariantList{"menu", 0}) {
             std::cerr << "picking a tray menu entry did not reach the item and close the menu\n";
             return 1;
         }
@@ -1984,17 +2220,17 @@ int main(int argc, char **argv) {
             std::cerr << "a left click on a tray item that is only a menu did not open it\n";
             return 1;
         }
-        // The surface is taller while the menu is open, the bar at its bottom.
-        QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, centre(trayButton("menu")));
+        // A second right click closes it.
+        click(trayButton("menu"), Qt::RightButton);
         if (!QTest::qWaitFor([&] { return !menuOpen(); })) {
             std::cerr << "a second right click did not close the tray menu\n";
             return 1;
         }
         // Escape closes it too.
-        QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(trayButton("menu")));
+        click(trayButton("menu"));
         if (!QTest::qWaitFor([&] { return trayMenuShown(); }))
             return fail("the tray menu did not open again");
-        QTest::keyClick(&view, Qt::Key_Escape);
+        QTest::keyClick(trayMenu->window(), Qt::Key_Escape);
         if (!QTest::qWaitFor([&] { return !menuOpen(); })) {
             std::cerr << "Escape did not close the tray menu\n";
             return 1;
@@ -2013,7 +2249,7 @@ int main(int argc, char **argv) {
         }
         // The menu goes with its item.
         trayModel->remove("menu");
-        if (!QTest::qWaitFor([&] { return !menuOpen() && view.height() == controller.panelExtent(); })) {
+        if (!QTest::qWaitFor([&] { return !menuOpen() && !popover->isVisible(); })) {
             std::cerr << "a tray menu stayed open after its item went\n";
             return 1;
         }

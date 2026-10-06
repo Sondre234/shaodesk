@@ -491,3 +491,24 @@ fractional scaling at 1.25, a 144 or 200 Hz output), hover and pressed states un
 pointer (offscreen Qt sends no hover, so the gallery shows none), the tooltips (popup windows of
 their own, which a grab of the panel leaves out), and the switcher, palette, overview, cards,
 display and power dialog after their move to the tokens, which only the tests ran.
+
+## Taskbar popover and shared menus
+
+Added 2026-10-06. The taskbar's popups moved to a layer surface of their own (`PopoverWindow`)
+and onto `PopupCard` and `PopupMenu`. Every popup, and the bar menu's and a tray menu's open
+submenus, were looked at in the gallery in both themes and both renderers, and a top panel at
+scale 1.25 in software. `shell_ui` checks the popover's input region and keyboard, a bar button
+switching popups, a press beside closing them, keyboard navigation, hover-opened submenus, tray
+submenus and the levels their application hears of, and desktop actions from a private desktop
+entry; `popover_smoke` checks the overlay layer, the keyboard, switching on the bar and closing
+beside the popups without reaching the window under them through a headless compositor and a
+virtual pointer, with screenshots. Both ran eight at a time, besides the whole suite, without
+failing. The latency from `shaodesk msg launcher` to the launcher's first frame was measured on
+a headless 2560x1440 output (software, and Qt's OpenGL on llvmpipe): later openings take 1.7 ms
+and 8 ms, against 7 ms and 9.5 ms when the bar's surface grew; the first after startup 6 and 26
+ms, with the popover's graphics set up a moment after startup.
+
+Not checked: any of it on a real display and GPU (an NVIDIA driver's first frame of the popover,
+144 or 200 Hz outputs, fractional scaling there), direct scanout of a fullscreen game with the
+popover hidden, two monitors with popups open on both, a real pointer's hover over menus, and
+tooltips over the popover beyond one look at the power button's under a headless compositor.

@@ -5,34 +5,33 @@ import QtQuick.Layouts
 
 // The application menu: a search field over the installed applications, which pin and unpin
 // from here, and the power button in its bottom-right corner with its menu.
-Rectangle {
+PopupCard {
     id: launcher
     required property var panel
     required property Item barItem
-    parent: panel
+    parent: panel.popupLayer
     objectName: "launcher"
-    visible: panel.launcherOpen
-    function opened() { search.text = ""; takeFocus() }
+    open: panel.launcherOpen
     // The keyboard goes to the power menu while it is open, else to the search field.
+    initialFocus: null
+    onOpened: { search.text = ""; takeFocus() }
     function takeFocus() {
-        if (panel.powerOpen) { powerMenu.current = 0; powerMenu.forceActiveFocus() }
+        if (panel.powerOpen) powerMenu.forceActiveFocus()
         else search.forceActiveFocus()
     }
-    onVisibleChanged: if (visible) opened()
-    Component.onCompleted: if (visible) opened()
     Connections {
         target: launcher.panel
-        function onPowerOpenChanged() { if (launcher.visible) launcher.takeFocus() }
+        function onPowerOpenChanged() { if (launcher.open) launcher.takeFocus() }
     }
-    width: Math.min(460, panel.width - 24)
-    height: panel.height - shell.panelExtent - 20
-    anchors.left: parent.left
-    anchors.leftMargin: 12 + shell.panelMarginLeft
-    y: panel.onTop ? barItem.y + barItem.height + 10 : barItem.y - height - 10
-    color: Theme.surface
-    border.color: Theme.border
+    // By the bar's start, up to 720 pixels tall as the output leaves room for.
+    implicitWidth: 460
+    implicitHeight: 720
+    anchorRect: panel.barAnchor(12 + shell.panelMarginLeft, 0)
+    alignment: Qt.AlignLeft
+    side: panel.popupSide
+    gap: 10
+    margin: 10
     radius: Theme.radiusLarge
-    MouseArea { anchors.fill: parent }
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 20
@@ -142,12 +141,19 @@ Rectangle {
         visible: panel.powerOpen
         onPressed: panel.powerOpen = false
     }
-    // The power menu, above the power button.
+    // The power menu, above the power button and ending where it ends, over the launcher. The
+    // button is the footer's last item, in the corner the layout's margins leave.
     PowerMenu {
         id: powerMenu
         panel: launcher.panel
-        z: 2
-        anchors.right: parent.right; anchors.rightMargin: 14
-        anchors.bottom: parent.bottom; anchors.bottomMargin: 20 + launcherFooter.height + 6
+        parent: launcher.panel.popupLayer
+        z: 1
+        anchorRect: Qt.rect(launcher.x + launcher.width - 20 - powerButton.width,
+                            launcher.y + launcher.height - 20 - powerButton.height,
+                            powerButton.width, powerButton.height)
+        side: Qt.TopEdge
+        alignment: Qt.AlignRight
+        gap: 6
+        bounds: launcher.panel.popupArea
     }
 }

@@ -43,7 +43,7 @@ Button {
     Accessible.name: (stacked ? title + " and " + (windows - 1) + " more" : title) + (shownUrgent ? " (needs attention)" : "")
     // The panel's surface is only as tall as the bar, so an in-window tooltip would be
     // squeezed onto the icon and swallow its clicks; a popup window of its own sits above
-    // the bar instead. Qt before 6.8 has no popup windows and draws it in the bar.
+    // the bar instead.
     BarTip {
         panel: task.panel; owner: task
         visible: shell.iconsOnly && !task.stacked && task.hovered && !task.panel.expanded && !task.pressed

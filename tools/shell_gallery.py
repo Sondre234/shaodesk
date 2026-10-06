@@ -29,9 +29,9 @@ import tempfile
 import zlib
 
 # The names previewPopup in shell/Panel.qml knows.
-POPUPS = ["bar", "launcher", "power", "bar-menu", "profile-menu", "task-menu", "pin-menu",
-          "group", "tray-menu", "calendar", "mixer", "outputs", "profiles", "wallpapers",
-          "notifications"]
+POPUPS = ["bar", "launcher", "power", "bar-menu", "bar-submenu", "task-menu", "pin-menu",
+          "group", "tray-menu", "tray-submenu", "calendar", "mixer", "outputs", "profiles",
+          "wallpapers", "notifications"]
 
 # Translucent bars, as appearance profiles often have them.
 THEMES = {
@@ -48,6 +48,16 @@ APPS = [("firefox", "Firefox", "firefox"), ("org.kde.dolphin", "Dolphin", "syste
         ("gimp", "GNU Image Manipulation Program", "gimp"),
         ("thunderbird", "Thunderbird", "thunderbird"), ("mpv", "mpv Media Player", "mpv"),
         ("org.kde.kate", "Kate", "kate"), ("steam", "Steam", "steam")]
+
+# Their desktop actions ([Desktop Action …]), for menus that offer them: desktop id, then each
+# action's id, name and icon.
+ACTIONS = {
+    "firefox": [("new-window", "New Window", "window-new"),
+                ("new-private-window", "New Private Window", "view-private")],
+    "foot": [("server", "Foot Server", "")],
+    "thunderbird": [("compose", "Write New Message", "mail-message-new"),
+                    ("contacts", "Open Address Book", "x-office-address-book")],
+}
 
 # A line of the shell's output that is a QML warning or error.
 QML_WARNING = re.compile(r"\.qml:\d+|ReferenceError|TypeError|Binding loop|QQmlComponent")
@@ -139,8 +149,14 @@ def prepare(root, theme_name):
     data = root / "data"
     (data / "applications").mkdir(parents=True)
     for desktop_id, name, icon in APPS:
-        (data / "applications" / f"{desktop_id}.desktop").write_text(
-            f"[Desktop Entry]\nType=Application\nName={name}\nIcon={icon}\nExec=true\n")
+        actions = ACTIONS.get(desktop_id, [])
+        entry = f"[Desktop Entry]\nType=Application\nName={name}\nIcon={icon}\nExec=true\n"
+        if actions:
+            entry += "Actions=" + "".join(f"{action};" for action, _, _ in actions) + "\n"
+        for action, title, action_icon in actions:
+            entry += f"\n[Desktop Action {action}]\nName={title}\nExec=true\n"
+            entry += f"Icon={action_icon}\n" if action_icon else ""
+        (data / "applications" / f"{desktop_id}.desktop").write_text(entry)
     # The applications are the ones above, but the icons are the desktop's: the user's and the
     # system's icon folders are linked into the private data folders.
     home = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share")
@@ -208,9 +224,13 @@ def run_gpu(build, shell, env, root, jobs, args):
     # The compositor makes a runtime directory of its own, short enough for its sockets.
     env = {name: value for name, value in env.items() if name != "XDG_RUNTIME_DIR"}
 
+    # An output large enough for the preview's popover window, which would be shrunk to fit.
+    config = ('return { xwayland = false, outputs = { monitors = { ["HEADLESS-1"] = '
+              '{ mode = "1920x1080" } } } }\n')
+
     def render_one(popup, out):
-        with harness.Compositor(str(build / "shaodesk"), "return { xwayland = false }\n",
-                                env=env, prefix="sd-gal-") as desktop:
+        with harness.Compositor(str(build / "shaodesk"), config, env=env,
+                                prefix="sd-gal-") as desktop:
             gpu_env = dict(desktop.env, QT_QPA_PLATFORM="wayland")
             gpu_env.pop("SHAODESK_SOCKET", None)  # a preview needs no compositor state
             return render(shell, gpu_env, root, popup, out, 600, args.icon_theme)

@@ -16,14 +16,13 @@ Item {
     // finds them ready: what the bar shows first does not wait for them.
     property bool warm: false
     Timer { interval: 1500; running: true; onTriggered: root.warm = true }
+    onWarmChanged: if (warm) popover.prepare()
     // The context menu belongs to a task, a pinned application (pinMenuApp), or the bar itself
     // when barMenuOpen is set. A task's menu offers to pin the application it belongs to.
     property int taskMenuId: -1
     property string taskMenuApp: ""
     property var pinMenuApp: null
     property bool barMenuOpen: false
-    // The bar menu shows the appearance profiles instead of its own entries.
-    property bool profileMenu: false
     property real contextMenuX: 0
     // The windows the taskbar shows; a stand-in model replaces it in tests.
     property var taskSource: shell.tasks
@@ -34,11 +33,8 @@ Item {
     property var statusSource: shell.status
     property string audioPopup: ""
     property real audioPopupX: 0
-    // A tray item's menu: the item it belongs to ("" while closed), the entry whose children it
-    // lists (0 for the top), and the entries passed through to get there, to go back to.
+    // A tray item's menu: the item it belongs to ("" while closed), and where its icon is.
     property string trayMenuKey: ""
-    property int trayMenuParent: 0
-    property var trayMenuTrail: []
     property real trayMenuX: 0
     // Bumped when the open menu's item changes its entries, so they are read again.
     property int trayMenuRevision: 0
@@ -53,12 +49,28 @@ Item {
     property string groupIcon: ""
     property real groupX: 0
     property Item groupPending: null
-    // The list needs room too, but not the keyboard: it opens under a window being typed in.
+    // Something is open in the popover. The list shown on hover does not take the keyboard: it
+    // opens under a window being typed in.
     readonly property bool expanded: menuOpen || groupOpen
-    onExpandedChanged: shellView.setExpanded(expanded, menuOpen)
-    onMenuOpenChanged: {
-        if (menuOpen) groupOpen = false
-        shellView.setExpanded(expanded, menuOpen)
+    onMenuOpenChanged: if (menuOpen) groupOpen = false
+    // The surface the popups are drawn in, and the bar's edges in its coordinates: the bar's
+    // surface lies along its top or bottom edge, across its width.
+    readonly property Item popupLayer: popupLayer
+    readonly property real barTop: (onTop ? 0 : popover.height - height) + bar.y
+    readonly property real barBottom: barTop + bar.height
+    // A popup of the bar opens away from the screen edge the bar is on (PopupCard's side), beside
+    // the rectangle barAnchor gives: from `x`, `width` wide, and across the bar.
+    readonly property int popupSide: onTop ? Qt.BottomEdge : Qt.TopEdge
+    function barAnchor(x, width) { return Qt.rect(x, barTop, width, bar.height) }
+    // The output but the bar's strip, where popups stay (PopupCard's bounds).
+    readonly property rect popupArea: Qt.rect(0, onTop ? height : 0, popover.width, popover.height - height)
+    // Where a list shown on hover takes the pointer: over it and down to the bar, so that the
+    // pointer crossing from its button never lands on a window between (which, with focus
+    // following the pointer, would take the keyboard).
+    function hoverArea(item) {
+        var top = onTop ? popupArea.y : item.y
+        var bottom = onTop ? item.y + item.height : popupArea.y + popupArea.height
+        return Qt.rect(item.x, top, item.width, bottom - top)
     }
     onLauncherOpenChanged: {
         if (launcherOpen) { taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; trayMenuKey = "" }
@@ -101,13 +113,12 @@ Item {
     }
     // Opens on press, as a desktop context menu does: waiting for a tap lost a press held
     // past the long-press time or moved while held. The new menu opens before the old one
-    // closes, so the surface does not collapse in between.
+    // closes, so the popover stays up in between.
     function openContextMenu(item, x, taskId, app) {
         contextMenuX = item.mapToItem(root, x, 0).x
         if (taskId >= 0) { taskMenuId = taskId; taskMenuApp = shell.appFor(app || ""); pinMenuApp = null; barMenuOpen = false }
         else if (app) { pinMenuApp = app; taskMenuId = -1; barMenuOpen = false }
         else { barMenuOpen = true; taskMenuId = -1; pinMenuApp = null }
-        profileMenu = false
         launcherOpen = false; audioPopup = ""; trayMenuKey = ""
     }
     // Opens (or, when it is already open, closes) one of the volume control's popups.
@@ -143,10 +154,14 @@ Item {
             togglePowerMenu()
             return powerOpen
         case "bar-menu":
-        case "profile-menu":
             openContextMenu(bar, bar.width / 2, -1)
-            profileMenu = name === "profile-menu"
             return true
+        case "bar-submenu":
+            // The appearance profiles beside the bar menu.
+            openContextMenu(bar, bar.width / 2, -1)
+            previewSubmenu.menu = contextMenuLoader
+            previewSubmenu.start()
+            return shell.profiles.length > 0
         case "task-menu":
             var task = taskList.itemAtIndex(0)
             if (task)
@@ -171,9 +186,14 @@ Item {
                 }
             return false
         case "tray-menu":
+        case "tray-submenu":
             for (i = 0; i < tray.children.length; ++i)
                 if (tray.children[i].hasMenu) {
                     trayMenu(tray.children[i])
+                    if (name === "tray-submenu") {
+                        previewSubmenu.menu = trayMenuLoader
+                        previewSubmenu.start()
+                    }
                     return true
                 }
             return false
@@ -195,6 +215,20 @@ Item {
             return bell.visible
         }
         return false
+    }
+    // For a preview: opens the first submenu of a menu just opened, once its rows are laid out.
+    Timer {
+        id: previewSubmenu
+        property Loader menu
+        interval: 50
+        onTriggered: {
+            var entries = menu.item ? menu.item.entries : []
+            for (var i = 0; i < entries.length; ++i)
+                if (entries[i].submenu) {
+                    menu.item.openSubmenu(i)
+                    return
+                }
+        }
     }
     // Where a tray item's icon is on the screen, which some applications place a window by: the
     // panel spans its output's width, at its top or bottom edge.
@@ -235,49 +269,46 @@ Item {
             return
         }
         trayMenuX = button.mapToItem(root, button.width / 2, 0).x
-        trayMenuTrail = []
-        trayMenuParent = 0
         trayMenuKey = button.key
         launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false
     }
-    // An entry picked: a submenu shows its entries in place, "Back" returns, anything else is
-    // the application's to carry out, and the menu closes.
-    function trayMenuPick(entry) {
-        if (entry.back) {
-            var trail = trayMenuTrail.slice()
-            trayMenuParent = trail.pop()
-            trayMenuTrail = trail
-        } else if (entry.submenu) {
-            trayMenuTrail = trayMenuTrail.concat([trayMenuParent])
-            trayMenuParent = entry.id
-        } else {
-            shell.tray.clickMenu(trayMenuKey, entry.id)
-            trayMenuKey = ""
-        }
+    // The entries of item `key`'s menu entry `parent` (0 for the top), as a PopupMenu lists them:
+    // an entry with children opens them beside it, read as it opens; any other is the
+    // application's to carry out. `revision` only makes a binding read them again when it changes.
+    function trayEntries(key, parent, revision) {
+        if (key === "")
+            return []
+        var entries = shell.tray.menu(key, parent).map(function(entry) {
+            if (entry.separator)
+                return { separator: true }
+            return { id: entry.id, text: entry.label, icon: entry.icon, enabled: entry.enabled,
+                     toggle: entry.toggle, checked: entry.checked,
+                     submenu: entry.submenu ? function() { return root.trayEntries(key, entry.id, root.trayMenuRevision) }
+                                            : undefined,
+                     run: entry.submenu ? undefined : function() { shell.tray.clickMenu(key, entry.id) } }
+        })
+        return entries.length > 0 ? entries : [{ text: "No entries", enabled: false }]
     }
-    // The entries shown; `revision` only makes the binding read them again when it changes.
-    function trayEntries(key, parent, trail, revision) {
-        var entries = key === "" ? [] : shell.tray.menu(key, parent)
-        return trail.length > 0 ? [{ id: -2, back: true, label: "\u2039 Back", enabled: true, separator: false,
-                                     toggle: "", checked: false, icon: "", submenu: false }].concat(entries)
-                                : entries
-    }
-    // The application is told which level of its menu is on screen (AboutToShow and "opened")
-    // and when it no longer is ("closed"), once a change has settled.
-    property string trayShownKey: ""
-    property int trayShownParent: 0
+    // The application is told which levels of its menu are on screen (AboutToShow and "opened"
+    // for each that appears) and which no longer are ("closed", the deepest first), once a change
+    // has settled: what it was told, as {key, id}.
+    property var trayShown: []
     function syncTrayMenu() {
-        if (trayShownKey === trayMenuKey && trayShownParent === trayMenuParent)
-            return
-        if (trayShownKey !== "")
-            shell.tray.closeMenu(trayShownKey, trayShownParent)
-        trayShownKey = trayMenuKey
-        trayShownParent = trayMenuParent
-        if (trayMenuKey !== "")
-            shell.tray.openMenu(trayMenuKey, trayMenuParent)
+        var menu = trayMenuLoader.item
+        var wanted = trayMenuKey === "" ? [] : [0].concat(menu ? menu.openEntries.map(function(entry) { return entry.id }) : [])
+        wanted = wanted.map(function(id) { return { key: trayMenuKey, id: id } })
+        function among(list, level) {
+            return list.some(function(other) { return other.key === level.key && other.id === level.id })
+        }
+        for (var i = trayShown.length - 1; i >= 0; --i)
+            if (!among(wanted, trayShown[i]))
+                shell.tray.closeMenu(trayShown[i].key, trayShown[i].id)
+        for (i = 0; i < wanted.length; ++i)
+            if (!among(trayShown, wanted[i]))
+                shell.tray.openMenu(wanted[i].key, wanted[i].id)
+        trayShown = wanted
     }
     onTrayMenuKeyChanged: Qt.callLater(syncTrayMenu)
-    onTrayMenuParentChanged: Qt.callLater(syncTrayMenu)
     Connections {
         target: shell.tray
         function onActivationRefused(key) {
@@ -294,6 +325,18 @@ Item {
             else
                 root.trayMenuKey = ""
         }
+    }
+    // The overview, the window switcher and the command palette come up over the output's
+    // windows, and the popups' surface is above them: what is open here closes, as the start
+    // menu does on Windows.
+    Connections {
+        target: shell
+        function onOverviewChanged() { if (shell.overviewOutput === root.outputName) root.closeMenus() }
+        function onSwitcherChanged() { if (shell.switcherOutput === root.outputName) root.closeMenus() }
+    }
+    Connections {
+        target: shell.palette
+        function onOpenChanged() { if (shell.palette.output === root.outputName) root.closeMenus() }
     }
     function pinAction(appId) {
         // Reading shell.pinned re-evaluates the menu when pins change. Pinning waits until
@@ -312,123 +355,156 @@ Item {
     readonly property bool floating: shell.panelRadius > 0 || shell.panelMarginLeft > 0 ||
                                      shell.panelMarginRight > 0 || shell.panelMarginTop > 0 ||
                                      shell.panelMarginBottom > 0
-    Keys.onEscapePressed: closeMenus()
 
+    // A click on the bar's empty space closes what is open.
     MouseArea {
         anchors.fill: parent
         visible: root.menuOpen
         onClicked: root.closeMenus()
     }
 
-    // Left-clicking the volume control: the default output's volume, then each application's.
-    Loader {
-        id: mixerLoader
-        asynchronous: !(root.audioPopup === "mixer")
-        active: root.audioPopup === "mixer" || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { AudioMixer { panel: root; barItem: bar } }
-    }
+    // The popups' surface, over the whole output (PopoverWindow in view.hpp). While a menu is
+    // open it takes the keyboard and every press but those on the bar, and a press beside the
+    // popups closes them; the list shown on hover takes only the pointer over it and up to the
+    // bar. It stays up while what closed fades out.
+    PopoverWindow {
+        id: popover
+        panel: root.shellView
+        keyboard: root.menuOpen
+        inputRects: root.menuOpen
+            ? [root.popupArea]
+            : root.groupOpen && groupListLoader.item ? [root.hoverArea(groupListLoader.item)] : []
+        onDismissed: root.closeMenus()
+        Timer { id: closing; interval: Theme.durationNormal; onTriggered: if (!root.expanded) popover.open = false }
+        Connections {
+            target: root
+            function onExpandedChanged() {
+                if (root.expanded) popover.open = true
+                else closing.restart()
+            }
+        }
 
-    // Clicking the clock: a month calendar with the current day marked.
-    Loader {
-        id: calendarLoader
-        asynchronous: !(root.audioPopup === "calendar")
-        active: root.audioPopup === "calendar" || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { CalendarPopup { panel: root; barItem: bar } }
-    }
+        Item {
+            id: popupLayer
+            anchors.fill: parent
+            focus: true
+            Keys.onEscapePressed: root.closeMenus()
+            MouseArea {
+                anchors.fill: parent
+                enabled: root.menuOpen
+                onPressed: root.closeMenus()
+            }
 
-    // Right-clicking the volume control: the outputs to play through.
-    Loader {
-        id: outputsLoader
-        asynchronous: !(root.audioPopup === "outputs")
-        active: root.audioPopup === "outputs" || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { AudioOutputs { panel: root; barItem: bar } }
-    }
+            // Left-clicking the volume control: the default output's volume, then each application's.
+            Loader {
+                id: mixerLoader
+                asynchronous: !(root.audioPopup === "mixer")
+                active: root.audioPopup === "mixer" || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { AudioMixer { panel: root; barItem: bar } }
+            }
 
-    // The profile button: the appearance profiles, the one in use marked.
-    Loader {
-        id: profilesLoader
-        asynchronous: !(root.audioPopup === "profiles")
-        active: root.audioPopup === "profiles" || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { ProfileList { panel: root; barItem: bar } }
-    }
+            // Clicking the clock: a month calendar with the current day marked.
+            Loader {
+                id: calendarLoader
+                asynchronous: !(root.audioPopup === "calendar")
+                active: root.audioPopup === "calendar" || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { CalendarPopup { panel: root; barItem: bar } }
+            }
 
-    // The wallpaper button: thumbnails of the pictures in shell.wallpapers, by subfolder, with
-    // a filter; clicking one shows it at once and keeps the picker open to try another.
-    Loader {
-        id: wallpapersLoader
-        asynchronous: !(root.audioPopup === "wallpapers")
-        active: root.audioPopup === "wallpapers" || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { WallpaperPicker { panel: root; barItem: bar } }
-    }
+            // Right-clicking the volume control: the outputs to play through.
+            Loader {
+                id: outputsLoader
+                asynchronous: !(root.audioPopup === "outputs")
+                active: root.audioPopup === "outputs" || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { AudioOutputs { panel: root; barItem: bar } }
+            }
 
-    // The bell's notification history.
-    Loader {
-        id: historyLoader
-        asynchronous: !(root.audioPopup === "notifications")
-        active: shell.notifications.serving && (root.audioPopup === "notifications" || root.warm || used)
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { NotificationHistory { panel: root; barItem: bar } }
-    }
+            // The profile button: the appearance profiles, the one in use marked.
+            Loader {
+                id: profilesLoader
+                asynchronous: !(root.audioPopup === "profiles")
+                active: root.audioPopup === "profiles" || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { ProfileList { panel: root; barItem: bar } }
+            }
 
-    Loader {
-        id: launcherLoader
-        asynchronous: !(root.launcherOpen)
-        active: root.launcherOpen || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { Launcher { panel: root; barItem: bar } }
-    }
+            // The wallpaper button: thumbnails of the pictures in shell.wallpapers, by subfolder, with
+            // a filter; clicking one shows it at once and keeps the picker open to try another.
+            Loader {
+                id: wallpapersLoader
+                asynchronous: !(root.audioPopup === "wallpapers")
+                active: root.audioPopup === "wallpapers" || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { WallpaperPicker { panel: root; barItem: bar } }
+            }
 
-    Loader {
-        id: contextMenuLoader
-        asynchronous: !(root.taskMenuId >= 0 || root.pinMenuApp !== null || root.barMenuOpen)
-        active: root.taskMenuId >= 0 || root.pinMenuApp !== null || root.barMenuOpen || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { TaskbarMenu { panel: root; barItem: bar } }
-    }
+            // The bell's notification history.
+            Loader {
+                id: historyLoader
+                asynchronous: !(root.audioPopup === "notifications")
+                active: shell.notifications.serving && (root.audioPopup === "notifications" || root.warm || used)
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { NotificationHistory { panel: root; barItem: bar } }
+            }
 
-    // A tray item's menu, in the style of the bar's own: a submenu's entries take the place of
-    // the menu's, with a way back, as the bar menu's appearance entry does. A long one scrolls.
-    Loader {
-        id: trayMenuLoader
-        asynchronous: root.trayMenuKey === ""
-        active: root.trayMenuKey !== "" || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { TrayMenu { panel: root; barItem: bar } }
-    }
+            Loader {
+                id: launcherLoader
+                asynchronous: !(root.launcherOpen)
+                active: root.launcherOpen || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { Launcher { panel: root; barItem: bar } }
+            }
 
-    // The windows of the hovered stacked button: clicking one focuses it (or minimizes it when
-    // focused already), the cross or a middle click closes it, and a right click opens its menu.
-    Loader {
-        id: groupListLoader
-        asynchronous: !(root.groupOpen)
-        active: root.groupOpen || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { GroupList { panel: root; barItem: bar } }
+            Loader {
+                id: contextMenuLoader
+                asynchronous: !(root.taskMenuId >= 0 || root.pinMenuApp !== null || root.barMenuOpen)
+                active: root.taskMenuId >= 0 || root.pinMenuApp !== null || root.barMenuOpen || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { TaskbarMenu { panel: root; barItem: bar } }
+            }
+
+            // A tray item's menu, in the style of the bar's own, its submenus beside it.
+            Loader {
+                id: trayMenuLoader
+                asynchronous: root.trayMenuKey === ""
+                active: root.trayMenuKey !== "" || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { TrayMenu { panel: root; barItem: bar } }
+            }
+
+            // The windows of the hovered stacked button: clicking one focuses it (or minimizes it when
+            // focused already), the cross or a middle click closes it, and a right click opens its menu.
+            Loader {
+                id: groupListLoader
+                asynchronous: !(root.groupOpen)
+                active: root.groupOpen || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { GroupList { panel: root; barItem: bar } }
+            }
+        }
     }
 
     Rectangle {
