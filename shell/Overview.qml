@@ -20,18 +20,26 @@ Item {
     width: screenSize.width
     height: screenSize.height
 
-    // The search box: what was typed, or what typing does.
+    // The search box, a field as the palette's: what was typed, or what typing does. It keeps to
+    // the room the compositor leaves above the strip.
     Rectangle {
         id: search
         anchors.horizontalCenter: parent.horizontalCenter
-        y: overview.area.y + 8
-        width: Math.min(420, overview.width - 32); height: 32
-        radius: 16
+        y: overview.area.y + Theme.spacingS
+        width: Math.min(460, overview.width - 2 * Theme.spacingXL); height: Theme.rowHeight
+        radius: Theme.radiusSmall
         color: Theme.surface
         border.color: overview.filter.length > 0 ? Theme.accent : Theme.border
-        border.width: 1
+        Icon {
+            id: magnifier
+            x: Theme.spacingL; anchors.verticalCenter: parent.verticalCenter
+            name: "search"; size: Theme.iconSize
+            color: overview.filter.length > 0 ? Theme.text : Theme.textMuted
+        }
         Text {
-            anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 14
+            anchors.fill: parent
+            anchors.leftMargin: magnifier.x + magnifier.width + Theme.spacingM
+            anchors.rightMargin: Theme.spacingL
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideLeft
             text: overview.filter.length > 0 ? overview.filter : qsTr("Type to search windows")
