@@ -5,7 +5,7 @@ import QtQuick.Layouts
 
 // The volume control's popup: the default output's volume, then a slider for each application
 // playing sound.
-Rectangle {
+PopupCard {
     id: audioMixer
     required property var panel
     required property Item barItem
@@ -18,15 +18,12 @@ Rectangle {
             if (outputs[i].name === panel.audioSource.output) return outputs[i].description
         return "No output"
     }
-    visible: panel.audioPopup === "mixer"
-    width: 340
-    height: Math.min(panel.popupLayer.height - shell.panelExtent - 20,
-                     30 + 2 * 26 + rowHeight + Math.max(1, streamList.count) * rowHeight + 10)
-    x: Math.max(8, Math.min(panel.audioPopupX - width / 2, panel.width - width - 8))
-    y: panel.onTop ? panel.barBottom + 8 : panel.barTop - height - 8
-    color: Theme.surface; radius: Theme.radiusLarge
-    border.color: Theme.border
-    MouseArea { anchors.fill: parent }
+    open: panel.audioPopup === "mixer"
+    implicitWidth: 340
+    implicitHeight: 30 + 2 * 26 + rowHeight + Math.max(1, streamList.count) * rowHeight + 10
+    anchorRect: panel.barAnchor(panel.audioPopupX, 0)
+    side: panel.popupSide
+    radius: Theme.radiusLarge
     ColumnLayout {
         anchors.fill: parent; anchors.margins: 14; spacing: 0
         Text {
