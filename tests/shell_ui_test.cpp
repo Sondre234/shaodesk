@@ -3559,6 +3559,161 @@ ListModel {
             return fail("could not restore the configuration");
         controller.reload();
     }
+    // Launchpad, the macOS style's launcher: it opens over the whole output with the keyboard in
+    // its search; the arrows move its highlight and page past a page's edge, Page Down and Up,
+    // the wheel and the dots page; typing filters the grid, Enter launches the best match; Escape
+    // clears the search and then closes it; a click on an application launches it, a right click
+    // opens its menu, and a click beside the applications closes Launchpad.
+    {
+        if (!rewrite(QString(lua).replace("shell={wallpaper", "shell={style='macos',wallpaper")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return controller.style() == "macos"; }))
+            return fail("the configuration's macOS style was not read");
+        QFile::remove(marker);
+        auto *root = view.rootObject();
+        QQuickItem *launchpad = nullptr;
+        auto openLaunchpad = [&] {
+            root->setProperty("launcherOpen", true);
+            return QTest::qWaitFor([&] {
+                launchpad = find(root, "launchpad");
+                return launchpad && launchpad->property("progress").toReal() == 1;
+            });
+        };
+        auto closed = [&] {
+            return QTest::qWaitFor([&] { return !root->property("launcherOpen").toBool() && !launchpad->isVisible(); });
+        };
+        if (!openLaunchpad())
+            return fail("the launcher did not open as Launchpad in the macOS style");
+        if (launchpad->window() != popover ||
+            launchpad->mapRectToScene(QRectF(0, 0, launchpad->width(), launchpad->height())) !=
+                QRectF(QPointF(0, 0), QSizeF(popover->size())))
+            return fail("Launchpad does not cover the whole output");
+        auto *field = find(root, "launchpadSearch");
+        if (!field || !QTest::qWaitFor([&] { return field->hasActiveFocus(); }))
+            return fail("Launchpad's search did not take the keyboard");
+        // Pages of two: Action app and Fake app, then Other app and Test app.
+        launchpad->setProperty("columns", 2);
+        launchpad->setProperty("rows", 1);
+        auto at = [&] {
+            return QPoint(launchpad->property("page").toInt(), launchpad->property("current").toInt());
+        };
+        auto press = [&](Qt::Key key) { QTest::keyClick(popover, key); };
+        if (launchpad->property("pageCount").toInt() != 2 || at() != QPoint(0, -1) ||
+            !find(root, "launchpadDots")->isVisible())
+            return fail("Launchpad did not cut four applications into two pages of two");
+        press(Qt::Key_Right);
+        if (at() != QPoint(0, 0))
+            return fail("an arrow did not highlight the page's first application");
+        press(Qt::Key_Right);
+        press(Qt::Key_Right);
+        if (at() != QPoint(1, 2))
+            return fail("Right past the page's edge did not go on to the next page");
+        press(Qt::Key_Left);
+        if (at() != QPoint(0, 1))
+            return fail("Left past the page's edge did not go back to the page before");
+        press(Qt::Key_PageDown);
+        if (at() != QPoint(1, 3))
+            return fail("Page Down did not show the next page");
+        press(Qt::Key_PageUp);
+        if (at() != QPoint(0, 1))
+            return fail("Page Up did not show the page before");
+        auto wheel = [&](int delta) {
+            const QPoint centre(popover->width() / 2, popover->height() / 2);
+            QWheelEvent event(centre, popover->mapToGlobal(centre), QPoint(), QPoint(0, delta), Qt::NoButton,
+                              Qt::NoModifier, Qt::NoScrollPhase, false);
+            QCoreApplication::sendEvent(popover, &event);
+        };
+        wheel(-120);
+        if (launchpad->property("page").toInt() != 1)
+            return fail("a wheel notch down did not show the next page");
+        wheel(120);
+        if (launchpad->property("page").toInt() != 0)
+            return fail("a wheel notch up did not show the page before");
+        // Dragging beside the applications, to the left, shows the next page.
+        {
+            const int y = launchpad->property("gridTop").toInt() - 10;
+            const QPoint from(popover->width() - 50, y), to(popover->width() - 450, y);
+            QTest::mousePress(popover, Qt::LeftButton, Qt::NoModifier, from);
+            for (int step = 1; step <= 10; ++step) {
+                QTest::mouseMove(popover, from + (to - from) * step / 10);
+                QTest::qWait(10);
+            }
+            QTest::mouseRelease(popover, Qt::LeftButton, Qt::NoModifier, to);
+            if (launchpad->property("page").toInt() != 1 || !root->property("launcherOpen").toBool())
+                return fail("dragging Launchpad to the left did not show the next page");
+            press(Qt::Key_PageUp);
+        }
+        // Typing filters the grid, the best match highlighted.
+        for (Qt::Key key : {Qt::Key_O, Qt::Key_T, Qt::Key_H})
+            press(key);
+        auto shown = [&] { return launchpad->property("shown").toList(); };
+        if (!QTest::qWaitFor([&] { return shown().size() == 1; }) ||
+            shown()[0].toMap()["name"] != "Other app" || at() != QPoint(0, 0) ||
+            !find(root, "launchpadApp:shaodesk-test-other.desktop") ||
+            find(root, "launchpadApp:shaodesk-test-app.desktop"))
+            return fail("typing in Launchpad did not filter its grid");
+        press(Qt::Key_Escape);
+        if (field->property("text").toString() != "" || shown().size() != 4 ||
+            !root->property("launcherOpen").toBool())
+            return fail("Escape did not clear Launchpad's search first");
+        press(Qt::Key_Escape);
+        if (!closed())
+            return fail("Escape did not close Launchpad");
+        // A click beside the applications closes it.
+        if (!openLaunchpad())
+            return fail("Launchpad did not open again");
+        QTest::mouseClick(popover, Qt::LeftButton, Qt::NoModifier, QPoint(5, popover->height() / 2));
+        if (!closed())
+            return fail("a click beside Launchpad's applications did not close it");
+        // A right click on an application opens its menu, over Launchpad.
+        if (!openLaunchpad())
+            return fail("Launchpad did not open a third time");
+        auto *other = find(root, "launchpadApp:shaodesk-test-other.desktop");
+        if (!other)
+            return fail("Launchpad does not show the other application");
+        click(other, Qt::RightButton);
+        auto *appMenu = find(root, "launchpadMenu");
+        if (!appMenu || !QTest::qWaitFor([&] { return inPopover(appMenu); }) ||
+            !find(root, "launchpad:open") || !find(root, "launchpad:dock"))
+            return fail("a right click on an application in Launchpad did not open its menu");
+        press(Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !appMenu->property("open").toBool(); }) ||
+            !root->property("launcherOpen").toBool())
+            return fail("Escape in an application's menu closed Launchpad too");
+        // Typing and Enter launch the best match, and Launchpad closes.
+        for (Qt::Key key : {Qt::Key_T, Qt::Key_E, Qt::Key_S, Qt::Key_T, Qt::Key_Space, Qt::Key_A})
+            press(key);
+        if (!QTest::qWaitFor([&] { return shown().size() > 0 && shown()[0].toMap()["name"] == "Test app"; }))
+            return fail("Launchpad's search did not find the configured launcher first");
+        press(Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return QFile::exists(marker); }) || !closed())
+            return fail("Enter in Launchpad's search did not launch the best match and close it");
+        QFile::remove(marker);
+        // A click on an application launches it.
+        if (!openLaunchpad())
+            return fail("Launchpad did not open a fourth time");
+        launchpad->setProperty("columns", 2);
+        launchpad->setProperty("rows", 1);
+        auto *secondDot = find(root, "launchpadDot:1");
+        if (!secondDot)
+            return fail("Launchpad has no dot for its second page");
+        click(secondDot);
+        auto *test = find(root, "launchpadApp:pinned:0");
+        if (launchpad->property("page").toInt() != 1 || !test ||
+            !QTest::qWaitFor([&] { return test->mapToScene(QPointF(0, 0)).x() >= 0 &&
+                                          test->mapToScene(QPointF(0, 0)).x() < popover->width(); }))
+            return fail("clicking the second page's dot did not show it");
+        click(test);
+        if (!QTest::qWaitFor([&] { return QFile::exists(marker); }) || !closed())
+            return fail("clicking an application in Launchpad did not launch it and close it");
+        QFile::remove(marker);
+        if (!rewrite(lua))
+            return fail("could not restore the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return controller.style() == "taskbar"; }))
+            return fail("the configuration's taskbar style was not read back");
+    }
     // The desktop's menu: a right press opens it where it was, with Show desktop and the
     // appearance profiles beside their entry; a press elsewhere closes it.
     {

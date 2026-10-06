@@ -248,7 +248,8 @@ Item {
         }
     }
 
-    // The wallpaper, as the desktop shows it, under a scrim. A click on it closes Launchpad.
+    // The wallpaper, as the desktop shows it, under a scrim. A click on it closes Launchpad, and
+    // dragging it sideways pages, once it has gone far enough.
     Item {
         id: backdrop
         anchors.fill: parent
@@ -271,10 +272,32 @@ Item {
             color: Theme.launchpadScrim
         }
         MouseArea {
+            id: drag
             anchors.fill: parent
             enabled: launchpad.open
             acceptedButtons: Qt.AllButtons
-            onClicked: (mouse) => { if (mouse.button === Qt.LeftButton) launchpad.panel.closeMenus() }
+            property real from: 0
+            property bool active: false
+            // How far the grid follows the pointer.
+            readonly property real moved: active ? mouseX - from : 0
+            onPressed: (mouse) => {
+                from = mouse.x
+                active = false
+            }
+            onPositionChanged: (mouse) => {
+                if ((pressedButtons & Qt.LeftButton) && Math.abs(mouse.x - from) > Qt.styleHints.startDragDistance)
+                    active = true
+            }
+            onReleased: (mouse) => {
+                if (active) {
+                    var moved = mouse.x - from
+                    active = false
+                    if (Math.abs(moved) > launchpad.width / 8)
+                        launchpad.showPage(launchpad.page + (moved < 0 ? 1 : -1))
+                } else if (mouse.button === Qt.LeftButton && containsMouse) {
+                    launchpad.panel.closeMenus()
+                }
+            }
         }
     }
 
@@ -320,12 +343,12 @@ Item {
         }
 
         // The pages, side by side, each as wide as the output; the one shown slides into place,
-        // following a drag of the grid.
+        // following a drag.
         Row {
             id: strip
             objectName: "launchpadPages"
             y: launchpad.gridTop
-            x: -launchpad.page * launchpad.width + (drag.active ? drag.translation.x : 0)
+            x: -launchpad.page * launchpad.width + drag.moved
             Behavior on x {
                 enabled: !drag.active
                 NumberAnimation { duration: Theme.durationSlow; easing.type: Theme.easing }
@@ -399,19 +422,6 @@ Item {
                 }
             }
         }
-        // Dragging the grid sideways pages, once it has gone far enough or fast enough.
-        DragHandler {
-            id: drag
-            target: null
-            yAxis.enabled: false
-            onActiveChanged: {
-                if (active)
-                    return
-                var moved = drag.translation.x
-                if (Math.abs(moved) > launchpad.width / 8 || Math.abs(drag.centroid.velocity.x) > 600)
-                    launchpad.showPage(launchpad.page + (moved < 0 ? 1 : -1))
-            }
-        }
         // A wheel notch, or a touchpad's swipe of as much, pages once: down or right to the next.
         WheelHandler {
             property real travel: 0
@@ -450,6 +460,7 @@ Item {
                 delegate: AbstractButton {
                     id: dot
                     required property int index
+                    objectName: "launchpadDot:" + index
                     width: Theme.launchpadDot + 2 * Theme.spacingS + Theme.spacingXS; height: width
                     focusPolicy: Qt.NoFocus
                     Accessible.name: "Page " + (index + 1)
