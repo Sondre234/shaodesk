@@ -82,7 +82,8 @@ one's popup at once. The overview, the window switcher and the command palette c
 (the bar's, a window's, the tray's, the power menu) take the keyboard: Up and Down (wrapping),
 Home and End move, Enter or Space chooses, Right opens a submenu and Left or Escape closes it,
 and Escape closes the menu; resting the pointer on an entry with a submenu opens it beside the
-entry, the menu staying open. The shell
+entry, the menu staying open, and moving the pointer towards an open submenu across other entries
+keeps it open. The shell
 draws through the GPU; `renderer = "software"` draws on the CPU instead, for a weak machine: it
 starts faster and uses less memory, but cannot draw effects such as shadows. In a nested
 session, applications that reuse an existing process or D-Bus service can open

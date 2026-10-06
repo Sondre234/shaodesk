@@ -176,8 +176,10 @@ returns `true`; `triggered(entry)` comes first. `submenu` is an array of entries
 returning one that is read as it opens and again when what it read changes. Placement is the
 card's: `anchorRect`, `side`, `alignment`, `gap`, `bounds`; `minimumWidth`, `maximumWidth` and
 `rowHeight` size the rows. A submenu opens beside its entry after the pointer rests there for
-`submenuDelay` milliseconds, on a click, or with Right, Enter or Space; Up, Down, Home and End
-move, Left or Escape closes a submenu and Escape in the first level emits `dismissed()`.
+`submenuDelay` milliseconds, on a click, or with Right, Enter or Space; the pointer heading for an
+open submenu across other entries (inside the triangle from where it was to the submenu's near
+edge) leaves it open until it rests on one. Up, Down, Home and End move, Left or Escape closes a
+submenu and Escape in the first level emits `dismissed()`.
 `initialIndex` highlights an entry as it opens (-1, none, for a menu opened with the pointer).
 `openEntries` lists the entries whose submenus are open, `openSubmenu(index)` opens one,
 `closeSubmenus()` closes them, and `card` is the first level's card. Rows are `MenuRow`s, named

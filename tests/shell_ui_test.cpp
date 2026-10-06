@@ -1535,6 +1535,26 @@ ListModel {
         std::cerr << "resting on another entry did not close the submenu\n";
         return 1;
     }
+    // Heading for the open submenu across another entry leaves it open, the entry crossed taking
+    // over only once the pointer rests on it.
+    QTest::mouseMove(popover, centre(menuItem("Appearance")));
+    if (!QTest::qWaitFor([&] { return menuItem("dark") && menuItem("dark")->isVisible(); }))
+        return fail("resting on the appearance entry again did not open its submenu");
+    {
+        auto *crossed = menuItem("Show desktop");
+        const QRectF across = crossed->mapRectToScene(QRectF(0, 0, crossed->width(), crossed->height()));
+        const QPoint from = centre(menuItem("Appearance"));
+        const QPoint to(qRound(across.right()) - 8, qRound(across.center().y()));
+        for (int step = 1; step <= 6; ++step) {
+            QTest::mouseMove(popover, from + (to - from) * step / 6);
+            QTest::qWait(10);
+        }
+        if (crossed->property("highlighted").toBool() || !menuItem("dark") ||
+            !menuItem("Appearance")->property("highlighted").toBool())
+            return fail("heading for the open submenu across another entry took it over");
+        if (!QTest::qWaitFor([&] { return crossed->property("highlighted").toBool() && !menuItem("dark"); }))
+            return fail("resting on the entry crossed did not take over from the submenu");
+    }
     click(menuItem("Show desktop"));
     // The profile button on the bar lists the profiles, the one in use marked, and switches.
     auto *profilesButton = find(view.rootObject(), "profilesButton");

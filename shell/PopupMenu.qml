@@ -29,7 +29,9 @@ import QtQuick.Controls.Basic
 // does, by `anchorRect`, `side`, `alignment` and `gap`. A submenu opens when the pointer rests on
 // its entry for `submenuDelay` milliseconds, on a click, or with Right, Enter or Space; it opens
 // on the side its parent opened towards, or the other where there is no room, and its parent
-// stays open. Up and Down (wrapping), Home and End move through the entries the keyboard is in,
+// stays open. The pointer heading for an open submenu across other entries (inside the triangle
+// between where it was and the submenu's near edge) leaves it open: an entry it crosses takes
+// over only once the pointer rests on it. Up and Down (wrapping), Home and End move through the entries the keyboard is in,
 // skipping what cannot be chosen; Enter or Space chooses; Left or Escape closes a submenu; Escape
 // in the first level asks to close. Whoever uses it sets `open` and clears it on dismissed().
 Item {
@@ -221,33 +223,79 @@ Item {
             level.menu.updatePath()
         }
         // The pointer on row `index`: it is highlighted at once, and its submenu opens (or the
-        // one open closes) once the pointer has rested there.
+        // one open closes) once the pointer has rested there. On its way into the open submenu,
+        // the row waits instead, and takes over only if the pointer rests on it.
         function rowHovered(index) {
-            current = selectable(index) ? index : -1
-            resting.restart()
             if (parentLevel)
                 parentLevel.keepChild()
+            if (index !== openIndex && headingToChild()) {
+                aimed = index
+                aiming.restart()
+                return
+            }
+            aiming.stop()
+            current = selectable(index) ? index : -1
+            resting.restart()
         }
-        function stopResting() { resting.stop() }
+        function stopResting() { resting.stop(); aiming.stop() }
         // The pointer reached the submenu: what it crossed on the way does not count.
         function keepChild() {
-            resting.stop()
+            stopResting()
             if (openIndex >= 0)
                 current = openIndex
             if (parentLevel)
                 parentLevel.keepChild()
         }
+        // Opens the highlighted row's submenu, or closes the one open for another row.
+        function settle() {
+            if (current === openIndex)
+                return
+            if (current >= 0 && hasSubmenu(current))
+                openChild(current, false)
+            else
+                closeChild()
+        }
         Timer {
             id: resting
             interval: level.menu.submenuDelay
+            onTriggered: level.settle()
+        }
+        // The row the pointer crossed while heading into the submenu, which takes over if the
+        // pointer is still on it a submenu delay later.
+        property int aimed: -1
+        Timer {
+            id: aiming
+            interval: level.menu.submenuDelay
             onTriggered: {
-                if (level.current === level.openIndex)
+                var row = rows.itemAtIndex(level.aimed)
+                if (!row || !row.hovered)
                     return
-                if (level.current >= 0 && level.hasSubmenu(level.current))
-                    level.openChild(level.current, false)
-                else
-                    level.closeChild()
+                level.current = level.selectable(level.aimed) ? level.aimed : -1
+                level.settle()
             }
+        }
+        // The last two places the pointer was seen on this card, a few pixels apart, in its
+        // coordinates: the way it is going.
+        property point pointerFrom: Qt.point(-1, -1)
+        property point pointerAt: Qt.point(-1, -1)
+        function trackPointer(position) {
+            if (Math.abs(position.x - pointerAt.x) + Math.abs(position.y - pointerAt.y) < Theme.spacingXS)
+                return
+            pointerFrom = pointerAt
+            pointerAt = position
+        }
+        // Whether the pointer is heading into the open submenu: its last step lies inside the
+        // triangle between where it came from and the submenu's near edge.
+        function headingToChild() {
+            if (!child || !child.open || pointerFrom.x < 0)
+                return false
+            var near = child.x >= x + width / 2 ? child.x - x : child.x + child.width - x
+            var top = child.y - y, bottom = top + child.height
+            function side(p, a, b) { return (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y) }
+            var corner = Qt.point(near, top), other = Qt.point(near, bottom)
+            var d1 = side(pointerAt, pointerFrom, corner), d2 = side(pointerAt, corner, other),
+                d3 = side(pointerAt, other, pointerFrom)
+            return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))
         }
         // What changed under an open menu (an application's own) may have moved its rows.
         onEntriesChanged: {
@@ -262,7 +310,11 @@ Item {
                     level.parentLevel.keepChild()
                 else if (!hovered && !level.child)
                     level.current = -1
+                // Where it went while away says nothing of where it is heading now.
+                if (!hovered)
+                    level.pointerFrom = level.pointerAt = Qt.point(-1, -1)
             }
+            onPointChanged: if (hovered) level.trackPointer(point.position)
         }
 
         FontMetrics { id: labelFont; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
