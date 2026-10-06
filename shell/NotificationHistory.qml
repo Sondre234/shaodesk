@@ -103,20 +103,13 @@ PopupCard {
                     verticalAlignment: Text.AlignVCenter
                 }
             }
-            FlatButton {
-                id: clear
+            TextButton {
                 objectName: "clearNotifications"
                 Layout.preferredHeight: Theme.rowHeight - Theme.spacingS
-                leftPadding: Theme.spacingM; rightPadding: Theme.spacingM
+                text: "Clear all"
                 enabled: history.center.history.count > 0
                 onClicked: history.center.clearHistory()
                 Accessible.name: "Clear all notifications"
-                contentItem: Text {
-                    text: "Clear all"
-                    color: clear.enabled ? Theme.accent : Theme.textDisabled
-                    font.pixelSize: Theme.fontSizeSmall; font.weight: Font.DemiBold; font.family: Theme.fontFamily
-                    verticalAlignment: Text.AlignVCenter
-                }
             }
         }
         // Nothing kept: a quiet bell and a line saying so.
@@ -181,25 +174,14 @@ PopupCard {
                             color: Theme.textMuted
                             font.pixelSize: Theme.fontSizeSmall; font.weight: Font.DemiBold; font.family: Theme.fontFamily
                         }
-                        FlatButton {
-                            id: groupToggle
+                        TextButton {
                             objectName: "groupToggle"
                             visible: group.collapsible
                             Layout.preferredHeight: Theme.headingHeight - Theme.spacingS
-                            leftPadding: Theme.spacingM; rightPadding: Theme.spacingS
+                            text: group.open ? "Show less" : (group.notifications.length - history.collapsedCount) + " more"
+                            chevron: true
+                            chevronRotation: group.open ? -90 : 90
                             onClicked: history.toggleGroup(group.modelData.key)
-                            contentItem: RowLayout {
-                                spacing: Theme.spacingXS
-                                Text {
-                                    text: group.open ? "Show less" : (group.notifications.length - history.collapsedCount) + " more"
-                                    color: Theme.accent
-                                    font.pixelSize: Theme.fontSizeCaption; font.weight: Font.DemiBold; font.family: Theme.fontFamily
-                                }
-                                Icon {
-                                    name: "chevron-right"; rotation: group.open ? -90 : 90
-                                    size: Theme.iconSizeSmall; color: Theme.accent
-                                }
-                            }
                         }
                     }
                     Repeater {
