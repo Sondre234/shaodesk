@@ -1837,6 +1837,12 @@ int main(int argc, char **argv) {
         if (!QTest::qWaitFor([&] { return requests == QStringList{"toggle_tiling"} && !launcherOpen(); }))
             return fail("Enter did not run the action the start menu found");
         requests.clear();
+        // Along its bottom, the user's name and picture.
+        start->setUser("Robin Lee", QUrl::fromLocalFile(walls + "/a/one.png"));
+        if (!openStart() || !QTest::qWaitFor([&] { return shown("userPicture"); }) ||
+            item("userName")->property("text") != "Robin Lee")
+            return fail("the start menu does not show the user's name and picture");
+        view.rootObject()->setProperty("launcherOpen", false);
         editTasks("model.remove(model.count - 1)");
     }
     // The power menu, from the power button in the launcher's bottom-right corner, lists what

@@ -312,6 +312,18 @@ class StartMenuTest : public QObject {
         StartMenu menu(state.path());
         QVERIFY(!menu.userName().isEmpty());
     }
+    void findsTheUsersPicture() {
+        // ~/.face, else ~/.face.icon, else none (without D-Bus to ask AccountsService).
+        QTemporaryDir fakeHome, state;
+        const auto realHome = qgetenv("HOME");
+        qputenv("HOME", fakeHome.path().toLocal8Bit());
+        QVERIFY(StartMenu(state.path()).userIcon().isEmpty());
+        QVERIFY(write(fakeHome.filePath(".face.icon"), "picture"));
+        QCOMPARE(StartMenu(state.path()).userIcon(), QUrl::fromLocalFile(fakeHome.filePath(".face.icon")));
+        QVERIFY(write(fakeHome.filePath(".face"), "picture"));
+        QCOMPARE(StartMenu(state.path()).userIcon(), QUrl::fromLocalFile(fakeHome.filePath(".face")));
+        qputenv("HOME", realHome);
+    }
 
   private:
     QTemporaryDir home;
