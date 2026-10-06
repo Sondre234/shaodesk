@@ -3,12 +3,11 @@ import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
-// The clock's popup: a month calendar with today marked, paged by month.
+// The clock flyout's calendar card (ClockFlyout.qml): a month calendar with today marked, paged
+// by month.
 PopupCard {
     id: calendar
     required property var panel
-    required property Item barItem
-    parent: panel.popupLayer
     objectName: "calendar"
     property int month: new Date().getMonth()
     property int year: new Date().getFullYear()
@@ -17,11 +16,11 @@ PopupCard {
         year = d.getFullYear(); month = d.getMonth()
     }
     function today() { var d = new Date(); year = d.getFullYear(); month = d.getMonth() }
-    open: panel.audioPopup === "calendar"
     onOpened: today()
     implicitWidth: 288; implicitHeight: 330
-    anchorRect: panel.barAnchor(panel.audioPopupX, 0)
     side: panel.popupSide
+    alignment: Qt.AlignRight
+    bounds: panel.popupArea
     radius: Theme.radiusLarge
     ColumnLayout {
         anchors.fill: parent; anchors.margins: 14; spacing: 6

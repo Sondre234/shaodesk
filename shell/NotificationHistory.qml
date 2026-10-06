@@ -3,16 +3,13 @@ import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
-// The notification history popover above (or below) the panel's bell: every notification still
-// kept, newest first, with a do-not-disturb switch and a button that clears the list.
+// The clock flyout's notification card (ClockFlyout.qml): every notification still kept, newest
+// first, with a do-not-disturb switch and a button that clears the list.
 PopupCard {
     id: history
     required property var panel
-    required property Item barItem
     readonly property var center: shell.notifications
     objectName: "notificationHistory"
-    parent: panel.popupLayer
-    open: panel.audioPopup === "notifications"
     // Looking at the list is reading it, also when it was made open.
     onOpened: center.markAllRead()
     Connections { target: history.center; function onUnreadChanged() { if (history.open) history.center.markAllRead() } }
@@ -23,10 +20,10 @@ PopupCard {
         if (new Date().toDateString() === time.toDateString()) return Qt.formatTime(time, "HH:mm")
         return Qt.formatDate(time, "d MMM") + " " + Qt.formatTime(time, "HH:mm")
     }
-    implicitWidth: 380
     implicitHeight: Math.min(460, 56 + Math.max(90, list.contentHeight) + 8)
-    anchorRect: panel.barAnchor(panel.audioPopupX, 0)
     side: panel.popupSide
+    alignment: Qt.AlignRight
+    bounds: panel.popupArea
     radius: Theme.radiusLarge
     ColumnLayout {
         anchors.fill: parent; anchors.margins: 10; spacing: 6

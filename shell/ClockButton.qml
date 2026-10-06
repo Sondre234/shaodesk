@@ -2,7 +2,8 @@
 import QtQuick
 import QtQuick.Layouts
 
-// The time and date. Clicking it opens the month calendar.
+// The time and date. Clicking it opens the clock flyout: the notifications and the month
+// calendar.
 FlatButton {
     id: clockButton
     required property var panel
@@ -11,11 +12,19 @@ FlatButton {
     visible: shell.widgets.clock
     Layout.preferredWidth: clock.implicitWidth + 12; Layout.preferredHeight: clockButton.barHeight - 10
     hoverEnabled: true
-    enabled: shell.widgets.calendar
-    onClicked: clockButton.panel.toggleAudioPopup("calendar", clockButton)
+    enabled: shell.widgets.calendar || shell.notifications.serving
+    onClicked: clockButton.panel.toggleAudioPopup("clock", clockButton)
     Accessible.name: Qt.formatDateTime(clock.now, "dddd d MMMM yyyy, HH:mm")
-    active: clockButton.panel.audioPopup === "calendar"
+    active: clockButton.panel.audioPopup === "clock"
     BarTip { panel: clockButton.panel; owner: clockButton; text: Qt.formatDate(clock.now, "dddd d MMMM yyyy") }
+    // The compositor's notification_history action opens the flyout on the output under the
+    // pointer, whether or not the clock is on the bar.
+    Connections {
+        target: shell
+        function onNotificationsRequested(output) {
+            if (output === clockButton.panel.outputName) clockButton.panel.toggleAudioPopup("clock", clockButton)
+        }
+    }
     contentItem: Text {
         id: clock
         objectName: "clock"
