@@ -347,46 +347,7 @@ Item {
         // Once made, a popup stays, so closing it never destroys the item its handler runs in.
         property bool used: false
         onLoaded: used = true
-        sourceComponent: Component {
-            Rectangle {
-                id: audioOutputs
-                parent: root
-                objectName: "audioOutputs"
-                visible: root.audioPopup === "outputs"
-                width: 300; height: 12 + 30 + root.audioSource.outputs.length * 42
-                x: Math.max(8, Math.min(root.audioPopupX - width / 2, root.width - width - 8))
-                y: root.onTop ? bar.y + bar.height + 8 : bar.y - height - 8
-                color: shell.panelColor; radius: 10
-                border.color: Qt.lighter(shell.panelColor, 1.6)
-                MouseArea { anchors.fill: parent }
-                Column {
-                    anchors.fill: parent; anchors.margins: 6; spacing: 0
-                    Text {
-                        width: parent.width; height: 30; leftPadding: 10; verticalAlignment: Text.AlignVCenter
-                        text: "Output"; color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize - 1; font.family: root.uiFont
-                    }
-                    Repeater {
-                        model: root.audioSource.outputs
-                        delegate: Button {
-                            id: outputItem
-                            required property var modelData
-                            readonly property bool current: modelData.name === root.audioSource.output
-                            objectName: "audioOutputItem"
-                            width: parent.width; height: 42
-                            text: modelData.description
-                            Accessible.name: modelData.description
-                            onClicked: { root.audioSource.setOutput(modelData.name); root.audioPopup = "" }
-                            background: Rectangle { color: outputItem.hovered ? Qt.lighter(shell.panelColor, 1.5) : "transparent"; radius: 6 }
-                            contentItem: RowLayout {
-                                spacing: 10
-                                Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; Layout.leftMargin: 4; radius: 4; color: outputItem.current ? shell.accent : "transparent"; border.color: outputItem.current ? shell.accent : Qt.lighter(shell.panelColor, 2.2) }
-                                Text { Layout.fillWidth: true; text: outputItem.modelData.description; elide: Text.ElideRight; color: outputItem.current ? shell.accent : shell.textColor; font.pixelSize: shell.fontSize; font.family: root.uiFont }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        sourceComponent: Component { AudioOutputs { panel: root; barItem: bar } }
     }
 
     // The profile button: the appearance profiles, the one in use marked.
