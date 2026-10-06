@@ -98,6 +98,7 @@ void tile_toplevel_at(struct sh_toplevel *toplevel, struct wlr_output *output,
     sh_tiling_insert(server->tiling, output->name, toplevel->workspace, toplevel, target, has_point,
                      x, y);
     reflow_output(server, output);
+    window_objects_changed(server);
 }
 
 /* As tile_toplevel_at, at the tile under the pointer with `at_cursor`. */
@@ -135,6 +136,7 @@ void untile_toplevel(struct sh_toplevel *toplevel, bool restore) {
     }
     if (output && tiles_for(toplevel, output))
         reflow_output(server, output);
+    window_objects_changed(server);
 }
 
 /* Takes the window out of the tiling, floating where it was before it tiled, or lets it tile
@@ -158,6 +160,7 @@ void set_floating(struct sh_toplevel *toplevel, bool floating, bool at_cursor) {
         if (wants_tiling(toplevel, NULL))
             tile_toplevel(toplevel, NULL, NULL, at_cursor);
     }
+    window_objects_changed(toplevel->server);
 }
 
 /* Tiles of an output disabled in the config join the tiling of the output they are nearest

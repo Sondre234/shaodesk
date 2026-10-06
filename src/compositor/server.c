@@ -300,6 +300,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     add_listener(&layer_shell->events.new_surface, &server.new_layer_surface,
                  server_new_layer_surface);
     server.foreign_manager = wlr_foreign_toplevel_manager_v1_create(server.wl_display);
+    window_control_init(&server);
     // Screen capture for screenshots and portal screen sharing (xdg-desktop-portal-wlr).
     wlr_screencopy_manager_v1_create(server.wl_display);
     wlr_export_dmabuf_manager_v1_create(server.wl_display);

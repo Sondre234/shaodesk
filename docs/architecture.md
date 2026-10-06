@@ -58,6 +58,7 @@ all. In short:
 | `lock.c` | Session lock and idle/sleep inhibitors. |
 | `power.c` | The power actions: suspend, hibernate, reboot and power off through logind (`src/login1.c`), locking first, closing windows first, log out. |
 | `foreign_toplevel.c` | Window lists for taskbars and single-window capture. |
+| `window_control.c` | The shell's window menu: shaodesk-window-control-v1, which names a window by its taskbar handle. |
 
 A function used by one file is `static`; one used by several is declared in `server.h` under
 the file that defines it. The build warns (`-Wmissing-prototypes`) about one that is neither.

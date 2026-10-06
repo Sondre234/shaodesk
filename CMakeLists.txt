@@ -183,6 +183,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/switcher.c
         src/compositor/tiling.c
         src/compositor/toplevel.c
+        src/compositor/window_control.c
         src/compositor/workspace.c
         src/compositor/xwayland.c
     )

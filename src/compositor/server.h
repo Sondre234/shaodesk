@@ -113,6 +113,7 @@
 #endif
 #endif
 #include <xkbcommon/xkbcommon.h>
+#include "shaodesk-window-control-v1-protocol.h"
 
 enum sh_cursor_mode {
     SH_CURSOR_PASSTHROUGH,
@@ -333,6 +334,11 @@ struct sh_server {
     struct sh_toplevel *focused_toplevel;
     struct wlr_foreign_toplevel_manager_v1 *foreign_manager;
     struct wlr_ext_foreign_toplevel_list_v1 *toplevel_list; // windows offered for screen sharing
+    /* shaodesk-window-control-v1 (window_control.c): its global, the shaodesk_window_v1 objects
+     * clients hold, and the idle callback that tells them what changed. */
+    struct wl_global *window_control;
+    struct wl_list window_objects;
+    struct wl_event_source *window_objects_idle;
     struct wl_listener new_capture_request;
 
     /* Session lock: `locked` outlives a crashed locker so the screen stays covered. */
@@ -948,6 +954,11 @@ struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *o
 struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel);
 pid_t toplevel_pid(struct sh_toplevel *toplevel);
 bool toplevel_is_dialog(struct sh_toplevel *toplevel);
+
+/* window_control.c */
+void window_objects_changed(struct sh_server *server);
+void window_objects_forget(struct sh_toplevel *toplevel);
+void window_control_init(struct sh_server *server);
 
 /* workspace.c */
 int output_slot(struct sh_server *server, const char *name);
