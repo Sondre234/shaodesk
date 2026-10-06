@@ -106,13 +106,17 @@ Item {
                 Layout.preferredHeight: Theme.spacingS + Theme.spacingXS
                 radius: height / 2
                 color: Theme.selected
+                // The level glides to a new value, and on from there when keys repeat.
                 Rectangle {
                     width: parent.width * Math.max(0, osd.model.percent) / 100; height: parent.height
                     radius: height / 2
                     color: osd.model.kind === "muted" ? Theme.textMuted : Theme.accent
-                    Behavior on width { NumberAnimation { duration: Theme.duration(80) } }
+                    Behavior on width { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
+                    Behavior on color { ColorAnimation { duration: Theme.durationFast } }
                 }
             }
+            // The number in figures of one width, in room for 100, so that it does not shift as
+            // it changes.
             Text {
                 visible: osd.hasLevel
                 Layout.preferredWidth: digits.width
@@ -124,6 +128,7 @@ Item {
                     id: digits
                     text: "100"
                     font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+                    font.features: { "tnum": 1 }
                 }
             }
         }
