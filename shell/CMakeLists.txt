@@ -56,6 +56,8 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     Launcher.qml
     StartHome.qml
     StartAllApps.qml
+    StartSearch.qml
+    StartBestMatch.qml
     StartTile.qml
     StartRow.qml
     StartButton.qml

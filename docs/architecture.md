@@ -97,7 +97,7 @@ window as large as `ShellView::previewSize()`, and a preview's screenshot draws 
 | `PopupCard.qml` | A popup's card: surface, outline, corners, a shadow through the GPU, the open and close animation, and its place beside what it belongs to. |
 | `PopupMenu.qml`, `MenuRow.qml` | A menu of plain entries on popup cards, with cascading submenus and keyboard navigation, and one row of it. |
 | `AudioSlider.qml`, `MuteButton.qml` | Controls the mixer uses. |
-| `StartHome.qml`, `StartAllApps.qml`, `StartTile.qml`, `StartRow.qml`, `StartButton.qml`, `UserAvatar.qml` | Parts of the start menu (`Launcher.qml`): its pinned and recent applications, every application from A to Z, a pinned one, a row of its lists, the buttons of its headings, the user's picture. |
+| `StartHome.qml`, `StartAllApps.qml`, `StartSearch.qml`, `StartBestMatch.qml`, `StartTile.qml`, `StartRow.qml`, `StartButton.qml`, `UserAvatar.qml` | Parts of the start menu (`Launcher.qml`): its pinned and recent applications, every application from A to Z, what its search finds and the best match of it, a pinned application, a row of its lists, its small buttons, the user's picture. |
 | `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |
 | `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |
 

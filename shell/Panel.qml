@@ -151,6 +151,7 @@ Item {
             launcherOpen = true
             return true
         case "launcher-all":
+        case "launcher-search":
             // The start menu's other views, as Launcher.preview names them.
             launcherOpen = true
             return launcherLoader.item.preview(name)

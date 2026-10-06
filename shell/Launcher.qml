@@ -47,7 +47,7 @@ PopupCard {
     // What it shows: the pinned and recent applications ("home"), all of them ("all"), or what
     // the search finds ("search") while there is text to search for.
     property bool allApps: false
-    readonly property string view: search.text !== "" ? "search" : allApps ? "all" : "home"
+    readonly property string view: search.text.trim() !== "" ? "search" : allApps ? "all" : "home"
     // The time the recent applications' "5 min ago" is told from.
     property date now: new Date()
     Timer { interval: 30000; repeat: true; running: launcher.open; onTriggered: launcher.now = new Date() }
@@ -56,10 +56,28 @@ PopupCard {
         if (shell.launch(id))
             panel.closeMenus()
     }
-    // For a preview (Panel.previewPopup): shows "launcher-all", every application.
+    function launchAction(id, action) {
+        if (shell.launchAction(id, action))
+            panel.closeMenus()
+    }
+    // Runs a result of the search: launches an application, or does what the palette does with
+    // a window, workspace or action. The menu closes first, handing the keyboard back.
+    function run(result) {
+        if (result.kind === "app") {
+            launch(result.appId)
+        } else {
+            var output = panel.outputName
+            panel.closeMenus()
+            shell.palette.run(result, output)
+        }
+    }
+    // For a preview (Panel.previewPopup): shows "launcher-all", every application, or
+    // "launcher-search", what a search finds.
     function preview(name) {
         if (name === "launcher-all")
             allApps = true
+        else if (name === "launcher-search")
+            search.text = "fi"
         else
             return false
         return true
@@ -89,7 +107,9 @@ PopupCard {
             }
         }
         onAccepted: {
-            if (applications.count > 0 && shell.launch(applications.model[0].appId)) panel.closeMenus()
+            var result = searchView.results[searchView.current]
+            if (launcher.view === "search" && result)
+                launcher.run(result)
         }
         Keys.onEscapePressed: panel.closeMenus()
     }
@@ -114,30 +134,14 @@ PopupCard {
             inset: launcher.padding - Theme.spacingM
             visible: launcher.view === "all"
         }
-    }
-    ListView {
-        id: applications
-        visible: launcher.view === "search"
-        anchors.fill: views
-        anchors.leftMargin: launcher.padding - Theme.spacingM; anchors.rightMargin: anchors.leftMargin
-        clip: true
-        spacing: 3
-        model: shell.apps.filter(function(app) {
-            return (app.name + " " + app.appId).toLowerCase().indexOf(search.text.toLowerCase()) >= 0
-        })
-        ScrollBar.vertical: ScrollBar {}
-        delegate: FlatButton {
-            required property var modelData
-            width: ListView.view.width - 10
-            height: 48
-            onClicked: { if (shell.launch(modelData.appId)) panel.closeMenus() }
-            contentItem: RowLayout {
-                spacing: 12
-                Image { source: "image://icons/" + modelData.icon; sourceSize: Qt.size(Theme.appIconSizeLarge, Theme.appIconSizeLarge); Layout.preferredWidth: Theme.appIconSizeLarge; Layout.preferredHeight: Theme.appIconSizeLarge }
-                Text { text: modelData.name; textFormat: Text.PlainText; color: Theme.text; font.pixelSize: Theme.fontSizeLarge; elide: Text.ElideRight; Layout.fillWidth: true; font.family: Theme.fontFamily }
-            }
+        StartSearch {
+            id: searchView
+            anchors.fill: parent
+            launcher: launcher
+            inset: launcher.padding - Theme.spacingM
+            query: search.text.trim()
+            visible: launcher.view === "search"
         }
-        Text { anchors.centerIn: parent; visible: applications.count === 0; text: "No matching applications"; color: Theme.textMuted; font.family: Theme.fontFamily }
     }
     // Along the bottom, in a shade of its own: who is logged in, and the power button.
     Rectangle {
