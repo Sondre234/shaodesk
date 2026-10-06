@@ -188,7 +188,7 @@ is a `BarTip`, a popup is a `PopupCard` and a menu a `PopupMenu`.
 renders the taskbar offscreen with one popup open, on stand-in windows, sound, tray items and
 notifications, over the configured wallpaper (`--preview-popup` lists the names). The overlay
 surfaces have names there too (`osd-volume`, `osd-text`, `cards`, `power-dialog`, `palette`,
-`switcher`, `overview`): `PreviewData` in `preview.cpp` shows one in a window of its own over the
+`palette-empty`, `switcher`, `overview`): `PreviewData` in `preview.cpp` shows one in a window of its own over the
 bar alone, with stand-ins for what the compositor would tell it, and the screenshot draws it where
 its layer surface would be (the overview over stand-ins for the compositor's thumbnails).
 `tools/shell_gallery.py BUILD_DIR OUT_DIR` does that for every popup in a light and a dark

@@ -196,7 +196,8 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
 }
 
 QStringList PreviewData::surfaces() {
-    return {"osd-volume", "osd-text", "cards", "power-dialog", "palette", "switcher", "overview"};
+    return {"osd-volume", "osd-text", "cards",    "power-dialog",
+            "palette",    "switcher", "overview", "palette-empty"};
 }
 
 bool PreviewData::showSurface(QScreen *screen, const QString &name) {
@@ -252,12 +253,12 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
         file = "PowerDialog.qml";
         mode = QQuickView::SizeRootObjectToView;
         controller_.power()->request("poweroff", output);
-    } else if (name == "palette") {
+    } else if (name == "palette" || name == "palette-empty") {
         file = "Palette.qml";
         properties = {{"screenSize", ShellView::previewSize()}};
         controller_.palette()->open(output);
-        // A search that finds applications and actions both.
-        controller_.palette()->setQuery("fi");
+        // A search that finds applications and actions both, or one that finds nothing.
+        controller_.palette()->setQuery(name == "palette" ? "fi" : "> nothing like this");
     } else if (name == "switcher") {
         file = "Switcher.qml";
         // The taskbar's stand-in windows, most recently focused first, the one before the
@@ -302,7 +303,7 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
     if (surface_->status() != QQuickView::Ready)
         return false;
     // As PaletteView does before it shows, and PowerView once it shows.
-    if (name == "palette")
+    if (file == "Palette.qml")
         QMetaObject::invokeMethod(surface_->rootObject(), "reset");
     surface_->show();
     if (name == "power-dialog")
@@ -330,7 +331,7 @@ QImage PreviewData::withSurface(QImage desktop) const {
         // OsdView: centred, 48 pixels from the bottom edge or from the top.
         at = QPoint((output.width() - size.width()) / 2,
                     controller_.osd()->top() ? 48 : output.height() - 48 - size.height());
-    } else if (surfaceName_ == "palette") {
+    } else if (surfaceName_.startsWith("palette")) {
         // PaletteView: centred, a sixth of the output's height down.
         at = QPoint(usable.left() + (usable.width() - size.width()) / 2,
                     usable.top() + output.height() / 6);

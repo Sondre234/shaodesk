@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
                       "bar-submenu, task-menu, pin-menu, group, tray-menu, tray-submenu, "
                       "calendar, mixer, outputs, profiles, wallpapers or notifications; or an "
                       "overlay over the bar: osd-volume, osd-text, cards, power-dialog, palette, "
-                      "switcher or overview",
+                      "palette-empty, switcher or overview",
                       "name"});
     parser.addOption(
         {"quit-after",

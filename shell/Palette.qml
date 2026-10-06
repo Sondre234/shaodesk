@@ -43,7 +43,7 @@ Item {
         id: card
         x: Theme.shadowMargin; y: Theme.shadowMargin
         width: Math.min(680, root.screenSize.width - 32)
-        height: input.height + (list.count > 0 ? list.height + root.padding : 0) + 2 * root.padding
+        height: input.height + (list.count > 0 ? list.height : empty.height) + 3 * root.padding
         opacity: root.progress
         scale: 0.97 + 0.03 * root.progress
         transform: Translate { y: (root.progress - 1) * Theme.spacingM }
@@ -188,6 +188,34 @@ Item {
                     onEntered: shell.palette.selected = row.index
                     onClicked: shell.palette.activate(row.index)
                 }
+            }
+        }
+        // What to try when nothing matches: the prefixes that narrow a search.
+        Column {
+            id: empty
+            objectName: "paletteEmpty"
+            visible: list.count === 0
+            x: root.padding; y: input.y + input.height + root.padding
+            width: card.width - 2 * root.padding
+            topPadding: Theme.spacingL; bottomPadding: Theme.spacingL
+            spacing: Theme.spacingS
+            Icon {
+                anchors.horizontalCenter: parent.horizontalCenter
+                name: "search"; size: Theme.iconSizeLarge; color: Theme.textMuted
+            }
+            Text {
+                width: parent.width
+                text: "Nothing matches"
+                color: Theme.text
+                font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeLarge; font.weight: Font.Medium
+                horizontalAlignment: Text.AlignHCenter
+            }
+            Text {
+                width: parent.width
+                text: "Start with > for actions, @ for windows, # for workspaces or % for sessions"
+                color: Theme.textMuted
+                font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall
+                horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap
             }
         }
     }
