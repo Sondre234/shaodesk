@@ -8,9 +8,15 @@ import QtQuick
 Item {
     id: overview
     required property size screenSize
-    readonly property var windows: shell.overviewWindows
-    readonly property var strip: shell.overviewStrip
-    readonly property string filter: shell.overviewFilter
+    // The compositor's overview, unless set (as a preview sets them).
+    property var windows: shell.overviewWindows
+    property var strip: shell.overviewStrip
+    property string filter: shell.overviewFilter
+    property rect area: shell.overviewArea
+    property int selected: shell.overviewSelected
+    property int viewed: shell.overviewViewed
+    // The workspaces with a window asking for attention.
+    property var urgentWorkspaces: (shell.workspaces[shell.overviewOutput] || ({})).urgent || []
     width: screenSize.width
     height: screenSize.height
 
@@ -18,7 +24,7 @@ Item {
     Rectangle {
         id: search
         anchors.horizontalCenter: parent.horizontalCenter
-        y: shell.overviewArea.y + 8
+        y: overview.area.y + 8
         width: Math.min(420, overview.width - 32); height: 32
         radius: 16
         color: Theme.surface
@@ -43,18 +49,18 @@ Item {
             x: modelData.x; y: modelData.y; width: modelData.w; height: modelData.h
             readonly property string name: shell.workspaceNames[modelData.workspace - 1] || ""
             // A window on this workspace is asking for attention.
-            readonly property bool urgent: ((shell.workspaces[shell.overviewOutput] || ({})).urgent || []).indexOf(modelData.workspace) >= 0
+            readonly property bool urgent: overview.urgentWorkspaces.indexOf(modelData.workspace) >= 0
             Rectangle {
                 anchors.left: parent.left; anchors.bottom: parent.bottom
                 anchors.margins: 4
                 width: label.implicitWidth + 12; height: 18; radius: 9
-                color: modelData.workspace === shell.overviewViewed ? Theme.accent : Theme.alpha(Theme.surface, 0.85)
+                color: modelData.workspace === overview.viewed ? Theme.accent : Theme.alpha(Theme.surface, 0.85)
                 border.width: cell.urgent ? 2 : 0; border.color: Theme.urgent
                 Text {
                     id: label
                     anchors.centerIn: parent
                     text: cell.name.length > 0 ? modelData.workspace + " " + cell.name : modelData.workspace
-                    color: modelData.workspace === shell.overviewViewed ? Theme.textOnAccent : Theme.text
+                    color: modelData.workspace === overview.viewed ? Theme.textOnAccent : Theme.text
                     font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall; font.bold: true
                 }
             }
@@ -69,7 +75,7 @@ Item {
             required property var modelData
             required property int index
             x: modelData.x; y: modelData.y; width: modelData.w; height: modelData.h
-            readonly property bool selected: index === shell.overviewSelected
+            readonly property bool selected: index === overview.selected
             readonly property string title: modelData.title.length > 0 ? modelData.title : modelData.appId
             visible: width >= 48
             // A window asking for attention has a frame in the urgent colour.
@@ -112,7 +118,7 @@ Item {
 
     Text {
         anchors.horizontalCenter: parent.horizontalCenter
-        y: shell.overviewArea.y + shell.overviewArea.height - height - 4
+        y: overview.area.y + overview.area.height - height - 4
         text: qsTr("Enter picks · Esc closes · middle click closes a window · drag a window onto a workspace to move it")
         color: Theme.textMuted
         font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall

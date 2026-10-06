@@ -51,6 +51,38 @@ TrayMenuEntry menuEntry(QVariantMap properties, std::vector<int> children = {}) 
     return entry;
 }
 
+// What the panel leaves of the output a preview stands for, where a layer surface that keeps
+// clear of it (an exclusive zone of 0) goes.
+QRect usableArea(const ShellController &controller) {
+    const int panel = controller.panelExtent();
+    return QRect(QPoint(0, 0), ShellView::previewSize())
+        .adjusted(0, controller.panelTop() ? panel : 0, 0, controller.panelTop() ? 0 : -panel);
+}
+
+// The overview's stand-ins, as the compositor would lay them out in `area`: four windows of the
+// first workspace (the first selected, the third asking for attention), and the strip of four
+// workspaces above them.
+QVariantList overviewWindows(const QRect &area) {
+    auto window = [&area](int x, int y, int w, int h, const QString &appId, const QString &title,
+                          bool urgent = false) {
+        return QVariantMap{{"x", area.x() + x}, {"y", area.y() + y}, {"w", w},
+                           {"h", h},            {"appId", appId},   {"title", title},
+                           {"workspace", 1},    {"urgent", urgent}};
+    };
+    return {window(130, 160, 410, 256, "firefox", "Release notes - Mozilla Firefox"),
+            window(562, 160, 410, 256, "foot", "~/dev/shaodesk"),
+            window(232, 444, 300, 170, "kitty", "Build finished", true),
+            window(562, 444, 300, 170, "foot", "htop")};
+}
+QVariantList overviewStrip(const QRect &area) {
+    QVariantList cells;
+    for (int i = 0; i < 4; ++i)
+        cells.push_back(QVariantMap{{"x", area.x() + 292 + i * 132}, {"y", area.y() + 56},
+                                    {"w", 120}, {"h", 68}, {"workspace", i + 1},
+                                    {"windows", i == 0 ? 4 : i == 1 ? 2 : 0}});
+    return cells;
+}
+
 Notification notification(const QString &app, const QString &icon, const QString &summary,
                           const QString &body, int urgency = Notification::Normal) {
     Notification n;
@@ -164,7 +196,7 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
 }
 
 QStringList PreviewData::surfaces() {
-    return {"osd-volume", "osd-text", "cards", "power-dialog", "palette", "switcher"};
+    return {"osd-volume", "osd-text", "cards", "power-dialog", "palette", "switcher", "overview"};
 }
 
 bool PreviewData::showSurface(QScreen *screen, const QString &name) {
@@ -243,6 +275,16 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
                                                window("foot", "htop", 2),
                                                window("org.kde.dolphin", "Downloads - Dolphin", 1, true)}},
                       {"selected", 1}};
+    } else if (name == "overview") {
+        file = "Overview.qml";
+        const QRect area = usableArea(controller_);
+        properties = {{"screenSize", ShellView::previewSize()},
+                      {"windows", overviewWindows(area)},
+                      {"strip", overviewStrip(area)},
+                      {"area", area},
+                      {"selected", 0},
+                      {"viewed", 1},
+                      {"urgentWorkspaces", QVariantList{1}}};
     } else {
         return false;
     }
@@ -281,9 +323,7 @@ QImage PreviewData::withSurface(QImage desktop) const {
     // panel leaves when it keeps clear of it (an exclusive zone of 0), over the whole output when
     // it does not (-1).
     const QRect output(QPoint(0, 0), ShellView::previewSize());
-    const int panel = controller_.panelExtent();
-    const QRect usable = output.adjusted(0, controller_.panelTop() ? panel : 0, 0,
-                                         controller_.panelTop() ? 0 : -panel);
+    const QRect usable = usableArea(controller_);
     const QSize size = root.toSize();
     QPoint at;
     if (surfaceName_.startsWith("osd-")) {
@@ -304,6 +344,41 @@ QImage PreviewData::withSurface(QImage desktop) const {
                     center->bottom() ? usable.bottom() + 1 - size.height() : usable.top());
     }
     QPainter painter(&desktop);
+    if (surfaceName_ == "overview") {
+        // What the compositor draws under the shell's text, in its colours: the dimmed backdrop,
+        // the strip's cells with the workspace shown framed, and each window on a card, a plain
+        // stand-in for its picture, the selected one framed.
+        painter.scale(scale, scale);
+        painter.fillRect(output, QColor::fromRgbF(0.04f, 0.05f, 0.08f, 0.86f));
+        for (const auto &item : overviewStrip(usable)) {
+            const auto cell = item.toMap();
+            const QRect rect(cell["x"].toInt(), cell["y"].toInt(), cell["w"].toInt(), cell["h"].toInt());
+            const bool viewed = cell["workspace"].toInt() == 1;
+            painter.fillRect(rect, viewed ? QColor::fromRgbF(0.22f, 0.25f, 0.31f, 0.95f)
+                                          : QColor::fromRgbF(0.12f, 0.13f, 0.16f, 0.95f));
+            if (viewed) {
+                painter.setPen(QPen(QColor::fromRgbF(0.36f, 0.6f, 1.0f), 2));
+                painter.drawRect(rect);
+            }
+        }
+        const auto windows = overviewWindows(usable);
+        for (int i = 0; i < windows.size(); ++i) {
+            const auto window = windows[i].toMap();
+            const QRect rect(window["x"].toInt(), window["y"].toInt(), window["w"].toInt(),
+                             window["h"].toInt());
+            const bool dark = window["appId"] != "firefox";
+            painter.fillRect(rect.adjusted(-6, -6, 6, 6), QColor::fromRgbF(0.1f, 0.11f, 0.14f, 0.85f));
+            painter.fillRect(rect, dark ? QColor("#1e1f29") : QColor("#eceef3"));
+            painter.fillRect(rect.adjusted(0, 0, 0, 14 - rect.height()),
+                             dark ? QColor("#2b2d3a") : QColor("#cfd3dd"));
+            if (i == 0) {
+                painter.setPen(QPen(QColor::fromRgbF(0.36f, 0.6f, 1.0f), 3));
+                painter.setBrush(Qt::NoBrush);
+                painter.drawRect(rect.adjusted(-6, -6, 6, 6));
+            }
+        }
+        painter.resetTransform();
+    }
     painter.drawImage(QPointF(at) * scale, image);
     return desktop;
 }

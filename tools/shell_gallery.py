@@ -33,7 +33,8 @@ POPUPS = ["bar", "launcher", "power", "bar-menu", "bar-submenu", "task-menu", "p
           "group", "tray-menu", "tray-submenu", "calendar", "mixer", "outputs", "profiles",
           "wallpapers", "notifications"]
 # The overlay surfaces, each shown over the bar alone (PreviewData::surfaces in shell/preview.cpp).
-POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switcher"]
+POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switcher",
+           "overview"]
 
 # Translucent bars, as appearance profiles often have them.
 THEMES = {
