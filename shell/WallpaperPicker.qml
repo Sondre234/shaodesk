@@ -36,30 +36,30 @@ Rectangle {
     height: Math.max(220, Math.min(500, panel.height - barItem.height - shell.panelMarginTop - shell.panelMarginBottom - 16))
     x: Math.max(8, Math.min(panel.audioPopupX - width / 2, panel.width - width - 8))
     y: panel.onTop ? barItem.y + barItem.height + 8 : barItem.y - height - 8
-    color: shell.panelColor; radius: 10
-    border.color: Qt.lighter(shell.panelColor, 1.6)
+    color: Theme.surface; radius: 10
+    border.color: Theme.border
     MouseArea { anchors.fill: parent }
     ColumnLayout {
         anchors.fill: parent; anchors.margins: 10; spacing: 8
         RowLayout {
             Layout.fillWidth: true; spacing: 8
             Text {
-                text: "Wallpapers"; color: shell.textColor; font.pixelSize: shell.fontSize + 1; font.bold: true; font.family: panel.uiFont
+                text: "Wallpapers"; color: Theme.text; font.pixelSize: shell.fontSize + 1; font.bold: true; font.family: Theme.fontFamily
             }
             Text {
                 Layout.fillWidth: true
                 text: wallpaperPicker.shown.length + (wallpaperPicker.shown.length === 1 ? " picture" : " pictures")
                 elide: Text.ElideRight
-                color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize - 1; font.family: panel.uiFont
+                color: Theme.textMuted; font.pixelSize: shell.fontSize - 1; font.family: Theme.fontFamily
             }
             TextField {
                 id: filter
                 objectName: "wallpaperFilter"
                 Layout.preferredWidth: 220; Layout.preferredHeight: 30
                 placeholderText: "Filter"
-                color: shell.textColor; placeholderTextColor: Qt.darker(shell.textColor, 1.6)
-                font.pixelSize: shell.fontSize; font.family: panel.uiFont
-                background: Rectangle { radius: 6; color: Qt.lighter(shell.panelColor, 1.35); border.color: filter.activeFocus ? shell.accent : "transparent" }
+                color: Theme.text; placeholderTextColor: Theme.textMuted
+                font.pixelSize: shell.fontSize; font.family: Theme.fontFamily
+                background: Rectangle { radius: 6; color: Theme.surfaceRaised; border.color: filter.activeFocus ? Theme.accent : "transparent" }
                 Keys.onEscapePressed: panel.closeMenus()
                 Keys.onReturnPressed: if (wallpaperPicker.shown.length > 0) shell.pickWallpaper(wallpaperPicker.shown[0].path)
             }
@@ -70,7 +70,7 @@ Rectangle {
                 enabled: wallpaperPicker.shown.length > 0
                 Accessible.name: "Random wallpaper"
                 onClicked: shell.pickWallpaper(wallpaperPicker.shown[Math.floor(Math.random() * wallpaperPicker.shown.length)].path)
-                background: Rectangle { radius: 6; color: shuffle.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
+                background: Rectangle { radius: 6; color: shuffle.hovered ? Theme.hover : "transparent" }
                 contentItem: Item { Icon { anchors.centerIn: parent; name: "shuffle"; size: 16 } }
             }
         }
@@ -90,14 +90,14 @@ Rectangle {
                 onClicked: wallpaperPicker.folder = modelData
                 background: Rectangle {
                     radius: 14
-                    color: folderTab.current ? shell.accent : (folderTab.hovered ? Qt.lighter(shell.panelColor, 1.55) : Qt.lighter(shell.panelColor, 1.25))
+                    color: folderTab.current ? Theme.accent : (folderTab.hovered ? Theme.selected : Theme.hover)
                 }
                 contentItem: Text {
                     leftPadding: 6; rightPadding: 6
                     text: folderTab.modelData === "" ? "All" : folderTab.modelData
                     verticalAlignment: Text.AlignVCenter
-                    color: folderTab.current ? shell.panelColor : shell.textColor
-                    font.pixelSize: shell.fontSize - 1; font.family: panel.uiFont
+                    color: folderTab.current ? Theme.textOnAccent : Theme.text
+                    font.pixelSize: shell.fontSize - 1; font.family: Theme.fontFamily
                 }
             }
             WheelHandler {
@@ -124,7 +124,7 @@ Rectangle {
                 width: parent.width - 40
                 horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap
                 text: shell.wallpapers.length === 0 ? "No pictures in " + shell.wallpaperFolder : "Nothing matches"
-                color: Qt.darker(shell.textColor, 1.4); font.pixelSize: shell.fontSize; font.family: panel.uiFont
+                color: Theme.textMuted; font.pixelSize: shell.fontSize; font.family: Theme.fontFamily
             }
             delegate: Button {
                 id: thumb
@@ -139,7 +139,7 @@ Rectangle {
                     Rectangle {
                         anchors.fill: parent; anchors.margins: 4
                         radius: 6
-                        color: Qt.lighter(shell.panelColor, 1.25)
+                        color: Theme.surfaceRaised
                         Image {
                             anchors.fill: parent; anchors.margins: 2
                             source: "image://thumbs/" + encodeURIComponent(thumb.modelData.path)
@@ -157,13 +157,13 @@ Rectangle {
                             anchors.margins: 2
                             height: nameText.implicitHeight + 6
                             visible: thumb.hovered
-                            color: Qt.rgba(shell.panelColor.r, shell.panelColor.g, shell.panelColor.b, 0.85)
+                            color: Theme.alpha(Theme.surface, 0.85)
                             Text {
                                 id: nameText
                                 anchors.fill: parent; anchors.leftMargin: 6; anchors.rightMargin: 6
                                 verticalAlignment: Text.AlignVCenter; elide: Text.ElideMiddle
                                 text: thumb.modelData.name
-                                color: shell.textColor; font.pixelSize: shell.fontSize - 2; font.family: panel.uiFont
+                                color: Theme.text; font.pixelSize: shell.fontSize - 2; font.family: Theme.fontFamily
                             }
                         }
                         // The border sits over the picture: the software renderer
@@ -172,7 +172,7 @@ Rectangle {
                             anchors.fill: parent
                             radius: 6; color: "transparent"
                             border.width: thumb.current ? 3 : (thumb.hovered ? 2 : 0)
-                            border.color: thumb.current ? shell.accent : Qt.rgba(shell.textColor.r, shell.textColor.g, shell.textColor.b, 0.7)
+                            border.color: thumb.current ? Theme.accent : Theme.alpha(Theme.text, 0.7)
                         }
                     }
                 }
