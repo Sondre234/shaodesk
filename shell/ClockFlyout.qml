@@ -6,6 +6,10 @@ import QtQuick
 // nothing to show: the notifications while the shell serves none, the calendar with
 // shell.widgets.calendar off. Where the output is too short for both, the calendar leaves out its
 // time and date to give the notifications the room, and they scroll in what is left.
+//
+// In the macOS style it is Notification Center: the notifications nearest the clock, each on a card
+// of its own, and the calendar under them, without the time the menu bar shows; they scroll in
+// the room the calendar leaves.
 Item {
     id: flyout
     required property var panel
@@ -27,15 +31,18 @@ Item {
         id: calendar
         panel: flyout.panel
         open: flyout.open && flyout.showCalendar
-        anchorRect: flyout.barEnd
-        compact: flyout.showNotifications && calendar.fullHeight + notifications.implicitHeight > flyout.room
+        anchorRect: Theme.macos && flyout.showNotifications
+            ? Qt.rect(notifications.x, notifications.y, notifications.width, notifications.height)
+            : flyout.barEnd
+        compact: Theme.macos || flyout.showNotifications && calendar.fullHeight + notifications.implicitHeight > flyout.room
     }
     NotificationHistory {
         id: notifications
         panel: flyout.panel
         open: flyout.open && flyout.showNotifications
         implicitWidth: calendar.implicitWidth
-        anchorRect: flyout.showCalendar ? Qt.rect(calendar.x, calendar.y, calendar.width, calendar.height)
-                                        : flyout.barEnd
+        anchorRect: flyout.showCalendar && !Theme.macos ? Qt.rect(calendar.x, calendar.y, calendar.width, calendar.height)
+                                                        : flyout.barEnd
+        maximumHeight: Theme.macos && flyout.showCalendar ? flyout.room - calendar.implicitHeight : Infinity
     }
 }

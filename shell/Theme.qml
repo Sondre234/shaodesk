@@ -197,6 +197,15 @@ QtObject {
     readonly property int moduleHeadingHeight: 22
     readonly property int moduleTileHeight: 52
     readonly property int moduleButtonSize: 28
+    // Notification Center, the clock's flyout in the macOS style, and its banners: how wide it is,
+    // and a notification's icon beside it.
+    readonly property int notificationCenterWidth: 344
+    readonly property int notificationIconSize: 32
+    // A switch's track while off, and the knob of a switch or a slider: white, as macOS has them,
+    // with a faint outline that keeps it apart from a light surface.
+    readonly property color switchTrack: alpha(text, light ? 0.14 : 0.2)
+    readonly property color knob: macos ? "#ffffff" : accent
+    readonly property color knobOutline: Qt.rgba(0, 0, 0, light ? 0.14 : 0.3)
 
     // `milliseconds` at the animation speed, 0 with animations off.
     function duration(milliseconds) { return Math.round(milliseconds * motionScale) }

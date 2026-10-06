@@ -6,7 +6,8 @@ import QtQuick.Layouts
 // The clock flyout's calendar card (ClockFlyout.qml): the time and today's date over a month
 // calendar with today marked, paged by month. Weeks start on the locale's first day. As on
 // Windows, the title zooms out to the year's months and then to a decade's years, where a pick
-// zooms back in.
+// zooms back in. In the macOS style it is Notification Center's, as wide as it and with shorter
+// rows.
 PopupCard {
     id: calendar
     required property var panel
@@ -91,9 +92,10 @@ PopupCard {
         duration: Theme.durationNormal; easing.type: Theme.easing
     }
     // A day's cell, and the room around the grid.
-    readonly property real cellWidth: Theme.rowHeight + Theme.spacingL
-    readonly property real cellHeight: Theme.rowHeight + Theme.spacingS
-    readonly property real padding: Theme.spacingXL
+    readonly property real padding: Theme.macos ? Theme.spacingL + Theme.spacingXS : Theme.spacingXL
+    readonly property real cellWidth: Theme.macos ? Math.floor((Theme.notificationCenterWidth - 2 * padding) / 7)
+                                                  : Theme.rowHeight + Theme.spacingL
+    readonly property real cellHeight: Theme.macos ? Theme.menuRowHeight + Theme.spacingS : Theme.rowHeight + Theme.spacingS
     implicitWidth: 7 * cellWidth + 2 * padding
     implicitHeight: content.implicitHeight + 2 * padding
     side: panel.popupSide
@@ -233,8 +235,10 @@ PopupCard {
                     spacing: 0
                     delegate: Text {
                         required property string shortName
+                        // A letter in the macOS style, as its calendar has them.
+                        required property string narrowName
                         width: weekRow.availableWidth / 7; height: weekRow.availableHeight
-                        text: shortName; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                        text: Theme.macos ? narrowName : shortName; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
                         color: Theme.textMuted; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
                     }
                 }

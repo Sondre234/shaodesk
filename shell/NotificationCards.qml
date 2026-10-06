@@ -6,6 +6,8 @@ import QtQuick.Layouts
 // The notification cards: a stack of them from a corner of the focused monitor, each sliding in
 // and out. Clicking a card runs its default action or dismisses it; hovering one holds its timer,
 // whose time left runs down as a line along the card's bottom edge, and shows its close button.
+// In the macOS style they are banners: the application's icon beside the bold summary, the time at
+// its end and the body under it, the close button on the card's corner, and no line.
 Item {
     id: cards
     required property string outputName
@@ -95,9 +97,11 @@ Item {
             // The header's icon: the application's, else the notification's own.
             readonly property string headerIcon: appIcon.length > 0 ? appIcon : icon
             // The picture beside the text: the notification's image (a contact's, an album's),
-            // else its own icon when the header shows the application's instead.
+            // else its own icon when the header shows the application's instead; in the macOS
+            // style, which has no header, else the header's icon.
             readonly property string picture: hasImage ? "image://notify/" + notificationId + "/" + Number(time)
-                : icon.length > 0 && appIcon.length > 0 && icon !== appIcon ? "image://icons/" + icon : ""
+                : icon.length > 0 && appIcon.length > 0 && icon !== appIcon ? "image://icons/" + icon
+                : Theme.macos && headerIcon.length > 0 ? "image://icons/" + headerIcon : ""
             // How long it stays, from when it came or was last replaced (`time`), 0 for until it
             // is dismissed; and how much of that is left, from 1 to 0, run down as the daemon's
             // timer runs, held while the pointer holds that.
@@ -145,8 +149,15 @@ Item {
                 Rectangle {
                     anchors.fill: parent
                     radius: Theme.radiusLarge
-                    color: entry.critical ? Theme.mix(Theme.surface, Theme.dangerFill, 0.06) : Theme.surface
-                    border.color: entry.critical ? Theme.danger : Theme.border
+                    color: entry.critical ? Theme.mix(Theme.popupSurface, Theme.dangerFill, 0.06) : Theme.popupSurface
+                    border.color: entry.critical ? Theme.danger : Theme.popupOutline
+                    Rectangle {
+                        visible: Theme.popupInnerEdge.a > 0
+                        anchors.fill: parent; anchors.margins: 1
+                        radius: parent.radius - 1
+                        color: "transparent"
+                        border.color: Theme.popupInnerEdge
+                    }
                 }
                 Item {
                     visible: entry.critical
@@ -171,11 +182,28 @@ Item {
                     anchors.fill: parent
                     onClicked: cards.center.activate(entry.notificationId)
                 }
+                // The macOS style's close button, on the card's top-left corner.
+                CloseButton {
+                    objectName: "notificationCornerClose"
+                    visible: Theme.macos && opacity > 0
+                    z: 1
+                    x: -Theme.spacingS; y: -Theme.spacingS
+                    size: Theme.iconSize + Theme.spacingXS
+                    opacity: hover.hovered ? 1 : 0
+                    Behavior on opacity { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
+                    background: Rectangle {
+                        radius: width / 2
+                        color: Theme.popupSurface
+                        border.color: Theme.popupOutline
+                    }
+                    Accessible.name: "Dismiss"
+                    onClicked: cards.center.dismiss(entry.notificationId)
+                }
                 // The time it has left, a line along its bottom edge that shortens towards its
                 // start; with animations off it is not drawn.
                 Rectangle {
                     objectName: "notificationCountdown"
-                    visible: entry.lifetime > 0 && Theme.animations
+                    visible: entry.lifetime > 0 && Theme.animations && !Theme.macos
                     x: Theme.radiusLarge
                     y: parent.height - height - 1
                     width: (parent.width - 2 * Theme.radiusLarge) * entry.remaining
@@ -189,6 +217,7 @@ Item {
                     spacing: Theme.spacingM
                     // Who it is from and when: the application's icon and name, and the time.
                     RowLayout {
+                        visible: !Theme.macos
                         Layout.fillWidth: true
                         spacing: Theme.spacingS + Theme.spacingXS
                         Image {
@@ -221,10 +250,11 @@ Item {
                         spacing: Theme.spacingL
                         // Twice an application's icon.
                         Image {
+                            readonly property real size: Theme.macos ? Theme.notificationIconSize : 2 * Theme.appIconSize
                             visible: entry.picture.length > 0
                             Layout.alignment: Qt.AlignTop
-                            Layout.preferredWidth: 2 * Theme.appIconSize; Layout.preferredHeight: 2 * Theme.appIconSize
-                            sourceSize: Qt.size(4 * Theme.appIconSize, 4 * Theme.appIconSize)
+                            Layout.preferredWidth: size; Layout.preferredHeight: size
+                            sourceSize: Qt.size(2 * size, 2 * size)
                             fillMode: Image.PreserveAspectFit
                             source: entry.picture
                             cache: false
@@ -233,20 +263,33 @@ Item {
                             Layout.fillWidth: true
                             Layout.alignment: Qt.AlignTop
                             spacing: Theme.spacingXS
-                            Text {
+                            RowLayout {
                                 Layout.fillWidth: true
-                                visible: text.length > 0
-                                text: entry.summary
-                                color: Theme.text
-                                font.pixelSize: Theme.fontSizeLarge; font.weight: Font.DemiBold; font.family: Theme.fontFamily
-                                textFormat: Text.PlainText
-                                wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
+                                spacing: Theme.spacingS
+                                Text {
+                                    Layout.fillWidth: true
+                                    visible: text.length > 0
+                                    text: entry.summary
+                                    color: Theme.text
+                                    font.pixelSize: Theme.macos ? Theme.fontSize : Theme.fontSizeLarge
+                                    font.weight: Font.DemiBold; font.family: Theme.fontFamily
+                                    textFormat: Text.PlainText
+                                    wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
+                                }
+                                // The macOS style's time, at the summary's end.
+                                Text {
+                                    visible: Theme.macos
+                                    Layout.alignment: Qt.AlignTop
+                                    text: cards.ago(entry.time)
+                                    color: Theme.textMuted
+                                    font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily
+                                }
                             }
                             Text {
                                 Layout.fillWidth: true
                                 visible: text.length > 0
                                 text: entry.body
-                                color: Theme.textMuted
+                                color: Theme.macos ? Theme.text : Theme.textMuted
                                 font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
                                 lineHeight: 1.1
                                 textFormat: Text.StyledText
