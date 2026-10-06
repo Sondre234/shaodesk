@@ -134,7 +134,7 @@ if(BUILD_TESTING)
     add_test(NAME palette COMMAND palette_test)
     # The start menu's model: its pins, the launch history and its search.
     add_executable(start_menu_test ${PROJECT_SOURCE_DIR}/tests/start_menu_test.cpp
-        start_menu.cpp start_menu.hpp launch_history.cpp launch_history.hpp)
+        start_menu.cpp start_menu.hpp launch_history.cpp launch_history.hpp fuzzy.cpp fuzzy.hpp)
     set_target_properties(start_menu_test PROPERTIES AUTOMOC ON)
     target_include_directories(start_menu_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_definitions(start_menu_test PRIVATE QT_NO_KEYWORDS)

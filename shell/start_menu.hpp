@@ -60,6 +60,13 @@ class StartMenu : public QObject {
     Q_INVOKABLE void unpin(const QString &id);
     // Moves pinned `id` to the place of pinned `target`, those between moving aside.
     Q_INVOKABLE void movePin(const QString &id, const QString &target);
+    // What `query` finds, best first, in groups: "best" (the one best match), "apps", "windows"
+    // and "actions". `others` are the command palette's entries (Palette::entries), of which the
+    // windows, workspaces and actions are searched as the palette searches them. Applications
+    // are found by name, generic name, keywords, desktop id and comment, those launched often a
+    // little ahead. A result is its entry, an application's being its record with `kind` "app",
+    // a `title` and a `subtitle`, with its `group` and `score` added.
+    Q_INVOKABLE QVariantList search(const QString &query, const QVariantList &others) const;
     // When `then` was, said from `now`: "Just now", "5 min ago", "2 hours ago", "Yesterday", a
     // day of the week, or a date.
     Q_INVOKABLE QString ago(const QDateTime &then, const QDateTime &now) const;

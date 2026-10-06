@@ -229,6 +229,75 @@ class StartMenuTest : public QObject {
         menu.setUser("Robin Lee", QUrl());
         QCOMPARE(menu.userName(), QString("Robin Lee"));
     }
+    void searches() {
+        QTemporaryDir state;
+        StartMenu menu(state.path());
+        auto described = [](const QString &id, const QString &name, const QString &generic,
+                            const QStringList &keywords, const QString &description) {
+            auto record = app(id, name).toMap();
+            record["genericName"] = generic;
+            record["keywords"] = keywords;
+            record["description"] = description;
+            return QVariant(record);
+        };
+        menu.setApps({described("firefox.desktop", "Firefox", "Web Browser", {"Internet", "WWW"},
+                                "Browse the World Wide Web"),
+                      described("foot.desktop", "Foot", "Terminal", {"shell", "prompt", "command"}, ""),
+                      described("org.gnome.clocks.desktop", "Clocks", "World clocks", {}, ""),
+                      described("kalk.desktop", "Kalk", "Calculator", {}, ""),
+                      described("kate.desktop", "Kate", "Text Editor", {}, ""),
+                      app("pinned:0", "Files", true)},
+                     {});
+        auto entry = [](const QString &kind, const QString &title, const QString &subtitle) {
+            return QVariant(QVariantMap{{"kind", kind}, {"title", title}, {"subtitle", subtitle},
+                                        {"target", title}});
+        };
+        // The palette's entries: its sessions and applications are not searched again.
+        const QVariantList others{entry("window", "Release notes - Mozilla Firefox", "Window · firefox"),
+                                  entry("window", "htop", "Window · foot"),
+                                  entry("session", "Restore session work", "Session · 3 windows"),
+                                  entry("workspace", "Workspace 2: web", "Switch workspace"),
+                                  entry("action", "Lock screen", "Action · lock"),
+                                  entry("action", "Toggle tiling", "Action · toggle_tiling"),
+                                  entry("app", "Firefox", "Application")};
+        auto found = [&](const QString &query) {
+            QStringList list;
+            for (const auto &result : menu.search(query, others))
+                list << result.toMap()["group"].toString() + ":" + result.toMap()["title"].toString();
+            return list;
+        };
+        QCOMPARE(found(""), QStringList{});
+        QCOMPARE(found("  "), QStringList{});
+        // The application best, then the window of it.
+        QCOMPARE(found("firefox"), (QStringList{"best:Firefox", "windows:Release notes - Mozilla Firefox"}));
+        // By generic name, keywords, id and comment.
+        QCOMPARE(found("web browser"), QStringList{"best:Firefox"});
+        QCOMPARE(found("prompt"), QStringList{"best:Foot"});
+        QCOMPARE(found("gnome"), QStringList{"best:Clocks"});
+        QCOMPARE(found("world wide"), QStringList{"best:Firefox"});
+        // A configured launcher by its name only.
+        QCOMPARE(found("files"), QStringList{"best:Files"});
+        QCOMPARE(found("pinned"), QStringList{});
+        // An action that matches better than any application is the best match.
+        QCOMPARE(found("lock screen"), QStringList{"best:Lock screen"});
+        QCOMPARE(found("lock").first(), QString("best:Lock screen"));
+        QVERIFY(found("lock").contains("apps:Clocks"));
+        // Workspaces are among the actions; sessions are not searched.
+        QCOMPARE(found("workspace web"), QStringList{"best:Workspace 2: web"});
+        QCOMPARE(found("restore session"), QStringList{});
+        // The palette's filters: only windows.
+        QCOMPARE(found("@"), (QStringList{"best:Release notes - Mozilla Firefox", "windows:htop"}));
+        // An application's result is its record, with what the menu shows of it.
+        const auto best = menu.search("kate", others).first().toMap();
+        QCOMPARE(best["kind"].toString(), QString("app"));
+        QCOMPARE(best["appId"].toString(), QString("kate.desktop"));
+        QCOMPARE(best["subtitle"].toString(), QString("Text Editor"));
+        QVERIFY(best["score"].toDouble() > 0);
+        // Of equal matches, the one launched more often comes first.
+        QCOMPARE(found("ka").mid(0, 2), (QStringList{"best:Kalk", "apps:Kate"}));
+        menu.record("kate.desktop", at(1000));
+        QCOMPARE(found("ka").mid(0, 2), (QStringList{"best:Kate", "apps:Kalk"}));
+    }
     void knowsTheUser() {
         QTemporaryDir state;
         StartMenu menu(state.path());

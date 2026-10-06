@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "start_menu.hpp"
+#include "fuzzy.hpp"
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QLocale>
 #include <QSaveFile>
 #include <algorithm>
+#include <cmath>
 #include <gio/gdesktopappinfo.h>
 #include <pwd.h>
 #include <unistd.h>
@@ -24,6 +26,33 @@ QString defaultStateDir() {
     if (state.isEmpty() || QDir::isRelativePath(state))
         state = QDir::homePath() + "/.local/state";
     return state + "/shaodesk";
+}
+
+// How well an application's record matches `query`, negative when it does not: its name counts
+// in full and what else says what it is for less, as the palette counts a subtitle; words found
+// only across them ("firefox browser") count least.
+double appScore(const QString &query, const QVariantMap &app) {
+    const auto name = app["name"].toString(), generic = app["genericName"].toString(),
+               keywords = app["keywords"].toStringList().join(' '),
+               description = app["description"].toString();
+    // A configured launcher's id is only its place in the configuration.
+    auto id = app["configured"].toBool() ? QString() : app["appId"].toString();
+    if (id.endsWith(".desktop"))
+        id.chop(8);
+    const std::pair<const QString &, double> fields[] = {
+        {name, 1}, {generic, 0.8}, {keywords, 0.7}, {id, 0.6}, {description, 0.5}};
+    double best = -1;
+    for (const auto &[text, weight] : fields) {
+        const double value = text.isEmpty() ? -1 : fuzzy::score(query, text);
+        if (value >= 0)
+            best = std::max(best, value * weight);
+    }
+    if (best < 0) {
+        const double value = fuzzy::score(query, QStringList{name, generic, keywords, id}.join(' '));
+        if (value >= 0)
+            best = value * 0.4;
+    }
+    return best;
 }
 } // namespace
 
@@ -178,6 +207,79 @@ void StartMenu::savePins() {
             return;
     }
     Q_EMIT failed("Could not save the start menu's pins: " + file.errorString());
+}
+
+QVariantList StartMenu::search(const QString &query, const QVariantList &others) const {
+    if (query.trimmed().isEmpty())
+        return {};
+    struct Found {
+        double score;
+        int launches;
+        QDateTime last;
+        QVariantMap entry;
+    };
+    // By name to begin with, the order equal matches keep.
+    std::vector<Found> apps;
+    for (const auto &item : sorted_) {
+        auto app = item.toMap();
+        double value = appScore(query, app);
+        if (value < 0)
+            continue;
+        // What is launched often breaks a tie, and comes a little ahead of a close match.
+        const auto *launched = history_.find(app["appId"].toString());
+        if (launched)
+            value += std::min(4.0, std::log2(1.0 + launched->count));
+        const auto generic = app["genericName"].toString();
+        app["kind"] = "app";
+        app["title"] = app["name"];
+        app["subtitle"] = generic.isEmpty() ? QString("App") : generic;
+        app["score"] = value;
+        apps.push_back({value, launched ? launched->count : 0, launched ? launched->last : QDateTime(), app});
+    }
+    std::stable_sort(apps.begin(), apps.end(), [](const Found &a, const Found &b) {
+        if (a.score != b.score)
+            return a.score > b.score;
+        if (a.launches != b.launches)
+            return a.launches > b.launches;
+        return a.last > b.last;
+    });
+    // The windows, workspaces and actions, ranked as the palette ranks them.
+    QVariantList candidates, windows, actions;
+    for (const auto &item : others) {
+        const auto kind = item.toMap()["kind"].toString();
+        if (kind == "window" || kind == "workspace" || kind == "action")
+            candidates.push_back(item);
+    }
+    for (const auto &item : fuzzy::rank(candidates, query, 40)) {
+        auto &group = item.toMap()["kind"] == "window" ? windows : actions;
+        if (group.size() < 5)
+            group.push_back(item);
+    }
+    QVariantList results;
+    auto add = [&results](QVariantMap entry, const char *group) {
+        entry["group"] = QString(group);
+        results.push_back(entry);
+    };
+    // The best match is the first of whichever group matched best; an application on a tie.
+    auto scoreOf = [](const QVariantList &group) {
+        return group.isEmpty() ? -1.0 : group.first().toMap()["score"].toDouble();
+    };
+    const double app = apps.empty() ? -1 : apps.front().score;
+    if (app >= 0 && app >= scoreOf(windows) && app >= scoreOf(actions)) {
+        add(apps.front().entry, "best");
+        apps.erase(apps.begin());
+    } else if (scoreOf(windows) >= 0 && scoreOf(windows) >= scoreOf(actions)) {
+        add(windows.takeFirst().toMap(), "best");
+    } else if (!actions.isEmpty()) {
+        add(actions.takeFirst().toMap(), "best");
+    }
+    for (size_t i = 0; i < apps.size() && i < 8; ++i)
+        add(apps[i].entry, "apps");
+    for (const auto &item : windows)
+        add(item.toMap(), "windows");
+    for (const auto &item : actions)
+        add(item.toMap(), "actions");
+    return results;
 }
 
 QString StartMenu::ago(const QDateTime &then, const QDateTime &now) const {
