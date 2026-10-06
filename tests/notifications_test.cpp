@@ -366,6 +366,42 @@ class NotificationsTest : public QObject {
         QCOMPARE(center.history()->count(), 0);
         QCOMPARE(center.unread(), 0);
     }
+    // The history by application: the one with the newest notification first, each newest first,
+    // an application known by its desktop entry before its name; a change is announced once.
+    void historyGroups() {
+        NotificationCenter center;
+        center.configure(config());
+        auto from = [](const QString &app, const QString &entry, const QString &summary) {
+            Notification n = make(summary);
+            n.app = app;
+            n.desktopEntry = entry;
+            return n;
+        };
+        QSignalSpy changed(center.history(), &NotificationModel::groupsChanged);
+        center.notify(from("Mail", "", "first mail"));
+        center.notify(from("Chat", "org.example.chat", "hello"));
+        center.notify(from("Mail", "", "second mail"));
+        center.notify(from("Chat (beta)", "org.example.chat", "again"));
+        QVERIFY(changed.wait());
+        QCOMPARE(changed.count(), 1);
+        const auto groups = center.history()->groups();
+        QCOMPARE(groups.size(), 2);
+        const auto chat = groups[0].toMap(), mail = groups[1].toMap();
+        QCOMPARE(chat["key"].toString(), QString("org.example.chat"));
+        QCOMPARE(chat["app"].toString(), QString("Chat (beta)"));
+        QCOMPARE(mail["key"].toString(), QString("Mail"));
+        const auto chats = chat["notifications"].toList(), mails = mail["notifications"].toList();
+        QCOMPARE(chats.size(), 2);
+        QCOMPARE(chats[0].toMap()["summary"].toString(), QString("again"));
+        QCOMPARE(chats[1].toMap()["summary"].toString(), QString("hello"));
+        QCOMPARE(mails[0].toMap()["summary"].toString(), QString("second mail"));
+        QVERIFY(mails[0].toMap()["notificationId"].toUInt() > 0);
+        QVERIFY(!mails[0].toMap()["read"].toBool());
+        center.markAllRead();
+        QVERIFY(changed.wait());
+        QCOMPARE(changed.count(), 2);
+        QVERIFY(center.history()->groups()[1].toMap()["notifications"].toList()[0].toMap()["read"].toBool());
+    }
     void noHistory() {
         NotificationCenter center;
         auto c = config();

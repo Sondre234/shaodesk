@@ -31,13 +31,20 @@ one; the network icon shows Wi-Fi, a wired link, or a dimmed struck-through icon
 interface is down, read from `/sys/class/net` (physical interfaces only, wired preferred), and
 is left out without any interface. Both refresh every five seconds. With two or more
 [keyboard layouts](#keyboard-layouts), the active one's short name (`us`, `no`) sits beside the
-clock, and clicking it switches every keyboard to the next. Clicking the clock opens a
-month calendar (previous and next month buttons; the title returns to today). Each widget is
+clock, and clicking it switches every keyboard to the next. Beside the time, the clock shows
+how many notifications have not been seen, muted (and a crossed-out bell) while do-not-disturb is
+on, which a right-click on it toggles. Clicking the clock opens its flyout at the bar's right end,
+as on Windows 11: the [notifications](#notifications-and-on-screen-display) on one card, and under
+it a calendar with the time and today's date over the month, today marked and the weeks starting
+on the locale's first day. The arrows or the mouse wheel page through the months, each sliding
+in; the title zooms out to the year's months and then to a decade's years, where a pick zooms back
+in; Today returns to this month. Each widget is
 switched off from Lua: `shell = { widgets = { battery = false, calendar = false } }`, with
 `workspaces`, `battery`, `network`, `volume`, `clock`, `calendar` (the clock stays, the
 calendar goes), `tiling`, `profiles` (the appearance profile picker), `keyboard_layout`,
 `power` (the [power button](#power) in the application menu) and `tray` (the [system tray](#system-tray)) all on by
-default. All of them take the panel's `accent`,
+default; `notifications = true` adds a bell for the [notifications](#notifications-and-on-screen-display),
+which the clock otherwise stands for. All of them take the panel's `accent`,
 `panel_color`, `text_color`, `font` and `font_size`: hovering, pressing and what is open or on
 are shown by laying the text color over the panel at a low opacity, which shows on a light
 panel as on a dark one. Popups (the application menu, menus, the mixer, the calendar and the
@@ -911,11 +918,15 @@ corner); further cards stack under it and slide in and out.
   line along the card's bottom edge runs down (with animations on). Critical notifications stay
   until dismissed. The pointer anywhere on a card, its buttons too, pauses its timer and the
   line, which continue with the time it had left. At most `notifications.max_visible` cards show; the oldest makes room.
-- The bell in the panel keeps the last `notifications.history` notifications. Its badge counts
-  those not yet seen; opening the list marks them seen. Clicking an entry runs its default action,
-  × removes it, Clear empties the list. It opens with `notification_history` too (Super + N).
+- The clock's flyout keeps the last `notifications.history` notifications, by application (the
+  one with the newest first; one with more than two shows its newest two until expanded), each
+  with its summary, body, picture, progress, how long ago it came and its actions' buttons. The
+  clock counts those not yet seen; opening the flyout marks them seen. Clicking an entry runs its
+  default action, the × that shows while the pointer is over it removes it, and Clear all empties
+  the list. The flyout opens on the monitor under the pointer with `notification_history` too
+  (Super + N), and from a bell on the bar with `shell.widgets.notifications = true`.
 - Do-not-disturb (`dnd_toggle`, `dnd_on`, `dnd_off`, `shaodesk msg dnd [on|off|toggle]`, a
-  right-click on the bell, or the switch in the list, or `notifications.dnd = true` to start that
+  right-click on the clock or the bell, or the switch in the flyout, or `notifications.dnd = true` to start that
   way) keeps cards away and lets everything reach the history; critical notifications still show.
   A reload of the configuration does not undo what was toggled.
 
@@ -935,7 +946,7 @@ osd = { position = "bottom", timeout = 1500 },
 
 Set `notifications.enabled = false` to run another daemon (mako, dunst): the shell then leaves
 the bus name alone, and if another daemon already holds it the shell logs that and serves
-nothing (the bell hides). The daemon needs Qt's D-Bus module at build time; without it (or with
+nothing (the flyout shows only the calendar). The daemon needs Qt's D-Bus module at build time; without it (or with
 `-DSHAODESK_NOTIFICATIONS=OFF`) the shell builds without notifications and the display still works.
 Settings are in the [configuration reference](config-reference.md).
 
@@ -946,8 +957,7 @@ do-not-disturb, the display and the history), and the configuration tests.
 
 ## System tray
 
-The panel shows the status icons applications put in a system tray, beside the bell on every
-monitor, in the order they appeared. These are StatusNotifierItems, the kind KDE and Qt
+The panel shows the status icons applications put in a system tray, on every monitor's bar, in the order they appeared. These are StatusNotifierItems, the kind KDE and Qt
 applications, Electron applications and Ayatana's indicator library show; the older X11 tray
 icons (XEmbed) are not shown. An icon is the item's named icon, looked up first in the folder the
 item names and then in the icon theme, or else the pictures it sends, at the size nearest the

@@ -224,7 +224,14 @@ Item {
                 }
             return false
         case "calendar":
-            toggleAudioPopup("calendar", clockButton)
+        case "clock-empty":
+        case "calendar-years":
+            // The flyout; with no notifications kept, or with the calendar zoomed out to the years.
+            if (name === "clock-empty")
+                shell.notifications.clearHistory()
+            toggleAudioPopup("clock", clockButton)
+            if (name === "calendar-years")
+                Qt.callLater(function() { clockFlyoutLoader.item.calendar.view = "years" })
             return clockButton.visible
         case "mixer":
         case "outputs":
@@ -237,8 +244,10 @@ Item {
             toggleAudioPopup("wallpapers", wallpapersButton)
             return wallpapersButton.visible
         case "notifications":
-            toggleAudioPopup("notifications", bell)
-            return bell.visible
+            // The flyout with the mail application's notifications expanded.
+            toggleAudioPopup("clock", clockButton)
+            Qt.callLater(function() { clockFlyoutLoader.item.notifications.expanded = { "Mail": true } })
+            return shell.notifications.serving
         }
         return false
     }
@@ -432,15 +441,15 @@ Item {
                 sourceComponent: Component { AudioMixer { panel: root; barItem: bar } }
             }
 
-            // Clicking the clock: a month calendar with the current day marked.
+            // Clicking the clock: the notifications and a month calendar, at the bar's right end.
             Loader {
-                id: calendarLoader
-                asynchronous: !(root.audioPopup === "calendar")
-                active: root.audioPopup === "calendar" || root.warm || used
+                id: clockFlyoutLoader
+                asynchronous: !(root.audioPopup === "clock")
+                active: root.audioPopup === "clock" || root.warm || used
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { CalendarPopup { panel: root; barItem: bar } }
+                sourceComponent: Component { ClockFlyout { panel: root; barItem: bar } }
             }
 
             // Right-clicking the volume control: the outputs to play through.
@@ -475,17 +484,6 @@ Item {
                 property bool used: false
                 onLoaded: used = true
                 sourceComponent: Component { WallpaperPicker { panel: root; barItem: bar } }
-            }
-
-            // The bell's notification history.
-            Loader {
-                id: historyLoader
-                asynchronous: !(root.audioPopup === "notifications")
-                active: shell.notifications.serving && (root.audioPopup === "notifications" || root.warm || used)
-                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-                property bool used: false
-                onLoaded: used = true
-                sourceComponent: Component { NotificationHistory { panel: root; barItem: bar } }
             }
 
             Loader {

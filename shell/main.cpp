@@ -67,10 +67,10 @@ int main(int argc, char **argv) {
                       "Preview the taskbar with one popup open, on stand-in windows, sound, "
                       "tray items and notifications: bar (none), launcher, launcher-all, "
                       "launcher-search, launcher-menu, power, bar-menu, bar-submenu, task-menu, "
-                      "stack-menu, pin-menu, group, tray-menu, tray-submenu, calendar, mixer, "
-                      "outputs, profiles, wallpapers or notifications; or an overlay over the bar: "
-                      "osd-volume, osd-text, cards, power-dialog, palette, palette-empty, switcher "
-                      "or overview",
+                      "stack-menu, pin-menu, group, tray-menu, tray-submenu, calendar, clock-empty, "
+                      "calendar-years, mixer, outputs, profiles, wallpapers or notifications; or an "
+                      "overlay over the bar: osd-volume, osd-text, cards, power-dialog, palette, "
+                      "palette-empty, switcher or overview",
                       "name"});
     parser.addOption(
         {"quit-after",

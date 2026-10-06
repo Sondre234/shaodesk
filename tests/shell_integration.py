@@ -68,9 +68,18 @@ with harness.Compositor(compositor, source, start=False) as desktop:
                      detail=layers)
     wtype = shutil.which("wtype")
     if wtype:
-        subprocess.run([wtype, "-k", "Escape"], env=env, check=True, timeout=30)
-        desktop.wait_for(lambda: "shaodesk palette hidden on" in shell_log.read_text(),
-                         "palette closed with Escape")
+        # Typed again until it lands: on a loaded machine the palette can map a moment before
+        # it holds the keyboard, and an Escape typed in between goes elsewhere.
+        def hidden():
+            return "shaodesk palette hidden on" in shell_log.read_text()
+        for _ in range(10):
+            subprocess.run([wtype, "-k", "Escape"], env=env, check=True, timeout=30)
+            try:
+                desktop.wait_for(hidden, "palette closed with Escape", timeout=1)
+                break
+            except harness.Timeout:
+                pass
+        assert hidden(), "palette closed with Escape"
     else:
         msg("palette")
     # A live panel-height change must alter maximized client geometry.

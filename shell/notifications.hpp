@@ -37,6 +37,12 @@ struct Notification {
 class NotificationModel : public QAbstractListModel {
     Q_OBJECT
     Q_PROPERTY(int count READ count NOTIFY countChanged)
+    // The notifications by application, as the history lists them: [{key, app, icon,
+    // desktopEntry, notifications}], the application with the newest notification first, and
+    // each one's notifications newest first as maps of the roles below. An application is known
+    // by its desktop entry, else by its name. Changes are announced once the event loop runs, so
+    // that marking a long list read rebuilds it once.
+    Q_PROPERTY(QVariantList groups READ groups NOTIFY groupsChanged)
   public:
     enum Role {
         IdRole = Qt::UserRole + 1,
@@ -53,11 +59,12 @@ class NotificationModel : public QAbstractListModel {
         TimeRole,
         ReadRole
     };
-    using QAbstractListModel::QAbstractListModel;
+    explicit NotificationModel(QObject *parent = nullptr);
     int rowCount(const QModelIndex &parent = {}) const override;
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
     int count() const { return int(items_.size()); }
+    QVariantList groups() const;
     const std::vector<Notification> &items() const { return items_; }
     int indexOf(uint id) const;
     const Notification *find(uint id) const;
@@ -70,9 +77,12 @@ class NotificationModel : public QAbstractListModel {
     void clear();
   Q_SIGNALS:
     void countChanged();
+    void groupsChanged();
 
   private:
     std::vector<Notification> items_;
+    bool groupsPending_ = false;
+    void touchGroups();
 };
 
 // Reduces the markup notification bodies may carry (<b>, <i>, <u>, <a href>, <br>, <img alt>) to

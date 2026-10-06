@@ -552,6 +552,10 @@ int main(int argc, char **argv) {
                 "shell widgets not parsed");
         require(shaodesk::parse_config("return {shell={}}").shell.widgets.battery,
                 "widgets not on by default");
+        require(!shaodesk::parse_config("return {shell={}}").shell.widgets.notifications &&
+                    shaodesk::parse_config("return {shell={widgets={notifications=true}}}")
+                        .shell.widgets.notifications,
+                "the notification bell is not off by default, or not switched on");
         rejects("return {shell={widgets={bluetooth=false}}}");
         rejects("return {shell={widgets=true}}");
         rejects("return {shell={accent='#12345'}}");

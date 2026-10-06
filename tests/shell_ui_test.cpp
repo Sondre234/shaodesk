@@ -705,9 +705,93 @@ int main(int argc, char **argv) {
             std::cerr << "the calendar did not page to the next month\n";
             return 1;
         }
-        click(find(view.rootObject(), "calendarTitle"));
-        if (!QTest::qWaitFor([&] { return calendar->property("month").toInt() == month; })) {
-            std::cerr << "the calendar title did not return to this month\n";
+        // A wheel notch down pages to the next month, one up back again.
+        auto wheelOn = [&](QQuickItem *item, int delta) {
+            QWheelEvent event(centre(item), item->window()->mapToGlobal(centre(item)), {}, {0, delta},
+                              Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+            QCoreApplication::sendEvent(item->window(), &event);
+        };
+        wheelOn(grid, -120);
+        if (!QTest::qWaitFor([&] { return calendar->property("month").toInt() == (month + 2) % 12; })) {
+            std::cerr << "the wheel did not page the calendar to the next month\n";
+            return 1;
+        }
+        wheelOn(grid, 120);
+        if (!QTest::qWaitFor([&] { return calendar->property("month").toInt() == (month + 1) % 12; })) {
+            std::cerr << "the wheel did not page the calendar back\n";
+            return 1;
+        }
+        auto *today = find(view.rootObject(), "calendarToday");
+        if (!today || !today->isEnabled())
+            return fail("the calendar has no Today button, or it does nothing on another month");
+        click(today);
+        if (!QTest::qWaitFor([&] { return calendar->property("month").toInt() == month; }) ||
+            today->isEnabled()) {
+            std::cerr << "Today did not return the calendar to this month\n";
+            return 1;
+        }
+        // The title zooms out to the year's months, where one is picked, then to a decade's years.
+        auto zoomed = [&] { return calendar->property("view").toString(); };
+        auto pick = [&](const char *name, const char *property, int value) -> QQuickItem * {
+            std::function<QQuickItem *(QQuickItem *)> search = [&](QQuickItem *item) -> QQuickItem * {
+                if (item->objectName() == name && item->property(property).toInt() == value)
+                    return item;
+                for (auto *child : item->childItems())
+                    if (auto *found = search(child))
+                        return found;
+                return nullptr;
+            };
+            return search(calendar);
+        };
+        // What is picked is clicked where it rests, once it has zoomed and slid into place.
+        auto settled = [&] {
+            return calendar->property("zoom").toReal() == 1 && calendar->property("shift").toReal() == 0;
+        };
+        auto *title = find(view.rootObject(), "calendarTitle");
+        click(title);
+        auto *months = find(view.rootObject(), "calendarMonths");
+        if (!QTest::qWaitFor([&] { return zoomed() == "months" && months && months->isVisible(); }) ||
+            grid->isVisible()) {
+            std::cerr << "the calendar's title did not zoom out to the months\n";
+            return 1;
+        }
+        const int later = (month + 3) % 12;
+        if (!QTest::qWaitFor(settled))
+            return fail("the months did not zoom into place");
+        click(pick("calendarMonth", "month", later));
+        if (!QTest::qWaitFor([&] { return zoomed() == "days" && calendar->property("month").toInt() == later; })) {
+            std::cerr << "picking a month did not show its days\n";
+            return 1;
+        }
+        click(title);
+        if (!QTest::qWaitFor([&] { return zoomed() == "months"; }))
+            return fail("the calendar's title did not zoom out to the months again");
+        click(title);
+        auto *years = find(view.rootObject(), "calendarYears");
+        const int year = calendar->property("year").toInt();
+        if (!QTest::qWaitFor([&] { return zoomed() == "years" && years && years->isVisible(); }) ||
+            title->isEnabled()) {
+            std::cerr << "the calendar's title did not zoom out to the years\n";
+            return 1;
+        }
+        click(find(view.rootObject(), "calendarNext"));
+        if (!QTest::qWaitFor([&] { return calendar->property("year").toInt() == year + 10; })) {
+            std::cerr << "the next arrow did not page the years by a decade\n";
+            return 1;
+        }
+        if (!QTest::qWaitFor(settled))
+            return fail("the years did not slide into place");
+        click(pick("calendarYear", "year", year + 11));
+        if (!QTest::qWaitFor([&] { return zoomed() == "months" && calendar->property("year").toInt() == year + 11; })) {
+            std::cerr << "picking a year did not show its months\n";
+            return 1;
+        }
+        click(today);
+        if (!QTest::qWaitFor([&] {
+                return zoomed() == "days" && calendar->property("month").toInt() == month &&
+                       calendar->property("year").toInt() == QDate::currentDate().year();
+            })) {
+            std::cerr << "Today did not return from the months to this month's days\n";
             return 1;
         }
         click(clock);
@@ -2472,8 +2556,14 @@ ListModel {
             return 1;
         }
         daemon->setServing(true);
+        // The bell is off unless shell.widgets.notifications asks for it: the clock does its work.
+        QTest::qWait(50);
+        if (bell->isVisible() || controller.widgets()["notifications"].toBool() ||
+            !rewrite(QString(lua).replace("shell={", "shell={widgets={notifications=true},")))
+            return fail("the bell showed by default, or the configuration could not be rewritten");
+        controller.reload();
         if (!QTest::qWaitFor([&] { return bell->isVisible() && bell->x() > 0; })) {
-            std::cerr << "the bell did not appear once the daemon served\n";
+            std::cerr << "the bell did not appear once the daemon served and the setting asked\n";
             return 1;
         }
         CardsView cards(controller, app.primaryScreen());
@@ -2514,6 +2604,11 @@ ListModel {
         if (auto *badge = find(view.rootObject(), "notificationBadge");
             !badge || !QTest::qWaitFor([&] { return badge->isVisible(); })) {
             std::cerr << "the bell has no badge for an unread notification\n";
+            return 1;
+        }
+        if (auto *badge = find(view.rootObject(), "clockBadge");
+            !badge || !QTest::qWaitFor([&] { return badge->isVisible(); })) {
+            std::cerr << "the clock has no badge for an unread notification\n";
             return 1;
         }
         // (Hovering a card holds its timer; offscreen Qt sends no hover to these items, so
@@ -2616,16 +2711,58 @@ ListModel {
             std::cerr << "the history is missing or open at start\n";
             return 1;
         }
-        make("Kept one", false);
+        make("Kept one", true);
         make("Kept two", false);
         click(bell);
         if (!QTest::qWaitFor([&] { return history->isVisible(); }) || daemon->unread() != 0) {
             std::cerr << "clicking the bell did not open the history and mark it read\n";
             return 1;
         }
+        // One application's notifications, under one heading, a row each.
         auto *list = find(view.rootObject(), "notificationList");
-        if (!list || !QTest::qWaitFor([&] { return list->property("count").toInt() == daemon->history()->count(); })) {
-            std::cerr << "the history does not list the notifications\n";
+        std::function<QList<QQuickItem *>(QQuickItem *, const QString &)> findAll =
+            [&](QQuickItem *item, const QString &name) {
+                QList<QQuickItem *> found;
+                if (item->objectName() == name)
+                    found << item;
+                for (auto *child : item->childItems())
+                    found << findAll(child, name);
+                return found;
+            };
+        auto rows = [&] { return list ? findAll(list, "notificationRow") : QList<QQuickItem *>(); };
+        if (!list || daemon->history()->count() < 3 || !QTest::qWaitFor([&] {
+                return list->property("count").toInt() == 1 && rows().size() == 2;
+            })) {
+            std::cerr << "the history does not list the notifications by application, the newest two of many\n";
+            return 1;
+        }
+        // Asked for, the rest show too.
+        QTest::qWait(300); // the flyout's slide in
+        click(find(list, "groupToggle"));
+        if (!QTest::qWaitFor([&] { return rows().size() == daemon->history()->count(); })) {
+            std::cerr << "expanding an application did not list all its notifications\n";
+            return 1;
+        }
+        // An action's button runs it, from the history as from a card.
+        invoked.clear();
+        auto *historyAction = find(list, "notificationHistoryAction");
+        if (!historyAction || historyAction->property("text").toString() != "Yes")
+            return fail("the history has no button for a notification's action");
+        click(historyAction);
+        if (!QTest::qWaitFor([&] { return invoked.count() == 1; }) ||
+            invoked.at(0).at(1).toString() != "yes") {
+            std::cerr << "the history's action button did not run the action\n";
+            return 1;
+        }
+        // The pointer over a notification shows its cross, which removes it.
+        const int kept = daemon->history()->count();
+        QTest::mouseMove(popover, centre(rows().first()));
+        auto *remove = find(rows().first(), "removeNotification");
+        if (!remove || !QTest::qWaitFor([&] { return remove->isVisible(); }))
+            return fail("the pointer over a notification did not show its cross");
+        click(remove);
+        if (!QTest::qWaitFor([&] { return daemon->history()->count() == kept - 1 && rows().size() == kept - 1; })) {
+            std::cerr << "the cross did not remove the notification\n";
             return 1;
         }
         auto *dndSwitch = find(view.rootObject(), "dndSwitch");
@@ -2639,18 +2776,51 @@ ListModel {
         }
         daemon->setDnd(false);
         click(find(view.rootObject(), "clearNotifications"));
-        if (!QTest::qWaitFor([&] { return daemon->history()->count() == 0; })) {
-            std::cerr << "Clear did not empty the history\n";
+        auto *empty = find(view.rootObject(), "notificationsEmpty");
+        if (!QTest::qWaitFor([&] { return daemon->history()->count() == 0 && empty && empty->isVisible(); })) {
+            std::cerr << "Clear all did not empty the history and say so\n";
+            return 1;
+        }
+        click(bell); // close the popup
+        // The compositor's notification_history action (Super + N) opens the flyout on the output
+        // it names, and closes it again.
+        subscriber->write(("notifications " + output + "\n").toUtf8());
+        if (!QTest::qWaitFor([&] { return inPopover(history); })) {
+            std::cerr << "notification_history did not open the clock flyout\n";
+            return 1;
+        }
+        subscriber->write("notifications ELSEWHERE-1\n");
+        subscriber->write(("notifications " + output + "\n").toUtf8());
+        if (!QTest::qWaitFor([&] { return !history->isVisible() && !popover->isVisible(); })) {
+            std::cerr << "notification_history did not close the clock flyout\n";
             return 1;
         }
         // Right-clicking the bell toggles do-not-disturb.
-        click(bell); // close the popup
         click(bell, Qt::RightButton);
         if (!QTest::qWaitFor([&] { return daemon->dnd(); })) {
             std::cerr << "right-clicking the bell did not turn do-not-disturb on\n";
             return 1;
         }
         daemon->setDnd(false);
+        // So does right-clicking the clock, which shows a crossed-out bell while it is on.
+        auto *clockDnd = find(view.rootObject(), "clockDnd");
+        click(find(view.rootObject(), "clockButton"), Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return daemon->dnd() && clockDnd && clockDnd->isVisible(); })) {
+            std::cerr << "right-clicking the clock did not turn do-not-disturb on\n";
+            return 1;
+        }
+        click(find(view.rootObject(), "clockButton"), Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return !daemon->dnd() && !clockDnd->isVisible(); })) {
+            std::cerr << "right-clicking the clock again did not turn do-not-disturb off\n";
+            return 1;
+        }
+        if (!rewrite(lua))
+            return fail("could not restore the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return !bell->isVisible(); })) {
+            std::cerr << "the bell stayed once the setting was gone\n";
+            return 1;
+        }
     }
     // The system tray: hidden while empty, a button for each item shown in the order they came,
     // and clicks and the wheel passed on to the item's application. The items are put in the
