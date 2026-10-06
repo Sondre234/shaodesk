@@ -8,7 +8,7 @@ import QtQuick.Effects
 // has. Both are instant with animations off. What it holds goes inside it, filling it. As it
 // opens it emits opened(), where what it shows is reset, and `initialFocus` (the card itself
 // unless set; null for none) takes the keyboard. Presses on it stay with it, so that they do not
-// close it.
+// close it, until it starts closing: a press then goes to what is under it.
 //
 // It places itself beside `anchorRect`, a rectangle in its parent's coordinates (a bar item's,
 // from panel.barAnchor): on the anchor's `side` (Qt.TopEdge above it, Qt.BottomEdge below it,
@@ -143,10 +143,12 @@ Item {
     }
     MouseArea {
         anchors.fill: parent
+        enabled: card.open
         acceptedButtons: Qt.AllButtons
     }
     Item {
         id: body
         anchors.fill: parent
+        enabled: card.open
     }
 }

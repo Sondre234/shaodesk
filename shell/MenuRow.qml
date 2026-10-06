@@ -26,10 +26,13 @@ AbstractButton {
     readonly property string toggle: modelData.toggle === "checkmark" ? "check" : (modelData.toggle || "")
     readonly property bool marked: modelData.checked === true
     readonly property bool danger: modelData.danger === true
-    readonly property color ink: !enabled ? Theme.textDisabled : danger ? Theme.danger : Theme.text
+    // Whether it can be chosen: drawn from the entry, so that a menu fading out, which takes no
+    // input, does not grey its rows.
+    readonly property bool available: !separator && !header && modelData.enabled !== false
+    readonly property color ink: !available ? Theme.textDisabled : danger ? Theme.danger : Theme.text
 
     text: header ? modelData.header : (modelData.text || "")
-    enabled: !separator && !header && modelData.enabled !== false
+    enabled: available
     hoverEnabled: true
     focusPolicy: Qt.NoFocus
     implicitHeight: separator ? 9 : header ? 30 : rowHeight
@@ -40,7 +43,7 @@ AbstractButton {
 
     background: Rectangle {
         radius: Theme.radiusSmall
-        color: !row.enabled ? "transparent"
+        color: !row.available ? "transparent"
                : row.pressed ? Theme.pressed
                : row.highlighted || row.expanded ? Theme.hover : "transparent"
         Rectangle {
@@ -81,7 +84,7 @@ AbstractButton {
                 readonly property string icon: row.toggle === "" && !glyph.known ? (row.modelData.icon || "") : ""
                 visible: icon !== ""
                 anchors.fill: parent
-                opacity: row.enabled ? 1 : 0.4
+                opacity: row.available ? 1 : 0.4
                 source: icon === "" ? "" : icon.indexOf(":") >= 0 || icon.charAt(0) === "/" ? icon
                                                                                           : "image://icons/" + icon
                 sourceSize: Qt.size(Theme.iconSizeSmall, Theme.iconSizeSmall)
@@ -99,14 +102,14 @@ AbstractButton {
             visible: text !== "" && !row.header
             Layout.rightMargin: row.submenu ? 0 : row.labelEnd
             text: row.modelData.secondary || ""; textFormat: Text.PlainText
-            color: row.enabled ? Theme.textMuted : Theme.textDisabled
+            color: row.available ? Theme.textMuted : Theme.textDisabled
             font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
         }
         Icon {
             visible: row.submenu && !row.header
             Layout.rightMargin: row.labelEnd
             name: "chevron-right"; size: Theme.iconSizeSmall
-            color: row.enabled ? Theme.textMuted : Theme.textDisabled
+            color: row.available ? Theme.textMuted : Theme.textDisabled
         }
     }
 }
