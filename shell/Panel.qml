@@ -591,7 +591,7 @@ Item {
                 anchors.right: parent.right; height: parent.height; width: 40
                 Accessible.name: "Dismiss"
                 onClicked: shell.clearError()
-                contentItem: Text { text: "×"; color: Theme.text; font.pixelSize: Theme.fontSizeTitle; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+                contentItem: Text { text: "×"; color: Theme.text; font.pixelSize: Theme.fontSizeLarge; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
             }
         }
     }

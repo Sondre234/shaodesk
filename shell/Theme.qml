@@ -55,13 +55,15 @@ QtObject {
     readonly property color urgent: shell.urgentColor
     readonly property color urgentSubtle: alpha(urgent, 0.24)
 
-    // Type, from shell.font and shell.font_size.
+    // Type, from shell.font and shell.font_size: body text, then smaller for secondary text and
+    // captions, larger for list entries and popup headings, a title for a dialog or an overlay's
+    // input, and the launcher's heading.
     readonly property string fontFamily: shell.fontFamily.length > 0 ? shell.fontFamily : Qt.application.font.family
     readonly property int fontSize: shell.fontSize
     readonly property int fontSizeSmall: Math.max(6, fontSize - 1)
     readonly property int fontSizeCaption: Math.max(6, fontSize - 2)
     readonly property int fontSizeLarge: fontSize + 2
-    readonly property int fontSizeTitle: fontSize + 2
+    readonly property int fontSizeTitle: fontSize + 4
     readonly property int fontSizeDisplay: Math.round(fontSize * 1.75)
 
     // Corners: buttons and rows, menus and small popups, large popups.

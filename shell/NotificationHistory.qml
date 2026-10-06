@@ -38,7 +38,7 @@ Rectangle {
             Text {
                 Layout.fillWidth: true; leftPadding: 4
                 text: "Notifications"
-                color: Theme.text; font.pixelSize: Theme.fontSizeTitle; font.bold: true; font.family: Theme.fontFamily
+                color: Theme.text; font.pixelSize: Theme.fontSizeLarge; font.bold: true; font.family: Theme.fontFamily
             }
             Switch {
                 id: dnd
