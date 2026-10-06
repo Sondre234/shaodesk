@@ -22,8 +22,33 @@ Item {
         return list
     }
     readonly property real rowHeight: Theme.rowHeight + Theme.spacingS
+    // Clicking a letter's heading shows every letter instead of the list, to jump to one: # and
+    // A to Z, and any other an application's name starts with.
+    property bool lettersOpen: false
+    readonly property var letters: {
+        var list = ["#"]
+        for (var c = 65; c <= 90; ++c)
+            list.push(String.fromCharCode(c))
+        entries.forEach(function(entry) {
+            if (entry.header !== undefined && list.indexOf(entry.header) < 0)
+                list.push(entry.header)
+        })
+        return list
+    }
 
-    function reset() { list.positionViewAtBeginning() }
+    function reset() {
+        lettersOpen = false
+        list.positionViewAtBeginning()
+    }
+    // Shows the applications under `letter` at the top of the list.
+    function jump(letter) {
+        for (var i = 0; i < entries.length; ++i)
+            if (entries[i].header === letter) {
+                list.positionViewAtIndex(i, ListView.Beginning)
+                break
+            }
+        lettersOpen = false
+    }
 
     Item {
         id: heading
@@ -51,6 +76,9 @@ Item {
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         model: all.entries
+        enabled: !all.lettersOpen
+        opacity: all.lettersOpen ? 0 : 1
+        Behavior on opacity { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
         delegate: Item {
             id: entry
@@ -59,13 +87,26 @@ Item {
             readonly property bool header: modelData.header !== undefined
             width: ListView.view.width
             height: header ? Theme.headingHeight : all.rowHeight
-            Text {
+            AbstractButton {
+                id: letter
                 visible: entry.header
                 objectName: entry.header ? "startLetter:" + entry.modelData.header : ""
-                x: Theme.spacingM; anchors.verticalCenter: parent.verticalCenter
-                text: entry.header ? entry.modelData.header : ""
-                color: Theme.textMuted
-                font.pixelSize: Theme.fontSize; font.weight: Font.DemiBold; font.family: Theme.fontFamily
+                anchors.verticalCenter: parent.verticalCenter
+                width: Theme.headingHeight; height: Theme.headingHeight
+                focusPolicy: Qt.NoFocus
+                hoverEnabled: true
+                Accessible.name: "Letters"
+                onClicked: all.lettersOpen = true
+                background: Rectangle {
+                    radius: Theme.radiusSmall
+                    color: letter.pressed ? Theme.pressed : letter.hovered ? Theme.hover : "transparent"
+                }
+                contentItem: Text {
+                    text: entry.header ? entry.modelData.header : ""
+                    horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontSize; font.weight: Font.DemiBold; font.family: Theme.fontFamily
+                }
             }
             StartRow {
                 visible: !entry.header
@@ -75,6 +116,48 @@ Item {
                 iconName: entry.header ? "" : entry.modelData.icon
                 title: entry.header ? "" : entry.modelData.name
                 onClicked: all.launcher.launch(entry.modelData.appId)
+            }
+        }
+    }
+    // Every letter in place of the list, those no application starts with greyed out; a click
+    // beside them goes back to the list.
+    MouseArea {
+        anchors.fill: list
+        visible: all.lettersOpen
+        onClicked: all.lettersOpen = false
+    }
+    Grid {
+        id: letterGrid
+        objectName: "startLetters"
+        x: list.x + Theme.spacingM; y: list.y + Math.max(Theme.spacingL, (list.height - height) / 2)
+        width: list.width - 2 * Theme.spacingM
+        columns: 7
+        visible: opacity > 0
+        opacity: all.lettersOpen ? 1 : 0
+        scale: all.lettersOpen ? 1 : 0.95
+        Behavior on opacity { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
+        Behavior on scale { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
+        Repeater {
+            model: all.letters
+            delegate: AbstractButton {
+                id: jump
+                required property string modelData
+                objectName: "startJump:" + modelData
+                width: letterGrid.width / letterGrid.columns; height: Theme.rowHeight + Theme.spacingL
+                enabled: all.entries.some(function(entry) { return entry.header === jump.modelData })
+                focusPolicy: Qt.NoFocus
+                hoverEnabled: true
+                onClicked: all.jump(modelData)
+                background: Rectangle {
+                    radius: Theme.radiusMedium
+                    color: jump.pressed ? Theme.pressed : jump.hovered ? Theme.hover : "transparent"
+                }
+                contentItem: Text {
+                    text: jump.modelData
+                    horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                    color: jump.enabled ? Theme.text : Theme.textDisabled
+                    font.pixelSize: Theme.fontSizeTitle; font.weight: Font.DemiBold; font.family: Theme.fontFamily
+                }
             }
         }
     }
