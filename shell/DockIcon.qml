@@ -73,7 +73,11 @@ Button {
     }
     readonly property bool bouncing: bouncing.running || bouncesLeft > 0
     onRunningChanged: if (running) settle()
-    onUrgentChanged: if (urgent) bounce(Theme.dockBounces)
+    // A window asking for attention as the dock is made has been asking a while; one that starts
+    // asking later is bounced for.
+    property bool made: false
+    Component.onCompleted: Qt.callLater(function() { dockIcon.made = true })
+    onUrgentChanged: if (urgent && made) bounce(Theme.dockBounces)
 
     BarTip {
         panel: dockIcon.panel; owner: dockIcon
