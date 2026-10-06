@@ -159,10 +159,12 @@ measure and have not been.
 and reports medians over several runs: the time from spawning the shell to the first rendered
 frame of each surface, resident (RSS) and proportional (PSS) memory, mapped libraries, threads,
 and while idle the CPU use and context switches per second (a context switch is what a wakeup
-costs). It reads only `/proc`. `--env NAME=VALUE` changes the environment, for example
-`--env QT_QUICK_BACKEND=rhi` for the GPU path. Nothing touches a real session.
+costs). It reads only `/proc`. `--renderer gpu` (the default) or `software` draws as
+`shell.renderer` would, in the environment the compositor gives such a shell, and
+`--env NAME=VALUE` changes the environment further. Nothing touches a real session.
 
     python3 tools/shell_perf.py build --runs 7 --idle 20
+    python3 tools/shell_perf.py build --runs 7 --idle 20 --renderer software
 
 ## Results
 
@@ -219,6 +221,38 @@ for the panel's (the first use of Qt Quick Controls), and 5 ms scanning desktop 
 dynamic loader takes about 1.5 ms. What is left is Qt's own initialisation, which the shell
 cannot shorten without changing what it uses.
 
+## The GPU renderer by default
+
+The shell now draws through the GPU unless `shell.renderer = "software"`. The redesign of the
+shell is for machines with a GPU to spare: shadows and other shader effects need Qt Quick's GPU
+renderer, which its software renderer cannot stand in for, and the software renderer draws
+every frame of an animation on the CPU, which at 144 Hz and above costs more than the GPU would.
+The software renderer stays, documented as the choice for a weak machine; the compositor still
+keeps the GPU vendor's GLX library out of a shell that uses it.
+
+Measured with `tools/shell_perf.py build --runs 5` and `--renderer software`, one after the
+other, on the development desktop (24 threads, NVIDIA proprietary driver, Qt 6.11.2, two
+surfaces on one headless output, the example configuration):
+
+| | GPU (llvmpipe here) | software |
+|---|---|---|
+| first frame, panel | 366 ms (346 to 417) | 149 ms (125 to 193) |
+| RSS | 279 MB | 85 MB |
+| PSS | 192 MB | 47 MB |
+| mapped libraries | 116 | 86 |
+| threads | 58 | 9 |
+| idle CPU, context switches per second | 0 | 0 |
+
+What this can and cannot say: the private compositor renders with pixman and offers the shell
+no GPU buffers, so "GPU" here is Qt's OpenGL renderer on Mesa's software implementation
+(llvmpipe), as `QSG_INFO=1` shows. Most of its threads are llvmpipe's rasterizers; its first
+frame includes compiling llvmpipe's shaders on the CPU; and its memory is llvmpipe's, not a GPU
+driver's. With a real driver the threads, the startup time and the
+resident memory are different (NVIDIA's own libraries are about 16 MB PSS and 94 MB RSS before
+anything is drawn, as measured before), and buffers move to video memory, which `/proc` does
+not show. What carries over is that an idle shell costs nothing either way: no wakeups, no CPU.
+The real cost on the GPU has to be measured in a session; it was not, here.
+
 ## Notifications and the on-screen display
 
 The shell now also serves `org.freedesktop.Notifications` and draws cards and an on-screen display
@@ -246,9 +280,9 @@ tool never lets the shell see the real one.
 
 ## Not verified
 
-- Real GPU drawing. `renderer = "gpu"` was measured only on the software GL implementation,
-  and software rendering was not compared with a GPU on a 4K output, where the desktop
-  surface's buffers (three of 33 MB each) are the largest memory cost either way.
+- Real GPU drawing, now the default. `renderer = "gpu"` was measured only on the software GL
+  implementation, and software rendering was not compared with a GPU on a 4K output, where the
+  desktop surface's buffers (three of 33 MB each) are the largest memory cost either way.
 - The kernel uevent path (`power_supply`) needs a battery, and this desktop has none. The
   filter for those messages is unit-tested, and the rtnetlink path runs end to end.
 - The clock is a coarse timer: Qt may fire it up to 5 % of a minute late, so the displayed
