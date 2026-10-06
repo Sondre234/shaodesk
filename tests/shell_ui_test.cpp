@@ -1975,8 +1975,21 @@ int main(int argc, char **argv) {
             std::cerr << "Clear did not empty the history\n";
             return 1;
         }
-        // Right-clicking the bell toggles do-not-disturb.
         click(bell); // close the popup
+        // The compositor's notification_history action (Super + N) opens the flyout on the output
+        // it names, and closes it again.
+        subscriber->write(("notifications " + output + "\n").toUtf8());
+        if (!QTest::qWaitFor([&] { return inPopover(history); })) {
+            std::cerr << "notification_history did not open the clock flyout\n";
+            return 1;
+        }
+        subscriber->write("notifications ELSEWHERE-1\n");
+        subscriber->write(("notifications " + output + "\n").toUtf8());
+        if (!QTest::qWaitFor([&] { return !history->isVisible() && !popover->isVisible(); })) {
+            std::cerr << "notification_history did not close the clock flyout\n";
+            return 1;
+        }
+        // Right-clicking the bell toggles do-not-disturb.
         click(bell, Qt::RightButton);
         if (!QTest::qWaitFor([&] { return daemon->dnd(); })) {
             std::cerr << "right-clicking the bell did not turn do-not-disturb on\n";
