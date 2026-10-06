@@ -68,7 +68,10 @@ int main(int argc, char **argv) {
                       "outputs, profiles, wallpapers or notifications",
                       "name"});
     parser.addOption(
-        {"quit-after", "Exit after this many milliseconds (for UI tests)", "milliseconds"});
+        {"quit-after",
+         "Exit after this many milliseconds (for UI tests); with --preview-popup, counted from "
+         "the popup opening",
+         "milliseconds"});
     parser.addOption({"screenshot", "Save a preview screenshot before exiting", "path"});
     parser.process(app);
     if (!parser.isSet("config"))
@@ -86,6 +89,13 @@ int main(int argc, char **argv) {
         return 1;
     }
     try {
+        int quitAfter = 0;
+        if (parser.isSet("quit-after")) {
+            bool ok = false;
+            quitAfter = parser.value("quit-after").toInt(&ok);
+            if (!ok || quitAfter < 1)
+                throw std::runtime_error("--quit-after must be a positive integer");
+        }
         ShellController controller(parser.value("config").toStdString());
         if (!controller.enabled())
             return 0;
@@ -114,6 +124,20 @@ int main(int argc, char **argv) {
         std::vector<std::unique_ptr<CardsView>> cardViews;
         std::vector<std::unique_ptr<OsdView>> osdViews;
         std::vector<std::unique_ptr<ConfigErrorView>> errorViews;
+        // --quit-after's end, with --screenshot's picture of the first view.
+        auto quit = [&] {
+            if (!parser.isSet("screenshot")) {
+                app.quit();
+                return;
+            }
+            QImage shot = views.front()->grabWindow();
+            if (preview && !parser.isSet("preview-desktop"))
+                shot = previewOnDesktop(shot, controller);
+            if (!shot.save(parser.value("screenshot")))
+                app.exit(1);
+            else
+                app.quit();
+        };
         auto addScreen = [&](QScreen *screen) {
             // Qt's stand-in while the compositor has no outputs has no wl_output to attach to.
             if (!preview && screen->name().isEmpty())
@@ -151,6 +175,8 @@ int main(int argc, char **argv) {
                                 std::cerr << "shaodesk-shell: no popup to preview called "
                                           << name.toStdString() << '\n';
                                 app.exit(1);
+                            } else if (quitAfter > 0) {
+                                QTimer::singleShot(quitAfter, &app, quit);
                             }
                         },
                         Qt::ConnectionType(Qt::QueuedConnection | Qt::SingleShotConnection));
@@ -270,25 +296,9 @@ int main(int argc, char **argv) {
                 else
                     app.quit();
         });
-        if (parser.isSet("quit-after")) {
-            bool ok = false;
-            int timeout = parser.value("quit-after").toInt(&ok);
-            if (!ok || timeout < 1)
-                throw std::runtime_error("--quit-after must be a positive integer");
-            QTimer::singleShot(timeout, &app, [&] {
-                if (!parser.isSet("screenshot")) {
-                    app.quit();
-                    return;
-                }
-                QImage shot = views.front()->grabWindow();
-                if (preview && !parser.isSet("preview-desktop"))
-                    shot = previewOnDesktop(shot, controller);
-                if (!shot.save(parser.value("screenshot")))
-                    app.exit(1);
-                else
-                    app.quit();
-            });
-        }
+        // A previewed popup starts the clock when it opens instead.
+        if (quitAfter > 0 && !previewData)
+            QTimer::singleShot(quitAfter, &app, quit);
         std::cerr << "shaodesk shell ready: " << views.size() << " surfaces\n";
         int result = app.exec();
         signalFd = -1;
