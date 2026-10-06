@@ -431,6 +431,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(tiling_open_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME smart_gaps_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/smart_gaps_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(smart_gaps_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME maximized_tile_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/maximized_tile_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>
