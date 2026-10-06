@@ -82,11 +82,18 @@ Item {
                 required property var modelData
                 required property int index
                 width: switcher.cell; height: switcher.cell
-                opacity: modelData.minimized ? 0.6 : 1
+                readonly property bool minimized: modelData.minimized === true
+                readonly property bool urgent: modelData.urgent === true
+                // A window asking for attention is tinted in the urgent colour.
                 Rectangle {
                     anchors.fill: parent; anchors.margins: Theme.spacingXS
                     radius: Theme.radiusMedium
-                    color: pick.containsMouse ? Theme.hover : "transparent"
+                    color: entry.urgent ? Theme.urgentSubtle : "transparent"
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: parent.radius
+                        color: pick.containsMouse ? Theme.hover : "transparent"
+                    }
                 }
                 Image {
                     id: icon
@@ -95,23 +102,39 @@ Item {
                     width: Theme.appIconSizeDisplay; height: Theme.appIconSizeDisplay
                     sourceSize: Qt.size(2 * Theme.appIconSizeDisplay, 2 * Theme.appIconSizeDisplay)
                     source: "image://icons/" + shell.iconFor(entry.modelData.appId)
+                    // A minimized window's is faded.
+                    opacity: entry.minimized ? 0.45 : 1
                 }
                 Text {
                     anchors.top: icon.bottom; anchors.topMargin: Theme.spacingM + Theme.spacingXS
                     anchors.left: parent.left; anchors.right: parent.right; anchors.margins: Theme.spacingM
                     text: entry.modelData.title.length > 0 ? entry.modelData.title : entry.modelData.appId
                     textFormat: Text.PlainText
-                    color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize
+                    color: entry.minimized ? Theme.textMuted : Theme.text
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize
                     horizontalAlignment: Text.AlignHCenter
                     wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
                 }
-                // A window asking for attention has a dot in the urgent colour over its icon.
+                // Badges on the icon's corners: a dot in the urgent colour for a window asking for
+                // attention, a dash for a minimized one.
                 Rectangle {
                     objectName: "switcherUrgent"
-                    visible: entry.modelData.urgent === true
-                    anchors.right: icon.right; anchors.top: icon.top
-                    width: 12; height: 12; radius: 6
+                    visible: entry.urgent
+                    x: icon.x + icon.width - width + Theme.spacingXS; y: icon.y - Theme.spacingXS
+                    width: Theme.iconSizeSmall; height: width; radius: width / 2
                     color: Theme.urgent; border.width: 2; border.color: Theme.surface
+                }
+                Rectangle {
+                    objectName: "switcherMinimized"
+                    visible: entry.minimized
+                    x: icon.x + icon.width - width + Theme.spacingXS
+                    y: icon.y + icon.height - height + Theme.spacingXS
+                    width: Theme.iconSize + Theme.spacingS; height: width; radius: width / 2
+                    color: Theme.surfaceRaised; border.color: Theme.border
+                    Icon {
+                        anchors.centerIn: parent
+                        name: "minus"; size: Theme.iconSizeSmall; color: Theme.textMuted
+                    }
                 }
                 MouseArea {
                     id: pick
