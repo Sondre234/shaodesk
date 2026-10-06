@@ -106,6 +106,13 @@ void TaskFilter::setGrouped(bool grouped) {
     refilter();
     Q_EMIT groupedChanged();
 }
+void TaskFilter::setTaskId(int taskId) {
+    if (taskId_ == taskId)
+        return;
+    taskId_ = taskId;
+    refilter();
+    Q_EMIT taskIdChanged();
+}
 int TaskFilter::roleId(const char *role) const {
     auto found = roleIds_.constFind(role);
     if (found != roleIds_.cend())
@@ -124,6 +131,8 @@ int TaskFilter::value(int row, const char *role) const {
     return sourceValue(mapToSource(index(row, 0)).row(), role).toInt();
 }
 bool TaskFilter::belongs(int row) const {
+    if (taskId_ >= 0)
+        return sourceValue(row, "taskId").toInt() == taskId_;
     const auto appId = sourceValue(row, "appId").toString();
     if (!windowApp_.isEmpty() && appId != windowApp_)
         return false;
@@ -173,6 +182,17 @@ bool TaskFilter::urgent() const {
         if (value(row, "urgent"))
             return true;
     return false;
+}
+QVariantList TaskFilter::windows() const {
+    QVariantList list;
+    const auto roles = roleNames();
+    for (int row = 0; row < rowCount(); ++row) {
+        QVariantMap window;
+        for (auto role = roles.cbegin(); role != roles.cend(); ++role)
+            window.insert(QString::fromUtf8(role.value()), data(index(row, 0), role.key()));
+        list.push_back(window);
+    }
+    return list;
 }
 int TaskFilter::nextTask() const {
     if (rowCount() == 0)
