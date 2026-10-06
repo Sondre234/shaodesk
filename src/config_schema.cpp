@@ -546,6 +546,22 @@ const Option options[] = {
      "Taskbar buttons show only the window icon, the title as a tooltip."},
     {"shell.group_windows", "boolean", "true", "true", none, none,
      "One taskbar button per application; `false` gives every window its own."},
+    {"shell.thumbnails", "table", "", "", none, none,
+     "Pictures of the windows on the taskbar: resting the pointer on a button with windows shows "
+     "a card beside it with a small picture of each, as Windows does. The taskbar style only; "
+     "the macOS style's dock lists a stack's windows by name."},
+    {"shell.thumbnails.enabled", "boolean", "true", "true", none, none,
+     "Show the pictures; `false` gives a window's button its title as a tooltip again, and a "
+     "stack the list of its windows' titles."},
+    {"shell.thumbnails.delay", "integer", "400", "400", 0, 2000,
+     "Milliseconds the pointer rests on the button before the card opens."},
+    {"shell.thumbnails.size", "integer", "240", "240", 120, 480,
+     "Width of one picture in pixels, which is 5/8 as tall. With more windows than fit across "
+     "the monitor they get narrower, down to 60 % of it, and past that the card lists the "
+     "windows by title instead."},
+    {"shell.thumbnails.live", "boolean", "true", "true", none, none,
+     "The pictures follow their windows while the card is open, at most about ten times a "
+     "second; `false` takes one of each window as the card opens."},
     {"shell.workspaces_shown", "integer", "0", "3", 0, 10,
      "How many of the monitor's workspaces the workspace indicator shows, the current one in "
      "the middle: `3` shows it with the one before and the one after, or the first or last "

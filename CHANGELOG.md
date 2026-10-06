@@ -58,6 +58,13 @@ shadows.
   and colour, the current workspace's pill slides between workspaces, tooltips fade in, the
   clock's, the bell's and a stack's counts grow in and pop as they go up, and icons that follow a
   state crossfade. Nothing moves, or wakes the shell, while nothing changes.
+- Resting the pointer on a window's taskbar button, or a stack's, shows a small picture of each of
+  its windows on a card above it, as Windows 11 does, under the window's icon and title: the
+  pictures follow the windows while shown, a click focuses one, a middle click or its cross closes
+  it and a right click opens its menu. They take the place of the button's tooltip and of a
+  stack's list, which still shows when the pictures would not fit across the monitor.
+  `shell.thumbnails` sets the delay, the pictures' size and whether they follow the windows, and
+  `enabled = false` turns them off. The macOS style's dock lists a stack's windows as before.
 - A window's taskbar menu is headed by its application's icon and name over the window's title,
   and offers the application's desktop actions and a new window, then minimize or restore,
   maximize or restore, fullscreen, moving the window to another workspace or monitor, keeping it

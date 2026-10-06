@@ -5,6 +5,7 @@
 #include "view.hpp"
 #include <QAbstractItemModel>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QGuiApplication>
 #include <QImage>
@@ -14,7 +15,9 @@
 #include <QPointer>
 #include <QQmlComponent>
 #include <QQmlEngine>
+#include <QQuickImageProvider>
 #include <QQuickItem>
+#include <QRegularExpression>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
@@ -43,6 +46,19 @@ class FakeAudio : public Audio {
     }
     void sendStreamMute(uint32_t id, bool muted) override {
         requests << QString("stream-mute %1 %2").arg(id).arg(muted);
+    }
+};
+
+// Pictures for the stand-in windows, image://test-windows/WIDTHxHEIGHT: that large, in one colour.
+class TestPictures : public QQuickImageProvider {
+  public:
+    TestPictures() : QQuickImageProvider(QQuickImageProvider::Image) {}
+    QImage requestImage(const QString &id, QSize *size, const QSize &) override {
+        QImage image(id.section('x', 0, 0).toInt(), id.section('x', 1, 1).toInt(), QImage::Format_RGB32);
+        image.fill(Qt::darkCyan);
+        if (size)
+            *size = image.size();
+        return image;
     }
 };
 } // namespace
@@ -850,12 +866,16 @@ int main(int argc, char **argv) {
     }
     // Context menus: a task's, then the bar's. Stand-in tasks replace the Wayland ones.
     auto *tasks = view.rootObject()->findChild<QQuickItem *>("taskList");
-    // It notes what the taskbar's menus ask of the windows, as "minimize 7".
+    // It notes what the taskbar's menus ask of the windows, as "minimize 7", and apart from
+    // that what the taskbar asks of their pictures, as "watch 7 240 true" and "unwatch 7".
     QQmlComponent fakeTasks(view.engine());
     fakeTasks.setData(R"(import QtQml.Models
 ListModel {
     property var requests: []
+    property var pictures: []
     function note(request) { requests = requests.concat([request]) }
+    function watchPicture(id, width, live) { pictures = pictures.concat(["watch " + id + " " + width + " " + live]) }
+    function unwatchPicture(id) { pictures = pictures.concat(["unwatch " + id]) }
     function activate(id) { note("activate " + id) }
     function minimize(id) { note("minimize " + id) }
     function maximize(id) { note("maximize " + id) }
@@ -867,7 +887,7 @@ ListModel {
     function setFloating(id, on) { note("floating " + id + " " + on) }
     ListElement { taskId: 7; title: 'Fake'; appId: 'fake'; active: false; minimized: false; urgent: false
                   maximized: false; fullscreen: false; output: 'TEST-1'; workspace: 2; sticky: false
-                  floating: false; tiling: false }
+                  floating: false; tiling: false; picture: '' }
 })",
                       QUrl());
     QObject *fakeModel = fakeTasks.create();
@@ -875,6 +895,7 @@ ListModel {
         return fail("the task models did not load");
     QQmlEngine::setObjectOwnership(fakeModel, QQmlEngine::CppOwnership);
     view.rootObject()->setProperty("taskSource", QVariant::fromValue(fakeModel));
+    view.engine()->addImageProvider("test-windows", new TestPictures);
     // What the menus asked of the stand-in windows since the last call, joined by "|".
     auto taskRequests = [&] {
         const auto asked = fakeModel->property("requests").value<QJSValue>().toVariant().toStringList();
@@ -1734,8 +1755,310 @@ ListModel {
         std::cerr << "an application's windows did not share one stacked task button\n";
         return 1;
     }
-    // Hovering it lists both windows above the bar, without taking the keyboard; leaving hides
-    // the list and shrinks the panel again.
+    // With shell.thumbnails, on by default, resting on any window's button shows pictures of its
+    // windows on a card above it after shell.thumbnails.delay, instead of its tooltip or a
+    // stack's list, a tile for each window. Each tile asks the task source for its window's
+    // picture while it is there.
+    {
+        std::function<void(QQuickItem *, const QString &, QList<QQuickItem *> &)> collect =
+            [&](QQuickItem *item, const QString &name, QList<QQuickItem *> &found) {
+                for (auto *child : item->childItems()) {
+                    if (child->objectName() == name && child->isVisible())
+                        found << child;
+                    collect(child, name, found);
+                }
+            };
+        // The visible items called `name` under `item`, in the order of the item tree.
+        auto named = [&](QQuickItem *item, const QString &name) {
+            QList<QQuickItem *> found;
+            if (item)
+                collect(item, name, found);
+            return found;
+        };
+        auto *card = find(view.rootObject(), "windowThumbnails");
+        auto *list = find(view.rootObject(), "groupList");
+        auto *root = view.rootObject();
+        if (!card || !list)
+            return fail("the card of window pictures or the stack's list was not made ahead of use");
+        auto tiles = [&] { return named(card, "windowThumbnail"); };
+        auto titles = [&] {
+            QStringList shown;
+            for (auto *tile : tiles())
+                shown << tile->property("title").toString();
+            return shown.join("|");
+        };
+        auto tileFor = [&](int id) -> QQuickItem * {
+            for (auto *tile : tiles())
+                if (tile->property("taskId").toInt() == id)
+                    return tile;
+            return nullptr;
+        };
+        auto buttonFor = [&](int id) -> QQuickItem * {
+            for (int i = 0; i < tasks->property("count").toInt(); ++i)
+                if (auto *button = listedTask(i); button && button->property("taskId").toInt() == id)
+                    return button;
+            return nullptr;
+        };
+        auto rowOf = [&](int id) {
+            for (int row = 0; row < fakeModel->property("count").toInt(); ++row)
+                if (taskIdAt(row) == id)
+                    return row;
+            return -1;
+        };
+        // Every request for pictures since the section began.
+        QStringList pictures;
+        auto pictureRequests = [&] {
+            const auto asked = fakeModel->property("pictures").value<QJSValue>().toVariant().toStringList();
+            fakeModel->setProperty("pictures", QVariant::fromValue(view.engine()->newArray()));
+            pictures += asked;
+            return asked;
+        };
+        // Whether the tooltip of a button is shown or waiting to be.
+        auto tooltip = [](QQuickItem *button) {
+            for (auto *child : button->children())
+                if (child->inherits("QQuickToolTip") && child->property("visible").toBool())
+                    return true;
+            return false;
+        };
+        // The popover takes the pointer over a popup and between it and the bar alone.
+        auto hoverRegion = [&](QQuickItem *popup) {
+            QRectF area = popup->mapRectToScene(QRectF(0, 0, popup->width(), popup->height()));
+            area.setBottom(popover->height() - view.height());
+            return QRegion(area.toAlignedRect());
+        };
+        const QPoint barSpace = stack->mapToScene(QPointF(stack->width() + 40, stack->height() / 2)).toPoint();
+        QTest::mouseMove(&view, barSpace);
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("something was open in the popover before a button was hovered");
+        pictureRequests();
+        pictures.clear();
+        auto *single = buttonFor(7);
+        if (!single || single->property("stacked").toBool())
+            return fail("the window's own button is not on the bar");
+        QElapsedTimer resting;
+        resting.start();
+        QTest::mouseMove(&view, centre(single));
+        if (card->isVisible() || root->property("groupOpen").toBool())
+            return fail("the card of window pictures opened as soon as the pointer came");
+        if (!QTest::qWaitFor([&] {
+                return inPopover(card) && titles() == "Fake" && !popover->keyboard() &&
+                       !root->property("menuOpen").toBool();
+            }) ||
+            resting.elapsed() < 350) {
+            std::cerr << "resting on a window's button did not show its picture after the delay: "
+                      << titles().toStdString() << " after " << resting.elapsed() << " ms\n";
+            return 1;
+        }
+        if (tooltip(single))
+            return fail("a window's button shows its tooltip beside the card of its picture");
+        // Centred over the button, or kept inside the output by the card's margin.
+        {
+            const QRectF area = card->mapRectToScene(QRectF(0, 0, card->width(), card->height()));
+            if (qAbs(area.center().x() - centre(single).x()) > 1 && area.left() != 8)
+                return fail("the card of window pictures is not over its button");
+        }
+        if (!QTest::qWaitFor([&] { return popover->inputRegion() == hoverRegion(card); })) {
+            std::cerr << "the popover takes the pointer elsewhere than over the card: "
+                      << QDebug::toString(popover->inputRegion()).toStdString() << '\n';
+            return 1;
+        }
+        if (pictureRequests() != QStringList{"watch 7 240 true"})
+            return fail("the card did not ask for the window's picture at its width, to follow it");
+        // Moving onto another button with windows shows its windows at once: a stack's, in its
+        // list's order, the focused one marked.
+        QTest::mouseMove(&view, centre(stack));
+        if (root->property("groupWindowApp").toString() != "grouped" ||
+            root->property("groupTask").toInt() != -1 || !card->isVisible())
+            return fail("moving onto a stacked button did not show its windows at once");
+        if (!QTest::qWaitFor([&] { return titles() == "Group one|Group two" && inPopover(card); }) ||
+            !find(tileFor(11), "windowThumbnailLine")->isVisible() ||
+            find(tileFor(10), "windowThumbnailLine")->isVisible()) {
+            std::cerr << "a stack's card does not show a tile for each window, the focused one marked: "
+                      << titles().toStdString() << '\n';
+            return 1;
+        }
+        {
+            auto asked = pictureRequests();
+            asked.sort();
+            if (asked != QStringList{"unwatch 7", "watch 10 240 true", "watch 11 240 true"})
+                return fail("switching cards did not trade one window's picture for the others'");
+        }
+        // Until a picture comes, the application's icon stands in for it; then the picture
+        // shows, fitted into its box keeping its proportions.
+        auto shows = [&](int id) {
+            auto *picture = find(tileFor(id), "windowThumbnailPicture");
+            return picture && picture->isVisible() && !find(tileFor(id), "windowThumbnailStandIn")->isVisible();
+        };
+        if (shows(10) || shows(11))
+            return fail("a window without a picture shows one");
+        editTasks(QString("model.setProperty(%1, 'picture', 'image://test-windows/320x100')").arg(rowOf(10)));
+        if (!QTest::qWaitFor([&] { return shows(10); }) || shows(11) ||
+            find(tileFor(10), "windowThumbnailPicture")->size() != QSizeF(240, 75)) {
+            std::cerr << "a window's picture does not show in its tile, fitted into it\n";
+            return 1;
+        }
+        // A new picture takes the old one's place, and without one the icon is back.
+        editTasks(QString("model.setProperty(%1, 'picture', 'image://test-windows/100x200')").arg(rowOf(10)));
+        if (!QTest::qWaitFor([&] {
+                return shows(10) && find(tileFor(10), "windowThumbnailPicture")->size() == QSizeF(75, 150);
+            }))
+            return fail("a window's new picture did not take the place of the old one");
+        editTasks(QString("model.setProperty(%1, 'picture', '')").arg(rowOf(10)));
+        if (!QTest::qWaitFor([&] { return !shows(10) && find(tileFor(10), "windowThumbnailStandIn")->isVisible(); }))
+            return fail("a window whose picture went shows no icon in its place");
+        editTasks(QString("model.setProperty(%1, 'picture', 'image://test-windows/320x100')").arg(rowOf(10)));
+        if (!QTest::qWaitFor([&] { return shows(10); }))
+            return fail("a window's picture did not come back");
+        // The pointer can cross from the button to the card without it closing, and a click on
+        // a tile focuses its window and closes the card.
+        const QPoint into = centre(tileFor(10));
+        QEvent leaveBar(QEvent::Leave);
+        QCoreApplication::sendEvent(&view, &leaveBar);
+        for (int step = 1; step <= 5; ++step) {
+            QTest::mouseMove(popover, into + QPoint(0, 30 * (5 - step) / 5));
+            QTest::qWait(10);
+        }
+        QTest::qWait(600);
+        if (!card->isVisible())
+            return fail("moving from a button into its card closed it");
+        taskRequests();
+        QString asked;
+        QTest::mouseClick(popover, Qt::LeftButton, Qt::NoModifier, into);
+        if (!QTest::qWaitFor([&] {
+                asked += taskRequests();
+                return !card->isVisible() && !popover->isVisible() && asked == "activate 10";
+            })) {
+            std::cerr << "clicking a window's picture did not focus it and close the card: "
+                      << asked.toStdString() << '\n';
+            return 1;
+        }
+        // Shown again: a right click on a tile opens its window's menu instead.
+        auto reopen = [&] {
+            QEvent leavePopover(QEvent::Leave);
+            QCoreApplication::sendEvent(popover, &leavePopover);
+            QTest::mouseMove(&view, barSpace);
+            QTest::mouseMove(&view, centre(stack));
+            return QTest::qWaitFor([&] { return inPopover(card) && tiles().size() == 2; });
+        };
+        if (!reopen())
+            return fail("hovering a stacked button again did not show its windows' pictures");
+        click(tileFor(11), Qt::RightButton);
+        if (!QTest::qWaitFor([&] {
+                return root->property("taskMenuId").toInt() == 11 && menuShown() && !card->isVisible();
+            }))
+            return fail("a right click on a window's picture did not open its menu in the card's place");
+        QTest::keyClick(popover, Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }) || !reopen())
+            return fail("the stack's windows did not show again after its window's menu");
+        // A middle click closes a window, and so does the cross on a tile under the pointer; a
+        // window that closes leaves the card, and the last one closes it.
+        asked.clear();
+        taskRequests();
+        QTest::mouseClick(popover, Qt::MiddleButton, Qt::NoModifier, centre(tileFor(11)));
+        if (!QTest::qWaitFor([&] { asked += taskRequests(); return asked == "close 11"; }))
+            return fail("a middle click on a window's picture did not close it");
+        editTasks(QString("model.remove(%1)").arg(rowOf(11)));
+        if (!QTest::qWaitFor([&] { return titles() == "Group one" && inPopover(card); }))
+            return fail("the picture of a window that closed stayed on the card");
+        auto *cross = find(tileFor(10), "windowThumbnailClose");
+        QTest::mouseMove(popover, centre(tileFor(10)));
+        if (!QTest::qWaitFor([&] { return cross->isEnabled() && cross->opacity() == 1; }))
+            return fail("a window's picture under the pointer has no cross to close it");
+        asked.clear();
+        click(cross);
+        if (!QTest::qWaitFor([&] { asked += taskRequests(); return asked == "close 10"; }))
+            return fail("the cross on a window's picture did not close it");
+        editTasks(QString("model.remove(%1)").arg(rowOf(10)));
+        if (!QTest::qWaitFor([&] { return !card->isVisible() && !root->property("groupOpen").toBool(); }))
+            return fail("the card stayed open once all its windows had closed");
+        // Each window's picture was let go as often as it was asked for.
+        pictureRequests();
+        for (int id : {7, 10, 11})
+            if (pictures.filter(QRegularExpression(QString("^watch %1 ").arg(id))).size() !=
+                pictures.count(QString("unwatch %1").arg(id))) {
+                std::cerr << "the windows' pictures were not let go as often as they were asked for: "
+                          << pictures.join("|").toStdString() << '\n';
+                return 1;
+            }
+        // Back as they were, for what follows.
+        editTasks("model.append({ taskId: 10, title: 'Group one', appId: 'grouped', active: false, "
+                  "minimized: false, urgent: false })");
+        editTasks("model.append({ taskId: 11, title: 'Group two', appId: 'grouped', active: true, "
+                  "minimized: false, urgent: false })");
+        QEvent leavePopover(QEvent::Leave);
+        QCoreApplication::sendEvent(popover, &leavePopover);
+        if (!QTest::qWaitFor([&] {
+                stack = listedTask(3);
+                return stack && stack->property("stacked").toBool() && tasks->property("count").toInt() == 4;
+            }))
+            return fail("the stacked button did not come back");
+        // Pressing a button closes its card, which stays closed while the pointer stays.
+        QTest::mouseMove(&view, centre(stack));
+        if (!QTest::qWaitFor([&] { return inPopover(card); }))
+            return fail("hovering the stacked button did not show its windows' pictures");
+        QTest::mousePress(&view, Qt::LeftButton, Qt::NoModifier, centre(stack));
+        if (!QTest::qWaitFor([&] { return !root->property("groupOpen").toBool(); }))
+            return fail("pressing a button did not close the card of its windows' pictures");
+        QTest::mouseRelease(&view, Qt::LeftButton, Qt::NoModifier, centre(stack));
+        QTest::qWait(600);
+        if (root->property("groupOpen").toBool())
+            return fail("the card of a pressed button's windows came back while the pointer stayed");
+        // As many windows as fit across the output at 60 % of their pictures' size get narrower
+        // pictures; with more, the stack lists them instead.
+        for (int id = 12; id <= 15; ++id)
+            editTasks(QString("model.append({ taskId: %1, title: 'More %1', appId: 'grouped', active: false, "
+                              "minimized: false, urgent: false })").arg(id));
+        QTest::mouseMove(&view, barSpace);
+        QTest::mouseMove(&view, centre(stack));
+        if (!QTest::qWaitFor([&] { return inPopover(card) && tiles().size() == 6; }) ||
+            root->property("thumbnailWidth").toReal() >= 240 || root->property("thumbnailWidth").toReal() < 144) {
+            std::cerr << "six windows' pictures did not fit across the output, narrower: "
+                      << root->property("thumbnailWidth").toReal() << '\n';
+            return 1;
+        }
+        editTasks("model.append({ taskId: 16, title: 'More 16', appId: 'grouped', active: false, "
+                  "minimized: false, urgent: false })");
+        if (!QTest::qWaitFor([&] {
+                return inPopover(list) && named(list, "groupWindow").size() == 7 && !card->isVisible();
+            }))
+            return fail("seven windows, too many for their pictures, were not listed instead");
+        for (int id = 12; id <= 16; ++id)
+            editTasks(QString("model.remove(%1)").arg(rowOf(id)));
+        QTest::mouseMove(&view, barSpace);
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("leaving the stacked button did not close its windows' list");
+        // shell.thumbnails = { enabled = false }: a window's button has its tooltip and no card,
+        // and a stack lists its windows as it did.
+        if (!rewrite(QString(lua).replace("shell={", "shell={thumbnails={enabled=false},")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return !controller.thumbnails(); }))
+            return fail("shell.thumbnails = { enabled = false } was not read");
+        single = buttonFor(7);
+        QTest::mouseMove(&view, centre(single));
+        if (!QTest::qWaitFor([&] { return tooltip(single); }))
+            return fail("without pictures, a window's button has no tooltip");
+        QTest::qWait(600);
+        if (card->isVisible() || root->property("groupOpen").toBool())
+            return fail("without pictures, resting on a window's button opened a card");
+        // The reload may have made the buttons anew.
+        if (!QTest::qWaitFor([&] { return (stack = listedTask(3)) && stack->property("stacked").toBool(); }))
+            return fail("the stacked button is not on the bar");
+        // The tooltip's window goes before the pointer moves on, and the pointer's next move in
+        // the bar, which comes with an enter event once the window it was last in has gone, is
+        // over bare bar, so that hovering below starts afresh.
+        QTest::mouseMove(&view, barSpace);
+        if (!QTest::qWaitFor([&] {
+                const auto windows = QGuiApplication::topLevelWindows();
+                return std::none_of(windows.begin(), windows.end(), [&](QWindow *window) {
+                    return window->isVisible() && window != &view && window != popover;
+                });
+            }))
+            return fail("the tooltip of a window's button did not go once the pointer left it");
+        QTest::mouseMove(&view, barSpace + QPoint(1, 0));
+    }
+    // Without pictures, hovering it lists both windows above the bar, without taking the
+    // keyboard; leaving hides the list and shrinks the panel again.
     auto *groupList = find(view.rootObject(), "groupList");
     auto groupRows = [&] {
         int rows = 0;
@@ -1816,6 +2139,11 @@ ListModel {
         std::cerr << "leaving a stacked task did not hide its windows\n";
         return 1;
     }
+    if (!rewrite(lua))
+        return fail("could not restore the configuration");
+    controller.reload();
+    if (!QTest::qWaitFor([&] { return controller.thumbnails(); }))
+        return fail("the taskbar's window pictures did not come back on");
     // Dragging the stack moves all its windows together.
     {
         const QPoint from = centre(stack), to = centre(listedTask(0)) - QPoint(8, 0);
@@ -3991,12 +4319,16 @@ ListModel {
         click(icon("dockApp:fake"));
         if (!QTest::qWaitFor([&] { return taskRequests() == "activate 33"; }))
             return fail("clicking a running application on the dock did not bring up its next window");
-        // Resting on one with several windows lists them above it.
+        // Resting on one with several windows lists them above it, pictures of windows or not
+        // (shell.thumbnails is on).
         QTest::mouseMove(&view, centre(icon("dockApp:fake")));
         auto *groupList = find(root, "groupList");
         if (!QTest::qWaitFor([&] { return groupList && groupList->isVisible() && groupList->property("progress").toReal() == 1; }) ||
             sceneRect(groupList).bottom() > popover->height() - view.height() + dockRect.top())
             return fail("resting on an application with two windows did not list them above the dock");
+        if (!controller.thumbnails() || root->property("thumbnailsOpen").toBool() ||
+            (find(root, "windowThumbnails") && find(root, "windowThumbnails")->isVisible()))
+            return fail("the dock shows pictures of an application's windows");
         QTest::mouseMove(&view, QPoint(10, 10));
         if (!QTest::qWaitFor([&] { return !root->property("groupOpen").toBool(); }))
             return fail("the windows listed on the dock did not go with the pointer");

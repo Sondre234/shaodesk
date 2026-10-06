@@ -65,6 +65,12 @@ class ShellController : public QObject {
     // software renderer cannot draw them. Set from what the views actually use.
     Q_PROPERTY(bool effects READ effects NOTIFY effectsChanged)
     Q_PROPERTY(bool groupWindows READ groupWindows NOTIFY configChanged)
+    // shell.thumbnails: whether resting on a taskbar button shows pictures of its windows, after
+    // how many milliseconds, how wide each is, and whether they follow the windows while shown.
+    Q_PROPERTY(bool thumbnails READ thumbnails NOTIFY configChanged)
+    Q_PROPERTY(int thumbnailDelay READ thumbnailDelay NOTIFY configChanged)
+    Q_PROPERTY(int thumbnailSize READ thumbnailSize NOTIFY configChanged)
+    Q_PROPERTY(bool liveThumbnails READ liveThumbnails NOTIFY configChanged)
     // features.sticky: whether a window can be shown on every workspace of its monitor.
     Q_PROPERTY(bool stickyWindows READ stickyWindows NOTIFY configChanged)
     // Which panel widgets Lua enables, and where: {workspaces, clock, calendar, keyboard_layout,
@@ -188,6 +194,10 @@ class ShellController : public QObject {
     bool effects() const { return effects_; }
     void setEffects(bool effects);
     bool groupWindows() const { return config_.shell.group_windows; }
+    bool thumbnails() const { return config_.shell.thumbnails.enabled; }
+    int thumbnailDelay() const { return config_.shell.thumbnails.delay; }
+    int thumbnailSize() const { return config_.shell.thumbnails.size; }
+    bool liveThumbnails() const { return config_.shell.thumbnails.live; }
     bool stickyWindows() const { return config_.settings.sticky; }
     bool enabled() const { return config_.shell.enabled; }
     QStringList profiles() const;

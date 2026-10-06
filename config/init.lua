@@ -221,6 +221,14 @@ return {
         -- icons_only = true, -- taskbar buttons as small icons; false adds each window's title
         -- group_windows = true, -- one button per application, its windows listed on hover;
         --                          false gives every window its own button
+        -- Resting the pointer on a window's taskbar button shows a small picture of it (a stack's
+        -- of each of its windows); the macOS style's dock lists them by name instead:
+        -- thumbnails = {
+        --     enabled = true, -- false: a tooltip with the title, and a stack's list of titles
+        --     delay = 400,    -- milliseconds the pointer rests on the button first (0-2000)
+        --     size = 240,     -- width of one picture in pixels (120-480)
+        --     live = true,    -- the pictures follow the windows while shown; false takes one
+        -- },
         -- widgets = { workspaces = true, battery = true, network = true, volume = true,
         --             clock = true, calendar = true, tiling = true, wallpapers = true,
         --             keyboard_layout = true }, -- false hides one; battery, network, volume,

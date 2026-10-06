@@ -4,7 +4,8 @@ import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import Shaodesk
 
-// The windows of a hovered stacked button: clicking one focuses it (or minimizes it when
+// The windows of a hovered stacked button (or, with shell.thumbnails, of one with more windows
+// than their pictures fit across the output): clicking one focuses it (or minimizes it when
 // focused already), the cross or a middle click closes it, and a right click opens its menu.
 // Its rows are a menu's, the focused window's marked as the bar marks it: selected, with a line
 // in the accent colour (the urgent one for a window asking for attention) at its start.
@@ -16,7 +17,7 @@ PopupCard {
     objectName: "groupList"
     readonly property real rowHeight: Theme.rowHeight + Theme.spacingS
     readonly property real padding: Theme.spacingS
-    open: panel.groupOpen
+    open: panel.groupListOpen
     // Shown on hover, it leaves the keyboard where it is.
     initialFocus: null
     implicitWidth: 280
@@ -33,7 +34,7 @@ PopupCard {
         controller: shell; sourceModel: panel.taskSource
         app: panel.groupSlot; windowApp: panel.groupWindowApp
         // A window closing may leave nothing to choose between.
-        onCountChanged: if (count < 2) panel.groupOpen = false
+        onCountChanged: if (count < 2 && groupList.open) panel.groupOpen = false
     }
     Column {
         id: rows

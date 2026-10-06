@@ -53,18 +53,45 @@ Item {
     property bool menuOpen: launcherOpen || taskMenuId >= 0 || pinMenuApp !== null || barMenuOpen || audioPopup !== "" ||
                             trayMenuKey !== "" || menuBarMenu !== ""
     // Hovering an application's stacked button lists its windows above it: those of the pinned
-    // application groupSlot, or with the app id groupWindowApp outside the pinned slots.
+    // application groupSlot, or with the app id groupWindowApp outside the pinned slots, or the
+    // window groupTask alone when it is 0 or more (a button standing for one window).
     property bool groupOpen: false
-    readonly property bool groupListHovered: groupListLoader.item ? groupListLoader.item.hovered : false
     property string groupSlot: ""
     property string groupWindowApp: ""
+    property int groupTask: -1
     property string groupIcon: ""
     property real groupX: 0
     property Item groupPending: null
+    readonly property TaskFilter groupWindows: TaskFilter {
+        controller: shell; sourceModel: root.taskSource
+        app: root.groupSlot; windowApp: root.groupWindowApp; taskId: root.groupTask
+    }
+    // In the taskbar style with shell.thumbnails, resting on any button with windows shows them
+    // as pictures instead (WindowThumbnails.qml): a tile for each side by side, `thumbnailGap`
+    // apart and inside the card, each holding its window's picture `thumbnailPadding` inside it,
+    // thumbnailWidth wide: shell.thumbnailSize, or narrower so that the card fits across the
+    // output (with PopupCard's margin), but no narrower than 60 % of it. More windows than fit so
+    // are listed after all.
+    readonly property bool thumbnails: shell.thumbnails && !macos
+    // What shows a button's windows changes with it, and what was shown goes.
+    onThumbnailsChanged: closeGroup()
+    readonly property int thumbnailGap: Theme.spacingS
+    readonly property int thumbnailPadding: Theme.spacingM
+    readonly property real thumbnailWidth: {
+        var count = Math.max(1, groupWindows.count)
+        var room = popupArea.width - 2 * Theme.spacingM - (count + 1) * thumbnailGap
+        return Math.min(shell.thumbnailSize, Math.floor(room / count) - 2 * thumbnailPadding)
+    }
+    readonly property bool thumbnailsOpen: groupOpen && thumbnails &&
+                                           (groupWindows.count < 2 || thumbnailWidth >= 0.6 * shell.thumbnailSize)
+    readonly property bool groupListOpen: groupOpen && !thumbnailsOpen
+    // What shows the windows: the card of pictures or the list, and whether the pointer is on it.
+    readonly property Item groupPopup: thumbnailsOpen ? thumbnailsLoader.item : groupListLoader.item
+    readonly property bool groupListHovered: groupPopup ? groupPopup.hovered : false
     // Something is open in the popover. The list shown on hover does not take the keyboard: it
     // opens under a window being typed in.
     readonly property bool expanded: menuOpen || groupOpen
-    onMenuOpenChanged: if (menuOpen) groupOpen = false
+    onMenuOpenChanged: if (menuOpen) { groupShow.stop(); groupOpen = false }
     // The bars the style has: the taskbar (Taskbar.qml), or in the macOS style the dock
     // (Dock.qml) in the panel's surface and the menu bar (TopMenuBar.qml) in a surface of its own
     // along the output's top edge.
@@ -143,9 +170,12 @@ Item {
     // A change of style lays the panel out anew: what was open belonged to bars that are gone.
     onMacosChanged: closeMenus()
     // A stacked button hovered for a moment, or at once while another's list is open, shows its
-    // windows; leaving both it and the list hides them again.
+    // windows; leaving both it and the list hides them again. With thumbnails any window's button
+    // does, after shell.thumbnailDelay. Pressing the button hides them until the pointer comes
+    // back.
+    function showsWindows(button) { return button.stacked || thumbnails }
     function hoverGroup(button, hovered) {
-        if (hovered && button.stacked && !menuOpen) {
+        if (hovered && showsWindows(button) && !menuOpen && !button.pressed) {
             groupPending = button
             groupHide.stop()
             if (groupOpen) showGroup(); else groupShow.restart()
@@ -155,24 +185,30 @@ Item {
             if (groupOpen) groupHide.restart()
         }
     }
+    function closeGroup() {
+        groupShow.stop()
+        groupOpen = false
+    }
     function showGroup() {
         var button = groupPending
-        if (button && button.hovered && button.stacked && !menuOpen)
+        if (button && button.hovered && !button.pressed && showsWindows(button) && !menuOpen)
             openGroup(button)
     }
     function openGroup(button) {
+        // A taskbar button without a group stands for its own window; a dock icon has none.
+        groupTask = button.group === null ? button.taskId : -1
         groupSlot = button.groupSlot
         groupWindowApp = button.groupWindowApp
         groupIcon = button.iconName
         groupX = button.mapToItem(root, button.width / 2, 0).x
         groupOpen = true
     }
-    Timer { id: groupShow; interval: 350; onTriggered: root.showGroup() }
+    Timer { id: groupShow; interval: root.thumbnails ? shell.thumbnailDelay : 350; onTriggered: root.showGroup() }
     Timer {
         id: groupHide; interval: 300
         onTriggered: if (!root.groupListHovered && !(root.groupPending && root.groupPending.hovered)) root.groupOpen = false
     }
-    // The pointer entering the list keeps it, and leaving it hides it a moment later.
+    // The pointer entering the list (or the card) keeps it, and leaving it hides it a moment later.
     function hoverGroupList(hovered) {
         if (hovered) groupHide.stop(); else groupHide.restart()
     }
@@ -293,7 +329,9 @@ Item {
             }
             return false
         case "group":
-            // A stacked button, in the task list or in a pinned slot.
+        case "thumbnails":
+            // A stacked button, in the task list or in a pinned slot: its list, or with
+            // shell.thumbnails the pictures of its windows (the gallery's group turns them off).
             var buttons = []
             for (i = 0; i < taskList.count; ++i)
                 buttons.push(taskList.itemAtIndex(i))
@@ -302,7 +340,7 @@ Item {
             for (i = 0; i < buttons.length; ++i)
                 if (buttons[i] && buttons[i].stacked) {
                     openGroup(buttons[i])
-                    return true
+                    return name === "group" || thumbnailsOpen
                 }
             return false
         case "tray-menu":
@@ -392,8 +430,10 @@ Item {
             return icon !== null
         case "stack-menu":
         case "group":
+        case "thumbnails":
+            // The dock lists a stack's windows, pictures or not.
             icon = find(function(icon) { return icon.stacked })
-            if (icon && name === "group")
+            if (icon && name !== "stack-menu")
                 openGroup(icon)
             else if (icon)
                 dock.openMenu(icon, icon.modelData || null, "")
@@ -561,7 +601,7 @@ Item {
         keyboard: root.menuOpen
         inputRects: root.menuOpen
             ? root.popoverInput
-            : root.groupOpen && groupListLoader.item ? [root.hoverArea(groupListLoader.item)] : []
+            : root.groupOpen && root.groupPopup ? [root.hoverArea(root.groupPopup)] : []
         onDismissed: root.closeMenus()
         Timer { id: closing; interval: Theme.durationNormal; onTriggered: if (!root.expanded) popover.open = false }
         Connections {
@@ -683,6 +723,18 @@ Item {
                 property bool used: false
                 onLoaded: used = true
                 sourceComponent: Component { GroupList { panel: root; barItem: root.bar } }
+            }
+
+            // The pictures of the windows of the button the pointer rests on, with shell.thumbnails
+            // in the taskbar style.
+            Loader {
+                id: thumbnailsLoader
+                asynchronous: !(root.thumbnailsOpen)
+                active: root.thumbnails && (root.groupOpen || root.warm) || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { WindowThumbnails { panel: root; barItem: root.bar } }
             }
 
             // The Quick Settings button: tiles, the volume and brightness, the battery.

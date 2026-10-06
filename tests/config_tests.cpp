@@ -562,6 +562,22 @@ int main(int argc, char **argv) {
         rejects("return {shell={panel_margin={middle=1}}}");
         rejects("return {shell={font_size=2}}");
         rejects("return {shell={group_windows=1}}");
+        // The taskbar's window pictures: on by default, each setting read, and their ranges.
+        require(even.shell.thumbnails.enabled && even.shell.thumbnails.delay == 400 &&
+                    even.shell.thumbnails.size == 240 && even.shell.thumbnails.live,
+                "the taskbar's window pictures do not default to on, 400 ms, 240 pixels and live");
+        auto pictures = shaodesk::parse_config(
+            "return {shell={thumbnails={enabled=false,delay=0,size=480,live=false}}}");
+        require(!pictures.shell.thumbnails.enabled && pictures.shell.thumbnails.delay == 0 &&
+                    pictures.shell.thumbnails.size == 480 && !pictures.shell.thumbnails.live,
+                "shell.thumbnails not parsed");
+        require(shaodesk::parse_config("return {shell={thumbnails={size=120}}}").shell.thumbnails.enabled,
+                "a partial shell.thumbnails table does not keep the other defaults");
+        rejects("return {shell={thumbnails=true}}");
+        rejects("return {shell={thumbnails={delay=2001}}}");
+        rejects("return {shell={thumbnails={size=119}}}");
+        rejects("return {shell={thumbnails={live='yes'}}}");
+        rejects("return {shell={thumbnails={width=240}}}");
         using shaodesk::WidgetPlace;
         auto widgets = shaodesk::parse_config(
             "return {shell={widgets={battery=false,calendar=false,workspaces=false}}}");

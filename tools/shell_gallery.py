@@ -32,7 +32,7 @@ import zlib
 
 # The names previewPopup in shell/Panel.qml knows.
 POPUPS = ["bar", "launcher", "power", "bar-menu", "bar-submenu", "task-menu", "stack-menu",
-          "pin-menu", "group", "tray-menu", "tray-submenu", "calendar", "mixer", "outputs",
+          "pin-menu", "group", "thumbnails", "tray-menu", "tray-submenu", "calendar", "mixer", "outputs",
           "profiles", "wallpapers", "notifications", "clock-empty", "calendar-years"]
 # The overlay surfaces, each shown over the bar alone (PreviewData::surfaces in shell/preview.cpp).
 POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switcher",
@@ -47,8 +47,10 @@ POPUPS += MACOS_POPUPS
 POPUPS += ["desktop"]
 
 # Pictures taken with settings of their own, put in the shell table: name -> (popup, settings).
-# The volume's and the profiles' popups belong to buttons Quick Settings holds by default.
+# The volume's and the profiles' popups belong to buttons Quick Settings holds by default, and a
+# stack's list shows on the taskbar only without pictures of its windows.
 VARIANTS = {
+    "group": ("group", "thumbnails = { enabled = false },"),
     "mixer": ("mixer", 'widgets = { volume = "bar" },'),
     "outputs": ("outputs", 'widgets = { volume = "bar" },'),
     "profiles": ("profiles", 'widgets = { profiles = "bar" },'),

@@ -341,6 +341,15 @@ void read_shell(lua_State *L, ShellConfig &shell) {
     boolean(L, "icons_only", "shell.icons_only", shell.icons_only);
     boolean(L, "group_windows", "shell.group_windows", shell.group_windows);
     shell.workspaces_shown = integer(L, "workspaces_shown", 0, 0, 10);
+    if (section(L, "thumbnails", "shell.thumbnails")) {
+        auto &thumbnails = shell.thumbnails;
+        boolean(L, "enabled", "shell.thumbnails.enabled", thumbnails.enabled);
+        thumbnails.delay = integer(L, "delay", thumbnails.delay, 0, 2000);
+        thumbnails.size = integer(L, "size", thumbnails.size, 120, 480);
+        boolean(L, "live", "shell.thumbnails.live", thumbnails.live);
+    }
+    lua_pop(L, 1);
+    current_section = "shell";
     if (section(L, "widgets", "shell.widgets")) {
         for (auto [key, target] : {std::pair{"workspaces", &shell.widgets.workspaces},
                                    {"clock", &shell.widgets.clock},
