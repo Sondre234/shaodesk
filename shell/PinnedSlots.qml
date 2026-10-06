@@ -18,6 +18,8 @@ Repeater {
     property var shownApps: []
     property bool settled: false
     Component.onCompleted: Qt.callLater(remember)
+    // Also when the last pin goes, which adds no slot to remember by.
+    onModelChanged: Qt.callLater(remember)
     function remember() {
         shownApps = shell.pinned.map(function(app) { return app.appId })
         settled = true
