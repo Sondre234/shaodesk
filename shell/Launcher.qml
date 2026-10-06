@@ -188,7 +188,7 @@ PopupCard {
         width: launcher.width - 2 * launcher.padding
         height: Theme.rowHeight + Theme.spacingS
         leftPadding: Theme.spacingL + Theme.iconSizeSmall + Theme.spacingM
-        rightPadding: Theme.spacingL
+        rightPadding: clear.visible ? clear.width + Theme.spacingS : Theme.spacingL
         placeholderText: "Search apps, windows and actions"
         placeholderTextColor: Theme.textMuted
         color: Theme.text
@@ -205,6 +205,22 @@ PopupCard {
             }
         }
         Keys.onPressed: (event) => launcher.key(event)
+        // Clears the search, the keyboard staying in the field.
+        FlatButton {
+            id: clear
+            objectName: "startClear"
+            visible: search.text !== ""
+            anchors.right: parent.right; anchors.rightMargin: Theme.spacingS
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.height - 2 * Theme.spacingS; height: width
+            radius: width / 2
+            focusPolicy: Qt.NoFocus
+            Accessible.name: "Clear the search"
+            onClicked: search.text = ""
+            contentItem: Item {
+                Icon { anchors.centerIn: parent; name: "x"; size: Theme.iconSizeSmall; color: Theme.textMuted }
+            }
+        }
     }
     // A view, shown or not: it fades in sliding from `away` (a horizontal and a vertical
     // distance), and out back there. Changes are instant while the menu opens, which resets them.

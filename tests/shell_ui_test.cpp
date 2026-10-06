@@ -1807,6 +1807,12 @@ int main(int argc, char **argv) {
         QTest::mouseMove(popover, centre(item("startResult:" + next)));
         if (!QTest::qWaitFor([&] { return item("startResult:" + next)->property("current").toBool(); }))
             return fail("moving the pointer onto a result did not choose it");
+        // The field's cross clears the search, the keyboard staying there.
+        click(item("startClear"));
+        if (!QTest::qWaitFor([&] { return search->property("text").toString().isEmpty() && !shown("startClear"); }) ||
+            !search->hasActiveFocus() || !launcherOpen())
+            return fail("the search field's cross did not clear it");
+        type("app");
         // Escape clears the search, then closes the menu.
         key(Qt::Key_Escape);
         if (!QTest::qWaitFor([&] {
