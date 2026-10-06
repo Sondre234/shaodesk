@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 import Shaodesk
+import "WindowMenu.js" as WindowMenu
 
 // The context menu of a window's button (its pinned application's too), of a pinned
 // application's button, or of the bar itself, whose appearance entry opens the profiles beside
@@ -98,7 +99,7 @@ PopupMenu {
                 : { text: "Minimize all", icon: "minus",
                     run: function() {
                         windows.forEach(function(w) { if (!w.minimized) tasks.minimize(w.taskId) })
-                    } }].concat(placeEntries(windows, tasks))
+                    } }].concat(WindowMenu.placeEntries(windows, tasks))
     }
     // What can be done to the window `window` (its roles, as menuWindows lists them), labelled
     // by its state, through `tasks`, the panel's source of windows: a minimized one is only
@@ -112,7 +113,7 @@ PopupMenu {
                  run: function() { tasks.maximize(id) } },
                { text: "Fullscreen", toggle: "check", checked: window.fullscreen === true,
                  run: function() { tasks.setFullscreen(id, window.fullscreen !== true) } }]
-        entries = entries.concat(placeEntries([window], tasks))
+        entries = entries.concat(WindowMenu.placeEntries([window], tasks))
         if (window.workspace > 0 && shell.stickyWindows)
             entries.push({ text: "Keep on all workspaces", toggle: "check", checked: window.sticky === true,
                            run: function() { tasks.setSticky(id, window.sticky !== true) } })
@@ -120,54 +121,6 @@ PopupMenu {
         if (window.workspace > 0 && window.tiling === true)
             entries.push({ text: "Float", toggle: "check", checked: window.floating === true,
                            run: function() { tasks.setFloating(id, window.floating !== true) } })
-        return entries
-    }
-    // Where the windows can go, once the compositor has said where they are (workspace from 1):
-    // the workspaces of their monitors, the one they are all on marked.
-    function placeEntries(windows, tasks) {
-        if (windows.length === 0 || !windows.every(function(w) { return w.workspace > 0 }))
-            return []
-        var entries = []
-        if (shell.workspaceCount > 1)
-            entries.push({ text: "Move to workspace", icon: "layers", objectName: "contextMenuWorkspaces",
-                           submenu: workspaceEntries(windows, tasks) })
-        if (Object.keys(shell.workspaces).length > 1)
-            entries.push({ text: "Move to monitor", icon: "monitor", objectName: "contextMenuOutputs",
-                           submenu: outputEntries(windows, tasks) })
-        return entries
-    }
-    // The compositor's outputs from left to right, by connector name ("DP-1") with the monitor's
-    // make and model beside it where the screen says; the one the windows are on marked.
-    function outputEntries(windows, tasks) {
-        var screens = {}
-        Qt.application.screens.forEach(function(screen) { screens[screen.name] = screen })
-        var names = Object.keys(shell.workspaces).sort(function(a, b) {
-            var left = screens[a] ? screens[a].virtualX : 0, right = screens[b] ? screens[b].virtualX : 0
-            return left !== right ? left - right : a.localeCompare(b)
-        })
-        var on = windows.every(function(w) { return w.output === windows[0].output }) ? windows[0].output : ""
-        return names.map(function(name) {
-            var screen = screens[name]
-            return { text: name, toggle: "radio", checked: name === on, objectName: "contextMenuOutput",
-                     secondary: screen ? [screen.manufacturer, screen.model].filter(Boolean).join(" ") : "",
-                     run: function() { windows.forEach(function(w) { tasks.moveToOutput(w.taskId, name) }) } }
-        })
-    }
-    function workspaceEntries(windows, tasks) {
-        // A sticky window is on all of them.
-        var on = windows.every(function(w) { return w.workspace === windows[0].workspace && !w.sticky })
-            ? windows[0].workspace : 0
-        var names = shell.workspaceNames
-        var entries = []
-        for (var n = 1; n <= shell.workspaceCount; ++n) {
-            entries.push((function(number) {
-                return { text: names[number - 1] || "Workspace " + number, toggle: "radio",
-                         checked: number === on, objectName: "contextMenuWorkspace",
-                         run: function() {
-                             windows.forEach(function(w) { tasks.moveToWorkspace(w.taskId, number) })
-                         } }
-            })(n))
-        }
         return entries
     }
     // The groups of entries, with a line between those that have any.
