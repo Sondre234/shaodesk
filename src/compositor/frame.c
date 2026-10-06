@@ -39,6 +39,7 @@ static int pixel_scale(struct sh_server *server) {
     return (int)ceilf(scale);
 }
 
+/* The style of window controls windows.controls asks for. */
 enum sh_deco_style deco_style(struct sh_server *server) {
     return server_settings(server)->window_controls == SH_CONTROLS_TRAFFIC_LIGHTS
                ? SH_DECO_TRAFFIC_LIGHTS
@@ -218,10 +219,10 @@ static void remove_shadow(struct sh_toplevel *toplevel) {
 
 /* The shadow under a window whose frame reaches `outset` past its geometry (its border) with
  * corners of `radius`: slices of a shared image laid out around the frame, in a tree at the
- * bottom of the window's, which takes no input and is in no one's sums of the window's size.
- * The tree has a clip of its own as large as the shadow, since the one rounding the window
- * would hide it (only the nearest clip applies). Laid out again only when the frame's size or
- * the image changes, so a running animation keeps what it set. */
+ * bottom of the window's. It takes no input, and nothing that places or measures the window
+ * counts it. The tree has a clip of its own as large as the shadow, since the one rounding the
+ * window would hide it (only the nearest clip applies). Laid out again only when the frame's
+ * size or the image changes, so a running animation keeps what it set. */
 static void refresh_shadow(struct sh_toplevel *toplevel, bool on, int outset, int radius) {
     struct sh_server *server = toplevel->server;
     const struct sh_settings *settings = server_settings(server);
