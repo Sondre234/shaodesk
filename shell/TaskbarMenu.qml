@@ -68,13 +68,42 @@ PopupMenu {
     // restored.
     function windowEntries(window, tasks) {
         var id = window.taskId
-        if (window.minimized)
-            return [{ text: "Restore", icon: "app-window", run: function() { tasks.activate(id) } }]
-        return [{ text: "Minimize", icon: "minus", run: function() { tasks.minimize(id) } },
-                { text: window.maximized ? "Restore" : "Maximize", icon: window.maximized ? "copy" : "square",
-                  run: function() { tasks.maximize(id) } },
-                { text: "Fullscreen", toggle: "check", checked: window.fullscreen === true,
-                  run: function() { tasks.setFullscreen(id, window.fullscreen !== true) } }]
+        var entries = window.minimized
+            ? [{ text: "Restore", icon: "app-window", run: function() { tasks.activate(id) } }]
+            : [{ text: "Minimize", icon: "minus", run: function() { tasks.minimize(id) } },
+               { text: window.maximized ? "Restore" : "Maximize", icon: window.maximized ? "copy" : "square",
+                 run: function() { tasks.maximize(id) } },
+               { text: "Fullscreen", toggle: "check", checked: window.fullscreen === true,
+                 run: function() { tasks.setFullscreen(id, window.fullscreen !== true) } }]
+        return entries.concat(placeEntries([window], tasks))
+    }
+    // Where the windows can go, once the compositor has said where they are (workspace from 1):
+    // the workspaces of their monitors, the one they are all on marked.
+    function placeEntries(windows, tasks) {
+        if (windows.length === 0 || !windows.every(function(w) { return w.workspace > 0 }))
+            return []
+        var entries = []
+        if (shell.workspaceCount > 1)
+            entries.push({ text: "Move to workspace", icon: "layers", objectName: "contextMenuWorkspaces",
+                           submenu: workspaceEntries(windows, tasks) })
+        return entries
+    }
+    function workspaceEntries(windows, tasks) {
+        // A sticky window is on all of them.
+        var on = windows.every(function(w) { return w.workspace === windows[0].workspace && !w.sticky })
+            ? windows[0].workspace : 0
+        var names = shell.workspaceNames
+        var entries = []
+        for (var n = 1; n <= shell.workspaceCount; ++n) {
+            entries.push((function(number) {
+                return { text: names[number - 1] || "Workspace " + number, toggle: "radio",
+                         checked: number === on, objectName: "contextMenuWorkspace",
+                         run: function() {
+                             windows.forEach(function(w) { tasks.moveToWorkspace(w.taskId, number) })
+                         } }
+            })(n))
+        }
+        return entries
     }
     // The groups of entries, with a line between those that have any.
     function sections(groups) {

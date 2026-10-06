@@ -827,6 +827,33 @@ ListModel {
         if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
             return fail("the popover did not close after restoring");
     }
+    // Moving the window: its monitor's workspaces, by name where they have one, the one it is on
+    // marked; a sticky window is on none of them.
+    {
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Move to workspace"); }))
+            return fail("a window's menu does not offer to move it to another workspace");
+        click(menuItem("Move to workspace"));
+        auto marked = [&](const QString &text) {
+            return menuItem(text) && menuItem(text)->property("marked").toBool();
+        };
+        if (!QTest::qWaitFor([&] {
+                return menuItem("web") && menuItem("Workspace 2") && menuItem("Workspace 3") &&
+                       menuItem("mail") && marked("Workspace 2") && !marked("web");
+            }))
+            return fail("the workspace submenu does not list the workspaces, the window's marked");
+        editTasks("model.setProperty(0, 'sticky', true)");
+        if (!QTest::qWaitFor([&] { return menuItem("mail") && !marked("Workspace 2"); }))
+            return fail("the workspace submenu marks a workspace for a sticky window");
+        click(menuItem("mail"));
+        if (const auto asked = taskRequests(); asked != "workspace 7 4") {
+            std::cerr << "moving to a workspace from a task's menu asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        editTasks("model.setProperty(0, 'sticky', false)");
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the popover did not close after moving the window");
+    }
     // The task's window belongs to an installed application, which its menu pins. Pinned, the
     // window takes over the application's slot instead of adding a button; with no window left
     // the slot's launcher returns, and its own menu unpins it. Pins are remembered in the state
