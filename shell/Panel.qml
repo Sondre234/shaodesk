@@ -176,6 +176,18 @@ Item {
             if (slot)
                 openContextMenu(slot, 0, -1, slot.modelData)
             return slot !== null
+        case "stack-menu":
+            // A stacked button's menu, with the workspaces to move its windows to beside it.
+            for (i = 0; i < taskList.count; ++i) {
+                var stack = taskList.itemAtIndex(i)
+                if (stack && stack.stacked) {
+                    openContextMenu(stack, 0, stack.taskId, stack.appId)
+                    previewSubmenu.menu = contextMenuLoader
+                    previewSubmenu.start()
+                    return true
+                }
+            }
+            return false
         case "group":
             // A stacked button, in the task list or in a pinned slot.
             var buttons = []
