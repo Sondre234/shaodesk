@@ -2,8 +2,8 @@
 """The notification daemon and the on-screen display in the shell, end to end: a private session
 bus (a dbus-daemon this test starts and kills) and a headless compositor with the shell. Cards
 appear top right, a click runs the default action, hovering holds the timer, do-not-disturb keeps
-them away, `shaodesk msg osd` draws the pill, and the bell's history opens. The shell never sees
-the real session bus."""
+them away, `shaodesk msg osd` draws the pill, and the clock flyout with the history opens. The
+shell never sees the real session bus."""
 import os
 from pathlib import Path
 import select
@@ -240,7 +240,7 @@ with harness.Compositor(compositor, CONFIG, bus=True, start=False) as desktop:
     wait_for(lambda: count("osd hidden") == hidden + 1, "the brightness display faded out",
              timeout=4)
 
-    # The bell's history: opened by the notification_history action.
+    # The clock flyout, with the history: opened by the notification_history action.
     before = shot()
     for _ in range(20):
         msg("notification_history")
@@ -248,7 +248,7 @@ with harness.Compositor(compositor, CONFIG, bus=True, start=False) as desktop:
         after = shot()
         if before is None or after.at(1100, 560) != before.at(1100, 560):
             break
-    close_to(PANEL, (1100, 560), "the history popover", tolerance=10)
+    close_to(PANEL, (1100, 560), "the clock flyout", tolerance=10)
 
     # Cards go to the monitor with the focus (a click on its desktop gives it), and stay
     # there while they last.
