@@ -169,8 +169,13 @@ const Option options[] = {
     {"windows.border_width", "integer", "0", "0", 0, 20,
      "Border in pixels around each window; tiles shrink to keep it in their slot."},
     {"windows.corner_radius", "integer", "10", "10", 0, 40,
-     "Radius in pixels of the corners of windows on a monitor with tiling on, floating ones "
-     "included, and of their border; 0 keeps them square. Needs wlroots built with shaodesk's rounded-corners patch."},
+     "Radius in pixels of the corners of windows (which ones, `round` says) and of their "
+     "border; 0 keeps them square. Needs wlroots built with shaodesk's rounded-corners patch."},
+    {"windows.round", "enum", "\"tiling\"", "\"always\"", none, none,
+     "Which windows get rounded corners: `\"tiling\"`, those on a monitor with tiling on, "
+     "floating ones included; `\"always\"`, every window, but for one on a monitor without "
+     "tiling that draws a shadow of its own around it (a client-side frame, as GTK's), which "
+     "keeps its own corners. Fullscreen and maximized windows stay square."},
     {"windows.border_color", "color", "\"#7da8ff\"", "\"#7da8ff\"", none, none,
      "Focused window border, `#RRGGBB` or `#RRGGBBAA`."},
     {"windows.border_inactive_color", "color", "\"#404a5c\"", "\"#404a5c\"", none, none,

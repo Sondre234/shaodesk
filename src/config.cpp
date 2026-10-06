@@ -778,6 +778,14 @@ void read_windows(lua_State *L, Config &config) {
     }
     config.settings.border_width = integer(L, "border_width", 0, 0, 20);
     config.settings.corner_radius = integer(L, "corner_radius", 10, 0, 40);
+    lua_getfield(L, -1, "round");
+    if (!lua_isnil(L, -1)) {
+        auto name = string(L, -1, "windows.round");
+        if (name != "tiling" && name != "always")
+            unknown("round", name, {"tiling", "always"}, "=" + name);
+        config.settings.round_always = name == "always";
+    }
+    lua_pop(L, 1);
     for (auto [key, target] : {std::pair{"border_color", &config.settings.border_active},
                                {"border_inactive_color", &config.settings.border_inactive}}) {
         lua_getfield(L, -1, key);

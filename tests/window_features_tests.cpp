@@ -100,6 +100,14 @@ int main() {
                                        "controls='traffic_lights'}}}}")
                         .settings.window_controls == SH_CONTROLS_TRAFFIC_LIGHTS,
                 "a profile's controls not applied");
+        // windows.round: tiling monitors unless told otherwise.
+        require(!defaults.settings.round_always, "round default");
+        require(shaodesk::parse_config("return {windows={round='always'}}").settings.round_always,
+                "round not read");
+        require(!shaodesk::parse_config("return {windows={round='tiling'}}").settings.round_always,
+                "round = tiling not read");
+        rejects("return {windows={round='floating'}}");
+        rejects("return {windows={round=true}}");
         rejects("return {windows={controls='macos'}}");
         rejects("return {windows={controls=true}}");
         std::cout << "Window feature configuration passed\n";

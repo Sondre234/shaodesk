@@ -267,6 +267,9 @@ struct sh_settings {
     int border_width;
     /* Radius of the corners of tiled windows and their border; 0 keeps them square. */
     int corner_radius;
+    /* windows.round = "always": windows are rounded on outputs without tiling too, but for
+     * those that draw a shadow of their own. */
+    bool round_always;
     float border_active[4], border_inactive[4]; /* premultiplied RGBA */
     /* Pointer devices (libinput only). A negative value keeps the device's own default. */
     double pointer_speed; /* -1 to 1; used when pointer_speed_set */

@@ -186,6 +186,7 @@ struct Config {
                          .output_layout_count = 0,
                          .border_width = 0,
                          .corner_radius = 10,
+                         .round_always = false,
                          .border_active = {0.49F, 0.66F, 1.0F, 1.0F},
                          .border_inactive = {0.25F, 0.29F, 0.36F, 1.0F},
                          .pointer_speed = 0,
