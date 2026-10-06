@@ -25,7 +25,8 @@ Rectangle {
         function onPowerOpenChanged() { if (launcher.visible) launcher.takeFocus() }
     }
     width: Math.min(460, panel.width - 24)
-    height: Math.min(560, panel.popupLayer.height) - shell.panelExtent - 20
+    // Up to 720 pixels, as the output leaves room for beside the bar.
+    height: Math.min(720, panel.popupLayer.height - shell.panelExtent - 20)
     anchors.left: parent.left
     anchors.leftMargin: 12 + shell.panelMarginLeft
     y: panel.onTop ? panel.barBottom + 10 : panel.barTop - height - 10
