@@ -768,55 +768,7 @@ Item {
             NotificationBell { id: bell; panel: root; barHeight: bar.height }
             NetworkWidget { panel: root; barHeight: bar.height }
             BatteryWidget { panel: root; barHeight: bar.height }
-            // The default output's volume. Left-click: per-application volumes; right-click: the
-            // output; wheel: louder or quieter; middle-click: mute.
-            Button {
-                id: audioWidget
-                objectName: "audioWidget"
-                visible: root.audioSource.available && shell.widgets.volume
-                Layout.preferredWidth: 60; Layout.preferredHeight: bar.height - 10
-                onClicked: root.toggleAudioPopup("mixer", audioWidget)
-                Accessible.name: "Volume " + root.audioSource.volume + "%" + (root.audioSource.muted ? ", muted" : "")
-                BarTip { panel: root; owner: audioWidget; text: audioWidget.Accessible.name }
-                background: Rectangle {
-                    radius: 7
-                    color: (root.audioPopup === "mixer" || root.audioPopup === "outputs") ? Qt.lighter(shell.panelColor, 1.8) : (audioWidget.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
-                }
-                contentItem: Item {
-                    Row {
-                        anchors.centerIn: parent; spacing: 4
-                        SpeakerIcon { anchors.verticalCenter: parent.verticalCenter; level: root.audioSource.volume; muted: root.audioSource.muted; color: root.audioSource.muted ? "#8a96a8" : shell.textColor }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: root.audioSource.volume + "%"
-                            color: root.audioSource.muted ? "#8a96a8" : shell.textColor
-                            font.pixelSize: Math.max(6, shell.fontSize - 1); font.family: root.uiFont
-                        }
-                    }
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    acceptedButtons: Qt.RightButton | Qt.MiddleButton
-                    onPressed: (mouse) => {
-                        if (mouse.button === Qt.RightButton)
-                            root.toggleAudioPopup("outputs", audioWidget)
-                    }
-                    onClicked: (mouse) => {
-                        if (mouse.button === Qt.MiddleButton) root.audioSource.toggleMute()
-                    }
-                }
-                // Five percent a wheel notch, up for louder.
-                WheelHandler {
-                    property real travel: 0
-                    onWheel: (event) => {
-                        travel += event.angleDelta.y !== 0 ? event.angleDelta.y : -event.angleDelta.x
-                        var steps = travel > 0 ? Math.floor(travel / 120) : Math.ceil(travel / 120)
-                        travel -= steps * 120
-                        if (steps !== 0)
-                            root.audioSource.changeVolume(steps * 5)
-                    }
-                }
-            }
+            VolumeButton { id: audioWidget; panel: root; barHeight: bar.height }
             KeyboardLayout { panel: root; barHeight: bar.height }
             // The time and date. Clicking it opens the month calendar.
             Button {

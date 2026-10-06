@@ -42,7 +42,7 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     NO_PLUGIN NO_GENERATE_QMLTYPES
     QML_FILES Panel.qml Icon.qml Desktop.qml Switcher.qml Palette.qml Overview.qml NotificationCards.qml Osd.qml ConfigError.qml NotificationBell.qml NotificationHistory.qml
     KeyboardLayout.qml BarTip.qml TaskButton.qml TrayButton.qml
-    WorkspaceIndicator.qml BatteryWidget.qml NetworkWidget.qml SpeakerIcon.qml AudioSlider.qml MuteButton.qml
+    WorkspaceIndicator.qml VolumeButton.qml BatteryWidget.qml NetworkWidget.qml SpeakerIcon.qml AudioSlider.qml MuteButton.qml
     AudioMixer.qml
     CalendarPopup.qml
     AudioOutputs.qml
