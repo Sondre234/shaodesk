@@ -1053,9 +1053,14 @@ int main(int argc, char **argv) {
     }
     // The popover takes the pointer over the list alone.
     {
-        const auto box = groupList->mapRectToScene(QRectF(0, 0, groupList->width(), groupList->height()));
-        if (!QTest::qWaitFor([&] { return popover->inputRegion() == QRegion(box.toAlignedRect()); })) {
-            std::cerr << "the popover takes the pointer elsewhere than over the list\n";
+        // Once it has slid into place.
+        auto box = [&] {
+            return groupList->mapRectToScene(QRectF(0, 0, groupList->width(), groupList->height()));
+        };
+        if (!QTest::qWaitFor([&] { return popover->inputRegion() == QRegion(box().toAlignedRect()); })) {
+            std::cerr << "the popover takes the pointer elsewhere than over the list: "
+                      << QDebug::toString(popover->inputRegion()).toStdString() << " for "
+                      << QDebug::toString(box()).toStdString() << '\n';
             return 1;
         }
     }
@@ -1781,7 +1786,7 @@ int main(int argc, char **argv) {
         }
         auto *dndSwitch = find(view.rootObject(), "dndSwitch");
         QTest::qWait(300);
-        QTest::mouseMove(&view, centre(dndSwitch));
+        QTest::mouseMove(dndSwitch->window(), centre(dndSwitch));
         QTest::qWait(50);
         click(dndSwitch, Qt::LeftButton, 80);
         if (!QTest::qWaitFor([&] { return daemon->dnd(); })) {

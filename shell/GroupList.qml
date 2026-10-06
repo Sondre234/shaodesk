@@ -6,19 +6,20 @@ import Shaodesk
 
 // The windows of a hovered stacked button: clicking one focuses it (or minimizes it when
 // focused already), the cross or a middle click closes it, and a right click opens its menu.
-Rectangle {
+PopupCard {
     id: groupList
     required property var panel
     required property Item barItem
     parent: panel.popupLayer
     objectName: "groupList"
     readonly property int rowHeight: 40
-    visible: panel.groupOpen
-    width: 280; height: 12 + groupWindows.count * rowHeight + Math.max(0, groupWindows.count - 1) * 2
-    x: Math.max(8, Math.min(panel.groupX - width / 2, panel.width - width - 8))
-    y: panel.onTop ? panel.barBottom + 8 : panel.barTop - height - 8
-    color: Theme.surface; radius: Theme.radiusMedium
-    border.color: Theme.border
+    open: panel.groupOpen
+    // Shown on hover, it leaves the keyboard where it is.
+    initialFocus: null
+    implicitWidth: 280
+    implicitHeight: 12 + groupWindows.count * rowHeight + Math.max(0, groupWindows.count - 1) * 2
+    anchorRect: panel.barAnchor(panel.groupX, 0)
+    side: panel.popupSide
     HoverHandler {
         id: groupHover
         onHoveredChanged: groupList.panel.hoverGroupList(hovered)
@@ -34,7 +35,7 @@ Rectangle {
     Column {
         anchors.fill: parent; anchors.margins: 6; spacing: 2
         Repeater {
-            model: panel.groupOpen ? groupWindows : null
+            model: groupList.visible ? groupWindows : null
             delegate: Button {
                 id: groupWindow
                 required property int taskId
