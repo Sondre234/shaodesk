@@ -59,6 +59,45 @@ ACTIONS = {
                     ("contacts", "Open Address Book", "x-office-address-book")],
 }
 
+# More of them, so that the start menu's pages of pins and its list from A to Z look as on a
+# desktop in use (the preview pins some of them).
+APPS += [("code", "Visual Studio Code", "code"), ("libreoffice-writer", "LibreOffice Writer",
+                                                  "libreoffice-writer"),
+         ("libreoffice-calc", "LibreOffice Calc", "libreoffice-calc"),
+         ("spotify", "Spotify", "spotify"), ("obsidian", "Obsidian", "obsidian"),
+         ("systemsettings", "System Settings", "preferences-system"),
+         ("discord", "Discord", "discord"), ("inkscape", "Inkscape", "inkscape"),
+         ("keepassxc", "KeePassXC", "keepassxc"), ("obs", "OBS Studio", "obs"),
+         ("blender", "Blender", "blender"), ("krita", "Krita", "krita"),
+         ("org.kde.okular", "Okular", "okular"), ("org.kde.gwenview", "Gwenview", "gwenview"),
+         ("chromium", "Chromium", "chromium"), ("vlc", "VLC media player", "vlc"),
+         ("signal-desktop", "Signal", "signal-desktop"), ("htop", "htop", "htop"),
+         ("org.gnome.SystemMonitor", "System Monitor", "org.gnome.SystemMonitor")]
+
+# What a search finds some of them by besides their names: desktop id, then the generic name,
+# comment and keywords.
+DETAILS = {
+    "firefox": ("Web Browser", "Browse the World Wide Web", "Internet;WWW;Browser;Web;Explorer;"),
+    "chromium": ("Web Browser", "Access the Internet", "browser;web;"),
+    "foot": ("Terminal", "A Wayland native terminal emulator", "shell;prompt;command;commandline;"),
+    "kitty": ("Terminal emulator", "Fast, feature-rich, GPU based terminal", "shell;prompt;command;"),
+    "org.kde.dolphin": ("File Manager", "Browse and manage your files", "files;folders;explorer;"),
+    "thunderbird": ("Mail Client", "Send and receive mail with Thunderbird", "Email;E-mail;Calendar;"),
+    "code": ("Text Editor", "Code Editing. Redefined.", "vscode;ide;"),
+    "org.kde.kate": ("Advanced Text Editor", "Edit text files", "text;editor;"),
+    "gimp": ("Image Editor", "Create images and edit photographs", "photo;paint;"),
+    "libreoffice-writer": ("Word Processor", "Create and edit text and graphics in letters, "
+                           "reports, documents and Web pages", "Text;Letter;Fax;Document;"),
+    "libreoffice-calc": ("Spreadsheet", "Perform calculations, analyze information and manage "
+                         "lists in spreadsheets", "Accounting;Stats;Spreadsheet;"),
+    "systemsettings": ("System Settings", "Configure the system", "settings;preferences;"),
+    "org.gnome.Calculator": ("Calculator", "Perform arithmetic, scientific or financial "
+                             "calculations", "calculation;arithmetic;scientific;"),
+    "mpv": ("Multimedia player", "Play movies and songs", "mpv;media;player;video;audio;"),
+    "vlc": ("Media player", "Read, capture, broadcast your multimedia streams", "Player;Video;"),
+    "steam": ("Game Store", "Application for managing and playing games on Steam", "Games;"),
+}
+
 # A line of the shell's output that is a QML warning or error.
 QML_WARNING = re.compile(r"\.qml:\d+|ReferenceError|TypeError|Binding loop|QQmlComponent")
 
@@ -151,6 +190,8 @@ def prepare(root, theme_name):
     for desktop_id, name, icon in APPS:
         actions = ACTIONS.get(desktop_id, [])
         entry = f"[Desktop Entry]\nType=Application\nName={name}\nIcon={icon}\nExec=true\n"
+        if desktop_id in DETAILS:
+            entry += "GenericName={}\nComment={}\nKeywords={}\n".format(*DETAILS[desktop_id])
         if actions:
             entry += "Actions=" + "".join(f"{action};" for action, _, _ in actions) + "\n"
         for action, title, action_icon in actions:
