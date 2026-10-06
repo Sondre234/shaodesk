@@ -21,7 +21,7 @@ BODY = (0x41, 0x7b, 0xc4)
 def settings(duration=400, extra=""):
     return f"""return {{
     xwayland = false,
-    layout = {{ tiling = true, gap = 100 }},
+    layout = {{ tiling = true, gap = 100, smart_gaps = false }},
     appearance = {{ background = '#000000' }},
     animations = {{ enabled = true, duration = 10 }},
     zoom = {{ step = 2, max = 4, duration = {duration}{extra} }},

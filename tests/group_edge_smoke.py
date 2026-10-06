@@ -8,9 +8,10 @@ import harness
 
 compositor, probe = (str(Path(p).resolve()) for p in sys.argv[1:3])
 
+# A lone tile keeps its gaps, which tell it from a fullscreen window.
 CONFIG = """return {
     xwayland = false,
-    layout = { tiling = true },
+    layout = { tiling = true, smart_gaps = false },
     outputs = { monitors = { ["HEADLESS-1"] = { mode = "1280x720" } } },
     features = { groups = %s },
 }"""

@@ -17,11 +17,18 @@ struct sh_rect gap_area(const struct sh_settings *settings, struct sh_rect area,
 }
 
 /* The area the tiling of `workspace` on `output` is arranged in, and in `gap` the gap between
- * its tiles, while it holds its windows and `joining` more. Every arrangement of a workspace's
- * tiling and the preview of a new tile take them from here, so they agree. */
+ * its tiles, while it holds its windows and `joining` more. With layout.smart_gaps a lone tile
+ * has no gaps and fills the usable area. Every arrangement of a workspace's tiling and the
+ * preview of a new tile take them from here, so a lone window stays where it is however it is
+ * arranged, and the gaps come and go with its neighbours. */
 struct sh_rect tiling_area(struct sh_server *server, struct wlr_output *output, int workspace,
                            int joining, int *gap) {
     const struct sh_settings *settings = server_settings(server);
+    if (settings->smart_gaps &&
+        sh_tiling_count(server->tiling, output->name, workspace) + joining == 1) {
+        *gap = 0;
+        return usable_area(server, output);
+    }
     *gap = settings->gap_inner;
     return gap_area(settings, usable_area(server, output), SH_TILE);
 }

@@ -231,6 +231,7 @@ struct sh_settings {
     int repeat_delay;
     int gap_inner; /* between neighbouring windows */
     int gap_outer; /* between windows and the edges of the usable area */
+    bool smart_gaps; /* a workspace's only tile has no gaps */
     char keyboard_layout[128];
     char keyboard_variant[128];
     char keyboard_model[128];
