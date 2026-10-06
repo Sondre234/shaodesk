@@ -1032,9 +1032,43 @@ ListModel {
     }
     click(pinned(), Qt::RightButton);
     if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Unpin from taskbar"); }) ||
-        !menuItem("Open")) {
+        !menuItem("Open") || !menuItem("Fake app") ||
+        menuItem("Fake app")->objectName() != "contextMenuTitle") {
         std::cerr << "a pinned application's menu did not offer to unpin it\n";
         return 1;
+    }
+    // One with desktop actions offers them before opening it, and nothing of a window's.
+    {
+        QTest::keyClick(popover, Qt::Key_Escape);
+        controller.pin("shaodesk-test-actions.desktop");
+        auto withActions = [&] { return find(view.rootObject(), "pinned:shaodesk-test-actions.desktop"); };
+        if (!QTest::qWaitFor([&] { return withActions() && withActions()->isVisible() && !popover->isVisible(); }))
+            return fail("the application with desktop actions was not pinned");
+        click(withActions(), Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Touch a file"); }) ||
+            !menuItem("Missing program") || !menuItem("Open") || !menuItem("Unpin from taskbar") ||
+            menuItem("New window") || menuItem("Minimize") || menuItem("Close window"))
+            return fail("a pinned application's menu does not offer its desktop actions and to open it");
+        const auto entries = menu->property("entries").value<QJSValue>();
+        QStringList order; // the title or text of each entry, "-" for a separator
+        for (quint32 i = 0; i < entries.property("length").toUInt(); ++i) {
+            const auto entry = entries.property(i);
+            order << (entry.property("separator").toBool() ? QString("-")
+                      : entry.property("title").isString() ? entry.property("title").toString()
+                                                           : entry.property("text").toString());
+        }
+        if (order.join("|") != "Action app|-|Touch a file|Missing program|Open|-|Unpin from taskbar") {
+            std::cerr << "a pinned application's menu is in the wrong order: "
+                      << order.join("|").toStdString() << '\n';
+            return 1;
+        }
+        QTest::keyClick(popover, Qt::Key_Escape);
+        controller.unpin("shaodesk-test-actions.desktop");
+        if (!QTest::qWaitFor([&] { return !withActions() && !popover->isVisible(); }))
+            return fail("the application with desktop actions was not unpinned");
+        click(pinned(), Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Unpin from taskbar"); }))
+            return fail("the pinned application's menu did not open again");
     }
     click(menuItem("Unpin from taskbar"));
     if (!QTest::qWaitFor([&] { return pinned() == nullptr; }) || !readPins().isEmpty() ||
@@ -1061,6 +1095,11 @@ ListModel {
             std::cerr << "a window's menu is not headed by its application and title\n";
             return 1;
         }
+        // The keyboard passes over the title.
+        QTest::keyClick(popover, Qt::Key_Home);
+        if (!QTest::qWaitFor([&] { return menuItem("New window")->property("highlighted").toBool(); }) ||
+            title()->property("highlighted").toBool())
+            return fail("Home did not go to the first entry under the title");
         QTest::keyClick(popover, Qt::Key_Escape);
         editTasks("model.append({ taskId: 8, title: 'Report', appId: 'shaodesk-test-actions', "
                   "active: false, minimized: false, urgent: false })");
