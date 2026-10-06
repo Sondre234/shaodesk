@@ -45,6 +45,17 @@ enum sh_deco_style deco_style(struct sh_server *server) {
                : SH_DECO_FLAT;
 }
 
+/* Whether the window draws around its geometry, as a client-side frame draws its shadow: its
+ * surface reaches past the geometry it gives. */
+static bool draws_own_shadow(struct sh_toplevel *toplevel) {
+    if (!toplevel->xdg_toplevel || wants_decoration(toplevel))
+        return false;
+    struct wlr_xdg_surface *base = toplevel->xdg_toplevel->base;
+    struct wlr_box g = base->geometry;
+    return g.x > 0 || g.y > 0 || g.x + g.width < base->surface->current.width ||
+           g.y + g.height < base->surface->current.height;
+}
+
 /* The shared buffer for a look of the controls, drawn when first needed and again once an
  * output's scale asks for more pixels. */
 static struct wlr_buffer *deco_buffer(struct sh_server *server, struct sh_deco_look look) {
@@ -292,19 +303,23 @@ void refresh_frame(struct sh_toplevel *toplevel) {
     refresh_decoration(toplevel); // the controls follow the window's width
     refresh_tabs(toplevel);
 
-    // Windows on an output that tiles get rounded corners, floating ones too, clipping
-    // everything drawn for them but the border, which rounds itself to match.
+    // Windows on an output that tiles get rounded corners, floating ones too, and with
+    // windows.round = "always" so does every other window but one that draws a shadow of its
+    // own, which has corners of its own too (and would lose that shadow to the clip). The clip
+    // takes in everything drawn for them but the border, which rounds itself to match.
     struct wlr_box g = toplevel_geometry(toplevel);
     struct wlr_output *output = toplevel_output(toplevel);
-    int radius = mapped && tiles_for(toplevel, output) && !frameless(toplevel, output)
-                     ? settings->corner_radius
-                     : 0;
+    bool rounded = mapped && !frameless(toplevel, output) &&
+                   (tiles_for(toplevel, output) ||
+                    (settings->round_always && !draws_own_shadow(toplevel)));
+    int radius = rounded ? settings->corner_radius : 0;
 #ifdef SHAODESK_ROUNDED_CORNERS
     wlr_scene_tree_set_rounded_clip(
         toplevel->content, radius > 0 ? &(struct wlr_box){0, 0, g.width, g.height} : NULL, radius);
 #else
     radius = 0;
 #endif
+    toplevel->corner_radius = radius;
 
     // xdg-shell windows keep their scene tree while unmapped; the border must not.
     for (int i = 0; i < 4; ++i) {

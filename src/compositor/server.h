@@ -555,6 +555,7 @@ struct sh_toplevel {
     struct wlr_scene_buffer *deco;    // window controls; NULL when the client decorates itself
     struct wlr_scene_rect *border[4]; // top, bottom, left, right; NULL without a border
     int frame_hole; // with rounded corners, the width of the frame border[0] draws; else 0
+    int corner_radius; // of the rounded clip on `content`; 0 while the window is square
     float opacity;                    // last applied to the window's buffers
     struct wlr_scene_buffer *dim;     // black over the window while it is dimmed, else NULL
     struct sh_fade dim_fade;          // how opaque that black is, and where it is heading
