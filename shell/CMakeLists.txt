@@ -257,6 +257,11 @@ if(BUILD_TESTING)
             ${PROJECT_SOURCE_DIR}/tests/urgent_shell_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")
         set_tests_properties(urgent_shell_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME popover_smoke COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/popover_smoke.py $<TARGET_FILE:shaodesk>
+            $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>
+            "${GRIM_ARGUMENT}")
+        set_tests_properties(popover_smoke PROPERTIES TIMEOUT 90)
         if(SHAODESK_DBUS)
             add_test(NAME notifications_smoke COMMAND ${Python3_EXECUTABLE}
                 ${PROJECT_SOURCE_DIR}/tests/notifications_smoke.py $<TARGET_FILE:shaodesk>
