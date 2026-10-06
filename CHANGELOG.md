@@ -4,6 +4,21 @@ Notable changes, newest first. Dates are when the work landed. 0.1.0 is the firs
 release; the dated sections below it record the work that led up to it, and all of it is in
 0.1.0.
 
+## Unreleased
+
+- The shell draws through the GPU by default; `shell.renderer = "software"` keeps the CPU
+  renderer for a weak machine. See [docs/performance.md](docs/performance.md).
+- The shell's colours, type, corners and timings come from one set of design tokens derived from
+  the appearance profile. Hovering, pressing and what is open or on now show on a light panel
+  too, popups are opaque even when the bar is translucent, and the shell's animations follow
+  `animations.enabled` and `animations.speed`.
+- The notification history marks what it shows as read also when it is opened in the first
+  moments after the shell starts, and the network widget dims while the link is down rather
+  than while it is pressed.
+- For working on the shell: `shaodesk-shell --preview-popup NAME` shows one of the taskbar's
+  popups on stand-in data, and `tools/shell_gallery.py` saves a picture of every one, in a light
+  and a dark theme, drawn in software and through the GPU.
+
 ## 0.1.1 (2026-10-05)
 
 Fixes to the tests, CI and the ebuild; the compositor and the shell behave as in 0.1.0.
