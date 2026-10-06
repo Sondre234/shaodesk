@@ -112,6 +112,7 @@ Item {
         }
     }
     Text {
+        objectName: "startNothing"
         anchors.horizontalCenter: parent.horizontalCenter
         y: Theme.spacingXXL
         visible: found.query !== "" && found.results.length === 0

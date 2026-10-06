@@ -1681,6 +1681,13 @@ int main(int argc, char **argv) {
         click(item("startJump:F"));
         if (!QTest::qWaitFor([&] { return !shown("startLetters"); }))
             return fail("jumping to a letter did not show the list again");
+        click(item("startLetter:O"));
+        if (!QTest::qWaitFor([&] { return shown("startLetters"); }))
+            return fail("a letter's heading did not show the letters again");
+        key(Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !shown("startLetters"); }) || !launcherOpen() ||
+            !shown("startApp:shaodesk-test-other.desktop"))
+            return fail("Escape did not close only the letters");
         key(Qt::Key_Down);
         key(Qt::Key_Down);
         if (!QTest::qWaitFor([&] { return item("startApp:shaodesk-test-app.desktop")->property("current").toBool(); }))
@@ -1785,6 +1792,10 @@ int main(int argc, char **argv) {
             item("startBestMatch")->property("result").toMap()["title"] != "Quarterly report" ||
             item("startBestOpen")->property("text") != "Switch to")
             return fail("searching for a window's title did not find it as the best match");
+        search->setProperty("text", "");
+        type("zqxw");
+        if (!QTest::qWaitFor([&] { return shown("startNothing"); }) || shown("startBestMatch"))
+            return fail("a search that finds nothing does not say so");
         search->setProperty("text", "");
         type("action");
         if (!QTest::qWaitFor([&] { return shown("startBestMatch") && shown("startBestAction:touch"); }) ||
