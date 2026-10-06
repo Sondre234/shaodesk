@@ -164,7 +164,7 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
 }
 
 QStringList PreviewData::surfaces() {
-    return {"osd-volume", "osd-text", "cards", "power-dialog"};
+    return {"osd-volume", "osd-text", "cards", "power-dialog", "palette"};
 }
 
 bool PreviewData::showSurface(QScreen *screen, const QString &name) {
@@ -172,20 +172,21 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
     QString file;
     QVariantMap properties;
     auto mode = QQuickView::SizeViewToRootObject;
+    // The offscreen platform's screen has no name, which the palette would take for no output.
+    const QString output = screen->name().isEmpty() ? QStringLiteral("PREVIEW-1") : screen->name();
     if (name.startsWith("osd-")) {
         file = "Osd.qml";
-        properties = {{"outputName", screen->name()}};
+        properties = {{"outputName", output}};
         // Long enough for a slow screenshot, not cut short by the display fading away.
         auto config = controller_.osd()->config();
         config.timeout = 60000;
         controller_.osd()->configure(config);
         if (name == "osd-volume")
-            controller_.osd()->show(screen->name(), "Volume", 64, "volume");
+            controller_.osd()->show(output, "Volume", 64, "volume");
         else
-            controller_.osd()->show(screen->name(), "Do not disturb", -1, "dnd");
+            controller_.osd()->show(output, "Do not disturb", -1, "dnd");
     } else if (name == "cards") {
         file = "NotificationCards.qml";
-        properties = {{"outputName", screen->name()}};
         // Over the stand-ins every preview has: one with a picture, buttons and a timer.
         QImage picture(96, 96, QImage::Format_ARGB32_Premultiplied);
         picture.fill(Qt::transparent);
@@ -213,10 +214,18 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
         message.actions = {{"default", "Open"}, {"reply", "Reply"}, {"read", "Mark as read"}};
         message.timeout = 60000;
         controller_.notifications()->notify(message);
+        // The controller puts the cards on the primary screen.
+        properties = {{"outputName", controller_.cardsOutput()}};
     } else if (name == "power-dialog") {
         file = "PowerDialog.qml";
         mode = QQuickView::SizeRootObjectToView;
-        controller_.power()->request("poweroff", screen->name());
+        controller_.power()->request("poweroff", output);
+    } else if (name == "palette") {
+        file = "Palette.qml";
+        properties = {{"screenSize", ShellView::previewSize()}};
+        controller_.palette()->open(output);
+        // A search that finds applications and actions both.
+        controller_.palette()->setQuery("fi");
     } else {
         return false;
     }
@@ -233,8 +242,10 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
     surface_->setSource(QUrl("qrc:/shell/ShaodeskShell/" + file));
     if (surface_->status() != QQuickView::Ready)
         return false;
+    // As PaletteView does before it shows, and PowerView once it shows.
+    if (name == "palette")
+        QMetaObject::invokeMethod(surface_->rootObject(), "reset");
     surface_->show();
-    // As PowerView does once it shows.
     if (name == "power-dialog")
         QMetaObject::invokeMethod(surface_->rootObject(), "reset");
     return true;
@@ -262,6 +273,10 @@ QImage PreviewData::withSurface(QImage desktop) const {
         // OsdView: centred, 48 pixels from the bottom edge or from the top.
         at = QPoint((output.width() - size.width()) / 2,
                     controller_.osd()->top() ? 48 : output.height() - 48 - size.height());
+    } else if (surfaceName_ == "palette") {
+        // PaletteView: centred, a sixth of the output's height down.
+        at = QPoint(usable.left() + (usable.width() - size.width()) / 2,
+                    usable.top() + output.height() / 6);
     } else if (surfaceName_ == "cards") {
         // CardsView: in the configured corner.
         const auto *center = controller_.notifications();
