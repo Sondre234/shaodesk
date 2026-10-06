@@ -425,7 +425,7 @@ const Option options[] = {
     {"notifications", "table", "", "", none, none,
      "Notifications: the shell serves `org.freedesktop.Notifications` on the session bus and shows "
      "each one as a card on the focused monitor; clicking a card runs its default action, "
-     "hovering pauses its timer, and the panel's bell keeps a history. Critical notifications "
+     "hovering pauses its timer, and the clock's flyout keeps a history. Critical notifications "
      "stay until dismissed. The actions `dnd_toggle`, `dnd_on` and `dnd_off` (or `shaodesk msg "
      "dnd toggle`) silence the cards."},
     {"notifications.enabled", "boolean", "true", "true", none, none,
@@ -442,7 +442,7 @@ const Option options[] = {
      "Start in do-not-disturb: no cards, but everything still reaches the history."},
     {"notifications.width", "integer", "360", "360", 200, 800, "Card width in pixels."},
     {"notifications.history", "integer", "100", "100", 0, 1000,
-     "Notifications the history popover keeps; 0 keeps none."},
+     "Notifications the clock's flyout keeps; 0 keeps none."},
 
     {"osd", "table", "", "", none, none,
      "On-screen display: a small pill near the bottom centre of the focused monitor that shows "
@@ -540,7 +540,7 @@ const Option options[] = {
      "The default output's volume, only with a sound server."},
     {"shell.widgets.clock", "boolean", "true", "true", none, none, "The clock."},
     {"shell.widgets.calendar", "boolean", "true", "true", none, none,
-     "Clicking the clock opens a month calendar."},
+     "The month calendar in the clock's flyout."},
     {"shell.widgets.tiling", "boolean", "true", "true", none, none, "The tiling on/off button."},
     {"shell.widgets.profiles", "boolean", "true", "true", none, none,
      "The appearance profile picker: a button that lists `profiles` to switch between; shown "

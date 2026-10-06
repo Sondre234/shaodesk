@@ -256,14 +256,14 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 
 | Setting | Type | Default | Range | Description |
 | --- | --- | --- | --- | --- |
-| `notifications` | table | - | - | Notifications: the shell serves `org.freedesktop.Notifications` on the session bus and shows each one as a card on the focused monitor; clicking a card runs its default action, hovering pauses its timer, and the panel's bell keeps a history. Critical notifications stay until dismissed. The actions `dnd_toggle`, `dnd_on` and `dnd_off` (or `shaodesk msg dnd toggle`) silence the cards. |
+| `notifications` | table | - | - | Notifications: the shell serves `org.freedesktop.Notifications` on the session bus and shows each one as a card on the focused monitor; clicking a card runs its default action, hovering pauses its timer, and the clock's flyout keeps a history. Critical notifications stay until dismissed. The actions `dnd_toggle`, `dnd_on` and `dnd_off` (or `shaodesk msg dnd toggle`) silence the cards. |
 | `notifications.enabled` | boolean | true | - | Serve notifications. Turn it off to run another daemon such as mako or dunst. |
 | `notifications.position` | enum | "top-right" | - | Corner of the focused monitor the cards stack from: `"top-right"`, `"top-left"`, `"bottom-right"` or `"bottom-left"`. |
 | `notifications.timeout` | integer | 6000 | 0 to 600000 | Milliseconds before a card goes when the application asked for the default; 0 keeps cards until dismissed. An application's own timeout wins, and critical ones never expire. |
 | `notifications.max_visible` | integer | 4 | 1 to 10 | Cards shown at once; newer ones push the oldest into the history. |
 | `notifications.dnd` | boolean | false | - | Start in do-not-disturb: no cards, but everything still reaches the history. |
 | `notifications.width` | integer | 360 | 200 to 800 | Card width in pixels. |
-| `notifications.history` | integer | 100 | 0 to 1000 | Notifications the history popover keeps; 0 keeps none. |
+| `notifications.history` | integer | 100 | 0 to 1000 | Notifications the clock's flyout keeps; 0 keeps none. |
 
 ## `osd`
 
@@ -325,7 +325,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.widgets.network` | boolean | true | - | Connection state, only where a network interface exists. |
 | `shell.widgets.volume` | boolean | true | - | The default output's volume, only with a sound server. |
 | `shell.widgets.clock` | boolean | true | - | The clock. |
-| `shell.widgets.calendar` | boolean | true | - | Clicking the clock opens a month calendar. |
+| `shell.widgets.calendar` | boolean | true | - | The month calendar in the clock's flyout. |
 | `shell.widgets.tiling` | boolean | true | - | The tiling on/off button. |
 | `shell.widgets.profiles` | boolean | true | - | The appearance profile picker: a button that lists `profiles` to switch between; shown only when there are two or more. |
 | `shell.widgets.wallpapers` | boolean | true | - | The wallpaper picker: thumbnails of the images in `shell.wallpapers`; the one picked replaces `shell.wallpaper` for the profile in use until the configured one changes. |
