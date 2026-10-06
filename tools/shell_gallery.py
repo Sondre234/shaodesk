@@ -224,9 +224,13 @@ def run_gpu(build, shell, env, root, jobs, args):
     # The compositor makes a runtime directory of its own, short enough for its sockets.
     env = {name: value for name, value in env.items() if name != "XDG_RUNTIME_DIR"}
 
+    # An output large enough for the preview's popover window, which would be shrunk to fit.
+    config = ('return { xwayland = false, outputs = { monitors = { ["HEADLESS-1"] = '
+              '{ mode = "1920x1080" } } } }\n')
+
     def render_one(popup, out):
-        with harness.Compositor(str(build / "shaodesk"), "return { xwayland = false }\n",
-                                env=env, prefix="sd-gal-") as desktop:
+        with harness.Compositor(str(build / "shaodesk"), config, env=env,
+                                prefix="sd-gal-") as desktop:
             gpu_env = dict(desktop.env, QT_QPA_PLATFORM="wayland")
             gpu_env.pop("SHAODESK_SOCKET", None)  # a preview needs no compositor state
             return render(shell, gpu_env, root, popup, out, 600, args.icon_theme)

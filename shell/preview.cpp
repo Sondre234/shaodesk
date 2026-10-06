@@ -184,7 +184,9 @@ QImage previewOnDesktop(QImage panel, QImage popover, bool panelTop,
         painter.fillRect(desktop.rect(), gradient);
     }
     painter.drawImage(0, panelTop ? 0 : desktop.height() - panel.height(), panel);
+    // Along the bar's edge, as the popups are placed by it, should a compositor have made the
+    // window smaller.
     if (!popover.isNull())
-        painter.drawImage(0, 0, popover);
+        painter.drawImage(0, panelTop ? 0 : desktop.height() - popover.height(), popover);
     return desktop;
 }
