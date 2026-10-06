@@ -80,8 +80,10 @@ Item {
     }
     function showGroup() {
         var button = groupPending
-        if (!button || !button.hovered || !button.stacked || menuOpen)
-            return
+        if (button && button.hovered && button.stacked && !menuOpen)
+            openGroup(button)
+    }
+    function openGroup(button) {
         groupSlot = button.groupSlot
         groupWindowApp = button.groupWindowApp
         groupIcon = button.iconName
@@ -120,6 +122,75 @@ Item {
             launcherOpen = true
             powerOpen = true
         }
+    }
+    // For `shaodesk-shell --preview-popup NAME`, which shows one popup for a screenshot: opens it
+    // the way its button would. "bar" opens none. Returns false for a name it does not know, or
+    // when what the popup belongs to is not on the bar.
+    function previewPopup(name) {
+        taskList.forceLayout()
+        var i
+        switch (name) {
+        case "bar":
+            return true
+        case "launcher":
+            launcherOpen = true
+            return true
+        case "power":
+            togglePowerMenu()
+            return powerOpen
+        case "bar-menu":
+        case "profile-menu":
+            openContextMenu(bar, bar.width / 2, -1)
+            profileMenu = name === "profile-menu"
+            return true
+        case "task-menu":
+            var task = taskList.itemAtIndex(0)
+            if (task)
+                openContextMenu(task, 0, task.taskId, task.appId)
+            return task !== null
+        case "pin-menu":
+            var slot = pinnedSlots.itemAt(0)
+            if (slot)
+                openContextMenu(slot, 0, -1, slot.modelData)
+            return slot !== null
+        case "group":
+            // A stacked button, in the task list or in a pinned slot.
+            var buttons = []
+            for (i = 0; i < taskList.count; ++i)
+                buttons.push(taskList.itemAtIndex(i))
+            for (i = 0; i < pinnedSlots.count; ++i)
+                buttons = buttons.concat(pinnedSlots.itemAt(i).children)
+            for (i = 0; i < buttons.length; ++i)
+                if (buttons[i] && buttons[i].stacked) {
+                    openGroup(buttons[i])
+                    return true
+                }
+            return false
+        case "tray-menu":
+            for (i = 0; i < tray.children.length; ++i)
+                if (tray.children[i].hasMenu) {
+                    trayMenu(tray.children[i])
+                    return true
+                }
+            return false
+        case "calendar":
+            toggleAudioPopup("calendar", clockButton)
+            return clockButton.visible
+        case "mixer":
+        case "outputs":
+            toggleAudioPopup(name, audioWidget)
+            return audioWidget.visible
+        case "profiles":
+            toggleAudioPopup("profiles", profilesButton)
+            return profilesButton.visible
+        case "wallpapers":
+            toggleAudioPopup("wallpapers", wallpapersButton)
+            return wallpapersButton.visible
+        case "notifications":
+            toggleAudioPopup("notifications", bell)
+            return bell.visible
+        }
+        return false
     }
     // Where a tray item's icon is on the screen, which some applications place a window by: the
     // panel spans its output's width, at its top or bottom edge.
@@ -1936,7 +2007,7 @@ Item {
                     delegate: TrayButton { panel: root }
                 }
             }
-            NotificationBell { panel: root; barHeight: bar.height }
+            NotificationBell { id: bell; panel: root; barHeight: bar.height }
             NetworkWidget {}
             BatteryWidget {}
             // The default output's volume. Left-click: per-application volumes; right-click: the

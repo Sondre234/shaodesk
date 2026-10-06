@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "controller.hpp"
+#include "preview.hpp"
 #include "version.h"
 #include "view.hpp"
 #include <QCommandLineParser>
@@ -60,13 +61,19 @@ int main(int argc, char **argv) {
     parser.addOption({"config", "Lua configuration file", "path"});
     parser.addOption({"preview", "Open a normal window for UI development"});
     parser.addOption({"preview-desktop", "Preview the desktop instead of the taskbar"});
+    parser.addOption({"preview-popup",
+                      "Preview the taskbar with one popup open, on stand-in windows, sound, "
+                      "tray items and notifications: bar (none), launcher, power, bar-menu, "
+                      "profile-menu, task-menu, pin-menu, group, tray-menu, calendar, mixer, "
+                      "outputs, profiles, wallpapers or notifications",
+                      "name"});
     parser.addOption(
         {"quit-after", "Exit after this many milliseconds (for UI tests)", "milliseconds"});
     parser.addOption({"screenshot", "Save a preview screenshot before exiting", "path"});
     parser.process(app);
     if (!parser.isSet("config"))
         parser.showHelp(1);
-    const bool preview = parser.isSet("preview");
+    const bool preview = parser.isSet("preview") || parser.isSet("preview-popup");
 #if !SHAODESK_LAYER_SHELL
     if (!preview) {
         std::cerr
@@ -95,6 +102,10 @@ int main(int argc, char **argv) {
             return 1;
         }
         qmlRegisterUncreatableType<TaskModel>("Shaodesk", 1, 0, "TaskModel", "Provided by the shell");
+        // Made before the views, which refer to it, and so destroyed after them.
+        std::unique_ptr<PreviewData> previewData;
+        if (parser.isSet("preview-popup"))
+            previewData = std::make_unique<PreviewData>(controller);
         std::vector<std::unique_ptr<ShellView>> views;
         std::vector<std::unique_ptr<SwitcherView>> switchers;
         std::vector<std::unique_ptr<PaletteView>> palettes;
@@ -129,8 +140,23 @@ int main(int argc, char **argv) {
                 reportFrame();
                 QObject::connect(&controller, &ShellController::configChanged, view.get(),
                                  reportFrame);
+                if (previewData && !desktop) {
+                    previewData->fill(view->rootObject());
+                    // Once the bar is laid out, so the popup opens by its button.
+                    QObject::connect(
+                        view.get(), &QQuickWindow::frameSwapped, &app,
+                        [&, root = view->rootObject()] {
+                            const auto name = parser.value("preview-popup");
+                            if (!PreviewData::open(root, name)) {
+                                std::cerr << "shaodesk-shell: no popup to preview called "
+                                          << name.toStdString() << '\n';
+                                app.exit(1);
+                            }
+                        },
+                        Qt::ConnectionType(Qt::QueuedConnection | Qt::SingleShotConnection));
+                }
                 view->show();
-                if (preview && !desktop)
+                if (preview && !desktop && !previewData)
                     view->rootObject()->setProperty("launcherOpen", true);
                 views.push_back(std::move(view));
             }
