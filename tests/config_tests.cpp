@@ -525,7 +525,7 @@ int main(int argc, char **argv) {
         require(even.shell.panel_margin[0] == 8 && even.shell.panel_margin[3] == 8 &&
                     !even.shell.panel_top && even.shell.icons_only && even.shell.group_windows,
                 "single panel margin not parsed");
-        require(even.shell.software_renderer, "the shell does not draw in software by default");
+        require(!even.shell.software_renderer, "the shell does not draw through the GPU by default");
         require(!shaodesk::parse_config("return {shell={renderer='gpu'}}").shell.software_renderer &&
                     shaodesk::parse_config("return {shell={renderer='software'}}")
                         .shell.software_renderer,

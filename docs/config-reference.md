@@ -310,7 +310,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.panel_radius` | integer | 0 | 0 to 50 | Panel corner radius. |
 | `shell.font` | string | "" | - | Font family; empty keeps the Qt default. |
 | `shell.font_size` | integer | 12 | 6 to 48 | Taskbar text size in pixels. |
-| `shell.renderer` | enum | "software" | - | How the shell draws: `"software"` (the CPU, which starts about three times faster and uses about half the memory) or `"gpu"`. Read at shell start, so a change needs a restart. |
+| `shell.renderer` | enum | "gpu" | - | How the shell draws: `"gpu"` (Qt Quick's OpenGL or Vulkan renderer, which effects such as shadows need) or `"software"` (the CPU, without effects, but it starts about three times faster and uses about half the memory, for a weak machine). Read at shell start, so a change needs a restart. |
 | `shell.icons_only` | boolean | true | - | Taskbar buttons show only the window icon, the title as a tooltip. |
 | `shell.group_windows` | boolean | true | - | One taskbar button per application; `false` gives every window its own. |
 | `shell.accent` | color | "#7da8ff" | - | Accent color, `#RRGGBB` or `#RRGGBBAA`. |

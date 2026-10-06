@@ -504,10 +504,11 @@ const Option options[] = {
     {"shell.font", "string", "\"\"", "\"\"", none, none,
      "Font family; empty keeps the Qt default."},
     {"shell.font_size", "integer", "12", "12", 6, 48, "Taskbar text size in pixels."},
-    {"shell.renderer", "enum", "\"software\"", "\"software\"", none, none,
-     "How the shell draws: `\"software\"` (the CPU, which starts about three times faster and "
-     "uses about half the memory) or `\"gpu\"`. Read at shell start, so a change needs a "
-     "restart."},
+    {"shell.renderer", "enum", "\"gpu\"", "\"gpu\"", none, none,
+     "How the shell draws: `\"gpu\"` (Qt Quick's OpenGL or Vulkan renderer, which effects such "
+     "as shadows need) or `\"software\"` (the CPU, without effects, but it starts about three "
+     "times faster and uses about half the memory, for a weak machine). Read at shell start, so "
+     "a change needs a restart."},
     {"shell.icons_only", "boolean", "true", "true", none, none,
      "Taskbar buttons show only the window icon, the title as a tooltip."},
     {"shell.group_windows", "boolean", "true", "true", none, none,

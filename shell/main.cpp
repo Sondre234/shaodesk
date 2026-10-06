@@ -113,8 +113,9 @@ int main(int argc, char **argv) {
         ShellController controller(parser.value("config").toStdString());
         if (!controller.enabled())
             return 0;
-        // A panel and a wallpaper gain nothing from the GPU, and Qt's GL/Vulkan set-up costs
-        // startup time, memory and threads. The environment's choice, if any, wins.
+        // shell.renderer = "software" spares a weak machine Qt's GL/Vulkan set-up, which costs
+        // startup time, memory and threads, at the price of effects. The environment's choice,
+        // if any, wins.
         if (controller.softwareRenderer() && !qEnvironmentVariableIsSet("QT_QUICK_BACKEND") &&
             !qEnvironmentVariableIsSet("QSG_RHI_BACKEND"))
             QQuickWindow::setGraphicsApi(QSGRendererInterface::Software);
