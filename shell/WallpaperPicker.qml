@@ -5,13 +5,13 @@ import QtQuick.Layouts
 
 // The wallpaper button's popup: thumbnails of the pictures in shell.wallpapers, by subfolder,
 // with a filter; clicking one shows it at once and keeps the picker open to try another.
-Rectangle {
+PopupCard {
     id: wallpaperPicker
     required property var panel
     required property Item barItem
     parent: panel.popupLayer
     objectName: "wallpaperPicker"
-    visible: panel.audioPopup === "wallpapers"
+    open: panel.audioPopup === "wallpapers"
     // "" shows every folder.
     property string folder: ""
     readonly property var folders: {
@@ -29,17 +29,13 @@ Rectangle {
             return words.every(function(word) { return text.indexOf(word) >= 0 })
         })
     }
-    function opened() { shell.findWallpapers(); filter.forceActiveFocus() }
-    onVisibleChanged: if (visible) opened()
-    Component.onCompleted: if (visible) opened()
-    width: Math.min(880, panel.width - 16)
+    onOpened: shell.findWallpapers()
+    initialFocus: filter
+    implicitWidth: 880
     // As tall as when it shared the bar's surface, which grew to at most 560 pixels.
-    height: Math.max(220, Math.min(500, Math.min(560, panel.popupLayer.height) - barItem.height - shell.panelMarginTop - shell.panelMarginBottom - 16))
-    x: Math.max(8, Math.min(panel.audioPopupX - width / 2, panel.width - width - 8))
-    y: panel.onTop ? panel.barBottom + 8 : panel.barTop - height - 8
-    color: Theme.surface; radius: 10
-    border.color: Theme.border
-    MouseArea { anchors.fill: parent }
+    implicitHeight: Math.max(220, Math.min(500, Math.min(560, panel.popupLayer.height) - barItem.height - shell.panelMarginTop - shell.panelMarginBottom - 16))
+    anchorRect: panel.barAnchor(panel.audioPopupX, 0)
+    side: panel.popupSide
     ColumnLayout {
         anchors.fill: parent; anchors.margins: 10; spacing: 8
         RowLayout {
