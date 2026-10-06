@@ -3021,6 +3021,46 @@ ListModel {
                 std::cerr << name << " stayed on the bar while placed in Quick Settings\n";
                 return 1;
             }
+        // The button shows the volume and the battery, and the network only while its link is
+        // down; with none of those, sliders.
+        auto *networkIcon = find(view.rootObject(), "quickSettingsNetwork");
+        auto *volumeIcon = find(view.rootObject(), "quickSettingsVolume");
+        auto *batteryIcon = find(view.rootObject(), "quickSettingsBattery");
+        auto *slidersIcon = find(view.rootObject(), "quickSettingsSliders");
+        auto shows = [&](bool network, bool volume, bool battery, bool sliders) {
+            return networkIcon->isVisible() == network && volumeIcon->isVisible() == volume &&
+                   batteryIcon->isVisible() == battery && slidersIcon->isVisible() == sliders;
+        };
+        auto description = [&] { return button->property("description").toString(); };
+        if (!networkIcon || !volumeIcon || !batteryIcon || !slidersIcon ||
+            !QTest::qWaitFor([&] { return shows(true, true, true, false); }) ||
+            !description().contains("Network disconnected"))
+            return fail("the Quick Settings button does not show a link that is down");
+        // A wired link that is up and no battery: the volume alone, and without a sound server the
+        // sliders.
+        QDir linkSys(screens.filePath("link"));
+        linkSys.mkpath("class/net/eth0");
+        for (const auto &[name, text] : {std::pair{"device", ""}, {"operstate", "up\n"}}) {
+            QFile file(linkSys.filePath(QString("class/net/eth0/") + name));
+            if (!file.open(QIODevice::WriteOnly) || file.write(text) < 0)
+                return fail("could not write the fake network interface");
+        }
+        SystemStatus linked(linkSys.path());
+        QQmlEngine::setObjectOwnership(&linked, QQmlEngine::CppOwnership);
+        view.rootObject()->setProperty("statusSource", QVariant::fromValue(&linked));
+        if (!QTest::qWaitFor([&] { return linked.networkState() == "ethernet" && shows(false, true, false, false); }) ||
+            description().contains("connected"))
+            return fail("the Quick Settings button shows a link that is up");
+        FakeAudio silent; // never available
+        QQmlEngine::setObjectOwnership(&silent, QQmlEngine::CppOwnership);
+        view.rootObject()->setProperty("audioSource", QVariant::fromValue<QObject *>(&silent));
+        if (!QTest::qWaitFor([&] { return shows(false, false, false, true); }) ||
+            description() != "Quick settings")
+            return fail("the Quick Settings button shows no sliders with nothing else to show");
+        view.rootObject()->setProperty("audioSource", QVariant::fromValue<QObject *>(&audio));
+        view.rootObject()->setProperty("statusSource", QVariant::fromValue(&fake));
+        if (!QTest::qWaitFor([&] { return shows(true, true, true, false); }))
+            return fail("the Quick Settings button did not show the link going down");
         click(button);
         auto *quick = find(view.rootObject(), "quickSettings");
         if (!quick || !QTest::qWaitFor([&] { return inPopover(quick); }))

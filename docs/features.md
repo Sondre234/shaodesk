@@ -70,16 +70,17 @@ it goes on.
 
 ### Quick Settings
 
-Left of the clock, as on Windows 11, the Quick Settings button shows the network, the volume and
-the battery in small icons; its wheel changes the volume and a middle click mutes. Clicking it
-opens Quick Settings at the bar's right end: tiles for do-not-disturb, night light (on or off
-against its schedule, through the compositor), tiling on this monitor (greyed out where tiling is
-not available), the appearance profile (listing the profiles under it) and the wallpaper (opening
-the same picker as the bar's button), and the network's state on a disc rather than a tile, as it
-is only shown (Wi-Fi, wired or down, and the interface; shaodesk does not manage connections); a
-brightness slider where the screen has a backlight (set through logind's `SetBrightness`, so no
-privileges are needed); the volume with its mute, the outputs to play through and each
-application's volume a click away; and the battery's charge along the foot.
+Left of the clock, as on Windows 11, the Quick Settings button shows the volume and the battery in
+small icons, and the network only while its link is down, dimmed and struck through as a warning
+(a link that is up shows only in Quick Settings); its wheel changes the volume and a middle click
+mutes. Clicking it opens Quick Settings at the bar's right end: tiles for do-not-disturb, night
+light (on or off against its schedule, through the compositor), tiling on this monitor (greyed out
+where tiling is not available), the appearance profile (listing the profiles under it) and the
+wallpaper (opening the same picker as the bar's button), and the network's state on a disc rather
+than a tile, as it is only shown (Wi-Fi, wired or down, and the interface; shaodesk does not
+manage connections); a brightness slider where the screen has a backlight (set through logind's
+`SetBrightness`, so no privileges are needed); the volume with its mute, the outputs to play
+through and each application's volume a click away; and the battery's charge along the foot.
 
 ### Where the widgets go
 

@@ -3,9 +3,10 @@ import QtQuick
 import QtQuick.Layouts
 
 // The Quick Settings button, left of the clock as on Windows 11: the status of the widgets
-// shell.widgets puts in Quick Settings ("quick") in small icons (the network, the volume, the
-// battery with its charge), there while any widget is placed there. Clicking opens the flyout;
-// the wheel changes the volume and a middle click mutes it, as on the volume control.
+// shell.widgets puts in Quick Settings ("quick") in small icons (the volume, the battery with its
+// charge, and the network only while its link is down), there while any widget is placed there.
+// Clicking opens the flyout; the wheel changes the volume and a middle click mutes it, as on the
+// volume control.
 FlatButton {
     id: button
     required property var panel
@@ -13,7 +14,8 @@ FlatButton {
     readonly property var widgets: shell.widgets
     readonly property var audio: panel.audioSource
     readonly property var status: panel.statusSource
-    readonly property bool showNetwork: widgets.network === "quick" && status.networkState !== "none"
+    // A link that is up is not worth the room; one that is down is a warning.
+    readonly property bool showNetwork: widgets.network === "quick" && status.networkState === "disconnected"
     // The sound server the panel follows, which a test may take away as it ends.
     readonly property bool showVolume: widgets.volume === "quick" && !!audio && audio.available
     readonly property bool showBattery: widgets.battery === "quick" && status.batteryPresent
@@ -38,14 +40,16 @@ FlatButton {
             id: icons
             anchors.centerIn: parent
             spacing: Theme.spacingM
-            FadingIcon {
+            Icon {
+                objectName: "quickSettingsNetwork"
                 visible: button.showNetwork
                 anchors.verticalCenter: parent.verticalCenter
-                name: button.status.networkState === "ethernet" ? "ethernet-port"
-                    : button.status.networkState === "disconnected" ? "wifi-off" : "wifi"
-                color: button.status.networkState === "disconnected" ? Theme.textMuted : Theme.text
+                size: Theme.iconSize
+                name: "wifi-off"
+                color: Theme.textMuted
             }
             SpeakerIcon {
+                objectName: "quickSettingsVolume"
                 visible: button.showVolume
                 anchors.verticalCenter: parent.verticalCenter
                 level: button.showVolume ? button.audio.volume : 0
@@ -53,12 +57,14 @@ FlatButton {
                 color: muted ? Theme.textMuted : Theme.text
             }
             BatteryIcon {
+                objectName: "quickSettingsBattery"
                 visible: button.showBattery
                 anchors.verticalCenter: parent.verticalCenter
                 status: button.status
             }
             // With none of those to show, a sign that settings are behind it.
             Icon {
+                objectName: "quickSettingsSliders"
                 visible: !button.showNetwork && !button.showVolume && !button.showBattery
                 anchors.verticalCenter: parent.verticalCenter
                 name: "sliders-horizontal"
