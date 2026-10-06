@@ -290,7 +290,9 @@ static void get_opacities(struct sh_server *server, int fd, const char *argument
 static void get_frames(struct sh_server *server, int fd, const char *arguments) {
     // What the compositor draws for each window, in the order of `get windows`: app_id, title,
     // focused, its controls ("flat", "traffic_lights", or "none" while the window draws its
-    // own frame), whether they show, and the radius of its rounded corners (0 for square).
+    // own frame), whether they show, the radius of its rounded corners (0 for square), and its
+    // shadow: whether it has one, how dark (thousandths of the alpha where it is darkest) and
+    // the box it covers from the window's top-left corner.
     control_reply(fd, "ok\n");
     const char *style = deco_style(server) == SH_DECO_TRAFFIC_LIGHTS ? "traffic_lights" : "flat";
     struct sh_toplevel *toplevel;
@@ -304,9 +306,13 @@ static void get_frames(struct sh_server *server, int fd, const char *arguments) 
         for (char *c = title; *c; ++c)
             *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
         bool revealed = toplevel->deco && toplevel->deco->node.enabled;
-        snprintf(line, sizeof(line), "%s\t%s\t%d\t%s\t%d\t%d\n", app_id, title,
-                 server->focused_toplevel == toplevel, toplevel->deco ? style : "none", revealed,
-                 toplevel->corner_radius);
+        struct wlr_box shadow = toplevel->shadow ? toplevel->shadow_box : (struct wlr_box){0};
+        snprintf(line, sizeof(line), "%s\t%s\t%d\t%s\t%d\t%d\t%d\t%ld\t%d\t%d\t%d\t%d\n",
+                 app_id, title, server->focused_toplevel == toplevel,
+                 toplevel->deco ? style : "none", revealed, toplevel->corner_radius,
+                 toplevel->shadow != NULL,
+                 toplevel->shadow ? lround(1000 * toplevel->shadow_alpha) : 0, shadow.x, shadow.y,
+                 shadow.width, shadow.height);
         control_reply(fd, line);
     }
 }

@@ -653,6 +653,11 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>
             "${GRIM_ARGUMENT}")
         set_tests_properties(window_controls_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME window_shadow_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_shadow_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>
+            "${GRIM_ARGUMENT}")
+        set_tests_properties(window_shadow_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME peek_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/peek_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")
