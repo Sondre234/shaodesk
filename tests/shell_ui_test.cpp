@@ -1613,6 +1613,12 @@ int main(int argc, char **argv) {
         if (!QTest::qWaitFor([&] { return requests == QStringList{"toggle_tiling"}; }))
             return fail("an entry of the palette's did not run outside it");
         requests.clear();
+        // An application it launches is among those launched lately.
+        palette->run({{"kind", "app"}, {"target", "shaodesk-test-other.desktop"}}, output);
+        if (!QTest::qWaitFor([&] {
+                return controller.startMenu()->recent().value(0).toMap()["appId"] == "shaodesk-test-other.desktop";
+            }))
+            return fail("an application launched from the palette was not recorded");
     }
     // The start menu: its pinned applications and those launched lately, every application from
     // A to Z, and a search over applications, windows and actions, each moved through with the
