@@ -58,18 +58,22 @@ Item {
             readonly property string name: shell.workspaceNames[modelData.workspace - 1] || ""
             // A window on this workspace is asking for attention.
             readonly property bool urgent: overview.urgentWorkspaces.indexOf(modelData.workspace) >= 0
+            // A pill in the cell's corner: in the accent colour for the workspace shown, ringed in
+            // the urgent colour for one with a window asking for attention.
             Rectangle {
                 anchors.left: parent.left; anchors.bottom: parent.bottom
-                anchors.margins: 4
-                width: label.implicitWidth + 12; height: 18; radius: 9
-                color: modelData.workspace === overview.viewed ? Theme.accent : Theme.alpha(Theme.surface, 0.85)
+                anchors.margins: Theme.spacingS
+                width: label.implicitWidth + 2 * Theme.spacingM
+                height: label.implicitHeight + 2 * Theme.spacingXS
+                radius: height / 2
+                color: modelData.workspace === overview.viewed ? Theme.accent : Theme.surface
                 border.width: cell.urgent ? 2 : 0; border.color: Theme.urgent
                 Text {
                     id: label
                     anchors.centerIn: parent
                     text: cell.name.length > 0 ? modelData.workspace + " " + cell.name : modelData.workspace
                     color: modelData.workspace === overview.viewed ? Theme.textOnAccent : Theme.text
-                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall; font.bold: true
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall; font.weight: Font.DemiBold
                 }
             }
         }
