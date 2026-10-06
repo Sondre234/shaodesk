@@ -272,41 +272,10 @@ PopupCard {
                     }
                     Repeater {
                         model: quick.audio.streams
-                        RowLayout {
-                            id: streamRow
-                            required property int streamId
-                            required property string name
-                            required property string icon
-                            required property int volume
-                            required property bool muted
-                            width: parent.width; height: Theme.rowHeight + Theme.spacingM
-                            spacing: Theme.spacingS
-                            Image {
-                                source: "image://icons/" + streamRow.icon
-                                sourceSize: Qt.size(2 * Theme.appIconSize, 2 * Theme.appIconSize)
-                                Layout.preferredWidth: Theme.appIconSize; Layout.preferredHeight: Theme.appIconSize
-                                Layout.leftMargin: Theme.spacingXS; Layout.rightMargin: Theme.spacingXS
-                            }
-                            ColumnLayout {
-                                Layout.fillWidth: true; spacing: 0
-                                Text {
-                                    Layout.fillWidth: true
-                                    text: streamRow.name; textFormat: Text.PlainText; elide: Text.ElideRight
-                                    color: Theme.text; font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily
-                                }
-                                AudioSlider {
-                                    objectName: "quickStreamSlider"
-                                    Layout.fillWidth: true; Layout.preferredHeight: Theme.iconSize + Theme.spacingS
-                                    value: streamRow.volume; muted: streamRow.muted
-                                    Accessible.name: streamRow.name
-                                    onMoved: quick.audio.setStreamVolume(streamRow.streamId, Math.round(value))
-                                }
-                            }
-                            MuteButton {
-                                level: streamRow.volume; muted: streamRow.muted
-                                Accessible.name: (muted ? "Unmute " : "Mute ") + streamRow.name
-                                onClicked: quick.audio.toggleStreamMute(streamRow.streamId)
-                            }
+                        StreamRow {
+                            width: parent.width
+                            audio: quick.audio
+                            sliderName: "quickStreamSlider"
                         }
                     }
                 }
