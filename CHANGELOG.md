@@ -33,6 +33,14 @@ release; the dated sections below it record the work that led up to it, and all 
 - For working on the shell: `shaodesk-shell --preview-popup NAME` shows one of the taskbar's
   popups on stand-in data, and `tools/shell_gallery.py` saves a picture of every one, in a light
   and a dark theme, drawn in software and through the GPU.
+- The clock opens one flyout at the bar's right end, as on Windows 11: the notifications above
+  and a calendar below. The notifications are grouped by application, with pictures, progress,
+  action buttons and a cross on hover, and a do-not-disturb switch and Clear all over them. The
+  calendar shows the time and today's date, pages by month with arrows or the wheel (sliding each
+  month in), zooms out from its title to the months and the years, and has a Today button.
+  `notification_history` (Super + N) opens the flyout. The clock shows the unread count, muted
+  with do-not-disturb, which a right-click on it toggles; the bell is off unless
+  `shell.widgets.notifications = true`.
 
 ## 0.1.1 (2026-10-05)
 
