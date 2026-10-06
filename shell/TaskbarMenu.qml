@@ -29,12 +29,14 @@ PopupMenu {
         if (app !== null)
             return [{ text: "Open " + app.name, run: function() { shell.launch(app.appId) } }]
                 .concat(app.configured ? [] : [panel.pinAction(app.appId)])
-        return [{ text: panel.tiling ? "Turn tiling off" : "Turn tiling on", enabled: shell.tilingAvailable,
+        // Icons of what each entry leads to: floating windows or tiles, as the tiling button shows.
+        return [{ text: panel.tiling ? "Turn tiling off" : "Turn tiling on",
+                  icon: panel.tiling ? "copy" : "layout-panel-left", enabled: shell.tilingAvailable,
                   run: function() { shell.toggleTiling(contextMenu.panel.outputName) } },
-                { text: "Applications", run: function() { contextMenu.panel.launcherOpen = true } },
-                { text: "Show desktop", run: function() { shell.tasks.showDesktop() } }]
+                { text: "Applications", icon: "layout-grid", run: function() { contextMenu.panel.launcherOpen = true } },
+                { text: "Show desktop", icon: "minimize-2", run: function() { shell.tasks.showDesktop() } }]
             .concat(shell.profiles.length > 0
-                ? [{ text: "Appearance", secondary: shell.profile,
+                ? [{ text: "Appearance", icon: "palette", secondary: shell.profile,
                      submenu: shell.profiles.map(function(name) {
                          return { text: name, toggle: "radio", checked: name === shell.profile,
                                   run: function() { if (name !== shell.profile) shell.pickProfile(name) } }
