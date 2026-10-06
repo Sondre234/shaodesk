@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* The taskbar's window menu: shaodesk-window-control-v1 names a window by its wlr-foreign-toplevel
- * handle, tells the shell which output and workspace each is on and how it is placed, and moves
- * one to another workspace or output, makes it sticky or floats it. */
+/* The taskbar's window menu and pictures: shaodesk-window-control-v1 names a window by its
+ * wlr-foreign-toplevel handle, tells the shell which output and workspace each is on and how it
+ * is placed, moves one to another workspace or output, makes it sticky or floats it, and gives
+ * its capture source for a picture of it. */
 #include "server.h"
 
 /* One shaodesk_window_v1: the window it names, NULL once that is gone, and what it last sent. */
@@ -156,6 +157,17 @@ static void window_unset_floating(struct wl_client *client, struct wl_resource *
         set_floating(toplevel, false, false);
 }
 
+/* The capture source ext-foreign-toplevel-list's handle for the window gives, the same object;
+ * an inert one when the window is gone or the session is locked, never none, which the client's
+ * next request would find missing. */
+static void window_get_capture_source(struct wl_client *client, struct wl_resource *resource,
+                                      uint32_t id) {
+    struct sh_window_object *object = wl_resource_get_user_data(resource);
+    struct sh_toplevel *toplevel = object ? object->toplevel : NULL;
+    wlr_ext_image_capture_source_v1_create_resource(
+        toplevel ? toplevel_capture_source(toplevel) : NULL, client, id);
+}
+
 static const struct shaodesk_window_v1_interface window_implementation = {
     .destroy = window_destroy,
     .move_to_workspace = window_move_to_workspace,
@@ -164,6 +176,7 @@ static const struct shaodesk_window_v1_interface window_implementation = {
     .unset_sticky = window_unset_sticky,
     .set_floating = window_set_floating,
     .unset_floating = window_unset_floating,
+    .get_capture_source = window_get_capture_source,
 };
 
 static void window_resource_destroy(struct wl_resource *resource) {
@@ -214,11 +227,12 @@ static void control_bind(struct wl_client *client, void *data, uint32_t version,
 }
 
 /* Offered to every client, as wlr-foreign-toplevel-management is: it does nothing to a window a
- * taskbar could not already do. */
+ * taskbar could not already do, and shows nothing of one that ext-foreign-toplevel-list's
+ * capture sources do not. */
 void window_control_init(struct sh_server *server) {
     wl_list_init(&server->window_objects);
     server->window_control = wl_global_create(server->wl_display,
-                                              &shaodesk_window_control_v1_interface, 1, server,
+                                              &shaodesk_window_control_v1_interface, 2, server,
                                               control_bind);
     if (!server->window_control)
         wlr_log(WLR_ERROR, "Cannot offer shaodesk-window-control-v1");

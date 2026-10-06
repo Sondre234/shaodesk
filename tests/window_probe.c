@@ -16,7 +16,7 @@
 
 /* A taskbar's view of one window through shaodesk-window-control-v1, for the tests: finds the
  * window titled TITLE through wlr-foreign-toplevel, then prints its state, sends one request,
- * or prints each state the compositor sends until the window closes.
+ * prints each state the compositor sends until the window closes, or captures the window.
  *
  *   window_probe TITLE                   prints "OUTPUT WORKSPACE STATE"
  *   window_probe TITLE watch             prints that line after every done, until it closes
@@ -25,9 +25,11 @@
  *   window_probe TITLE sticky 0|1        set_sticky or unset_sticky
  *   window_probe TITLE floating 0|1      set_floating or unset_floating
  *   window_probe TITLE minimize          minimizes it through its wlr-foreign-toplevel handle
+ *   window_probe TITLE capture [watch]   captures it through get_capture_source (version 2)
  *   window_probe TITLE capture-listed [watch]
  *                                        captures it through ext-foreign-toplevel-list and
- *                                        ext-foreign-toplevel-image-capture-source-v1
+ *                                        ext-foreign-toplevel-image-capture-source-v1, as screen
+ *                                        sharing does
  *
  * STATE is the flags joined by commas ("floating,tiling"), or "-" for none; OUTPUT is "-" before
  * the window is on one.
@@ -335,7 +337,8 @@ static void registry_global(void *data, struct wl_registry *registry, uint32_t n
             wl_registry_bind(registry, name, &zwlr_foreign_toplevel_manager_v1_interface, 3);
         zwlr_foreign_toplevel_manager_v1_add_listener(probe->manager, &manager_listener, probe);
     } else if (!strcmp(interface, shaodesk_window_control_v1_interface.name)) {
-        probe->control = wl_registry_bind(registry, name, &shaodesk_window_control_v1_interface, 1);
+        probe->control = wl_registry_bind(registry, name, &shaodesk_window_control_v1_interface,
+                                          version < 2 ? version : 2);
     } else if (!strcmp(interface, ext_foreign_toplevel_list_v1_interface.name)) {
         probe->list = wl_registry_bind(registry, name, &ext_foreign_toplevel_list_v1_interface, 1);
         ext_foreign_toplevel_list_v1_add_listener(probe->list, &list_listener, probe);
@@ -381,7 +384,7 @@ static void capture(struct probe *probe, struct wl_display *display,
 int main(int argc, char **argv) {
     if (argc != 2 && argc != 3 && argc != 4)
         die("usage: window_probe TITLE [watch | workspace N | output NAME | sticky 0|1 | "
-            "floating 0|1 | minimize | capture-listed [watch]]");
+            "floating 0|1 | minimize | capture [watch] | capture-listed [watch]]");
     const char *title = argv[1], *command = argc > 2 ? argv[2] : "", *argument = argc > 3 ? argv[3] : "";
     struct probe probe = {.watch = !strcmp(command, "watch")};
     struct wl_display *display = wl_display_connect(NULL);
@@ -428,6 +431,11 @@ int main(int argc, char **argv) {
             shaodesk_window_v1_unset_floating(window);
     } else if (!strcmp(command, "minimize")) {
         zwlr_foreign_toplevel_handle_v1_set_minimized(found->object);
+    } else if (!strcmp(command, "capture")) {
+        if (shaodesk_window_control_v1_get_version(probe.control) < 2 || !probe.copy || !probe.shm)
+            die("the compositor offers no window capture");
+        capture(&probe, display, shaodesk_window_v1_get_capture_source(window),
+                !strcmp(argument, "watch"));
     } else if (!strcmp(command, "capture-listed")) {
         if (!probe.list || !probe.sources || !probe.copy || !probe.shm)
             die("the compositor offers no window capture");
