@@ -4,32 +4,85 @@ import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
 // The clock flyout's calendar card (ClockFlyout.qml): the time and today's date over a month
-// calendar with today marked, paged by month. Weeks start on the locale's first day.
+// calendar with today marked, paged by month. Weeks start on the locale's first day. As on
+// Windows, the title zooms out to the year's months and then to a decade's years, where a pick
+// zooms back in.
 PopupCard {
     id: calendar
     required property var panel
     objectName: "calendar"
     property int month: new Date().getMonth()
     property int year: new Date().getFullYear()
+    // What the grid shows: "days" of the month, the "months" of the year, or the "years" of its
+    // decade.
+    property string view: "days"
+    readonly property int decade: Math.floor(year / 10) * 10
     // Now, to the minute, while it shows.
     property date now: new Date()
-    // Shows another month, sliding it in from the side it lies on: a later one from below.
-    function show(newYear, newMonth) {
-        var later = newYear * 12 + newMonth - (year * 12 + month)
-        year = newYear; month = newMonth
+    // How far the grid still has to slide in after paging, from 1 (from below) or -1 (from
+    // above) to 0, and how far a new view has zoomed in, from 0 to 1, starting at zoomFrom times
+    // its size.
+    property real shift: 0
+    property real zoom: 1
+    property real zoomFrom: 1
+    function slideIn(later) {
         if (later !== 0) {
             slide.direction = later > 0 ? 1 : -1
             slide.restart()
         }
     }
-    function step(delta) {
-        var d = new Date(year, month + delta, 1)
-        show(d.getFullYear(), d.getMonth())
+    // Shows another month, sliding it in from the side it lies on: a later one from below.
+    function show(newYear, newMonth) {
+        var later = newYear * 12 + newMonth - (year * 12 + month)
+        year = newYear; month = newMonth
+        slideIn(later)
     }
-    function today() { var d = new Date(); show(d.getFullYear(), d.getMonth()) }
+    // Pages by a month, a year or a decade, as the view goes.
+    function step(delta) {
+        if (view === "days") {
+            var d = new Date(year, month + delta, 1)
+            show(d.getFullYear(), d.getMonth())
+        } else {
+            var years = view === "months" ? delta : 10 * delta
+            year += years
+            slideIn(years)
+        }
+    }
+    // Zooms out (to a longer span) or in to another view: the new one shrinks or grows into place.
+    function zoomTo(next) {
+        var order = ["days", "months", "years"]
+        zoomFrom = order.indexOf(next) > order.indexOf(view) ? 1.15 : 0.85
+        view = next
+        zooming.restart()
+    }
+    function today() {
+        var d = new Date()
+        if (view === "days") {
+            show(d.getFullYear(), d.getMonth())
+        } else {
+            year = d.getFullYear(); month = d.getMonth()
+            zoomTo("days")
+        }
+    }
     onOpened: {
         now = new Date()
         year = now.getFullYear(); month = now.getMonth()
+        view = "days"
+        slide.stop(); zooming.stop()
+        shift = 0; zoom = 1
+    }
+    NumberAnimation {
+        id: slide
+        property real direction: 1
+        target: calendar; property: "shift"
+        from: direction; to: 0
+        duration: Theme.durationNormal; easing.type: Theme.easing
+    }
+    NumberAnimation {
+        id: zooming
+        target: calendar; property: "zoom"
+        from: 0; to: 1
+        duration: Theme.durationNormal; easing.type: Theme.easing
     }
     // A day's cell, and the room around the grid.
     readonly property real cellWidth: Theme.rowHeight + Theme.spacingL
@@ -46,11 +99,37 @@ PopupCard {
         interval: untilMinute(); running: calendar.visible; repeat: true
         onTriggered: { calendar.now = new Date(); interval = untilMinute() }
     }
+
+    // A month or a year to pick in the zoomed-out views: a disc in the accent colour for this
+    // month or year, muted outside the decade shown.
+    component Pick: AbstractButton {
+        id: pick
+        property bool current: false
+        property bool dim: false
+        hoverEnabled: true
+        focusPolicy: Qt.NoFocus
+        background: Item {
+            Rectangle {
+                anchors.centerIn: parent
+                width: Math.min(parent.width, parent.height) - 2 * Theme.spacingL; height: width; radius: width / 2
+                color: pick.current ? (pick.hovered ? Theme.accentHover : Theme.accent)
+                       : pick.pressed ? Theme.pressed : pick.hovered ? Theme.hover : "transparent"
+            }
+        }
+        contentItem: Text {
+            text: pick.text
+            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+            color: pick.current ? Theme.textOnAccent : pick.dim ? Theme.textDisabled : Theme.text
+            font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+            font.weight: pick.current ? Font.DemiBold : Font.Normal
+        }
+    }
+
     ColumnLayout {
         id: content
         anchors.fill: parent; anchors.margins: calendar.padding
         spacing: Theme.spacingM
-        // A wheel notch pages one month: down or right to the next.
+        // A wheel notch pages once: down or right to what comes next.
         WheelHandler {
             property real travel: 0
             onWheel: (event) => {
@@ -79,7 +158,7 @@ PopupCard {
             }
         }
         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.divider }
-        // The month shown, and the arrows to page through the months.
+        // What is shown, which zooms out when clicked, and the arrows to page through it.
         RowLayout {
             Layout.fillWidth: true; spacing: Theme.spacingXS
             FlatButton {
@@ -87,10 +166,13 @@ PopupCard {
                 objectName: "calendarTitle"
                 Layout.preferredHeight: Theme.rowHeight
                 leftPadding: Theme.spacingS; rightPadding: Theme.spacingS
-                onClicked: calendar.today()
-                Accessible.name: "Go to today"
+                enabled: calendar.view !== "years"
+                onClicked: calendar.zoomTo(calendar.view === "days" ? "months" : "years")
+                Accessible.name: calendar.view === "days" ? "Choose a month" : "Choose a year"
                 contentItem: Text {
-                    text: Qt.locale().monthName(calendar.month) + " " + calendar.year
+                    text: calendar.view === "days" ? Qt.locale().standaloneMonthName(calendar.month) + " " + calendar.year
+                        : calendar.view === "months" ? String(calendar.year)
+                        : calendar.decade + "–" + (calendar.decade + 9)
                     color: Theme.text; font.pixelSize: Theme.fontSizeLarge; font.weight: Font.DemiBold; font.family: Theme.fontFamily
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -101,7 +183,8 @@ PopupCard {
                 objectName: "calendarToday"
                 Layout.preferredHeight: Theme.rowHeight
                 leftPadding: Theme.spacingM; rightPadding: Theme.spacingM
-                enabled: calendar.month !== calendar.now.getMonth() || calendar.year !== calendar.now.getFullYear()
+                enabled: calendar.view !== "days" || calendar.month !== calendar.now.getMonth() ||
+                         calendar.year !== calendar.now.getFullYear()
                 onClicked: calendar.today()
                 Accessible.name: "Go to today"
                 contentItem: Text {
@@ -115,72 +198,129 @@ PopupCard {
                 objectName: "calendarPrevious"
                 Layout.preferredWidth: Theme.rowHeight; Layout.preferredHeight: Theme.rowHeight
                 onClicked: calendar.step(-1)
-                Accessible.name: "Previous month"
+                Accessible.name: calendar.view === "days" ? "Previous month" : calendar.view === "months" ? "Previous year" : "Previous decade"
                 contentItem: Item { Icon { anchors.centerIn: parent; name: "chevron-right"; rotation: -90; size: Theme.iconSize } }
             }
             FlatButton {
                 objectName: "calendarNext"
                 Layout.preferredWidth: Theme.rowHeight; Layout.preferredHeight: Theme.rowHeight
                 onClicked: calendar.step(1)
-                Accessible.name: "Next month"
+                Accessible.name: calendar.view === "days" ? "Next month" : calendar.view === "months" ? "Next year" : "Next decade"
                 contentItem: Item { Icon { anchors.centerIn: parent; name: "chevron-right"; rotation: 90; size: Theme.iconSize } }
             }
         }
-        // Both size their cells only when their own size changes, which can happen
-        // before the cells exist when the popup is made ahead of use; size them here.
-        DayOfWeekRow {
-            id: weekRow
-            Layout.fillWidth: true; Layout.preferredHeight: Theme.headingHeight
-            locale: Qt.locale()
-            spacing: 0
-            delegate: Text {
-                required property string shortName
-                width: weekRow.availableWidth / 7; height: weekRow.availableHeight
-                text: shortName; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
-                color: Theme.textMuted; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
-            }
-        }
-        // The month slides in a little and fades in as it changes.
+        // The views, one at a time, in the same room. The one shown zooms in from zoomFrom times
+        // its size and fades in, and what it lists slides in when paged.
         Item {
-            Layout.fillWidth: true; Layout.preferredHeight: 6 * calendar.cellHeight
+            id: pages
+            Layout.fillWidth: true
+            Layout.preferredHeight: Theme.headingHeight + 6 * calendar.cellHeight
             clip: true
-            NumberAnimation {
-                id: slide
-                property real direction: 1
-                target: monthGrid; property: "shift"
-                from: direction; to: 0
-                duration: Theme.durationNormal; easing.type: Theme.easing
-            }
-            MonthGrid {
-                id: monthGrid
-                objectName: "monthGrid"
-                // How far it still has to slide, in cells: from 1 (below) or -1 (above) to 0.
-                property real shift: 0
-                width: parent.width; height: parent.height
-                y: shift * calendar.cellHeight
-                opacity: 1 - Math.abs(shift)
-                month: calendar.month; year: calendar.year
-                locale: Qt.locale()
-                spacing: 0
-                delegate: Item {
-                    id: dayCell
-                    required property var model
-                    width: monthGrid.availableWidth / 7; height: monthGrid.availableHeight / 6
-                    readonly property bool inMonth: model.month === monthGrid.month
-                    readonly property bool isToday: model.today && inMonth
-                    HoverHandler { id: dayHover }
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: Math.min(parent.width, parent.height) - Theme.spacingXS; height: width; radius: width / 2
-                        visible: dayCell.isToday || dayHover.hovered
-                        color: dayCell.isToday ? (dayHover.hovered ? Theme.accentHover : Theme.accent) : Theme.hover
+            readonly property real zoomScale: calendar.zoomFrom + (1 - calendar.zoomFrom) * calendar.zoom
+            Item {
+                id: days
+                anchors.fill: parent
+                visible: calendar.view === "days"
+                scale: pages.zoomScale; opacity: calendar.zoom
+                // Both size their cells only when their own size changes, which can happen
+                // before the cells exist when the popup is made ahead of use; size them here.
+                DayOfWeekRow {
+                    id: weekRow
+                    width: parent.width; height: Theme.headingHeight
+                    locale: Qt.locale()
+                    spacing: 0
+                    delegate: Text {
+                        required property string shortName
+                        width: weekRow.availableWidth / 7; height: weekRow.availableHeight
+                        text: shortName; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                        color: Theme.textMuted; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
                     }
-                    Text {
-                        anchors.centerIn: parent
-                        text: dayCell.model.day
-                        color: dayCell.isToday ? Theme.textOnAccent : dayCell.inMonth ? Theme.text : Theme.textDisabled
-                        font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
-                        font.weight: dayCell.isToday ? Font.DemiBold : Font.Normal
+                }
+                Item {
+                    y: Theme.headingHeight
+                    width: parent.width; height: 6 * calendar.cellHeight
+                    clip: true
+                    MonthGrid {
+                        id: monthGrid
+                        objectName: "monthGrid"
+                        width: parent.width; height: parent.height
+                        y: calendar.shift * calendar.cellHeight
+                        opacity: 1 - Math.abs(calendar.shift)
+                        month: calendar.month; year: calendar.year
+                        locale: Qt.locale()
+                        spacing: 0
+                        delegate: Item {
+                            id: dayCell
+                            required property var model
+                            width: monthGrid.availableWidth / 7; height: monthGrid.availableHeight / 6
+                            readonly property bool inMonth: model.month === monthGrid.month
+                            readonly property bool isToday: model.today && inMonth
+                            HoverHandler { id: dayHover }
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: Math.min(parent.width, parent.height) - Theme.spacingXS; height: width; radius: width / 2
+                                visible: dayCell.isToday || dayHover.hovered
+                                color: dayCell.isToday ? (dayHover.hovered ? Theme.accentHover : Theme.accent) : Theme.hover
+                            }
+                            Text {
+                                anchors.centerIn: parent
+                                text: dayCell.model.day
+                                color: dayCell.isToday ? Theme.textOnAccent : dayCell.inMonth ? Theme.text : Theme.textDisabled
+                                font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+                                font.weight: dayCell.isToday ? Font.DemiBold : Font.Normal
+                            }
+                        }
+                    }
+                }
+            }
+            // The year's months; picking one shows its days.
+            Grid {
+                objectName: "calendarMonths"
+                anchors.fill: parent
+                visible: calendar.view === "months"
+                scale: pages.zoomScale; opacity: calendar.zoom * (1 - Math.abs(calendar.shift))
+                transform: Translate { y: calendar.shift * Theme.rowHeight }
+                columns: 4
+                Repeater {
+                    model: 12
+                    Pick {
+                        required property int index
+                        readonly property int month: index
+                        objectName: "calendarMonth"
+                        width: pages.width / 4; height: pages.height / 3
+                        text: Qt.locale().standaloneMonthName(index, Locale.ShortFormat)
+                        current: index === calendar.now.getMonth() && calendar.year === calendar.now.getFullYear()
+                        Accessible.name: Qt.locale().standaloneMonthName(index) + " " + calendar.year
+                        onClicked: {
+                            calendar.month = index
+                            calendar.zoomTo("days")
+                        }
+                    }
+                }
+            }
+            // The decade's years, with the one before and the one after; picking one shows its
+            // months.
+            Grid {
+                objectName: "calendarYears"
+                anchors.fill: parent
+                visible: calendar.view === "years"
+                scale: pages.zoomScale; opacity: calendar.zoom * (1 - Math.abs(calendar.shift))
+                transform: Translate { y: calendar.shift * Theme.rowHeight }
+                columns: 4
+                Repeater {
+                    model: 12
+                    Pick {
+                        required property int index
+                        readonly property int year: calendar.decade - 1 + index
+                        objectName: "calendarYear"
+                        width: pages.width / 4; height: pages.height / 3
+                        text: String(year)
+                        current: year === calendar.now.getFullYear()
+                        dim: index === 0 || index === 11
+                        onClicked: {
+                            calendar.year = year
+                            calendar.zoomTo("months")
+                        }
                     }
                 }
             }

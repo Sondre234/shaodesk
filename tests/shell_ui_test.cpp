@@ -691,6 +691,70 @@ int main(int argc, char **argv) {
             std::cerr << "Today did not return the calendar to this month\n";
             return 1;
         }
+        // The title zooms out to the year's months, where one is picked, then to a decade's years.
+        auto zoomed = [&] { return calendar->property("view").toString(); };
+        auto pick = [&](const char *name, const char *property, int value) -> QQuickItem * {
+            std::function<QQuickItem *(QQuickItem *)> search = [&](QQuickItem *item) -> QQuickItem * {
+                if (item->objectName() == name && item->property(property).toInt() == value)
+                    return item;
+                for (auto *child : item->childItems())
+                    if (auto *found = search(child))
+                        return found;
+                return nullptr;
+            };
+            return search(calendar);
+        };
+        // What is picked is clicked where it rests, once it has zoomed and slid into place.
+        auto settled = [&] {
+            return calendar->property("zoom").toReal() == 1 && calendar->property("shift").toReal() == 0;
+        };
+        auto *title = find(view.rootObject(), "calendarTitle");
+        click(title);
+        auto *months = find(view.rootObject(), "calendarMonths");
+        if (!QTest::qWaitFor([&] { return zoomed() == "months" && months && months->isVisible(); }) ||
+            grid->isVisible()) {
+            std::cerr << "the calendar's title did not zoom out to the months\n";
+            return 1;
+        }
+        const int later = (month + 3) % 12;
+        if (!QTest::qWaitFor(settled))
+            return fail("the months did not zoom into place");
+        click(pick("calendarMonth", "month", later));
+        if (!QTest::qWaitFor([&] { return zoomed() == "days" && calendar->property("month").toInt() == later; })) {
+            std::cerr << "picking a month did not show its days\n";
+            return 1;
+        }
+        click(title);
+        if (!QTest::qWaitFor([&] { return zoomed() == "months"; }))
+            return fail("the calendar's title did not zoom out to the months again");
+        click(title);
+        auto *years = find(view.rootObject(), "calendarYears");
+        const int year = calendar->property("year").toInt();
+        if (!QTest::qWaitFor([&] { return zoomed() == "years" && years && years->isVisible(); }) ||
+            title->isEnabled()) {
+            std::cerr << "the calendar's title did not zoom out to the years\n";
+            return 1;
+        }
+        click(find(view.rootObject(), "calendarNext"));
+        if (!QTest::qWaitFor([&] { return calendar->property("year").toInt() == year + 10; })) {
+            std::cerr << "the next arrow did not page the years by a decade\n";
+            return 1;
+        }
+        if (!QTest::qWaitFor(settled))
+            return fail("the years did not slide into place");
+        click(pick("calendarYear", "year", year + 11));
+        if (!QTest::qWaitFor([&] { return zoomed() == "months" && calendar->property("year").toInt() == year + 11; })) {
+            std::cerr << "picking a year did not show its months\n";
+            return 1;
+        }
+        click(today);
+        if (!QTest::qWaitFor([&] {
+                return zoomed() == "days" && calendar->property("month").toInt() == month &&
+                       calendar->property("year").toInt() == QDate::currentDate().year();
+            })) {
+            std::cerr << "Today did not return from the months to this month's days\n";
+            return 1;
+        }
         click(clock);
         if (!QTest::qWaitFor([&] { return !calendar->isVisible(); })) {
             std::cerr << "clicking the clock again did not close the calendar\n";
