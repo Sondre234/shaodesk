@@ -130,11 +130,12 @@ PopupCard {
                 width: monthGrid.availableWidth / 7; height: monthGrid.availableHeight / 6
                 readonly property bool inMonth: model.month === monthGrid.month
                 readonly property bool isToday: model.today && inMonth
+                HoverHandler { id: dayHover }
                 Rectangle {
                     anchors.centerIn: parent
                     width: Math.min(parent.width, parent.height) - Theme.spacingXS; height: width; radius: width / 2
-                    visible: dayCell.isToday
-                    color: Theme.accent
+                    visible: dayCell.isToday || dayHover.hovered
+                    color: dayCell.isToday ? (dayHover.hovered ? Theme.accentHover : Theme.accent) : Theme.hover
                 }
                 Text {
                     anchors.centerIn: parent
