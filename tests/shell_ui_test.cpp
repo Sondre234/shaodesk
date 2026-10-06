@@ -3,6 +3,7 @@
 #include "controller.hpp"
 #include "system_status.hpp"
 #include "view.hpp"
+#include <QAbstractItemModel>
 #include <QDir>
 #include <QFile>
 #include <QGuiApplication>
@@ -1571,6 +1572,22 @@ int main(int argc, char **argv) {
             std::cerr << "Escape did not close the palette quietly\n";
             return 1;
         }
+        // Its entries for another search (the start menu's): the windows of the model it is
+        // given, no applications; one runs as it would from the palette.
+        int windows = 0;
+        bool apps = false, tiling = false;
+        for (const auto &item : palette->entries(fakeModel)) {
+            windows += item.toMap()["kind"] == "window";
+            apps = apps || item.toMap()["kind"] == "app";
+            tiling = tiling || item.toMap()["title"] == "Toggle tiling";
+        }
+        const int rows = qobject_cast<QAbstractItemModel *>(fakeModel)->rowCount();
+        if (rows == 0 || windows != rows || apps || !tiling)
+            return fail("the palette's entries for another search are not its windows and actions");
+        palette->run({{"kind", "action"}, {"target", "toggle_tiling"}}, output);
+        if (!QTest::qWaitFor([&] { return requests == QStringList{"toggle_tiling"}; }))
+            return fail("an entry of the palette's did not run outside it");
+        requests.clear();
     }
     // The power menu, from the power button in the launcher's bottom-right corner, lists what
     // the compositor says may run, and runs it.

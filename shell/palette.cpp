@@ -105,21 +105,33 @@ void Palette::close() {
 }
 
 void Palette::collect() {
+    entries_ = entries(controller_.tasks());
+    for (const auto &app : controller_.apps()) {
+        const auto map = app.toMap();
+        entries_.push_back(entry("app", map["name"].toString(), "Application",
+                                 map["icon"].toString(), map["appId"].toString()));
+    }
+}
+
+QVariantList Palette::entries(QObject *windows) const {
     QVariantList entries;
-    auto *tasks = controller_.tasks();
+    // The windows' roles by name, so that a stand-in model serves as well as TaskModel.
+    auto *tasks = qobject_cast<QAbstractItemModel *>(windows);
+    const auto roles = tasks ? tasks->roleNames() : QHash<int, QByteArray>();
+    auto value = [&](int row, const QByteArray &role) {
+        return tasks->data(tasks->index(row, 0), roles.key(role, -1));
+    };
     // Windows asking for attention come first, so an empty query offers them at the top.
     QVariantList urgent, others;
-    for (int row = 0; row < tasks->rowCount(); ++row) {
-        const auto index = tasks->index(row);
-        const auto appId = tasks->data(index, TaskModel::AppId).toString();
-        const bool asking = tasks->data(index, TaskModel::Urgent).toBool();
+    for (int row = 0; tasks && row < tasks->rowCount(); ++row) {
+        const auto appId = value(row, "appId").toString();
+        const bool asking = value(row, "urgent").toBool();
         const auto detail = appId.isEmpty() ? QString("Window") : "Window · " + appId;
         (asking ? urgent : others)
-            .push_back(entry("window", tasks->data(index, TaskModel::Title).toString(),
+            .push_back(entry("window", value(row, "title").toString(),
                              asking ? detail + " · needs attention" : detail,
-                             controller_.iconFor(appId),
-                             QString::number(tasks->data(index, TaskModel::TaskId).toInt()),
-                             tasks->data(index, TaskModel::Active).toBool() ? 1 : 0, asking));
+                             controller_.iconFor(appId), QString::number(value(row, "taskId").toInt()),
+                             value(row, "active").toBool() ? 1 : 0, asking));
     }
     entries += urgent;
     entries += others;
@@ -163,12 +175,7 @@ void Palette::collect() {
         item["power"] = true;
         entries.push_back(item);
     }
-    for (const auto &app : controller_.apps()) {
-        const auto map = app.toMap();
-        entries.push_back(entry("app", map["name"].toString(), "Application",
-                                map["icon"].toString(), map["appId"].toString()));
-    }
-    entries_ = entries;
+    return entries;
 }
 
 void Palette::refreshResults() {
@@ -213,10 +220,14 @@ void Palette::activate(int index) {
     if (index < 0 || index >= results_.size())
         return;
     const auto item = results_[index].toMap();
-    const auto kind = item["kind"].toString();
-    const auto target = item["target"].toString();
     const auto output = output_;
     close(); // hand the keyboard back before the request takes effect
+    run(item, output);
+}
+
+void Palette::run(const QVariantMap &item, const QString &output) {
+    const auto kind = item["kind"].toString();
+    const auto target = item["target"].toString();
     if (kind == "window") {
         if (item["number"].toInt() == 0) // the focused one would minimize on a second click
             controller_.tasks()->activate(target.toInt());
