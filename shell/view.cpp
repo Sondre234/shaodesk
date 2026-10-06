@@ -207,26 +207,94 @@ void PopoverWindow::applyInput() {
     // The region is the surface's state, sent with its next frame.
     update();
 }
-OverviewView::OverviewView(ShellController &controller, QScreen *screen)
-    : QQuickView(controller.engine(), nullptr), controller_(controller), outputScreen_(screen) {
+OverlayView::OverlayView(ShellController &controller, QScreen *screen, const char *name, bool keyboard)
+    : QQuickView(controller.engine(), nullptr), controller_(controller), outputScreen_(screen), name_(name),
+      keyboard_(keyboard) {
     setScreen(screen);
-    setTitle("shaodesk overview");
     setColor(Qt::transparent);
     setFlags(Qt::FramelessWindowHint);
-    resize(screen->geometry().size());
-    setInitialProperties({{"screenSize", screen->geometry().size()}});
 #if SHAODESK_LAYER_SHELL
     using W = LayerShellQt::Window;
     layer_ = W::get(this);
     layer_->setScreen(screen);
-    layer_->setScope("shaodesk-overview");
     layer_->setLayer(W::LayerOverlay);
+    holdKeyboard(keyboard_);
+    layer_->setActivateOnShow(keyboard_);
+#endif
+}
+void OverlayView::load(const QString &file) {
+    setSource(QUrl("qrc:/shell/ShaodeskShell/" + file));
+    if (auto *root = rootObject())
+        connect(root, SIGNAL(progressChanged()), this, SLOT(settle()));
+}
+void OverlayView::holdKeyboard(bool hold) {
+#if SHAODESK_LAYER_SHELL
+    using W = LayerShellQt::Window;
+    layer_->setKeyboardInteractivity(hold ? W::KeyboardInteractivityExclusive
+                                          : W::KeyboardInteractivityNone);
+#else
+    Q_UNUSED(hold);
+#endif
+}
+bool OverlayView::present() {
+    auto *root = rootObject();
+    if (leaving_) {
+        leaving_ = false;
+        setFlag(Qt::WindowTransparentForInput, false);
+        if (keyboard_) {
+            holdKeyboard(true);
+            requestActivate();
+        }
+        if (root)
+            root->setProperty("shown", true);
+        std::cerr << "shaodesk " << name_ << " kept on " << outputScreen_->name().toStdString() << '\n';
+        return false;
+    }
+    if (isVisible())
+        return false;
+    if (root)
+        root->setProperty("shown", true);
+    show();
+    if (keyboard_)
+        requestActivate();
+    std::cerr << "shaodesk " << name_ << " shown on " << outputScreen_->name().toStdString() << '\n';
+    return true;
+}
+void OverlayView::dismiss() {
+    if (!isVisible() || leaving_)
+        return;
+    leaving_ = true;
+    // The pointer and the keyboard go to what is under it with its next frame, its first going.
+    setFlag(Qt::WindowTransparentForInput, true);
+    if (keyboard_)
+        holdKeyboard(false);
+    if (auto *root = rootObject())
+        root->setProperty("shown", false);
+    settle();
+}
+void OverlayView::settle() {
+    auto *root = rootObject();
+    if (!leaving_ || (root && root->property("progress").toReal() > 0))
+        return;
+    leaving_ = false;
+    hide();
+    setFlag(Qt::WindowTransparentForInput, false);
+    if (keyboard_)
+        holdKeyboard(true);
+    std::cerr << "shaodesk " << name_ << " hidden on " << outputScreen_->name().toStdString() << '\n';
+}
+OverviewView::OverviewView(ShellController &controller, QScreen *screen)
+    : OverlayView(controller, screen, "overview", false) {
+    setTitle("shaodesk overview");
+    resize(screen->geometry().size());
+    setInitialProperties({{"screenSize", screen->geometry().size()}});
+#if SHAODESK_LAYER_SHELL
+    using W = LayerShellQt::Window;
+    layer_->setScope("shaodesk-overview");
     layer_->setAnchors(W::Anchors(W::AnchorTop | W::AnchorBottom | W::AnchorLeft | W::AnchorRight));
     layer_->setExclusiveZone(-1);
-    layer_->setKeyboardInteractivity(W::KeyboardInteractivityNone);
-    layer_->setActivateOnShow(false);
 #endif
-    setSource(QUrl("qrc:/shell/ShaodeskShell/Overview.qml"));
+    load("Overview.qml");
     connect(screen, &QScreen::geometryChanged, this, [this] {
         resize(outputScreen_->geometry().size());
         if (rootObject())
@@ -235,35 +303,23 @@ OverviewView::OverviewView(ShellController &controller, QScreen *screen)
     connect(&controller, &ShellController::overviewChanged, this, &OverviewView::update);
 }
 void OverviewView::update() {
-    const bool here = controller_.overviewOutput() == outputScreen_->name();
-    if (here && !isVisible()) {
-        show();
-        std::cerr << "shaodesk overview shown on " << outputScreen_->name().toStdString() << '\n';
-    } else if (!here && isVisible()) {
-        hide();
-        std::cerr << "shaodesk overview hidden on " << outputScreen_->name().toStdString() << '\n';
-    }
+    if (controller_.overviewOutput() == outputScreen_->name())
+        present();
+    else
+        dismiss();
 }
 PowerView::PowerView(ShellController &controller, QScreen *screen)
-    : QQuickView(controller.engine(), nullptr), controller_(controller), outputScreen_(screen) {
-    setScreen(screen);
+    : OverlayView(controller, screen, "power dialog", true) {
     setTitle("shaodesk power");
-    setColor(Qt::transparent);
     setResizeMode(QQuickView::SizeRootObjectToView);
-    setFlags(Qt::FramelessWindowHint);
     resize(screen->geometry().size());
 #if SHAODESK_LAYER_SHELL
     using W = LayerShellQt::Window;
-    layer_ = W::get(this);
-    layer_->setScreen(screen);
     layer_->setScope("shaodesk-power");
-    layer_->setLayer(W::LayerOverlay);
     layer_->setAnchors(W::Anchors(W::AnchorTop | W::AnchorBottom | W::AnchorLeft | W::AnchorRight));
     layer_->setExclusiveZone(-1);
-    layer_->setKeyboardInteractivity(W::KeyboardInteractivityExclusive);
-    layer_->setActivateOnShow(true);
 #endif
-    setSource(QUrl("qrc:/shell/ShaodeskShell/PowerDialog.qml"));
+    load("PowerDialog.qml");
     connect(screen, &QScreen::geometryChanged, this,
             [this] { resize(outputScreen_->geometry().size()); });
     connect(controller.power(), &Power::pendingChanged, this, &PowerView::update);
@@ -271,42 +327,30 @@ PowerView::PowerView(ShellController &controller, QScreen *screen)
 void PowerView::update() {
     auto *power = controller_.power();
     const bool mine = !power->pending().isEmpty() && power->output() == outputScreen_->name();
-    if (mine && !isVisible()) {
-        show();
-        requestActivate();
-        if (rootObject())
-            QMetaObject::invokeMethod(rootObject(), "reset");
-        std::cerr << "shaodesk power dialog shown on " << outputScreen_->name().toStdString()
-                  << '\n';
-    } else if (!mine && isVisible()) {
-        hide();
-        std::cerr << "shaodesk power dialog hidden on " << outputScreen_->name().toStdString()
-                  << '\n';
+    if (!mine) {
+        dismiss();
+        return;
     }
+    // Asked afresh, or again while it was going: the keyboard starts on its action's button.
+    const bool again = leaving();
+    if ((present() || again) && rootObject())
+        QMetaObject::invokeMethod(rootObject(), "reset");
 }
 SwitcherView::SwitcherView(ShellController &controller, QScreen *screen)
-    : QQuickView(controller.engine(), nullptr), controller_(controller), outputScreen_(screen), delay_(new QTimer(this)) {
-    setScreen(screen);
+    : OverlayView(controller, screen, "switcher", false), delay_(new QTimer(this)) {
     setTitle("shaodesk switcher");
-    setColor(Qt::transparent);
     setResizeMode(QQuickView::SizeViewToRootObject);
-    setFlags(Qt::FramelessWindowHint);
     setInitialProperties({{"screenSize", screen->geometry().size()}});
 #if SHAODESK_LAYER_SHELL
     using W = LayerShellQt::Window;
-    layer_ = W::get(this);
-    layer_->setScreen(screen);
     layer_->setScope("shaodesk-switcher");
-    layer_->setLayer(W::LayerOverlay);
     layer_->setAnchors(W::Anchors());
     layer_->setExclusiveZone(0);
-    layer_->setKeyboardInteractivity(W::KeyboardInteractivityNone);
-    layer_->setActivateOnShow(false);
     auto fit = [this] { layer_->setDesiredSize(size()); };
     connect(this, &QWindow::widthChanged, this, fit);
     connect(this, &QWindow::heightChanged, this, fit);
 #endif
-    setSource(QUrl("qrc:/shell/ShaodeskShell/Switcher.qml"));
+    load("Switcher.qml");
     connect(screen, &QScreen::geometryChanged, this, [this] {
         if (rootObject())
             rootObject()->setProperty("screenSize", outputScreen_->geometry().size());
@@ -315,46 +359,35 @@ SwitcherView::SwitcherView(ShellController &controller, QScreen *screen)
     delay_->setSingleShot(true);
     delay_->setInterval(120);
     connect(delay_, &QTimer::timeout, this, [this] {
-        if (controller_.switcherOutput() == outputScreen_->name()) {
-            show();
-            std::cerr << "shaodesk switcher shown on " << outputScreen_->name().toStdString() << '\n';
-        }
+        if (controller_.switcherOutput() == outputScreen_->name())
+            present();
     });
     connect(&controller, &ShellController::switcherChanged, this, &SwitcherView::update);
 }
 void SwitcherView::update() {
     if (controller_.switcherOutput() != outputScreen_->name()) {
         delay_->stop();
-        if (isVisible()) {
-            hide();
-            std::cerr << "shaodesk switcher hidden on " << outputScreen_->name().toStdString()
-                      << '\n';
-        }
+        dismiss();
+    } else if (leaving()) {
+        // Opened again while it was going: it comes back at once.
+        present();
     } else if (!isVisible() && !delay_->isActive()) {
         delay_->start();
     }
 }
 PaletteView::PaletteView(ShellController &controller, QScreen *screen)
-    : QQuickView(controller.engine(), nullptr), controller_(controller), outputScreen_(screen) {
-    setScreen(screen);
+    : OverlayView(controller, screen, "palette", true) {
     setTitle("shaodesk palette");
-    setColor(Qt::transparent);
     setResizeMode(QQuickView::SizeViewToRootObject);
-    setFlags(Qt::FramelessWindowHint);
     setInitialProperties({{"screenSize", screen->geometry().size()}});
 #if SHAODESK_LAYER_SHELL
     using W = LayerShellQt::Window;
-    layer_ = W::get(this);
-    layer_->setScreen(screen);
     layer_->setScope("shaodesk-palette");
-    layer_->setLayer(W::LayerOverlay);
     layer_->setAnchors(W::AnchorTop);
     layer_->setMargins(QMargins(0, screen->geometry().height() / 6, 0, 0));
     layer_->setExclusiveZone(0);
-    layer_->setKeyboardInteractivity(W::KeyboardInteractivityExclusive);
-    layer_->setActivateOnShow(true);
 #endif
-    setSource(QUrl("qrc:/shell/ShaodeskShell/Palette.qml"));
+    load("Palette.qml");
     // The surface is as big as the palette wants, whatever size the compositor last configured
     // (a palette that opened small would otherwise stay small).
     if (auto *root = rootObject()) {
@@ -379,27 +412,28 @@ PaletteView::PaletteView(ShellController &controller, QScreen *screen)
             layer_->setMargins(QMargins(0, outputScreen_->geometry().height() / 6, 0, 0));
 #endif
     });
-    // Clicking elsewhere takes the keyboard away, which closes the palette.
+    // Clicking elsewhere takes the keyboard away, which closes the palette; giving it up as it
+    // goes does not.
     connect(this, &QWindow::activeChanged, this, [this] {
         if (isActive())
             wasActive_ = true;
-        else if (wasActive_ && isVisible())
+        else if (wasActive_ && isVisible() && !leaving())
             controller_.palette()->close();
     });
     connect(controller.palette(), &Palette::openChanged, this, &PaletteView::update);
 }
 void PaletteView::update() {
     const bool mine = controller_.palette()->output() == outputScreen_->name();
-    if (mine && !isVisible()) {
+    if (!mine) {
+        dismiss();
+        return;
+    }
+    // Opened afresh, or again while it was going: it starts from the palette's new query.
+    if (!isVisible() || leaving()) {
         wasActive_ = false;
         if (rootObject())
             QMetaObject::invokeMethod(rootObject(), "reset");
-        show();
-        requestActivate();
-        std::cerr << "shaodesk palette shown on " << outputScreen_->name().toStdString() << '\n';
-    } else if (!mine && isVisible()) {
-        hide();
-        std::cerr << "shaodesk palette hidden on " << outputScreen_->name().toStdString() << '\n';
+        present();
     }
 }
 

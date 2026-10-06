@@ -7,17 +7,17 @@ import QtQuick.Layouts
 FlatButton {
     id: audioWidget
     required property var panel
-    required property real barHeight
     objectName: "audioWidget"
     visible: audioWidget.panel.audioSource.available && shell.widgets.volume === "bar"
-    Layout.preferredWidth: 60; Layout.preferredHeight: audioWidget.barHeight - 10
+    Layout.preferredWidth: level.implicitWidth + 2 * Theme.spacingM; Layout.preferredHeight: Theme.barButtonHeight
     onClicked: audioWidget.panel.toggleAudioPopup("mixer", audioWidget)
     Accessible.name: "Volume " + audioWidget.panel.audioSource.volume + "%" + (audioWidget.panel.audioSource.muted ? ", muted" : "")
     BarTip { panel: audioWidget.panel; owner: audioWidget; text: audioWidget.Accessible.name }
     active: audioWidget.panel.audioPopup === "mixer" || audioWidget.panel.audioPopup === "outputs"
     contentItem: Item {
         Row {
-            anchors.centerIn: parent; spacing: 4
+            id: level
+            anchors.centerIn: parent; spacing: Theme.spacingS
             SpeakerIcon { anchors.verticalCenter: parent.verticalCenter; level: audioWidget.panel.audioSource.volume; muted: audioWidget.panel.audioSource.muted; color: audioWidget.panel.audioSource.muted ? Theme.textMuted : Theme.text }
             Text {
                 anchors.verticalCenter: parent.verticalCenter

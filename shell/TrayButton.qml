@@ -18,7 +18,7 @@ FlatButton {
     required property Item panel
     objectName: "trayItem"
     visible: status !== "Passive"
-    width: 32; height: shell.panelHeight - 10
+    width: Theme.barButtonWidth - Theme.spacingM; height: Theme.barButtonHeight
     hoverEnabled: true
     active: panel.trayMenuKey === key
     Accessible.name: title
@@ -27,7 +27,7 @@ FlatButton {
     contentItem: Item {
         Image {
             objectName: "trayIcon"
-            readonly property int size: Math.max(12, Math.min(20, shell.panelHeight - 30))
+            readonly property int size: Math.max(Theme.spacingL, Math.min(Theme.iconSize, Theme.barButtonHeight - 2 * Theme.spacingM))
             anchors.centerIn: parent
             width: size; height: size
             source: trayButton.image; sourceSize: Qt.size(size, size)

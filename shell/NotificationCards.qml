@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
-import QtQuick.Controls.Basic
 import QtQuick.Effects
 import QtQuick.Layouts
 
@@ -207,28 +206,13 @@ Item {
                             textFormat: Text.PlainText; elide: Text.ElideRight
                         }
                         // Dismisses the card; it shows while the pointer is on the card.
-                        AbstractButton {
-                            id: close
+                        CloseButton {
                             objectName: "notificationClose"
-                            Layout.preferredWidth: Theme.iconSize + Theme.spacingS
-                            Layout.preferredHeight: Theme.iconSize + Theme.spacingS
+                            Layout.preferredWidth: size; Layout.preferredHeight: size
                             opacity: hover.hovered ? 1 : 0
-                            Behavior on opacity { NumberAnimation { duration: Theme.durationFast } }
-                            hoverEnabled: true
-                            focusPolicy: Qt.NoFocus
+                            Behavior on opacity { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
                             Accessible.name: "Dismiss"
                             onClicked: cards.center.dismiss(entry.notificationId)
-                            background: Rectangle {
-                                radius: height / 2
-                                color: close.pressed ? Theme.pressed : close.hovered ? Theme.hover : "transparent"
-                            }
-                            contentItem: Item {
-                                Icon {
-                                    anchors.centerIn: parent
-                                    name: "x"; size: Theme.iconSizeSmall
-                                    color: close.hovered ? Theme.text : Theme.textMuted
-                                }
-                            }
                         }
                     }
                     // What it says, the summary over the body, beside its picture.
@@ -292,31 +276,12 @@ Item {
                         columnSpacing: Theme.spacingM; rowSpacing: Theme.spacingM
                         Repeater {
                             model: entry.actions
-                            delegate: Button {
-                                id: action
+                            delegate: PushButton {
                                 required property var modelData
                                 objectName: "notificationAction"
                                 text: modelData.label
                                 Layout.fillWidth: true; Layout.preferredWidth: 1
-                                implicitHeight: Theme.rowHeight - Theme.spacingS
-                                padding: Theme.spacingS; leftPadding: Theme.spacingM; rightPadding: Theme.spacingM
                                 onClicked: cards.center.invoke(entry.notificationId, modelData.key)
-                                background: Rectangle {
-                                    radius: Theme.radiusSmall
-                                    color: action.hovered ? Theme.surfaceRaisedHover : Theme.surfaceRaised
-                                    border.color: Theme.border
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        radius: parent.radius
-                                        color: action.pressed ? Theme.pressed : "transparent"
-                                    }
-                                }
-                                contentItem: Text {
-                                    text: action.text; color: Theme.text
-                                    font.pixelSize: Theme.fontSize; font.weight: Font.Medium; font.family: Theme.fontFamily
-                                    horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
-                                    elide: Text.ElideRight
-                                }
                             }
                         }
                     }

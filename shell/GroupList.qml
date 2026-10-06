@@ -6,18 +6,21 @@ import Shaodesk
 
 // The windows of a hovered stacked button: clicking one focuses it (or minimizes it when
 // focused already), the cross or a middle click closes it, and a right click opens its menu.
+// Its rows are a menu's, the focused window's marked as the bar marks it: selected, with a line
+// in the accent colour (the urgent one for a window asking for attention) at its start.
 PopupCard {
     id: groupList
     required property var panel
     required property Item barItem
     parent: panel.popupLayer
     objectName: "groupList"
-    readonly property int rowHeight: 40
+    readonly property real rowHeight: Theme.rowHeight + Theme.spacingS
+    readonly property real padding: Theme.spacingS
     open: panel.groupOpen
     // Shown on hover, it leaves the keyboard where it is.
     initialFocus: null
     implicitWidth: 280
-    implicitHeight: 12 + groupWindows.count * rowHeight + Math.max(0, groupWindows.count - 1) * 2
+    implicitHeight: 2 * padding + groupWindows.count * rowHeight + Math.max(0, groupWindows.count - 1) * rows.spacing
     anchorRect: panel.barAnchor(panel.groupX, 0)
     side: panel.popupSide
     HoverHandler {
@@ -33,7 +36,8 @@ PopupCard {
         onCountChanged: if (count < 2) panel.groupOpen = false
     }
     Column {
-        anchors.fill: parent; anchors.margins: 6; spacing: 2
+        id: rows
+        anchors.fill: parent; anchors.margins: groupList.padding; spacing: Theme.spacingXS
         Repeater {
             model: groupList.visible ? groupWindows : null
             delegate: Button {
@@ -49,18 +53,24 @@ PopupCard {
                 Accessible.name: title
                 // Closing the list destroys this row, so it goes last.
                 onClicked: { shell.tasks.activate(taskId); panel.groupOpen = false }
-                background: Rectangle {
-                    radius: Theme.radiusSmall
-                    color: groupWindow.hovered ? Theme.selected : (groupWindow.active ? Theme.hover : "transparent")
-                    Rectangle { visible: groupWindow.active; x: 0; anchors.verticalCenter: parent.verticalCenter; width: 3; height: 16; radius: 1; color: Theme.accent }
-                    Rectangle { objectName: "groupWindowUrgent"; visible: groupWindow.urgent; x: 0; anchors.verticalCenter: parent.verticalCenter; width: 3; height: 16; radius: 1; color: Theme.urgent }
+                background: ButtonFill {
+                    hovered: groupWindow.hovered
+                    pressed: groupWindow.pressed
+                    active: groupWindow.active
+                    Rectangle {
+                        objectName: "groupWindowLine"
+                        visible: groupWindow.active || groupWindow.urgent
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 3; height: Theme.iconSizeSmall; radius: 1
+                        color: groupWindow.urgent ? Theme.urgent : Theme.accent
+                    }
                 }
                 contentItem: RowLayout {
-                    spacing: 8
+                    spacing: Theme.spacingM
                     Image {
-                        Layout.leftMargin: 4
-                        Layout.preferredWidth: 20; Layout.preferredHeight: 20
-                        source: "image://icons/" + panel.groupIcon; sourceSize: Qt.size(20, 20)
+                        Layout.leftMargin: Theme.spacingS
+                        Layout.preferredWidth: Theme.appIconSize; Layout.preferredHeight: Theme.appIconSize
+                        source: "image://icons/" + panel.groupIcon; sourceSize: Qt.size(Theme.appIconSize, Theme.appIconSize)
                         opacity: groupWindow.minimized ? 0.5 : 1
                     }
                     Text {
@@ -69,15 +79,13 @@ PopupCard {
                         color: groupWindow.urgent ? Theme.urgent : groupWindow.minimized ? Theme.textMuted : Theme.text
                         font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
                     }
-                    Button {
-                        id: closeWindow
+                    CloseButton {
                         objectName: "groupWindowClose"
                         visible: groupWindow.hovered || hovered
-                        Layout.preferredWidth: 24; Layout.preferredHeight: 24
+                        danger: true
+                        Layout.preferredWidth: size; Layout.preferredHeight: size
                         Accessible.name: "Close " + groupWindow.title
                         onClicked: shell.tasks.close(groupWindow.taskId)
-                        background: Rectangle { radius: Theme.radiusSmall; color: closeWindow.hovered ? Theme.dangerFill : "transparent" }
-                        contentItem: Text { text: "\u2715"; color: closeWindow.hovered ? Theme.textOnDanger : Theme.text; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 12 }
                     }
                 }
                 MouseArea {

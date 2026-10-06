@@ -86,6 +86,10 @@ QtObject {
     // A row of a menu or a list, and a section's heading over rows.
     readonly property int rowHeight: 36
     readonly property int headingHeight: 30
+    // A button on the bar: as tall as the bar (shell.panel_height) leaves with a small margin
+    // above and below, and an icon's as wide as Windows 11's.
+    readonly property real barButtonHeight: Math.max(0, shell.panelHeight - 2 * spacingS)
+    readonly property int barButtonWidth: 40
 
     // Line icons in menus, line icons on the bar, applications' icons on the bar and in lists,
     // and in the launcher.
@@ -108,6 +112,11 @@ QtObject {
     // Something arriving or moving, and something leaving.
     readonly property int easing: Easing.OutCubic
     readonly property int easingExit: Easing.InCubic
+    // How small a small thing (a taskbar button, a badge) starts as it grows in, and ends as it
+    // shrinks away.
+    readonly property real growFrom: 0.5
+    // How small an icon on the bar gets while its button is pressed.
+    readonly property real pressScale: 0.88
 
     // Whether shader effects (shadows) can be drawn: only through the GPU.
     readonly property bool effects: shell.effects

@@ -7,18 +7,17 @@ import QtQuick.Layouts
 FlatButton {
     id: network
     required property var panel
-    required property real barHeight
     objectName: "networkWidget"
     readonly property var status: network.panel.statusSource
     readonly property bool linkDown: status.networkState === "disconnected"
     readonly property color tint: linkDown ? Theme.textMuted : Theme.text
     visible: shell.widgets.network === "bar" && status.networkState !== "none"
-    Layout.preferredWidth: 34; Layout.preferredHeight: network.barHeight - 10
+    Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
     hoverEnabled: true
     Accessible.name: status.networkText
     BarTip { panel: network.panel; owner: network; text: network.status.networkText }
     contentItem: Item {
-        Icon {
+        FadingIcon {
             anchors.centerIn: parent
             name: network.status.networkState === "ethernet" ? "ethernet-port" : (network.linkDown ? "wifi-off" : "wifi")
             color: network.tint

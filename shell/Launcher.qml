@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
-import QtQuick.Controls.Basic
 
 // The start menu, after Windows 11's: a search field on top, the applications under it, and
 // along the bottom who is logged in and the power button, in the bottom-right corner, with its
@@ -36,11 +35,9 @@ PopupCard {
     // By the bar's start, 640 by 720 pixels, or as tall as the output leaves room for.
     implicitWidth: 640
     implicitHeight: 720
-    anchorRect: panel.barAnchor(12 + shell.panelMarginLeft, 0)
+    anchorRect: panel.barAnchor(Theme.spacingL + shell.panelMarginLeft, 0)
     alignment: Qt.AlignLeft
     side: panel.popupSide
-    gap: 10
-    margin: 10
     radius: Theme.radiusLarge
     // The space between the card's edges and what is on it.
     readonly property real padding: Theme.spacingXXL + Theme.spacingL
@@ -83,8 +80,9 @@ PopupCard {
         }
     }
     // The keys the search field leaves: what moves through the view shown (the arrows, Tab, the
-    // page keys), Enter, which runs what the keyboard is at, and Escape, which closes the letters
-    // of All apps, else clears the search, else closes the menu.
+    // page keys), Enter, which runs what the keyboard is at (in the search, the best match's
+    // button it is at), and Escape, which closes the letters of All apps, else clears the
+    // search, else closes the menu.
     function key(event) {
         var shown = view === "search" ? searchView : view === "all" ? allView : home
         if (event.key === Qt.Key_Escape) {
@@ -96,9 +94,9 @@ PopupCard {
                 panel.closeMenus()
             event.accepted = true
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (shown === searchView && searchView.currentResult)
-                run(searchView.currentResult)
-            else if (shown !== searchView && shown.currentApp)
+            if (shown === searchView)
+                searchView.activate()
+            else if (shown.currentApp)
                 launch(shown.currentApp.appId)
             event.accepted = true
         } else if (event.key === Qt.Key_Menu || (event.key === Qt.Key_F10 && (event.modifiers & Qt.ShiftModifier))) {
@@ -108,7 +106,8 @@ PopupCard {
             event.accepted = true
         } else {
             // Tab stays in the menu, whatever there is to move through.
-            event.accepted = shown.key(event) || event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab
+            event.accepted = shown.key(event, search.cursorPosition === search.length) ||
+                             event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab
         }
     }
     // Opens it at (x, y) in `item`, as a right press there does, or by `item`'s bottom-left
@@ -158,12 +157,15 @@ PopupCard {
         return entries
     }
     // For a preview (Panel.previewPopup): shows "launcher-all", every application,
-    // "launcher-search", what a search finds, or "launcher-menu", a pinned tile's menu.
+    // "launcher-search", what a search finds, "launcher-empty", a search finding nothing, or
+    // "launcher-menu", a pinned tile's menu.
     function preview(name) {
         if (name === "launcher-all") {
             allApps = true
         } else if (name === "launcher-search") {
             search.text = "fi"
+        } else if (name === "launcher-empty") {
+            search.text = "zqxw"
         } else if (name === "launcher-menu") {
             // The fourth tile's, which can move to the front, once the tiles are laid out.
             home.current = Math.min(3, home.pins.length - 1)
@@ -184,45 +186,24 @@ PopupCard {
         }
     }
 
-    TextField {
+    SearchInput {
         id: search
         objectName: "applicationSearch"
         x: launcher.padding; y: launcher.padding
         width: launcher.width - 2 * launcher.padding
-        height: Theme.rowHeight + Theme.spacingS
-        leftPadding: Theme.spacingL + Theme.iconSizeSmall + Theme.spacingM
         rightPadding: clear.visible ? clear.width + Theme.spacingS : Theme.spacingL
         placeholderText: "Search apps, windows and actions"
-        placeholderTextColor: Theme.textMuted
-        color: Theme.text
-        selectByMouse: true
-        verticalAlignment: TextInput.AlignVCenter
-        font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
-        background: Rectangle {
-            radius: height / 2
-            color: Theme.surfaceRaised
-            border.color: search.activeFocus ? Theme.accent : Theme.border
-            Icon {
-                x: Theme.spacingL; anchors.verticalCenter: parent.verticalCenter
-                name: "search"; size: Theme.iconSizeSmall; color: Theme.textMuted
-            }
-        }
         Keys.onPressed: (event) => launcher.key(event)
         // Clears the search, the keyboard staying in the field.
-        FlatButton {
+        CloseButton {
             id: clear
             objectName: "startClear"
             visible: search.text !== ""
             anchors.right: parent.right; anchors.rightMargin: Theme.spacingS
             anchors.verticalCenter: parent.verticalCenter
-            width: parent.height - 2 * Theme.spacingS; height: width
-            radius: width / 2
-            focusPolicy: Qt.NoFocus
+            size: parent.height - 2 * Theme.spacingS
             Accessible.name: "Clear the search"
             onClicked: search.text = ""
-            contentItem: Item {
-                Icon { anchors.centerIn: parent; name: "x"; size: Theme.iconSizeSmall; color: Theme.textMuted }
-            }
         }
     }
     // A view, shown or not: it fades in sliding from `away` (a horizontal and a vertical
@@ -379,7 +360,7 @@ PopupCard {
                             powerButton.width, powerButton.height)
         side: Qt.TopEdge
         alignment: Qt.AlignRight
-        gap: 6
+        gap: Theme.spacingS
         bounds: launcher.panel.popupArea
     }
 }

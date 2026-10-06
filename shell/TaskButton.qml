@@ -30,11 +30,12 @@ Button {
     readonly property bool shownMinimized: group && group.count > 0 ? group.minimized : minimized
     // Asking for attention: any window of a stack will do.
     readonly property bool shownUrgent: group && group.count > 0 ? group.urgent : urgent
-    height: shell.panelHeight - 10
+    height: Theme.barButtonHeight
     // Hovering a stacked button lists its windows, whatever the platform thinks of hover.
     hoverEnabled: true
     // The icon sits above the activity line, fitting however short the bar is.
-    topPadding: 2; bottomPadding: 6; leftPadding: 6; rightPadding: 6
+    topPadding: Theme.spacingXS; bottomPadding: Theme.spacingS + Theme.spacingXS
+    leftPadding: Theme.spacingS + Theme.spacingXS; rightPadding: leftPadding
     onClicked: {
         task.panel.closeMenus()
         shell.tasks.activate(stacked ? group.nextTask() : taskId)
@@ -49,10 +50,30 @@ Button {
         visible: shell.iconsOnly && !task.stacked && task.hovered && !task.panel.expanded && !task.pressed
         text: task.title
     }
-    background: Rectangle {
-        radius: Theme.radiusSmall
-        color: task.shownUrgent ? Theme.urgentSubtle
-               : task.shownActive ? Theme.selected : (task.hovered ? Theme.hover : "transparent")
+    // How far the activity line has come in, from 0 to 1, drawn out from its middle as the
+    // button arrives.
+    property real reveal: 1
+    // A button arriving where there was none (its window opening) fades and grows in, drawing its
+    // line out; one taking a pinned launcher's place, whose icon was there already, only draws
+    // its line out (appear()). The task list does the former with its own transition.
+    ParallelAnimation {
+        id: entering
+        NumberAnimation { target: task; property: "opacity"; from: 0; to: 1; duration: Theme.durationNormal; easing.type: Theme.easing }
+        NumberAnimation { target: task; property: "scale"; from: Theme.growFrom; to: 1; duration: Theme.durationNormal; easing.type: Theme.easing }
+    }
+    NumberAnimation {
+        id: revealing
+        target: task; property: "reveal"
+        from: 0; to: 1
+        duration: Theme.durationNormal; easing.type: Theme.easing
+    }
+    function enter() { entering.restart(); revealing.restart() }
+    function appear() { revealing.restart() }
+    background: ButtonFill {
+        hovered: task.hovered
+        pressed: task.pressed
+        active: task.shownActive
+        color: task.shownUrgent ? Theme.urgentSubtle : stateColor
         border.width: task.shownUrgent ? 1 : 0; border.color: Theme.urgent
         // Several windows: a second button's edge peeks out behind this one.
         Rectangle {
@@ -61,23 +82,39 @@ Button {
             color: "transparent"; border.width: 1
             border.color: task.shownActive ? Theme.alpha(Theme.text, 0.3) : Theme.border
         }
-        Row {
+        // The activity line along the bottom: long under the focused window's button, short
+        // under the others, split in two for a stack; in the accent colour, the urgent one, or
+        // dimmed while minimized. Its length and colour ease to each new state.
+        Item {
+            id: line
+            objectName: "taskLine"
+            readonly property real segment: task.shownActive ? (shell.iconsOnly ? 18 : 28) / (task.stacked ? 2 : 1)
+                                                             : (task.stacked ? 6 : 10)
+            property real first: segment
+            property real second: task.stacked ? segment : 0
+            property real gap: task.stacked ? 3 : 0
+            property color tint: task.shownUrgent ? Theme.urgent : task.shownMinimized ? Theme.textDisabled : Theme.accent
+            Behavior on first { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
+            Behavior on second { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
+            Behavior on gap { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
+            Behavior on tint { ColorAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
             anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 3
-            Repeater {
-                model: task.stacked ? 2 : 1
-                Rectangle {
-                    width: task.shownActive ? (shell.iconsOnly ? 18 : 28) / (task.stacked ? 2 : 1) : (task.stacked ? 6 : 10)
-                    height: 3; radius: 1; color: task.shownUrgent ? Theme.urgent : task.shownMinimized ? Theme.textDisabled : Theme.accent
-                }
+            // Drawn out from the middle by `reveal`, past the easing of its length.
+            width: (first + gap + second) * task.reveal; height: 3
+            Rectangle { width: line.first * task.reveal; height: parent.height; radius: 1; color: line.tint }
+            Rectangle {
+                visible: width > 0
+                x: (line.first + line.gap) * task.reveal; width: line.second * task.reveal
+                height: parent.height; radius: 1
+                color: line.tint
             }
         }
         // A dot that pulses a few times when the window asks for attention, then holds.
         Rectangle {
             objectName: "taskUrgent"
             visible: task.shownUrgent
-            anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 2
-            width: 8; height: 8; radius: 4
+            anchors.left: parent.left; anchors.top: parent.top; anchors.margins: Theme.spacingXS
+            width: Theme.spacingM; height: width; radius: width / 2
             color: Theme.urgent
             SequentialAnimation on opacity {
                 running: task.shownUrgent
@@ -86,21 +123,20 @@ Button {
                 NumberAnimation { to: 1; duration: Theme.duration(450) }
             }
         }
-        Rectangle {
+        // How many windows a stack has, on its corner.
+        Badge {
             objectName: "taskCount"
-            visible: task.stacked
-            anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 1
-            width: Math.max(14, count.implicitWidth + 6); height: 14; radius: 7
-            color: Theme.accent
-            Text { id: count; anchors.centerIn: parent; text: task.windows; color: Theme.textOnAccent; font.pixelSize: 10; font.bold: true; font.family: Theme.fontFamily }
+            anchors.right: parent.right; anchors.top: parent.top
+            count: task.stacked ? task.windows : 0
         }
     }
     contentItem: RowLayout {
-        spacing: 6
+        spacing: Theme.spacingS + Theme.spacingXS
         Item { Layout.fillWidth: shell.iconsOnly }
-        Image {
-            readonly property int size: Math.min(Theme.appIconSize, task.availableHeight)
-            source: "image://icons/" + task.iconName; sourceSize: Qt.size(size, size)
+        BarAppIcon {
+            name: task.iconName
+            pressed: task.pressed
+            size: Math.min(Theme.appIconSize, task.availableHeight)
             Layout.preferredWidth: size; Layout.preferredHeight: size
         }
         Text { visible: !shell.iconsOnly; text: task.title; textFormat: Text.PlainText; color: Theme.text; elide: Text.ElideRight; Layout.fillWidth: true; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }

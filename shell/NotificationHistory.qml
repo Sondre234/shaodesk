@@ -50,6 +50,21 @@ PopupCard {
     alignment: Qt.AlignRight
     bounds: panel.popupArea
     radius: Theme.radiusLarge
+    // The card's colour over the list's edge where it goes on past it, fading into the list over a
+    // row's height: from the top down with `fromTop`, else from the bottom up.
+    component EdgeFade: Rectangle {
+        property bool fromTop: false
+        property bool shown: false
+        anchors.left: parent.left; anchors.right: parent.right
+        height: Theme.rowHeight
+        opacity: shown ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
+        gradient: Gradient {
+            GradientStop { position: 0; color: Theme.alpha(history.color, fromTop ? 1 : 0) }
+            GradientStop { position: 1; color: Theme.alpha(history.color, fromTop ? 0 : 1) }
+        }
+    }
     ColumnLayout {
         anchors.fill: parent; anchors.margins: history.padding
         spacing: Theme.spacingM
@@ -88,20 +103,13 @@ PopupCard {
                     verticalAlignment: Text.AlignVCenter
                 }
             }
-            FlatButton {
-                id: clear
+            TextButton {
                 objectName: "clearNotifications"
                 Layout.preferredHeight: Theme.rowHeight - Theme.spacingS
-                leftPadding: Theme.spacingM; rightPadding: Theme.spacingM
+                text: "Clear all"
                 enabled: history.center.history.count > 0
                 onClicked: history.center.clearHistory()
                 Accessible.name: "Clear all notifications"
-                contentItem: Text {
-                    text: "Clear all"
-                    color: clear.enabled ? Theme.accent : Theme.textDisabled
-                    font.pixelSize: Theme.fontSizeSmall; font.weight: Font.DemiBold; font.family: Theme.fontFamily
-                    verticalAlignment: Text.AlignVCenter
-                }
             }
         }
         // Nothing kept: a quiet bell and a line saying so.
@@ -110,194 +118,164 @@ PopupCard {
             objectName: "notificationsEmpty"
             visible: history.center.history.count === 0
             Layout.fillWidth: true; Layout.fillHeight: true
-            implicitHeight: emptyColumn.implicitHeight + 2 * Theme.spacingXL
-            Column {
-                id: emptyColumn
-                anchors.centerIn: parent
-                spacing: Theme.spacingM
-                Icon {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    name: "bell"; size: Theme.appIconSizeLarge; color: Theme.textDisabled
-                }
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "No new notifications"
-                    color: Theme.textMuted
-                    font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
-                }
+            implicitHeight: emptyState.implicitHeight + 2 * Theme.spacingS
+            EmptyState {
+                id: emptyState
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width
+                icon: "bell"
+                title: "No new notifications"
             }
         }
-        ListView {
-            id: list
-            objectName: "notificationList"
-            visible: history.center.history.count > 0
+        // The list, its edges fading into the card where it goes on past them, so that a card
+        // too short for it reads as more to scroll to rather than as cut off.
+        Item {
             Layout.fillWidth: true; Layout.fillHeight: true
-            clip: true; spacing: Theme.spacingL
-            boundsBehavior: Flickable.StopAtBounds
-            model: history.visible ? history.center.history.groups : []
-            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
-            // An application's heading, its icon and name, and its notifications under it.
-            delegate: Column {
-                id: group
-                required property var modelData
-                readonly property var notifications: modelData.notifications
-                readonly property bool collapsible: notifications.length > history.collapsedCount
-                readonly property bool open: !collapsible || history.expanded[modelData.key] === true
-                width: ListView.view.width
-                spacing: Theme.spacingS
-                RowLayout {
-                    width: parent.width; height: Theme.headingHeight
-                    spacing: Theme.spacingM
-                    Image {
-                        readonly property string icon: history.iconSource(Object.assign({}, group.notifications[0], { hasImage: false }))
-                        visible: icon.length > 0
-                        Layout.leftMargin: Theme.spacingS
-                        Layout.preferredWidth: Theme.iconSizeSmall; Layout.preferredHeight: Theme.iconSizeSmall
-                        sourceSize: Qt.size(2 * Theme.iconSizeSmall, 2 * Theme.iconSizeSmall)
-                        fillMode: Image.PreserveAspectFit; source: icon; cache: false
-                    }
-                    Text {
-                        Layout.fillWidth: true
-                        text: group.modelData.app; textFormat: Text.PlainText; elide: Text.ElideRight
-                        color: Theme.textMuted
-                        font.pixelSize: Theme.fontSizeSmall; font.weight: Font.DemiBold; font.family: Theme.fontFamily
-                    }
-                    FlatButton {
-                        id: groupToggle
-                        objectName: "groupToggle"
-                        visible: group.collapsible
-                        Layout.preferredHeight: Theme.headingHeight - Theme.spacingS
-                        leftPadding: Theme.spacingM; rightPadding: Theme.spacingS
-                        onClicked: history.toggleGroup(group.modelData.key)
-                        contentItem: RowLayout {
-                            spacing: Theme.spacingXS
-                            Text {
-                                text: group.open ? "Show less" : (group.notifications.length - history.collapsedCount) + " more"
-                                color: Theme.accent
-                                font.pixelSize: Theme.fontSizeCaption; font.weight: Font.DemiBold; font.family: Theme.fontFamily
-                            }
-                            Icon {
-                                name: "chevron-right"; rotation: group.open ? -90 : 90
-                                size: Theme.iconSizeSmall; color: Theme.accent
-                            }
+            visible: history.center.history.count > 0
+            ListView {
+                id: list
+                objectName: "notificationList"
+                anchors.fill: parent
+                clip: true; spacing: Theme.spacingL
+                boundsBehavior: Flickable.StopAtBounds
+                model: history.visible ? history.center.history.groups : []
+                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                // An application's heading, its icon and name, and its notifications under it.
+                delegate: Column {
+                    id: group
+                    required property var modelData
+                    readonly property var notifications: modelData.notifications
+                    readonly property bool collapsible: notifications.length > history.collapsedCount
+                    readonly property bool open: !collapsible || history.expanded[modelData.key] === true
+                    width: ListView.view.width
+                    spacing: Theme.spacingS
+                    RowLayout {
+                        width: parent.width; height: Theme.headingHeight
+                        spacing: Theme.spacingM
+                        Image {
+                            readonly property string icon: history.iconSource(Object.assign({}, group.notifications[0], { hasImage: false }))
+                            visible: icon.length > 0
+                            Layout.leftMargin: Theme.spacingS
+                            Layout.preferredWidth: Theme.iconSizeSmall; Layout.preferredHeight: Theme.iconSizeSmall
+                            sourceSize: Qt.size(2 * Theme.iconSizeSmall, 2 * Theme.iconSizeSmall)
+                            fillMode: Image.PreserveAspectFit; source: icon; cache: false
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: group.modelData.app; textFormat: Text.PlainText; elide: Text.ElideRight
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontSizeSmall; font.weight: Font.DemiBold; font.family: Theme.fontFamily
+                        }
+                        TextButton {
+                            objectName: "groupToggle"
+                            visible: group.collapsible
+                            Layout.preferredHeight: Theme.headingHeight - Theme.spacingS
+                            text: group.open ? "Show less" : (group.notifications.length - history.collapsedCount) + " more"
+                            chevron: true
+                            chevronRotation: group.open ? -90 : 90
+                            onClicked: history.toggleGroup(group.modelData.key)
                         }
                     }
-                }
-                Repeater {
-                    model: group.open ? group.notifications : group.notifications.slice(0, history.collapsedCount)
-                    delegate: Rectangle {
-                        id: row
-                        objectName: "notificationRow"
-                        required property var modelData
-                        readonly property var n: modelData
-                        width: group.width
-                        height: rowContent.implicitHeight + 2 * Theme.spacingM
-                        radius: Theme.radiusMedium
-                        color: rowHover.hovered ? Theme.surfaceRaisedHover : Theme.surfaceRaised
-                        border.color: n.urgency === 2 ? Theme.danger : "transparent"
-                        HoverHandler { id: rowHover }
-                        // Under its buttons, which take their own clicks.
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: history.center.activate(row.n.notificationId)
-                        }
-                        RowLayout {
-                            id: rowContent
-                            x: Theme.spacingL; y: Theme.spacingM
-                            width: parent.width - 2 * Theme.spacingL
-                            spacing: Theme.spacingL
-                            // The notification's own picture (a sender's face, a screenshot).
-                            Image {
-                                objectName: "notificationImage"
-                                visible: row.n.hasImage
-                                Layout.alignment: Qt.AlignTop; Layout.topMargin: Theme.spacingXS
-                                Layout.preferredWidth: Theme.rowHeight; Layout.preferredHeight: Theme.rowHeight
-                                sourceSize: Qt.size(2 * Theme.rowHeight, 2 * Theme.rowHeight)
-                                fillMode: Image.PreserveAspectCrop; cache: false
-                                source: row.n.hasImage ? history.iconSource(row.n) : ""
+                    Repeater {
+                        model: group.open ? group.notifications : group.notifications.slice(0, history.collapsedCount)
+                        delegate: Rectangle {
+                            id: row
+                            objectName: "notificationRow"
+                            required property var modelData
+                            readonly property var n: modelData
+                            width: group.width
+                            height: rowContent.implicitHeight + 2 * Theme.spacingM
+                            radius: Theme.radiusMedium
+                            color: rowHover.hovered ? Theme.surfaceRaisedHover : Theme.surfaceRaised
+                            border.color: n.urgency === 2 ? Theme.danger : "transparent"
+                            HoverHandler { id: rowHover }
+                            // Under its buttons, which take their own clicks.
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: history.center.activate(row.n.notificationId)
                             }
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                spacing: Theme.spacingXS
-                                RowLayout {
+                            RowLayout {
+                                id: rowContent
+                                x: Theme.spacingL; y: Theme.spacingM
+                                width: parent.width - 2 * Theme.spacingL
+                                spacing: Theme.spacingL
+                                // The notification's own picture (a sender's face, a screenshot).
+                                Image {
+                                    objectName: "notificationImage"
+                                    visible: row.n.hasImage
+                                    Layout.alignment: Qt.AlignTop; Layout.topMargin: Theme.spacingXS
+                                    Layout.preferredWidth: Theme.rowHeight; Layout.preferredHeight: Theme.rowHeight
+                                    sourceSize: Qt.size(2 * Theme.rowHeight, 2 * Theme.rowHeight)
+                                    fillMode: Image.PreserveAspectCrop; cache: false
+                                    source: row.n.hasImage ? history.iconSource(row.n) : ""
+                                }
+                                ColumnLayout {
                                     Layout.fillWidth: true
-                                    spacing: Theme.spacingS
-                                    Text {
+                                    spacing: Theme.spacingXS
+                                    RowLayout {
                                         Layout.fillWidth: true
-                                        text: row.n.summary; textFormat: Text.PlainText
-                                        elide: Text.ElideRight; maximumLineCount: 2; wrapMode: Text.Wrap
-                                        color: Theme.text
-                                        font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
-                                        font.weight: row.n.read ? Font.DemiBold : Font.Bold
-                                    }
-                                    Text {
-                                        Layout.alignment: Qt.AlignTop
-                                        visible: !rowHover.hovered
-                                        text: history.ago(row.n.time)
-                                        color: Theme.textMuted
-                                        font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily
-                                    }
-                                    // Shown in the time's place while the pointer is over it.
-                                    FlatButton {
-                                        objectName: "removeNotification"
-                                        Layout.alignment: Qt.AlignTop
-                                        Layout.preferredWidth: Theme.iconSize + Theme.spacingS
-                                        Layout.preferredHeight: Theme.iconSize + Theme.spacingS
-                                        Layout.topMargin: -Theme.spacingXS
-                                        opacity: rowHover.hovered ? 1 : 0
-                                        visible: opacity > 0
-                                        Accessible.name: "Dismiss"
-                                        onClicked: history.center.removeFromHistory(row.n.notificationId)
-                                        contentItem: Item {
-                                            Icon { anchors.centerIn: parent; name: "x"; size: Theme.iconSizeSmall; color: Theme.textMuted }
+                                        spacing: Theme.spacingS
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: row.n.summary; textFormat: Text.PlainText
+                                            elide: Text.ElideRight; maximumLineCount: 2; wrapMode: Text.Wrap
+                                            color: Theme.text
+                                            font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+                                            font.weight: row.n.read ? Font.DemiBold : Font.Bold
+                                        }
+                                        Text {
+                                            Layout.alignment: Qt.AlignTop
+                                            visible: !rowHover.hovered
+                                            text: history.ago(row.n.time)
+                                            color: Theme.textMuted
+                                            font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily
+                                        }
+                                        // Shown in the time's place while the pointer is over it.
+                                        CloseButton {
+                                            objectName: "removeNotification"
+                                            Layout.alignment: Qt.AlignTop
+                                            Layout.preferredWidth: size; Layout.preferredHeight: size
+                                            Layout.topMargin: -Theme.spacingXS
+                                            opacity: rowHover.hovered ? 1 : 0
+                                            visible: opacity > 0
+                                            Behavior on opacity { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
+                                            Accessible.name: "Dismiss"
+                                            onClicked: history.center.removeFromHistory(row.n.notificationId)
                                         }
                                     }
-                                }
-                                Text {
-                                    Layout.fillWidth: true; visible: text.length > 0
-                                    text: row.n.body
-                                    color: Theme.textMuted
-                                    font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
-                                    textFormat: Text.StyledText; linkColor: Theme.accent
-                                    wrapMode: Text.Wrap; maximumLineCount: 4; elide: Text.ElideRight
-                                    onLinkActivated: (link) => history.center.openLink(link)
-                                }
-                                // The "value" hint, such as a download's progress.
-                                Rectangle {
-                                    visible: row.n.progress >= 0
-                                    Layout.fillWidth: true; Layout.topMargin: Theme.spacingXS
-                                    Layout.preferredHeight: Theme.spacingS
-                                    radius: height / 2; color: Theme.selected
-                                    Rectangle {
-                                        width: parent.width * Math.max(0, Math.min(100, row.n.progress)) / 100
-                                        height: parent.height; radius: parent.radius; color: Theme.accent
+                                    Text {
+                                        Layout.fillWidth: true; visible: text.length > 0
+                                        text: row.n.body
+                                        color: Theme.textMuted
+                                        font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+                                        textFormat: Text.StyledText; linkColor: Theme.accent
+                                        wrapMode: Text.Wrap; maximumLineCount: 4; elide: Text.ElideRight
+                                        onLinkActivated: (link) => history.center.openLink(link)
                                     }
-                                }
-                                // The application's actions, but the default one a click runs.
-                                Flow {
-                                    visible: row.n.actions.length > 0
-                                    Layout.fillWidth: true; Layout.topMargin: Theme.spacingXS
-                                    spacing: Theme.spacingS
-                                    Repeater {
-                                        model: row.n.actions
-                                        Button {
-                                            id: action
-                                            objectName: "notificationHistoryAction"
-                                            required property var modelData
-                                            text: modelData.label
-                                            topPadding: Theme.spacingXS; bottomPadding: Theme.spacingXS
-                                            leftPadding: Theme.spacingL; rightPadding: Theme.spacingL
-                                            onClicked: history.center.invoke(row.n.notificationId, modelData.key)
-                                            background: Rectangle {
-                                                radius: Theme.radiusSmall
-                                                color: action.pressed ? Theme.pressed : action.hovered ? Theme.hover : "transparent"
-                                                border.color: Theme.border
-                                            }
-                                            contentItem: Text {
-                                                text: action.text; textFormat: Text.PlainText
-                                                color: Theme.text
-                                                font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
-                                                horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                                    // The "value" hint, such as a download's progress.
+                                    Rectangle {
+                                        visible: row.n.progress >= 0
+                                        Layout.fillWidth: true; Layout.topMargin: Theme.spacingXS
+                                        Layout.preferredHeight: Theme.spacingS
+                                        radius: height / 2; color: Theme.selected
+                                        Rectangle {
+                                            width: parent.width * Math.max(0, Math.min(100, row.n.progress)) / 100
+                                            height: parent.height; radius: parent.radius; color: Theme.accent
+                                        }
+                                    }
+                                    // The application's actions, but the default one a click runs.
+                                    Flow {
+                                        visible: row.n.actions.length > 0
+                                        Layout.fillWidth: true; Layout.topMargin: Theme.spacingXS
+                                        spacing: Theme.spacingS
+                                        Repeater {
+                                            model: row.n.actions
+                                            PushButton {
+                                                required property var modelData
+                                                objectName: "notificationHistoryAction"
+                                                small: true
+                                                text: modelData.label
+                                                onClicked: history.center.invoke(row.n.notificationId, modelData.key)
                                             }
                                         }
                                     }
@@ -306,6 +284,17 @@ PopupCard {
                         }
                     }
                 }
+            }
+            EdgeFade {
+                objectName: "notificationFadeTop"
+                anchors.top: parent.top
+                fromTop: true
+                shown: !list.atYBeginning
+            }
+            EdgeFade {
+                objectName: "notificationFadeBottom"
+                anchors.bottom: parent.bottom
+                shown: !list.atYEnd
             }
         }
     }

@@ -8,7 +8,6 @@ import QtQuick.Layouts
 FlatButton {
     id: clockButton
     required property var panel
-    required property real barHeight
     objectName: "clockButton"
     readonly property var center: shell.notifications
     readonly property int unread: center.serving ? center.unread : 0
@@ -16,7 +15,7 @@ FlatButton {
         : (center.dnd ? "Do not disturb, " : "") +
           (unread > 0 ? unread + (unread === 1 ? " unread notification" : " unread notifications") : "No new notifications")
     visible: shell.widgets.clock
-    Layout.preferredWidth: content.implicitWidth + 12; Layout.preferredHeight: clockButton.barHeight - 10
+    Layout.preferredWidth: content.implicitWidth + 2 * Theme.spacingM; Layout.preferredHeight: Theme.barButtonHeight
     hoverEnabled: true
     enabled: shell.widgets.calendar || center.serving
     onClicked: clockButton.panel.toggleAudioPopup("clock", clockButton)
@@ -71,21 +70,11 @@ FlatButton {
             }
             // The unread count, in the accent colour, or muted while do-not-disturb holds the
             // cards back.
-            Rectangle {
-                id: badge
+            Badge {
                 objectName: "clockBadge"
-                visible: clockButton.unread > 0
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(height, badgeText.implicitWidth + 2 * Theme.spacingS); height: badgeText.implicitHeight + Theme.spacingXS
-                radius: height / 2
-                color: clockButton.center.dnd ? Theme.selected : Theme.accent
-                Text {
-                    id: badgeText
-                    anchors.centerIn: parent
-                    text: clockButton.unread > 9 ? "9+" : clockButton.unread
-                    color: clockButton.center.dnd ? Theme.textMuted : Theme.textOnAccent
-                    font.pixelSize: Theme.fontSizeCaption; font.weight: Font.DemiBold; font.family: Theme.fontFamily
-                }
+                count: clockButton.unread
+                muted: clockButton.center.dnd
             }
         }
     }

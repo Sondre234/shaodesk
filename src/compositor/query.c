@@ -55,7 +55,8 @@ static void control_describe_urgent(struct sh_server *server, int fd) {
 static void control_describe_layers(struct sh_server *server, int fd) {
     control_reply(fd, "ok\n");
     struct sh_layer *layer;
-    // namespace, output, layer (0 background to 3 overlay), shown — one per line.
+    // namespace, output, layer (0 background to 3 overlay), shown, holds the keyboard — one per
+    // line.
     wl_list_for_each_reverse(layer, &server->layers, link) {
         struct wlr_layer_surface_v1 *surface = layer->surface;
         char namespace[256], line[512];
@@ -63,9 +64,10 @@ static void control_describe_layers(struct sh_server *server, int fd) {
         for (char *c = namespace; *c; ++c)
             if (*c == '\n' || *c == '\r' || *c == '\t')
                 *c = ' ';
-        snprintf(line, sizeof(line), "%s\t%s\t%d\t%d\n", namespace,
+        snprintf(line, sizeof(line), "%s\t%s\t%d\t%d\t%d\n", namespace,
                  surface->output ? surface->output->name : "", surface->current.layer,
-                 surface->surface->mapped && layer->scene->tree->node.enabled);
+                 surface->surface->mapped && layer->scene->tree->node.enabled,
+                 server->focused_layer == layer);
         control_reply(fd, line);
     }
 }

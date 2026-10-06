@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
-import QtQuick.Controls.Basic
 import QtQuick.Effects
 import QtQuick.Layouts
 
@@ -14,17 +13,43 @@ Item {
     objectName: "powerDialog"
     readonly property var power: shell.power
     focus: true
-    // How far it has come in, from 0 to 1: the scrim's and the dialog's opacity, and what is left
-    // of the dialog's growth. It goes at once, as the action or the cancelling does.
+    // Set by its view as it shows and cleared as it goes (a preview sets it from the start).
+    // `progress` follows, from 0 to 1: the scrim's and the dialog's opacity, and what is left of
+    // the dialog's growth. It goes quicker than it came.
+    property bool shown: false
     property real progress: 0
     states: State {
         name: "shown"
-        when: root.Window.window !== null && root.Window.window.visible
+        when: root.shown
         PropertyChanges { root.progress: 1 }
     }
-    transitions: Transition {
-        to: "shown"
-        NumberAnimation { property: "progress"; duration: Theme.durationNormal; easing.type: Theme.easing }
+    transitions: [
+        Transition {
+            to: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationNormal; easing.type: Theme.easing }
+        },
+        Transition {
+            from: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationFast; easing.type: Theme.easingExit }
+        }
+    ]
+    // What it asks about, held as it was while it goes: the question is over before the view hears
+    // that it should go, so only a question still pending is taken.
+    property string pending: ""
+    property string pendingTitle: ""
+    property string message: ""
+    function hold() {
+        if (power.pending === "")
+            return
+        pending = power.pending
+        pendingTitle = power.pendingTitle
+        message = power.message
+    }
+    Component.onCompleted: hold()
+    Connections {
+        target: root.power
+        function onPendingChanged() { root.hold() }
+        function onCountdownChanged() { root.hold() }
     }
     Keys.onEscapePressed: root.power.cancel()
     Keys.onReturnPressed: cancel.activeFocus ? root.power.cancel() : root.power.confirm()
@@ -86,8 +111,8 @@ Item {
                     color: Theme.dangerSurface
                     Icon {
                         anchors.centerIn: parent
-                        name: root.power.pending === "reboot" ? "rotate-ccw"
-                              : root.power.pending === "logout" ? "log-out" : "power"
+                        name: root.pending === "reboot" ? "rotate-ccw"
+                              : root.pending === "logout" ? "log-out" : "power"
                         size: Theme.iconSizeLarge; color: Theme.danger
                     }
                 }
@@ -96,14 +121,14 @@ Item {
                     spacing: Theme.spacingS
                     Text {
                         Layout.fillWidth: true
-                        text: root.power.pendingTitle
+                        text: root.pendingTitle
                         color: Theme.text
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeTitle; font.weight: Font.DemiBold
                     }
                     Text {
                         objectName: "powerMessage"
                         Layout.fillWidth: true
-                        text: root.power.message
+                        text: root.message
                         wrapMode: Text.WordWrap
                         color: Theme.textMuted
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize
@@ -113,56 +138,22 @@ Item {
             RowLayout {
                 Layout.alignment: Qt.AlignRight
                 spacing: Theme.spacingM
-                DialogButton {
+                PushButton {
                     id: cancel
                     objectName: "powerCancel"
+                    Layout.minimumWidth: 3 * Theme.rowHeight
                     text: "Cancel"
                     onClicked: root.power.cancel()
                 }
-                DialogButton {
+                PushButton {
                     id: confirm
                     objectName: "powerConfirm"
-                    text: root.power.pendingTitle
+                    Layout.minimumWidth: 3 * Theme.rowHeight
+                    text: root.pendingTitle
                     danger: true
                     onClicked: root.power.confirm()
                 }
             }
-        }
-    }
-
-    // A button of the dialog: framed on the raised surface, or for the action itself, which
-    // cannot be taken back, filled with the danger colour. A ring in the accent colour around it
-    // says that the keyboard is on it.
-    component DialogButton: Button {
-        id: button
-        property bool danger: false
-        implicitWidth: Math.max(contentItem.implicitWidth + leftPadding + rightPadding, 3 * Theme.rowHeight)
-        implicitHeight: Theme.rowHeight
-        leftPadding: Theme.spacingXL; rightPadding: Theme.spacingXL
-        hoverEnabled: true
-        background: Rectangle {
-            radius: Theme.radiusSmall
-            color: button.danger ? (button.hovered ? Theme.mix(Theme.dangerFill, Theme.textOnDanger, 0.12) : Theme.dangerFill)
-                   : button.hovered ? Theme.surfaceRaisedHover : Theme.surfaceRaised
-            border.color: button.danger ? "transparent" : Theme.border
-            Rectangle {
-                anchors.fill: parent
-                radius: parent.radius
-                color: button.pressed ? Theme.pressed : "transparent"
-            }
-            Rectangle {
-                visible: button.activeFocus
-                anchors.fill: parent; anchors.margins: -Theme.spacingS
-                radius: parent.radius + Theme.spacingS
-                color: "transparent"
-                border.color: Theme.accent; border.width: 2
-            }
-        }
-        contentItem: Text {
-            text: button.text
-            color: button.danger ? Theme.textOnDanger : Theme.text
-            font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize; font.weight: Font.Medium
-            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
         }
     }
 }

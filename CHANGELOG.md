@@ -6,6 +6,36 @@ release; the dated sections below it record the work that led up to it, and all 
 
 ## Unreleased
 
+The shell, redesigned after Windows 11: a start menu, a clock flyout, Quick Settings, restyled
+menus and overlays, and motion throughout.
+
+### The look
+
+- The shell's colours, type, corners, sizes and timings come from one set of design tokens
+  derived from the appearance profile. Hovering, pressing and what is open or on now show on a
+  light panel too, popups are opaque even when the bar is translucent, and the shell's motion
+  follows `animations.enabled` and `animations.speed`.
+- The shell draws through the GPU by default, for shadows and smooth motion at high refresh
+  rates; `shell.renderer = "software"` keeps the CPU renderer for a weak machine. See
+  [docs/performance.md](docs/performance.md). It needs Qt 6.9 or newer: its shadows are Qt Quick
+  Effects' `RectangularShadow`, new in 6.9.
+- Buttons, search fields, the crosses that close or clear things, and what an empty list says look
+  the same everywhere, and a ring in the accent colour shows the button the keyboard is at.
+
+### The taskbar
+
+- The taskbar's popups open in a surface of their own over the whole monitor instead of growing
+  the bar's, so the bar never resizes and a popup can be as tall as the monitor allows. They show
+  over fullscreen windows (the start menu Super + R opens shows over a video), fade in with a
+  short slide from the bar, cast a shadow when drawn through the GPU, and close when the overview,
+  the window switcher or the command palette opens. A press on the bar while one is open still
+  opens another in one press, and one beside it closes it without reaching the window under it.
+- The bar moves: button fills fade in and out, application icons shrink a little while pressed, a
+  window's button fades and grows in as it opens and out as it closes while the others slide over,
+  an application just pinned grows into its slot, the line under a button eases to its new length
+  and colour, the current workspace's pill slides between workspaces, tooltips fade in, the
+  clock's, the bell's and a stack's counts grow in and pop as they go up, and icons that follow a
+  state crossfade. Nothing moves, or wakes the shell, while nothing changes.
 - A window's taskbar menu is headed by its application's icon and name over the window's title,
   and offers the application's desktop actions and a new window, then minimize or restore,
   maximize or restore, fullscreen, moving the window to another workspace or monitor, keeping it
@@ -14,47 +44,59 @@ release; the dated sections below it record the work that led up to it, and all 
   all its windows, and a pinned application's offers its actions too. The shell names the window
   to the compositor through `shaodesk-window-control-v1`, a protocol of shaodesk's own, so the
   menu acts on the window right-clicked even when several share a title, and without focusing it.
+- Menus share one look and the keyboard: Up, Down, Home and End move, Enter or Space chooses, and
+  Escape closes. Submenus open beside their entries instead of in their place (the bar menu's
+  appearance profiles, a tray item's submenus, whose application hears of each level as it opens
+  and closes), and stay open while the pointer heads for them across other entries. Escape in the
+  power menu closes only it, whose entries now have icons. The desktop's right-click menu is one
+  of them too, with Show desktop and the appearance profiles; its Refresh is gone, as the
+  applications are read again by themselves.
+
+### The start menu
+
 - The application menu is now a start menu after Windows 11's: a search field on top; pages of
   pinned tiles, which drag into place, and the applications launched lately with how long ago;
   All apps from A to Z with a letter jump; and along the bottom the user's name and picture
   beside the power button. Its search finds applications by name, generic name, keywords and
   comment, and open windows, workspaces and actions as the command palette does, grouped under a
-  best match with the application's desktop actions. The keyboard moves through all of it, and
-  each application has a menu to open it, run its desktop actions and pin it to the start menu or
-  the taskbar. The start menu keeps pins of its own (`$XDG_STATE_HOME/shaodesk/start-pinned`,
-  seeded from the taskbar's) and counts launches (`$XDG_STATE_HOME/shaodesk/launches`).
-  Applications installed or removed show at once: the Refresh button is gone.
-- The taskbar's popups open in a surface of their own over the whole monitor instead of growing
-  the bar's, so the bar never resizes and a popup can be as tall as the monitor allows: the
-  application menu is now up to 720 pixels tall. They show over fullscreen windows (the
-  application menu Super + R opens shows over a video), fade in with a short slide from the bar,
-  cast a shadow when drawn through the GPU, and close when the overview, the window switcher or
-  the command palette opens. A press on the bar while one is open still opens another in one
-  press, and one beside it closes it without reaching the window under it.
-- Menus share one look and the keyboard: Up, Down, Home and End move, Enter or Space chooses, and
-  Escape closes. Submenus open beside their entries instead of in their place: the bar menu's
-  appearance profiles, and a tray item's submenus, whose application hears of each level as it
-  opens and closes. Escape in the power menu closes only it.
+  best match with the application's desktop actions, which Right and Tab reach from the keyboard.
+  The keyboard moves through all of it, and each application has a menu to open it, run its
+  desktop actions and pin it to the start menu or the taskbar. The start menu keeps pins of its
+  own (`$XDG_STATE_HOME/shaodesk/start-pinned`, seeded from the taskbar's) and counts launches
+  (`$XDG_STATE_HOME/shaodesk/launches`). Applications installed or removed show at once: the
+  Refresh button is gone.
 - The shell can list an installed application's desktop actions ("New window", "New private
   window") and run one, a failure shown across the panel as for the application itself.
-- The shell needs Qt 6.9 or newer: its popups' shadows are Qt Quick Effects'
-  `RectangularShadow`, new in 6.9.
-- The shell draws through the GPU by default; `shell.renderer = "software"` keeps the CPU
-  renderer for a weak machine. See [docs/performance.md](docs/performance.md).
-- The shell's colours, type, corners and timings come from one set of design tokens derived from
-  the appearance profile. Hovering, pressing and what is open or on now show on a light panel
-  too, popups are opaque even when the bar is translucent, and the shell's animations follow
-  `animations.enabled` and `animations.speed`.
-- The notification history marks what it shows as read also when it is opened in the first
-  moments after the shell starts, and the network widget dims while the link is down rather
-  than while it is pressed.
-- For working on the shell: `shaodesk-shell --preview-popup NAME` shows one of the taskbar's
-  popups on stand-in data, and `tools/shell_gallery.py` saves a picture of every one, in a light
-  and a dark theme, drawn in software and through the GPU.
+
+### The clock and Quick Settings
+
+- The clock opens one flyout at the bar's right end, as on Windows 11: the notifications above
+  and a calendar below. The notifications are grouped by application, with pictures, progress,
+  action buttons and a cross on hover, and a do-not-disturb switch and Clear all over them; a list
+  longer than its card fades out at the edge where it goes on, and on a monitor too short for both
+  cards the calendar leaves out its time and date for them. The calendar shows the time and
+  today's date, pages by month with arrows or the wheel (sliding each month in), zooms out from its
+  title to the months and the years, and has a Today button. `notification_history` (Super + N)
+  opens the flyout. The clock shows the unread count, muted with do-not-disturb, which a
+  right-click on it toggles; the bell is off unless `shell.widgets.notifications = "bar"`.
+- Quick Settings, as on Windows 11: a button left of the clock with the network, volume and
+  battery icons (its wheel changes the volume, a middle click mutes) opens tiles for
+  do-not-disturb, night light, tiling on the monitor, the appearance profiles and the wallpaper
+  picker, the network's state on a disc of its own (it is only shown), a brightness slider where
+  there is a backlight (through logind), the volume with its outputs and the applications'
+  volumes, and the battery. The network, battery, volume, tiling, profiles and do-not-disturb are
+  in it by default and the wallpaper picker on the bar; `shell.widgets.NAME = "bar"` or `"quick"`
+  places each, `true` leaving it where it goes by default, so configurations with `true` and
+  `false` keep working. `shell.widgets.notifications = "bar"` is the bell.
+
+### Notifications and the overlays
+
 - The on-screen display, the notification cards, the window switcher, the command palette and the
   power dialog take the popups' look: opaque cards with a shadow through the GPU, the theme's type
-  and sizes, and each comes in on the theme's motion (at once with animations off). The overview's
-  search box, labels, title bars and hint follow, legible over its backdrop in a light theme too.
+  and sizes, and each comes in on the theme's motion (at once with animations off). The switcher,
+  the palette, the power dialog and the overview's text fade out as they close too, giving the
+  pointer and the keyboard back at once. The overview's search box, labels, title bars and hint
+  follow, legible over its backdrop in a light theme too.
 - The on-screen display draws line icons (a sun for brightness, a crossed-out bell for
   do-not-disturb), glides its level to each new value and keeps the number in figures of one
   width.
@@ -67,27 +109,23 @@ release; the dated sections below it record the work that led up to it, and all 
   workspace in its caption. The command palette's results look like a menu's rows with their kind
   on a pill, and it says how to narrow a search that finds nothing. The power dialog's keyboard
   starts on its action's button, ringed, and Tab moves it to Cancel.
-- `--preview-popup` and the gallery show the overlays too: `osd-volume`, `osd-text`, `cards`,
-  `power-dialog`, `palette`, `palette-empty`, `switcher` and `overview`.
-- The clock opens one flyout at the bar's right end, as on Windows 11: the notifications above
-  and a calendar below. The notifications are grouped by application, with pictures, progress,
-  action buttons and a cross on hover, and a do-not-disturb switch and Clear all over them. The
-  calendar shows the time and today's date, pages by month with arrows or the wheel (sliding each
-  month in), zooms out from its title to the months and the years, and has a Today button.
-  `notification_history` (Super + N) opens the flyout. The clock shows the unread count, muted
-  with do-not-disturb, which a right-click on it toggles; the bell is off unless
-  `shell.widgets.notifications = "bar"`.
-- Quick Settings, as on Windows 11: a button left of the clock with the network, volume and
-  battery icons (its wheel changes the volume, a middle click mutes) opens tiles for
-  do-not-disturb, night light, tiling on the monitor, the appearance profiles, the wallpaper
-  picker and the network's state, a brightness slider where there is a backlight (through
-  logind), the volume with its outputs and the applications' volumes, and the battery. The
-  network, battery, volume, tiling, profiles and do-not-disturb are in it by default and the
-  wallpaper picker on the bar; `shell.widgets.NAME = "bar"` or `"quick"` places each, `true`
-  leaving it where it goes by default, so configurations with `true` and `false` keep working.
-  `shell.widgets.notifications = "bar"` is the bell.
+- The notification history marks what it shows as read also when it is opened in the first
+  moments after the shell starts, and the network widget dims while the link is down rather
+  than while it is pressed.
+
+### The compositor
+
 - The compositor tells the shell whether night light is on and whether the schedule decides
   (`night-light ACTIVE MODE` on the control socket's state stream).
+- `shaodesk msg get layers` says which layer surface holds the keyboard, in a fifth column.
+
+### Working on the shell
+
+- `shaodesk-shell --preview-popup NAME` shows one of the taskbar's popups or overlays on stand-in
+  data, and `tools/shell_gallery.py` saves a picture of every one, in a light and a dark theme,
+  drawn in software and through the GPU: the overlays as `osd-volume`, `osd-text`, `cards`,
+  `power-dialog`, `palette`, `palette-empty`, `switcher` and `overview`, and a search finding
+  nothing as `launcher-empty`.
 
 ## 0.1.1 (2026-10-05)
 

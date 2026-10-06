@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
-import QtQuick.Controls.Basic
 import QtQuick.Effects
 
 // The command palette: a search box over windows, applications, workspaces, actions and saved
@@ -17,18 +16,26 @@ Item {
     readonly property var kindLabels: ({ window: "Window", app: "App", workspace: "Workspace", action: "Action", session: "Session" })
     width: card.width + 2 * Theme.shadowMargin
     height: card.height + 2 * Theme.shadowMargin
-    // How far it has come in, from 0 to 1, each time its window shows: the card's opacity, and
-    // what is left of its drop and growth. It goes at once, for what it runs to show.
+    // Set by its view as it shows and cleared as it goes (a preview sets it from the start).
+    // `progress` follows, from 0 to 1: the card's opacity, and what is left of its drop and
+    // growth. It goes quicker than it came, what it ran showing through.
+    property bool shown: false
     property real progress: 0
     states: State {
         name: "shown"
-        when: root.Window.window !== null && root.Window.window.visible
+        when: root.shown
         PropertyChanges { root.progress: 1 }
     }
-    transitions: Transition {
-        to: "shown"
-        NumberAnimation { property: "progress"; duration: Theme.durationNormal; easing.type: Theme.easing }
-    }
+    transitions: [
+        Transition {
+            to: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationNormal; easing.type: Theme.easing }
+        },
+        Transition {
+            from: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationFast; easing.type: Theme.easingExit }
+        }
+    ]
 
     function reset() {
         input.text = shell.palette.query
@@ -64,31 +71,14 @@ Item {
             border.color: Theme.border
         }
 
-        TextField {
+        // The start menu's field, larger.
+        SearchInput {
             id: input
             objectName: "paletteInput"
             x: root.padding; y: root.padding
             width: card.width - 2 * root.padding
-            height: Theme.rowHeight + Theme.spacingS + Theme.spacingXS
-            // A field as the launcher's, with a magnifier before the text.
-            leftPadding: Theme.spacingL + Theme.iconSize + Theme.spacingM
-            rightPadding: Theme.spacingL
-            color: Theme.text
+            large: true
             placeholderText: "Search windows, apps, workspaces, actions, sessions"
-            placeholderTextColor: Theme.textMuted
-            selectionColor: Theme.accent
-            selectedTextColor: Theme.textOnAccent
-            font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeTitle
-            selectByMouse: true
-            background: Rectangle {
-                radius: Theme.radiusSmall; color: Theme.surfaceRaised
-                border.color: input.activeFocus ? Theme.accent : Theme.border
-                Icon {
-                    x: Theme.spacingL; anchors.verticalCenter: parent.verticalCenter
-                    name: "search"; size: Theme.iconSize
-                    color: input.activeFocus ? Theme.text : Theme.textMuted
-                }
-            }
             onTextChanged: shell.palette.query = text
             Keys.onPressed: function(event) {
                 const ctrl = (event.modifiers & Qt.ControlModifier) !== 0
@@ -191,32 +181,15 @@ Item {
             }
         }
         // What to try when nothing matches: the prefixes that narrow a search.
-        Column {
+        EmptyState {
             id: empty
             objectName: "paletteEmpty"
             visible: list.count === 0
             x: root.padding; y: input.y + input.height + root.padding
             width: card.width - 2 * root.padding
-            topPadding: Theme.spacingL; bottomPadding: Theme.spacingL
-            spacing: Theme.spacingS
-            Icon {
-                anchors.horizontalCenter: parent.horizontalCenter
-                name: "search"; size: Theme.iconSizeLarge; color: Theme.textMuted
-            }
-            Text {
-                width: parent.width
-                text: "Nothing matches"
-                color: Theme.text
-                font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeLarge; font.weight: Font.Medium
-                horizontalAlignment: Text.AlignHCenter
-            }
-            Text {
-                width: parent.width
-                text: "Start with > for actions, @ for windows, # for workspaces or % for sessions"
-                color: Theme.textMuted
-                font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall
-                horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap
-            }
+            icon: "search"
+            title: "Nothing matches"
+            hint: "Start with > for actions, @ for windows, # for workspaces or % for sessions"
         }
     }
 }

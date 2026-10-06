@@ -111,20 +111,35 @@ keyboard where it is. Losing the keyboard while it holds it (`dismissed`)
 closes the popups. Without layer shell (`--preview-popup`, `shell_ui_test`) it is an ordinary
 window as large as `ShellView::previewSize()`, and a preview's screenshot draws it over the bar.
 
+The window switcher, the command palette, the power dialog and the overview's text are
+`OverlayView`s (`view.cpp`), a layer surface each on every output's overlay layer. `present()`
+shows one and sets its QML root's `shown`; `dismiss()` clears it, and the root animates its own
+`progress` back to 0 as its transition from the "shown" state says, the view hiding once it is
+there (at once with animations off). While it goes it is transparent for input and gives up the
+keyboard, so the windows under it have both at once, and shown again it comes back from where it
+was. What the compositor forgets as one closes (the switcher's windows, the power dialog's
+question, the overview's search) its root holds with a `Binding` while `shown`, so the fade shows
+what was there.
+
 | File | Covers |
 | --- | --- |
 | `Theme.qml` | The design tokens (colours, type, radii, spacing, icon sizes, motion, whether effects can be drawn), derived from the appearance profile. A singleton: every file reads `Theme.surface`, `Theme.hover`, ... instead of colours and sizes of its own. |
-| `Panel.qml` | The taskbar: which popup is open and where, the bar and its smaller buttons, and the popover with a loader for each popup. Every part below takes the panel as `panel` (and the bar's height, or the bar as `barItem`) and reaches its state and functions through it; a popup is placed in `panel.popupLayer`, by the bar's edges there (`panel.barTop`, `panel.barBottom`). |
-| `PinnedSlots.qml`, `TaskList.qml`, `TaskButton.qml`, `TrayButton.qml`, `WorkspaceIndicator.qml`, `VolumeButton.qml`, `ClockButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `QuickSettingsButton.qml`, `BarTip.qml` | Parts of the bar: widgets, and the tooltip for things on it. |
+| `Panel.qml` | The taskbar: which popup is open and where, the bar and its smaller buttons, and the popover with a loader for each popup. Every part below takes the panel as `panel` (and a popup the bar as `barItem`) and reaches its state and functions through it; a popup is placed in `panel.popupLayer`, beside the part of the bar it belongs to (`panel.barAnchor(x, width)`). |
+| `PinnedSlots.qml`, `TaskList.qml`, `TaskButton.qml`, `TrayButton.qml`, `WorkspaceIndicator.qml`, `VolumeButton.qml`, `ClockButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `QuickSettingsButton.qml`, `BarAppIcon.qml`, `Badge.qml`, `BarTip.qml` | Parts of the bar: widgets, an application's icon on it, a count on a pill, and the tooltip for things on it. |
 | `ClockFlyout.qml`, `QuickSettings.qml`, `AudioMixer.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
 | `CalendarPopup.qml`, `NotificationHistory.qml` | The clock flyout's cards: the month calendar, and the notifications grouped by application. |
 | `QuickTile.qml` | A tile of Quick Settings: a toggle, a list it opens, or a state. |
-| `Icon.qml`, `SpeakerIcon.qml`, `BatteryIcon.qml` | Line icons (Lucide), drawn as vectors in any colour, the loudspeaker for a volume, and a battery filled to its charge. |
-| `FlatButton.qml` | The frameless button of the bar and of menus, showing the hover, pressed and active states. |
+| `Icon.qml`, `FadingIcon.qml`, `SpeakerIcon.qml`, `BatteryIcon.qml` | Line icons (Lucide), drawn as vectors in any colour; one that crossfades as the state it shows changes, the loudspeaker for a volume, and a battery filled to its charge. |
+| `FlatButton.qml`, `ButtonFill.qml` | The frameless button of the bar and of menus, and its background, which fades between the hover, pressed and active states. |
+| `PushButton.qml` | A framed button with text: raised, or filled for what a click mostly does or for a destructive action, with a ring for the keyboard; a dialog's, a notification's, the start menu's. |
+| `TextButton.qml` | A button that is only its text in the accent colour, as Today and Clear all over a card's list. |
+| `CloseButton.qml` | The round cross that closes a card, a notification or a window in a stack's list, or clears the search. |
+| `SearchInput.qml` | The start menu's and the command palette's search field. |
+| `EmptyState.qml` | What a list says while it has nothing to show: an icon, a line and a hint. |
 | `PopupCard.qml` | A popup's card: surface, outline, corners, a shadow through the GPU, the open and close animation, and its place beside what it belongs to. |
 | `PopupMenu.qml`, `MenuRow.qml` | A menu of plain entries on popup cards, with cascading submenus and keyboard navigation, and one row of it. |
-| `AudioSlider.qml`, `MuteButton.qml` | Controls the mixer uses. |
-| `StartHome.qml`, `StartAllApps.qml`, `StartSearch.qml`, `StartBestMatch.qml`, `StartTile.qml`, `StartRow.qml`, `StartButton.qml`, `UserAvatar.qml` | Parts of the start menu (`Launcher.qml`): its pinned and recent applications, every application from A to Z, what its search finds and the best match of it, a pinned application, a row of its lists, its small buttons, the user's picture. |
+| `AudioSlider.qml`, `MuteButton.qml`, `StreamRow.qml` | Controls the mixer and Quick Settings use: a volume's slider, a mute button, and an application playing sound. |
+| `StartHome.qml`, `StartAllApps.qml`, `StartSearch.qml`, `StartBestMatch.qml`, `StartTile.qml`, `StartRow.qml`, `UserAvatar.qml` | Parts of the start menu (`Launcher.qml`): its pinned and recent applications, every application from A to Z, what its search finds and the best match of it, a pinned application, a row of its lists, the user's picture. |
 | `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |
 | `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |
 
@@ -176,8 +191,10 @@ returns `true`; `triggered(entry)` comes first. `submenu` is an array of entries
 returning one that is read as it opens and again when what it read changes. Placement is the
 card's: `anchorRect`, `side`, `alignment`, `gap`, `bounds`; `minimumWidth`, `maximumWidth` and
 `rowHeight` size the rows. A submenu opens beside its entry after the pointer rests there for
-`submenuDelay` milliseconds, on a click, or with Right, Enter or Space; Up, Down, Home and End
-move, Left or Escape closes a submenu and Escape in the first level emits `dismissed()`.
+`submenuDelay` milliseconds, on a click, or with Right, Enter or Space; the pointer heading for an
+open submenu across other entries (inside the triangle from where it was to the submenu's near
+edge) leaves it open until it rests on one. Up, Down, Home and End move, Left or Escape closes a
+submenu and Escape in the first level emits `dismissed()`.
 `initialIndex` highlights an entry as it opens (-1, none, for a menu opened with the pointer).
 `openEntries` lists the entries whose submenus are open, `openSubmenu(index)` opens one,
 `closeSubmenus()` closes them, and `card` is the first level's card. Rows are `MenuRow`s, named
@@ -212,13 +229,18 @@ states; `border` and `divider`; `text`, `textMuted` and `textDisabled`; `accent`
 `fontSizeCaption`, `fontSizeSmall`, `fontSizeLarge`, `fontSizeTitle` and `fontSizeDisplay`;
 shapes `radiusSmall`, `radiusMedium` and `radiusLarge`; spacing `spacingXS` to `spacingXXL`
 (2, 4, 8, 12, 16, 20); icons `iconSizeSmall`, `iconSize`, `appIconSize` and
-`appIconSizeLarge`; rows of menus and lists `rowHeight`, their headings `headingHeight`.
-Animations use `durationFast`, `durationNormal`, `durationSlow` or `duration(ms)` with `easing`
-or `easingExit`, all 0 while `animations.enabled` is off. `effects` says whether shader effects
+`appIconSizeLarge`; rows of menus and lists `rowHeight`, their headings `headingHeight`; buttons
+on the bar `barButtonHeight` and, an icon's, `barButtonWidth`. Animations use `durationFast`,
+`durationNormal`, `durationSlow` or `duration(ms)` with `easing` or `easingExit`, all 0 while
+`animations.enabled` is off; something small growing in starts at `growFrom` of its size, and an
+icon on the bar shrinks to `pressScale` while pressed. Nothing animates while nothing changes,
+so that an idle shell wakes for nothing: motion is a `Behavior` or a transition on a change, and
+an animation that runs by itself ends, as the urgent pulse does after a few beats. `effects` says whether shader effects
 (shadows) can be drawn: only through the GPU, so draw them only when it is true, as a popup's
 `shadow` colour, `shadowBlur` and `shadowOffset` are. `alpha()` and `mix()` derive a colour from
-these. A button without a frame of its own is a `FlatButton`, a tooltip for something on the bar
-is a `BarTip`, a popup is a `PopupCard` and a menu a `PopupMenu`.
+these. A button without a frame of its own is a `FlatButton`, one with a frame and text a
+`PushButton`, a tooltip for something on the bar is a `BarTip`, a popup is a `PopupCard` and a
+menu a `PopupMenu`.
 
 ### Seeing a change
 

@@ -85,11 +85,13 @@ Item {
             color: Theme.text
             font.pixelSize: Theme.fontSize; font.weight: Font.DemiBold; font.family: Theme.fontFamily
         }
-        StartButton {
+        PushButton {
             objectName: "startBack"
             anchors.right: parent.right; anchors.rightMargin: Theme.spacingM
             anchors.verticalCenter: parent.verticalCenter
+            small: true
             back: true
+            focusPolicy: Qt.NoFocus
             text: "Back"
             onClicked: all.launcher.allApps = false
         }

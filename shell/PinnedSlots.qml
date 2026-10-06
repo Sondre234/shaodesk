@@ -5,12 +5,31 @@ import Shaodesk
 
 // A pinned application's slot shows its launcher, or its windows while it has any.
 // Dragging either slides the slot along the bar, the slots it passes halfway over
-// making way; dropping it keeps it where it was dragged to.
+// making way; dropping it keeps it where it was dragged to. An application just pinned
+// fades and grows into a slot that opens for it, and a window opening in a slot draws
+// its line out under the launcher's icon (or, beside the slot's other windows, comes in
+// as a window's button does in the task list).
 Repeater {
     id: pinnedSlots
     required property var panel
-    required property real barHeight
     model: shell.pinned
+    // The applications whose slots are on the bar. Every change to the pins makes the slots
+    // anew, so a slot comes in only when its application was not among them.
+    property var shownApps: []
+    property bool settled: false
+    Component.onCompleted: Qt.callLater(remember)
+    // Also when the last pin goes, which adds no slot to remember by.
+    onModelChanged: Qt.callLater(remember)
+    function remember() {
+        shownApps = shell.pinned.map(function(app) { return app.appId })
+        settled = true
+    }
+    onItemAdded: (index, item) => {
+        if (settled && shownApps.indexOf(item.modelData.appId) < 0)
+            item.enter()
+        item.settled = true
+        Qt.callLater(remember)
+    }
     // The slot being dragged, the slot whose place it takes, and how far the slots
     // in between step aside.
     property int dragFrom: -1
@@ -57,8 +76,22 @@ Repeater {
         }
         property real shiftX: shift
         Behavior on shiftX { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
-        spacing: 4
+        spacing: Theme.spacingS
         z: dragging ? 1 : 0
+        // Made with the bar or anew as the pins changed: what is added after comes in.
+        property bool settled: false
+        // How far it has come in, from 0 to 1: it fades and grows in as its room opens.
+        property real grow: 1
+        NumberAnimation on grow {
+            id: growing
+            running: false
+            from: 0; to: 1
+            duration: Theme.durationNormal; easing.type: Theme.easing
+        }
+        function enter() { growing.restart() }
+        opacity: grow
+        scale: Theme.growFrom + (1 - Theme.growFrom) * grow
+        Layout.preferredWidth: implicitWidth * grow
         // The transform's own x, not the item's: it does not fight the layout.
         // qmllint disable Quick.layout-positioning
         transform: Translate { x: pinnedSlot.dragging ? pinnedSlot.dragX : pinnedSlot.shiftX }
@@ -67,16 +100,18 @@ Repeater {
             id: pinnedButton
             objectName: "pinned:" + pinnedSlot.modelData.appId
             visible: pinnedTasks.count === 0
-            Layout.preferredWidth: 40; Layout.preferredHeight: pinnedSlots.barHeight - 10
+            Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
             // Padded like a window's button, so the icon stays put when one opens.
-            topPadding: 2; bottomPadding: 6
+            topPadding: Theme.spacingXS; bottomPadding: Theme.spacingS + Theme.spacingXS
             onClicked: { if (shell.launch(pinnedSlot.modelData.appId)) pinnedSlots.panel.closeMenus() }
             Accessible.name: pinnedSlot.modelData.name
+            BarTip { panel: pinnedSlots.panel; owner: pinnedButton; text: pinnedSlot.modelData.name }
             contentItem: Item {
-                Image {
-                    readonly property int size: Math.min(Theme.appIconSize, parent.height)
-                    anchors.centerIn: parent; width: size; height: size
-                    source: "image://icons/" + pinnedSlot.modelData.icon; sourceSize: Qt.size(size, size)
+                BarAppIcon {
+                    anchors.centerIn: parent
+                    name: pinnedSlot.modelData.icon
+                    pressed: pinnedButton.pressed
+                    size: Math.min(Theme.appIconSize, parent.height)
                 }
             }
             MouseArea {
@@ -95,6 +130,12 @@ Repeater {
         TaskFilter { id: pinnedWindows; controller: shell; app: pinnedSlot.modelData.appId; sourceModel: pinnedSlots.panel.taskSource }
         Repeater {
             model: TaskFilter { id: pinnedTasks; controller: shell; app: pinnedSlot.modelData.appId; sourceModel: pinnedSlots.panel.taskSource; grouped: shell.groupWindows }
+            // The first window takes the launcher's place, the others come in beside it.
+            onItemAdded: (index, item) => {
+                if (pinnedSlot.settled) {
+                    if (pinnedTasks.count === 1) item.appear(); else item.enter()
+                }
+            }
             delegate: TaskButton {
                 objectName: "pinnedTask:" + pinnedSlot.modelData.appId
                 panel: pinnedSlots.panel
@@ -102,7 +143,7 @@ Repeater {
                 group: shell.groupWindows ? pinnedWindows : null
                 groupSlot: pinnedSlot.modelData.appId
                 groupWindowApp: ""
-                width: shell.iconsOnly ? 40 : 160
+                width: shell.iconsOnly ? Theme.barButtonWidth : 160
                 Layout.preferredWidth: width; Layout.preferredHeight: height
                 DragHandler {
                     target: null

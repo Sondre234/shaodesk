@@ -6,18 +6,18 @@ import QtQuick.Layouts
 FlatButton {
     id: battery
     required property var panel
-    required property real barHeight
     objectName: "batteryWidget"
     readonly property var status: battery.panel.statusSource
     readonly property bool low: icon.low
     readonly property color tint: icon.tint
     visible: shell.widgets.battery === "bar" && status.batteryPresent
-    Layout.preferredWidth: 62; Layout.preferredHeight: battery.barHeight - 10
+    Layout.preferredWidth: charge.implicitWidth + 2 * Theme.spacingM; Layout.preferredHeight: Theme.barButtonHeight
     hoverEnabled: true
     Accessible.name: status.batteryText
     BarTip { panel: battery.panel; owner: battery; text: battery.status.batteryText }
     contentItem: Row {
-        spacing: 5
+        id: charge
+        spacing: Theme.spacingS
         anchors.centerIn: parent
         BatteryIcon {
             id: icon

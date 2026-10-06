@@ -6,12 +6,11 @@ import Shaodesk
 ListView {
     id: taskList
     required property var panel
-    required property real barHeight
     objectName: "taskList"
     // As tall as a button, so its tasks line up with the pinned ones: a horizontal
     // list places each delegate at its top, whatever the delegate's own y.
-    Layout.fillWidth: true; Layout.preferredHeight: shell.panelHeight - 10
-    orientation: ListView.Horizontal; spacing: 4; clip: true
+    Layout.fillWidth: true; Layout.preferredHeight: Theme.barButtonHeight
+    orientation: ListView.Horizontal; spacing: Theme.spacingS; clip: true
     // Dragging moves a single task, not the list; the wheel scrolls an overflowing one.
     interactive: false
     // The task being dragged, the task whose place it takes, and how far the tasks
@@ -20,6 +19,24 @@ ListView {
     property int dragTo: -1
     property real dragStep: 0
     model: TaskFilter { controller: shell; sourceModel: taskList.panel.taskSource; grouped: shell.groupWindows }
+    // A window's button fades and grows in as the window opens, drawing its activity line out,
+    // and shrinks away as it closes, taking no more clicks; the buttons beside it slide over to
+    // make room or close the gap. Dragged ones slide aside quicker, keeping up with the pointer.
+    add: Transition {
+        NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durationNormal; easing.type: Theme.easing }
+        NumberAnimation { property: "scale"; from: Theme.growFrom; to: 1; duration: Theme.durationNormal; easing.type: Theme.easing }
+        NumberAnimation { property: "reveal"; from: 0; to: 1; duration: Theme.durationNormal; easing.type: Theme.easing }
+    }
+    remove: Transition {
+        PropertyAction { property: "enabled"; value: false }
+        NumberAnimation { property: "opacity"; to: 0; duration: Theme.durationFast; easing.type: Theme.easingExit }
+        NumberAnimation { property: "scale"; to: Theme.growFrom; duration: Theme.durationFast; easing.type: Theme.easingExit }
+    }
+    // A button displaced while it was still coming in ends whole.
+    displaced: Transition {
+        NumberAnimation { property: "x"; duration: Theme.durationNormal; easing.type: Theme.easing }
+        NumberAnimation { properties: "opacity,scale,reveal"; to: 1; duration: Theme.durationNormal; easing.type: Theme.easing }
+    }
     moveDisplaced: Transition { NumberAnimation { property: "x"; duration: Theme.durationFast; easing.type: Theme.easing } }
     WheelHandler {
         enabled: taskList.contentWidth > taskList.width
@@ -36,7 +53,7 @@ ListView {
         // Windows without an app id have nothing to group by.
         property TaskFilter appWindows: TaskFilter { controller: shell; sourceModel: taskList.panel.taskSource; windowApp: taskButton.appId }
         group: shell.groupWindows && appId !== "" ? appWindows : null
-        width: shell.iconsOnly ? 40 : Math.min(185, Math.max(92, taskList.width / Math.max(1, taskList.count) - 4))
+        width: shell.iconsOnly ? Theme.barButtonWidth : Math.min(185, Math.max(92, taskList.width / Math.max(1, taskList.count) - 4))
         z: reorder.active ? 1 : 0
         readonly property real shift: {
             var from = taskList.dragFrom, to = taskList.dragTo

@@ -16,6 +16,12 @@ PopupCard {
     // What the grid shows: "days" of the month, the "months" of the year, or the "years" of its
     // decade.
     property string view: "days"
+    // Without the time and today's date over the month, which the bar shows: for a short
+    // output, where the notifications over it want the room. `fullHeight` is its height with
+    // them, whether or not it is compact.
+    property bool compact: false
+    readonly property real fullHeight: 2 * padding + today.implicitHeight + 1 + navigation.implicitHeight +
+                                       pages.Layout.preferredHeight + 3 * content.spacing
     readonly property int decade: Math.floor(year / 10) * 10
     // Now, to the minute, while it shows.
     property date now: new Date()
@@ -142,6 +148,8 @@ PopupCard {
         }
         // The time, large, and today's date under it.
         ColumnLayout {
+            id: today
+            visible: !calendar.compact
             Layout.fillWidth: true; Layout.leftMargin: Theme.spacingS
             spacing: 0
             Text {
@@ -157,9 +165,10 @@ PopupCard {
                 font.pixelSize: Theme.fontSize; font.weight: Font.DemiBold; font.family: Theme.fontFamily
             }
         }
-        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.divider }
+        Rectangle { visible: !calendar.compact; Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.divider }
         // What is shown, which zooms out when clicked, and the arrows to page through it.
         RowLayout {
+            id: navigation
             Layout.fillWidth: true; spacing: Theme.spacingXS
             FlatButton {
                 id: title
@@ -178,21 +187,14 @@ PopupCard {
                 }
             }
             Item { Layout.fillWidth: true }
-            FlatButton {
-                id: todayButton
+            TextButton {
                 objectName: "calendarToday"
-                Layout.preferredHeight: Theme.rowHeight
-                leftPadding: Theme.spacingM; rightPadding: Theme.spacingM
+                Layout.preferredHeight: Theme.rowHeight - Theme.spacingS
+                text: "Today"
                 enabled: calendar.view !== "days" || calendar.month !== calendar.now.getMonth() ||
                          calendar.year !== calendar.now.getFullYear()
                 onClicked: calendar.today()
                 Accessible.name: "Go to today"
-                contentItem: Text {
-                    text: "Today"
-                    color: todayButton.enabled ? Theme.accent : Theme.textDisabled
-                    font.pixelSize: Theme.fontSizeSmall; font.weight: Font.DemiBold; font.family: Theme.fontFamily
-                    verticalAlignment: Text.AlignVCenter
-                }
             }
             FlatButton {
                 objectName: "calendarPrevious"

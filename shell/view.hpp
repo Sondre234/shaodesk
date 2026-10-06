@@ -85,64 +85,86 @@ class PopoverWindow : public QQuickWindow {
     void applyInput();
 };
 
-// The command palette's overlay on one output: a search box near the top, holding the keyboard
-// while the palette is open there.
-class PaletteView : public QQuickView {
+// An overlay that comes in and goes out on the shell's motion: the command palette, the power
+// dialog, the overview and the window switcher. Its root item has a `shown` property, set as it
+// shows and cleared as it goes, and a `progress` from 0 to 1 that its QML animates after it; the
+// window hides once progress is back at 0, at once with animations off. While it goes it takes no
+// input and holds no keyboard, so the windows under it have the pointer and the keyboard at once
+// and the compositor carries on as if it were gone; asked to show again, it comes back from where
+// it was.
+class OverlayView : public QQuickView {
     Q_OBJECT
   public:
-    PaletteView(ShellController &controller, QScreen *screen);
     QScreen *outputScreen() const { return outputScreen_; }
 
-  private:
+  protected:
+    // `name` is how its log lines call it ("palette" in "shaodesk palette shown on DP-1"), and
+    // `keyboard` whether it holds the keyboard while it is on.
+    OverlayView(ShellController &controller, QScreen *screen, const char *name, bool keyboard);
+    // Loads its QML from `file` in the shell's module.
+    void load(const QString &file);
+    // Shows it, or keeps it when it was going; returns whether it was hidden.
+    bool present();
+    // Starts it going, unless it is hidden or going already.
+    void dismiss();
+    // Whether it is going.
+    bool leaving() const { return leaving_; }
     ShellController &controller_;
     LayerShellQt::Window *layer_ = nullptr;
     QScreen *outputScreen_;
+
+  private Q_SLOTS:
+    // Hides it once it has gone.
+    void settle();
+
+  private:
+    const char *name_;
+    bool keyboard_, leaving_ = false;
+    void holdKeyboard(bool hold);
+};
+
+// The command palette's overlay on one output: a search box near the top, holding the keyboard
+// while the palette is open there.
+class PaletteView : public OverlayView {
+    Q_OBJECT
+  public:
+    PaletteView(ShellController &controller, QScreen *screen);
+
+  private:
     bool wasActive_ = false;
     void update();
 };
 
 // The confirmation of power off, restart and log out on one output: a dimmed cover with the
 // dialog in its middle, holding the keyboard while it waits.
-class PowerView : public QQuickView {
+class PowerView : public OverlayView {
     Q_OBJECT
   public:
     PowerView(ShellController &controller, QScreen *screen);
-    QScreen *outputScreen() const { return outputScreen_; }
 
   private:
-    ShellController &controller_;
-    LayerShellQt::Window *layer_ = nullptr;
-    QScreen *outputScreen_;
     void update();
 };
 
 // The overview's overlay on one output: the text over the compositor's thumbnails (titles,
 // workspace labels, the search box), covering the output while the overview is open there.
-class OverviewView : public QQuickView {
+class OverviewView : public OverlayView {
     Q_OBJECT
   public:
     OverviewView(ShellController &controller, QScreen *screen);
-    QScreen *outputScreen() const { return outputScreen_; }
 
   private:
-    ShellController &controller_;
-    LayerShellQt::Window *layer_ = nullptr;
-    QScreen *outputScreen_;
     void update();
 };
 
 // The window switcher's overlay on one output, shown in the middle of it while the compositor's
 // switcher is open there.
-class SwitcherView : public QQuickView {
+class SwitcherView : public OverlayView {
     Q_OBJECT
   public:
     SwitcherView(ShellController &controller, QScreen *screen);
-    QScreen *outputScreen() const { return outputScreen_; }
 
   private:
-    ShellController &controller_;
-    LayerShellQt::Window *layer_ = nullptr;
-    QScreen *outputScreen_;
     QTimer *delay_;
     void update();
 };

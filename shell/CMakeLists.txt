@@ -45,9 +45,9 @@ set_source_files_properties(Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREFIX /shell
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/ShaodeskShell
     NO_PLUGIN NO_GENERATE_QMLTYPES
-    QML_FILES Theme.qml FlatButton.qml PopupCard.qml PopupMenu.qml MenuRow.qml Panel.qml Icon.qml Desktop.qml Switcher.qml Palette.qml Overview.qml NotificationCards.qml Osd.qml ConfigError.qml NotificationBell.qml NotificationHistory.qml
-    KeyboardLayout.qml BarTip.qml TaskButton.qml TaskList.qml PinnedSlots.qml TrayButton.qml
-    WorkspaceIndicator.qml VolumeButton.qml ClockButton.qml BatteryWidget.qml NetworkWidget.qml SpeakerIcon.qml AudioSlider.qml MuteButton.qml
+    QML_FILES Theme.qml EmptyState.qml FlatButton.qml ButtonFill.qml PushButton.qml TextButton.qml CloseButton.qml SearchInput.qml PopupCard.qml PopupMenu.qml MenuRow.qml Panel.qml Icon.qml FadingIcon.qml Desktop.qml Switcher.qml Palette.qml Overview.qml NotificationCards.qml Osd.qml ConfigError.qml NotificationBell.qml NotificationHistory.qml
+    KeyboardLayout.qml BarTip.qml BarAppIcon.qml Badge.qml TaskButton.qml TaskList.qml PinnedSlots.qml TrayButton.qml
+    WorkspaceIndicator.qml VolumeButton.qml ClockButton.qml BatteryWidget.qml NetworkWidget.qml SpeakerIcon.qml AudioSlider.qml MuteButton.qml StreamRow.qml
     AudioMixer.qml
     CalendarPopup.qml
     AudioOutputs.qml
@@ -60,7 +60,6 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     StartBestMatch.qml
     StartTile.qml
     StartRow.qml
-    StartButton.qml
     UserAvatar.qml
     PowerMenu.qml
     TaskbarMenu.qml
@@ -285,6 +284,10 @@ if(BUILD_TESTING)
             ${PROJECT_SOURCE_DIR}/tests/overview_shell_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(overview_shell_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME overlay_exit_smoke COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/overlay_exit_smoke.py $<TARGET_FILE:shaodesk>
+            $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(overlay_exit_smoke PROPERTIES TIMEOUT 60)
         # A few of the gallery's popups and overlays through the GPU (Mesa's software OpenGL, in a
         # private compositor), where effects are drawn. Not under the sanitizers: now and then
         # Qt's Wayland platform leaks a surface of a preview that quits soon after showing.

@@ -9,7 +9,6 @@ import QtQuick.Layouts
 FlatButton {
     id: button
     required property var panel
-    required property real barHeight
     objectName: "quickSettingsButton"
     readonly property var widgets: shell.widgets
     readonly property var audio: panel.audioSource
@@ -28,7 +27,7 @@ FlatButton {
     visible: ["network", "battery", "volume", "tiling", "profiles", "wallpapers", "notifications"]
         .some(function(name) { return button.widgets[name] === "quick" })
     Layout.preferredWidth: icons.implicitWidth + 2 * Theme.spacingM
-    Layout.preferredHeight: barHeight - 10
+    Layout.preferredHeight: Theme.barButtonHeight
     hoverEnabled: true
     active: panel.audioPopup === "quick"
     onClicked: panel.toggleAudioPopup("quick", button)
@@ -39,7 +38,7 @@ FlatButton {
             id: icons
             anchors.centerIn: parent
             spacing: Theme.spacingM
-            Icon {
+            FadingIcon {
                 visible: button.showNetwork
                 anchors.verticalCenter: parent.verticalCenter
                 name: button.status.networkState === "ethernet" ? "ethernet-port"

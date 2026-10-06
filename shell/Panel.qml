@@ -58,13 +58,12 @@ Item {
     // opens under a window being typed in.
     readonly property bool expanded: menuOpen || groupOpen
     onMenuOpenChanged: if (menuOpen) groupOpen = false
-    // The surface the popups are drawn in, and the bar's edges in its coordinates: the bar's
+    // The surface the popups are drawn in, and the bar's top edge in its coordinates: the bar's
     // surface lies along its top or bottom edge, across its width.
     readonly property Item popupLayer: popupLayer
     // What Quick Settings opens the wallpaper picker by.
     readonly property Item quickSettingsButton: quickButton
     readonly property real barTop: (onTop ? 0 : popover.height - height) + bar.y
-    readonly property real barBottom: barTop + bar.height
     // A popup of the bar opens away from the screen edge the bar is on (PopupCard's side), beside
     // the rectangle barAnchor gives: from `x`, `width` wide, and across the bar.
     readonly property int popupSide: onTop ? Qt.BottomEdge : Qt.TopEdge
@@ -160,6 +159,7 @@ Item {
             return true
         case "launcher-all":
         case "launcher-search":
+        case "launcher-empty":
         case "launcher-menu":
             // The start menu's other views, as Launcher.preview names them.
             launcherOpen = true
@@ -594,31 +594,36 @@ Item {
             }
         }
         RowLayout {
-            anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
-            spacing: 6
+            anchors.fill: parent; anchors.leftMargin: Theme.spacingM; anchors.rightMargin: Theme.spacingM
+            spacing: Theme.spacingS
             FlatButton {
                 id: start
-                Layout.preferredWidth: 44; Layout.preferredHeight: bar.height - 10
+                Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
                 active: root.launcherOpen
                 onClicked: root.launcherOpen = !root.launcherOpen
                 Accessible.name: "Applications"
+                BarTip { panel: root; owner: start; text: "Start" }
+                // Four squares in the accent colour, which shrink a little while pressed as an
+                // application's icon does.
                 contentItem: Item {
                     Grid {
                         anchors.centerIn: parent; columns: 2; spacing: 3
+                        scale: start.pressed ? Theme.pressScale : 1
+                        Behavior on scale { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
                         Repeater { model: 4; Rectangle { width: 9; height: 9; radius: 2; color: Theme.accent } }
                     }
                 }
             }
-            PinnedSlots { id: pinnedSlots; panel: root; barHeight: bar.height }
-            Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 24; color: Theme.divider }
-            TaskList { id: taskList; panel: root; barHeight: bar.height }
-            WorkspaceIndicator { id: workspaceIndicator; panel: root; barHeight: bar.height }
+            PinnedSlots { id: pinnedSlots; panel: root }
+            Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: Theme.barButtonHeight / 2 + Theme.spacingS; color: Theme.divider }
+            TaskList { id: taskList; panel: root }
+            WorkspaceIndicator { id: workspaceIndicator; panel: root }
             // The wallpaper picker.
             FlatButton {
                 id: wallpapersButton
                 objectName: "wallpapersButton"
                 visible: shell.widgets.wallpapers === "bar"
-                Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
+                Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
                 active: root.audioPopup === "wallpapers"
                 onClicked: root.toggleAudioPopup("wallpapers", wallpapersButton)
                 Accessible.name: "Wallpapers"
@@ -632,7 +637,7 @@ Item {
                 id: profilesButton
                 objectName: "profilesButton"
                 visible: shell.widgets.profiles === "bar" && shell.profiles.length > 1
-                Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
+                Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
                 active: root.audioPopup === "profiles"
                 onClicked: root.toggleAudioPopup("profiles", profilesButton)
                 Accessible.name: "Appearance: " + (shell.profile || "none")
@@ -640,7 +645,7 @@ Item {
                 // Three swatches of the profile in use: accent, desktop background, text.
                 contentItem: Item {
                     Row {
-                        anchors.centerIn: parent; spacing: 2
+                        anchors.centerIn: parent; spacing: Theme.spacingXS
                         Repeater {
                             model: [shell.accent, shell.background, shell.textColor]
                             // A ring in the text colour keeps a swatch close to the panel's own
@@ -660,7 +665,7 @@ Item {
                 id: tilingToggle
                 objectName: "tilingToggle"
                 visible: shell.widgets.tiling === "bar"
-                Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
+                Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
                 enabled: shell.tilingAvailable
                 opacity: enabled ? 1 : 0.4
                 active: root.tiling
@@ -669,7 +674,8 @@ Item {
                 BarTip { panel: root; owner: tilingToggle; text: root.tiling ? "Tiling on: click for floating" : "Floating: click to tile" }
                 // On: a split layout in the accent colour. Off: two overlapping windows.
                 contentItem: Item {
-                    Icon {
+                    FadingIcon {
+                        objectName: "tilingIcon"
                         anchors.centerIn: parent
                         name: root.tiling ? "layout-panel-left" : "copy"
                         color: root.tiling ? Theme.accent : Theme.text
@@ -688,33 +694,39 @@ Item {
                     delegate: TrayButton { panel: root }
                 }
             }
-            NotificationBell { id: bell; panel: root; barHeight: bar.height }
-            NetworkWidget { panel: root; barHeight: bar.height }
-            BatteryWidget { panel: root; barHeight: bar.height }
-            VolumeButton { id: audioWidget; panel: root; barHeight: bar.height }
-            KeyboardLayout { panel: root; barHeight: bar.height }
-            QuickSettingsButton { id: quickButton; panel: root; barHeight: bar.height }
-            ClockButton { id: clockButton; panel: root; barHeight: bar.height }
+            NotificationBell { id: bell; panel: root }
+            NetworkWidget { panel: root }
+            BatteryWidget { panel: root }
+            VolumeButton { id: audioWidget; panel: root }
+            KeyboardLayout { panel: root }
+            QuickSettingsButton { id: quickButton; panel: root }
+            ClockButton { id: clockButton; panel: root }
+            // A sliver at the bar's end, its line taking the accent colour under the pointer.
             Button {
                 id: showDesktopButton
-                Layout.preferredWidth: 14; Layout.fillHeight: true
+                Layout.preferredWidth: Theme.spacingL + Theme.spacingXS; Layout.fillHeight: true
                 onClicked: { root.closeMenus(); shell.tasks.showDesktop() }
                 Accessible.name: "Show desktop"
                 BarTip { panel: root; owner: showDesktopButton; text: "Show desktop" }
-                background: Rectangle { color: parent.hovered ? Theme.accent : Theme.border; width: 3; anchors.right: parent.right }
+                background: Rectangle {
+                    anchors.right: parent.right
+                    width: 3
+                    color: showDesktopButton.pressed ? Theme.accentHover : showDesktopButton.hovered ? Theme.accent : Theme.border
+                    Behavior on color { ColorAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
+                }
             }
         }
         Rectangle {
             visible: shell.error.length > 0
-            anchors.fill: parent; anchors.margins: 4
+            anchors.fill: parent; anchors.margins: Theme.spacingS
             color: Theme.dangerSurface; radius: Theme.radiusSmall
-            Text { anchors.left: parent.left; anchors.right: dismiss.left; anchors.verticalCenter: parent.verticalCenter; anchors.margins: 10; text: shell.error; color: Theme.text; elide: Text.ElideRight; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
-            FlatButton {
+            Text { anchors.left: parent.left; anchors.right: dismiss.left; anchors.verticalCenter: parent.verticalCenter; anchors.margins: Theme.spacingL; text: shell.error; color: Theme.text; elide: Text.ElideRight; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
+            CloseButton {
                 id: dismiss
-                anchors.right: parent.right; height: parent.height; width: 40
+                anchors.right: parent.right; anchors.rightMargin: Theme.spacingS
+                anchors.verticalCenter: parent.verticalCenter
                 Accessible.name: "Dismiss"
                 onClicked: shell.clearError()
-                contentItem: Text { text: "×"; color: Theme.text; font.pixelSize: Theme.fontSizeLarge; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
             }
         }
     }

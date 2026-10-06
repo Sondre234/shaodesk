@@ -11,6 +11,7 @@
 #include <QJSValue>
 #include <QLocalServer>
 #include <QLocalSocket>
+#include <QPointer>
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickItem>
@@ -431,6 +432,15 @@ int main(int argc, char **argv) {
         std::cerr << "clicking a workspace did not switch to it\n";
         return 1;
     }
+    // The current workspace's pill slides over to it, and takes its width.
+    {
+        auto *pill = find(view.rootObject(), "workspacePill");
+        if (!pill || !QTest::qWaitFor([&] {
+                return pill->isVisible() && pill->x() == workspace(3)->x() &&
+                       pill->width() == workspace(3)->width();
+            }))
+            return fail("the current workspace's pill did not settle under it");
+    }
     auto scrollAt = [&](QPoint at, int delta) {
         QWheelEvent event(at, view.mapToGlobal(at), QPoint(), QPoint(0, delta), Qt::NoButton,
                           Qt::NoModifier, Qt::NoScrollPhase, false);
@@ -501,6 +511,14 @@ int main(int argc, char **argv) {
         return again.open(QIODevice::WriteOnly | QIODevice::Truncate) &&
                again.write(source.toUtf8()) >= 0;
     };
+    // Slows the shell's animations down to a quarter of their speed, or brings them back, so that
+    // a test sees what moves on its way.
+    auto slowMotion = [&](bool slow) {
+        if (!rewrite(slow ? QString(lua).replace("return {", "return {animations={speed=0.25},") : lua))
+            return false;
+        controller.reload();
+        return QTest::qWaitFor([&] { return controller.animationSpeed() == (slow ? 0.25 : 1); });
+    };
     // shell.workspaces_shown = 3 shows the current workspace with its neighbours, the last
     // three on the last one, and the names follow their workspaces.
     if (!rewrite(QString(lua).replace("shell={", "shell={workspaces_shown=3,")))
@@ -532,7 +550,10 @@ int main(int argc, char **argv) {
     if (!QTest::qWaitFor([&] { return workspace(4)->property("current").toBool(); }))
         return fail("could not switch back to the last workspace");
     // The window switcher's list says which windows are asking for attention (an older
-    // five-field line means none).
+    // five-field line means none). Its overlay shows them, and goes on showing them as it fades
+    // out once the switcher has closed, though the controller has forgotten them by then.
+    SwitcherView switcherView(controller, app.primaryScreen());
+    auto overlayListed = [&] { return switcherView.rootObject()->property("listed").toList().size(); };
     subscriber->write(("switcher " + output + " 0 3\n"
                        "switcher-window fake\tFake\t" + output + "\t3\t0\t1\n"
                        "switcher-window \tNo app id\t" + output + "\t1\t1\t0\n"
@@ -548,11 +569,16 @@ int main(int argc, char **argv) {
         std::cerr << "the switcher does not say which windows are urgent\n";
         return 1;
     }
+    if (!QTest::qWaitFor([&] { return switcherView.isVisible() && overlayListed() == 3; }))
+        return fail("the switcher's overlay did not show its windows");
     subscriber->write("switcher-close\n");
     if (!QTest::qWaitFor([&] { return controller.switcherWindows().isEmpty(); })) {
         std::cerr << "the switcher did not close\n";
         return 1;
     }
+    if (overlayListed() != 3 || !QTest::qWaitFor([&] { return !switcherView.isVisible(); }) ||
+        overlayListed() != 3)
+        return fail("the switcher's overlay did not hold its windows as it went");
     // The switcher, the overview and the command palette opening on this output close what is
     // open here: the popover would be over them.
     {
@@ -896,6 +922,52 @@ ListModel {
         }
         editTasks("model.remove(1)");
     }
+    // A window's button fades and grows in as its window opens, its line drawn out, and shrinks
+    // away as it closes, taking no more clicks. Slowed down, so that it is seen on its way.
+    {
+        if (!slowMotion(true))
+            return fail("the animations were not slowed down");
+        editTasks("model.append({taskId: 98, title: 'Arriving', appId: 'arriving', active: false, "
+                  "minimized: false, urgent: false})");
+        // Not the button of the window closed just before, which may still be on its way out.
+        QPointer<QQuickItem> arriving;
+        if (!QTest::qWaitFor([&] {
+                arriving = listedTask(1);
+                return arriving && arriving->property("taskId").toInt() == 98;
+            }) ||
+            arriving->opacity() == 1 || arriving->scale() == 1 || arriving->property("reveal").toReal() == 1)
+            return fail("a window's button did not fade and grow in");
+        if (!QTest::qWaitFor([&] {
+                return arriving && arriving->opacity() == 1 && arriving->scale() == 1 &&
+                       arriving->property("reveal").toReal() == 1;
+            }))
+            return fail("a window's button did not come all the way in");
+        editTasks("model.remove(1)");
+        if (!QTest::qWaitFor([&] { return arriving && arriving->opacity() < 1; }) ||
+            arriving->isEnabled())
+            return fail("a closing window's button did not fade out, or still takes clicks");
+        if (!QTest::qWaitFor([&] { return !arriving || !arriving->isVisible(); }))
+            return fail("a closed window's button stayed on the bar");
+        // An icon on the bar following a state crossfades to its new shape, as the tiling
+        // button's does.
+        auto *tilingIcon = find(tiling, "tilingIcon");
+        const bool wasTiling = panelTiling();
+        click(tiling);
+        if (!tilingIcon || !QTest::qWaitFor([&] { return panelTiling() != wasTiling; }) ||
+            tilingIcon->property("leaving").toString().isEmpty() ||
+            tilingIcon->property("progress").toReal() == 1)
+            return fail("the tiling button's icon did not crossfade to its new shape");
+        if (!QTest::qWaitFor([&] {
+                return tilingIcon->property("leaving").toString().isEmpty() &&
+                       tilingIcon->property("progress").toReal() == 1;
+            }))
+            return fail("the tiling button's icon did not finish its crossfade");
+        click(tiling);
+        if (!QTest::qWaitFor([&] { return panelTiling() == wasTiling; }))
+            return fail("the tiling button did not toggle tiling back");
+        if (!slowMotion(false))
+            return fail("the animations did not get their speed back");
+    }
     auto *menu = find(view.rootObject(), "contextMenu");
     // Repeater delegates are visual children only, so walk the item tree. Rows of the task
     // menus are named contextMenuItem, contextMenuTitle, contextMenuAction and the like.
@@ -1174,6 +1246,36 @@ ListModel {
         std::cerr << "a pinned slot did not show its launcher again once its window closed\n";
         return 1;
     }
+    // Slowed down: a window opening in a pinned slot draws its line out under the launcher's
+    // icon, which stays, and an application just pinned fades and grows into a slot opening
+    // for it.
+    {
+        if (!slowMotion(true))
+            return fail("the animations were not slowed down");
+        editTasks("model.append({taskId: 12, title: 'Fake again', appId: 'fake', active: false, "
+                  "minimized: false, urgent: false})");
+        QPointer<QQuickItem> arrived;
+        if (!QTest::qWaitFor([&] { return (arrived = pinnedTask()) != nullptr; }) ||
+            arrived->property("reveal").toReal() == 1 || arrived->opacity() != 1 || arrived->scale() != 1)
+            return fail("a window opening in a pinned slot did not only draw its line out");
+        if (!QTest::qWaitFor([&] { return arrived && arrived->property("reveal").toReal() == 1; }))
+            return fail("the line of a window opening in a pinned slot was not drawn all the way");
+        editTasks("model.remove(0)");
+        controller.pin("shaodesk-test-other.desktop");
+        QPointer<QQuickItem> slot;
+        if (!QTest::qWaitFor([&] { return other() && (slot = other()->parentItem()); }) ||
+            slot->property("grow").toReal() == 1 || slot->opacity() == 1)
+            return fail("an application just pinned did not grow into its slot");
+        if (!QTest::qWaitFor([&] { return slot && slot->property("grow").toReal() == 1; }))
+            return fail("an application just pinned did not come all the way in");
+        if (pinned()->parentItem()->property("grow").toReal() != 1)
+            return fail("a slot that was there already came in again with another");
+        controller.unpin("shaodesk-test-other.desktop");
+        if (!slowMotion(false))
+            return fail("the animations did not get their speed back");
+        if (!QTest::qWaitFor([&] { return !other() && !pinnedTask() && pinned()->isVisible(); }))
+            return fail("the pinned slots did not go back as they were");
+    }
     click(pinned(), Qt::RightButton);
     if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Unpin from taskbar"); }) ||
         !menuItem("Open") || !menuItem("Fake app") ||
@@ -1440,6 +1542,26 @@ ListModel {
     if (!QTest::qWaitFor([&] { return !menuItem("light"); })) {
         std::cerr << "resting on another entry did not close the submenu\n";
         return 1;
+    }
+    // Heading for the open submenu across another entry leaves it open, the entry crossed taking
+    // over only once the pointer rests on it.
+    QTest::mouseMove(popover, centre(menuItem("Appearance")));
+    if (!QTest::qWaitFor([&] { return menuItem("dark") && menuItem("dark")->isVisible(); }))
+        return fail("resting on the appearance entry again did not open its submenu");
+    {
+        auto *crossed = menuItem("Show desktop");
+        const QRectF across = crossed->mapRectToScene(QRectF(0, 0, crossed->width(), crossed->height()));
+        const QPoint from = centre(menuItem("Appearance"));
+        const QPoint to(qRound(across.right()) - 8, qRound(across.center().y()));
+        for (int step = 1; step <= 6; ++step) {
+            QTest::mouseMove(popover, from + (to - from) * step / 6);
+            QTest::qWait(10);
+        }
+        if (crossed->property("highlighted").toBool() || !menuItem("dark") ||
+            !menuItem("Appearance")->property("highlighted").toBool())
+            return fail("heading for the open submenu across another entry took it over");
+        if (!QTest::qWaitFor([&] { return crossed->property("highlighted").toBool() && !menuItem("dark"); }))
+            return fail("resting on the entry crossed did not take over from the submenu");
     }
     click(menuItem("Show desktop"));
     // The profile button on the bar lists the profiles, the one in use marked, and switches.
@@ -2185,6 +2307,26 @@ ListModel {
         if (!QTest::qWaitFor([&] { return shown("startBestMatch") && shown("startBestAction:touch"); }) ||
             item("startBestMatch")->property("result").toMap()["title"] != "Action app")
             return fail("an application found as the best match does not offer its desktop actions");
+        // The keyboard reaches the best match's buttons: Right or Tab moves on to Open and then
+        // its actions, Left back; Enter presses the one it is at.
+        auto atButton = [&](const QString &name) { return item(name)->property("current").toBool(); };
+        key(Qt::Key_Right);
+        if (!QTest::qWaitFor([&] { return atButton("startBestOpen"); }))
+            return fail("Right did not move from the best match to its Open button");
+        key(Qt::Key_Tab);
+        if (!QTest::qWaitFor([&] { return atButton("startBestAction:touch"); }) || atButton("startBestOpen"))
+            return fail("Tab did not move on to the best match's first action");
+        key(Qt::Key_Left);
+        if (!QTest::qWaitFor([&] { return atButton("startBestOpen"); }) || atButton("startBestAction:touch"))
+            return fail("Left did not move back to the best match's Open button");
+        key(Qt::Key_Right);
+        QFile::remove(actionMarker);
+        key(Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return QFile::exists(actionMarker); }) ||
+            !QTest::qWaitFor([&] { return !launcherOpen(); }))
+            return fail("Enter did not run the best match's action the keyboard was at");
+        if (!openStart())
+            return fail("the start menu did not open after running the best match's action");
         search->setProperty("text", "");
         type("app");
         // Every application's name has it (and "Applications menu", an action): the model says
@@ -2390,8 +2532,10 @@ ListModel {
             return 1;
         }
         QTest::keyClick(&dialog, Qt::Key_Escape);
-        if (!gaveUp()) {
-            std::cerr << "Escape did not give up the power off\n";
+        // It says what it asked as it fades out, the question over by then.
+        if (!gaveUp() || dialog.rootObject()->property("pendingTitle") != "Power off" ||
+            dialog.rootObject()->property("pending") != "poweroff") {
+            std::cerr << "Escape did not give up the power off, or the dialog forgot its question as it went\n";
             return 1;
         }
         if (!ask("reboot") || power->message() != "The computer restarts in 2 seconds.")
@@ -2763,6 +2907,17 @@ ListModel {
             std::cerr << "expanding an application did not list all its notifications\n";
             return 1;
         }
+        // Too many for the room the calendar leaves on this short output: the calendar gives up
+        // its time and date to them, and where the list still goes on past the card's edge, that
+        // edge fades out.
+        auto *flyoutCalendar = find(view.rootObject(), "calendar");
+        auto *calendarTime = find(view.rootObject(), "calendarTime");
+        auto *fadeBottom = find(view.rootObject(), "notificationFadeBottom");
+        if (!QTest::qWaitFor([&] {
+                return flyoutCalendar->property("compact").toBool() && !calendarTime->isVisible() &&
+                       fadeBottom->isVisible() == !list->property("atYEnd").toBool();
+            }))
+            return fail("the calendar did not make room for the notifications, or the list's edge does not fade where it is cut off");
         // An action's button runs it, from the history as from a card.
         invoked.clear();
         auto *historyAction = find(list, "notificationHistoryAction");
@@ -2801,6 +2956,8 @@ ListModel {
             std::cerr << "Clear all did not empty the history and say so\n";
             return 1;
         }
+        if (!QTest::qWaitFor([&] { return !flyoutCalendar->property("compact").toBool() && calendarTime->isVisible(); }))
+            return fail("the calendar did not show its time and date again once the notifications were gone");
         click(bell); // close the popup
         // The compositor's notification_history action (Super + N) opens the flyout on the output
         // it names, and closes it again.
@@ -3360,6 +3517,38 @@ ListModel {
         if (!rewrite(lua))
             return fail("could not restore the configuration");
         controller.reload();
+    }
+    // The desktop's menu: a right press opens it where it was, with Show desktop and the
+    // appearance profiles beside their entry; a press elsewhere closes it.
+    {
+        ShellView desktop(controller, app.primaryScreen(), true, true);
+        desktop.show();
+        if (!QTest::qWaitForWindowExposed(&desktop) || !desktop.rootObject())
+            return fail("the desktop never showed");
+        auto *desktopMenu = find(desktop.rootObject(), "desktopMenu");
+        auto entry = [&](const QString &text) {
+            std::function<QQuickItem *(QQuickItem *)> walk = [&](QQuickItem *item) -> QQuickItem * {
+                for (auto *child : item->childItems()) {
+                    if (child->objectName() == "desktopMenuItem" && child->property("text") == text)
+                        return child;
+                    if (auto *found = walk(child))
+                        return found;
+                }
+                return nullptr;
+            };
+            return desktopMenu ? walk(desktopMenu) : nullptr;
+        };
+        const QPoint at(200, 150);
+        QTest::mousePress(&desktop, Qt::RightButton, Qt::NoModifier, at);
+        QTest::mouseRelease(&desktop, Qt::RightButton, Qt::NoModifier, at);
+        auto *card = desktopMenu ? desktopMenu->property("card").value<QQuickItem *>() : nullptr;
+        if (!card || !QTest::qWaitFor([&] { return card->isVisible() && card->property("progress").toReal() == 1; }) ||
+            !entry("Show desktop") || !entry("Appearance") ||
+            card->mapToScene(QPointF(0, 0)).toPoint() != at)
+            return fail("a right press on the desktop did not open its menu there");
+        QTest::mouseClick(&desktop, Qt::LeftButton, Qt::NoModifier, QPoint(600, 500));
+        if (!QTest::qWaitFor([&] { return !card->isVisible(); }))
+            return fail("a press beside the desktop's menu did not close it");
     }
     std::cout << "Hover/click, launcher keyboard focus, search, command launch, tiling toggle, and "
                  "workspace indicator, task and bar context menus, pinning into a window's slot, "
