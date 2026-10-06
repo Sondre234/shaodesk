@@ -8,8 +8,9 @@ and every Lua setting, with its type, default and range, is in the
 
 The shell has pinned desktop shortcuts (double-click to launch), a taskbar with
 window activation/minimization (clicking a window's button focuses it, or minimizes it when it
-is focused already, as on Windows, from any monitor's bar) and a right-click window menu (maximize/restore,
-minimize, pin to taskbar, close), middle-click to close a window, a right-click menu on empty bar space (tiling,
+is focused already, as on Windows, from any monitor's bar) and a right-click [window menu](#taskbar-menus)
+(its application's actions, minimize, maximize, fullscreen, another workspace or monitor, sticky,
+floating, pin to taskbar, close), middle-click to close a window, a right-click menu on empty bar space (tiling,
 applications, show desktop, and the appearance profiles in a submenu), an application
 search menu, a tiling on/off button for its monitor, a workspace indicator, battery and network status,
 the default output's volume, a clock, a [system tray](#system-tray), and a show-desktop button. Buttons show a tooltip
@@ -56,6 +57,35 @@ draws through the GPU; `renderer = "software"` draws on the CPU instead, for a w
 starts faster and uses less memory, but cannot draw effects such as shadows. In a nested
 session, applications that reuse an existing process or D-Bus service can open
 in the host session instead.
+
+### Taskbar menus
+
+Right-clicking a window's button opens its menu, headed by the application's icon and name (from
+its desktop entry; the window's app id without one) over the window's title. Then come:
+
+- the application's desktop actions (Firefox's "New Private Window"), with their icons, and
+  **New window**, which starts the application again (left out when one of its own actions is a
+  new window);
+- **Minimize**, or **Restore** for a minimized window, which is all a minimized one offers of
+  these three; **Maximize**, or **Restore** for a maximized one; **Fullscreen**, checked while it
+  is;
+- **Move to workspace**, beside it the workspaces of its monitor (named as
+  `layout.workspace_names` names them), the one it is on marked; **Move to monitor**, with two or
+  more monitors, from left to right; **Keep on all workspaces**, making it
+  [sticky](#sticky-windows) (not with `features = { sticky = false }`); and where its workspace
+  tiles, **Float**, checked while it is kept out of the tiling;
+- **Pin to taskbar** or **Unpin from taskbar** for an installed application, and **Close window**
+  in the danger colour.
+
+None of these focuses the window or raises it: a focused window moved off the workspace on screen
+passes the focus on, as `move_to_workspace` does. The window menu names the window itself, never
+by its title, so it acts on the right one when several share a title.
+
+A stacked button's menu is about all its windows: its title counts them, and it offers
+**Minimize all** (or **Restore all**), moving them all to a workspace or monitor (their own
+marked when they share it), and **Close all 2 windows**. Right-clicking a window in its hover
+list opens that window's own menu. A pinned application's button without windows offers its
+desktop actions, **Open** and **Unpin from taskbar**; the bar's own menu has icons too.
 
 ## Windows
 

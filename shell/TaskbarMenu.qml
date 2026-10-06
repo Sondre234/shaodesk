@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
+import Shaodesk
 
 // The context menu of a window's button (its pinned application's too), of a pinned
 // application's button, or of the bar itself, whose appearance entry opens the profiles beside
-// it. It opens where the bar was pressed.
+// it. It opens where the bar was pressed. A window's begins with its application's icon and name
+// over its title, then offers what the application starts, what can be done to the window (by its
+// state, and where it is), pinning and closing it; a stacked button's acts on all its windows. A
+// pinned application's offers what it starts, and unpinning it.
 PopupMenu {
     id: contextMenu
     required property var panel
@@ -18,23 +22,185 @@ PopupMenu {
     bounds: panel.popupArea
     // Closing only this menu: an entry may have opened the launcher.
     onDismissed: { panel.taskMenuId = -1; panel.pinMenuApp = null; panel.barMenuOpen = false }
+
+    // The windows a task menu is about, as data from the panel's windows, which follows their
+    // changes while the menu is open: the one right-clicked, or those of a stacked button, found
+    // where its hover list finds them.
+    TaskFilter {
+        id: menuWindows
+        readonly property var group: contextMenu.panel.taskMenuGroup
+        controller: shell
+        sourceModel: contextMenu.panel.taskMenuId >= 0 ? contextMenu.panel.taskSource : null
+        app: group ? group.slot : ""
+        windowApp: group ? group.windowApp : ""
+        taskId: group ? -1 : contextMenu.panel.taskMenuId
+    }
+    // The application a window belongs to, as shell.apps lists it: the one whose pinned slot it
+    // takes (a configured launcher too), else the installed one; null when there is none.
+    function appRecord(windowAppId) {
+        var id = shell.pinnedAppFor(windowAppId) || shell.appFor(windowAppId)
+        var apps = id !== "" ? shell.apps : []
+        for (var i = 0; i < apps.length; ++i)
+            if (apps[i].appId === id)
+                return apps[i]
+        return null
+    }
+    // The menu's title: the application's icon and name (the window's app id when it has no
+    // entry), with `line` under it; without either, `line` alone.
+    function titleEntry(record, windowAppId, line) {
+        var named = record !== null || windowAppId !== ""
+        return { title: record ? record.name : (windowAppId || line),
+                 icon: record ? record.icon : shell.iconFor(windowAppId),
+                 secondary: named ? line : "", objectName: "contextMenuTitle" }
+    }
+    // What the application offers to start besides itself (its desktop actions, with their
+    // icons), then `open` starting it, unless an action of its own is a new window already.
+    function launchEntries(record, open) {
+        if (!record)
+            return []
+        var actions = shell.appActions(record.appId)
+        var entries = actions.map(function(action) {
+            return { text: action.name, icon: action.icon, objectName: "contextMenuAction",
+                     run: function() { shell.launchAction(record.appId, action.action) } }
+        })
+        var newWindow = actions.some(function(action) {
+            return action.action === "new-window" || action.name.toLowerCase() === "new window"
+        })
+        return open === "New window" && newWindow ? entries
+            : entries.concat([{ text: open, icon: open === "Open" ? "app-window" : "plus",
+                                run: function() { shell.launch(record.appId) } }])
+    }
+    // The menu of window `task`, or of a stacked button, which acts on all its windows: its
+    // title counts them, and it minimizes or restores, moves and closes them together.
+    function taskEntries(task, tasks) {
+        var windows = menuWindows.windows
+        var lead = windows.filter(function(w) { return w.taskId === task })[0] || windows[0] ||
+                   { taskId: task, appId: "", title: "" }
+        var record = appRecord(lead.appId)
+        var stacked = windows.length > 1
+        var close = stacked
+            ? { text: "Close all " + windows.length + " windows", icon: "x", danger: true,
+                objectName: "contextMenuClose",
+                run: function() { windows.forEach(function(w) { tasks.close(w.taskId) }) } }
+            : { text: "Close window", icon: "x", danger: true, objectName: "contextMenuClose",
+                run: function() { tasks.close(lead.taskId) } }
+        return sections([[titleEntry(record, lead.appId, stacked ? windows.length + " windows" : lead.title)],
+                         launchEntries(record, "New window"),
+                         stacked ? stackEntries(windows, tasks) : windowEntries(lead, tasks),
+                         (panel.taskMenuApp ? [panel.pinAction(panel.taskMenuApp)] : []).concat([close])])
+    }
+    // What can be done to every window of a stack at once.
+    function stackEntries(windows, tasks) {
+        var minimized = windows.every(function(w) { return w.minimized })
+        return [minimized
+                ? { text: "Restore all", icon: "app-window",
+                    run: function() { windows.forEach(function(w) { tasks.activate(w.taskId) }) } }
+                : { text: "Minimize all", icon: "minus",
+                    run: function() {
+                        windows.forEach(function(w) { if (!w.minimized) tasks.minimize(w.taskId) })
+                    } }].concat(placeEntries(windows, tasks))
+    }
+    // What can be done to the window `window` (its roles, as menuWindows lists them), labelled
+    // by its state, through `tasks`, the panel's source of windows: a minimized one is only
+    // restored.
+    function windowEntries(window, tasks) {
+        var id = window.taskId
+        var entries = window.minimized
+            ? [{ text: "Restore", icon: "app-window", run: function() { tasks.activate(id) } }]
+            : [{ text: "Minimize", icon: "minus", run: function() { tasks.minimize(id) } },
+               { text: window.maximized ? "Restore" : "Maximize", icon: window.maximized ? "copy" : "square",
+                 run: function() { tasks.maximize(id) } },
+               { text: "Fullscreen", toggle: "check", checked: window.fullscreen === true,
+                 run: function() { tasks.setFullscreen(id, window.fullscreen !== true) } }]
+        entries = entries.concat(placeEntries([window], tasks))
+        if (window.workspace > 0 && shell.stickyWindows)
+            entries.push({ text: "Keep on all workspaces", toggle: "check", checked: window.sticky === true,
+                           run: function() { tasks.setSticky(id, window.sticky !== true) } })
+        // Only where windows tile is there a tiling to leave.
+        if (window.workspace > 0 && window.tiling === true)
+            entries.push({ text: "Float", toggle: "check", checked: window.floating === true,
+                           run: function() { tasks.setFloating(id, window.floating !== true) } })
+        return entries
+    }
+    // Where the windows can go, once the compositor has said where they are (workspace from 1):
+    // the workspaces of their monitors, the one they are all on marked.
+    function placeEntries(windows, tasks) {
+        if (windows.length === 0 || !windows.every(function(w) { return w.workspace > 0 }))
+            return []
+        var entries = []
+        if (shell.workspaceCount > 1)
+            entries.push({ text: "Move to workspace", icon: "layers", objectName: "contextMenuWorkspaces",
+                           submenu: workspaceEntries(windows, tasks) })
+        if (Object.keys(shell.workspaces).length > 1)
+            entries.push({ text: "Move to monitor", icon: "monitor", objectName: "contextMenuOutputs",
+                           submenu: outputEntries(windows, tasks) })
+        return entries
+    }
+    // The compositor's outputs from left to right, by connector name ("DP-1") with the monitor's
+    // make and model beside it where the screen says; the one the windows are on marked.
+    function outputEntries(windows, tasks) {
+        var screens = {}
+        Qt.application.screens.forEach(function(screen) { screens[screen.name] = screen })
+        var names = Object.keys(shell.workspaces).sort(function(a, b) {
+            var left = screens[a] ? screens[a].virtualX : 0, right = screens[b] ? screens[b].virtualX : 0
+            return left !== right ? left - right : a.localeCompare(b)
+        })
+        var on = windows.every(function(w) { return w.output === windows[0].output }) ? windows[0].output : ""
+        return names.map(function(name) {
+            var screen = screens[name]
+            return { text: name, toggle: "radio", checked: name === on, objectName: "contextMenuOutput",
+                     secondary: screen ? [screen.manufacturer, screen.model].filter(Boolean).join(" ") : "",
+                     run: function() { windows.forEach(function(w) { tasks.moveToOutput(w.taskId, name) }) } }
+        })
+    }
+    function workspaceEntries(windows, tasks) {
+        // A sticky window is on all of them.
+        var on = windows.every(function(w) { return w.workspace === windows[0].workspace && !w.sticky })
+            ? windows[0].workspace : 0
+        var names = shell.workspaceNames
+        var entries = []
+        for (var n = 1; n <= shell.workspaceCount; ++n) {
+            entries.push((function(number) {
+                return { text: names[number - 1] || "Workspace " + number, toggle: "radio",
+                         checked: number === on, objectName: "contextMenuWorkspace",
+                         run: function() {
+                             windows.forEach(function(w) { tasks.moveToWorkspace(w.taskId, number) })
+                         } }
+            })(n))
+        }
+        return entries
+    }
+    // The groups of entries, with a line between those that have any.
+    function sections(groups) {
+        var entries = []
+        for (var i = 0; i < groups.length; ++i) {
+            if (groups[i].length === 0)
+                continue
+            if (entries.length > 0)
+                entries.push({ separator: true })
+            entries = entries.concat(groups[i])
+        }
+        return entries
+    }
+
+    // A task menu acts on the windows through the panel's source of them, which the tests replace
+    // with one that notes what it is asked.
     entries: {
-        var task = panel.taskMenuId
-        if (task >= 0)
-            return [{ text: "Maximize / restore", run: function() { shell.tasks.maximize(task) } },
-                    { text: "Minimize", run: function() { shell.tasks.minimize(task) } }]
-                .concat(panel.taskMenuApp ? [panel.pinAction(panel.taskMenuApp)] : [])
-                .concat([{ text: "Close window", run: function() { shell.tasks.close(task) } }])
+        if (panel.taskMenuId >= 0)
+            return taskEntries(panel.taskMenuId, panel.taskSource)
+        // A pinned application without windows.
         var app = panel.pinMenuApp
         if (app !== null)
-            return [{ text: "Open " + app.name, run: function() { shell.launch(app.appId) } }]
-                .concat(app.configured ? [] : [panel.pinAction(app.appId)])
-        return [{ text: panel.tiling ? "Turn tiling off" : "Turn tiling on", enabled: shell.tilingAvailable,
+            return sections([[titleEntry(app, app.appId, "")], launchEntries(app, "Open"),
+                             app.configured ? [] : [panel.pinAction(app.appId)]])
+        // Icons of what each entry leads to: floating windows or tiles, as the tiling button shows.
+        return [{ text: panel.tiling ? "Turn tiling off" : "Turn tiling on",
+                  icon: panel.tiling ? "copy" : "layout-panel-left", enabled: shell.tilingAvailable,
                   run: function() { shell.toggleTiling(contextMenu.panel.outputName) } },
-                { text: "Applications", run: function() { contextMenu.panel.launcherOpen = true } },
-                { text: "Show desktop", run: function() { shell.tasks.showDesktop() } }]
+                { text: "Applications", icon: "layout-grid", run: function() { contextMenu.panel.launcherOpen = true } },
+                { text: "Show desktop", icon: "minimize-2", run: function() { shell.tasks.showDesktop() } }]
             .concat(shell.profiles.length > 0
-                ? [{ text: "Appearance", secondary: shell.profile,
+                ? [{ text: "Appearance", icon: "palette", secondary: shell.profile,
                      submenu: shell.profiles.map(function(name) {
                          return { text: name, toggle: "radio", checked: name === shell.profile,
                                   run: function() { if (name !== shell.profile) shell.pickProfile(name) } }

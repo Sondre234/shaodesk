@@ -66,10 +66,52 @@ static void relocate_toplevel(struct sh_toplevel *toplevel, struct wlr_box from,
     if (was_tiled && tile && wants_tiling(toplevel, to)) {
         tile_toplevel_at(toplevel, to, NULL, false, 0, 0);
     } else if (was_tiled) {
-        restore_toplevel(toplevel); // floats where it was
+        // It floats where it floated before, moved over above, or where its tile is when it
+        // opened tiled; not by restore_toplevel, which places it by where its tile still is.
+        struct wlr_box floating = toplevel->restore_box;
+        if (floating.width <= 0 || floating.height <= 0) {
+            floating.x = box.x;
+            floating.y = box.y;
+        }
+        toplevel->arranged = false;
+        toplevel_set_states(toplevel, false, 0);
+        toplevel_configure_box(toplevel, floating);
     } else if (toplevel_mapped(toplevel)) {
         place_on_output(toplevel, to, box);
     }
+}
+
+/* Moves a window from the output it is on to `to`, onto the workspace `to` shows: a floating
+ * window keeps its place relative to the usable area, a maximized or snapped one is arranged
+ * there again, and a tile joins the tiling there or floats where that does not tile, as a
+ * window that floated only because its workspace did not tile joins one that does. A sticky
+ * window stays sticky. Focus stays where it is. */
+void move_toplevel_to_output(struct sh_toplevel *toplevel, struct wlr_output *to) {
+    struct sh_server *server = toplevel->server;
+    struct wlr_output *from = find_output(server, toplevel->output);
+    if (!from)
+        from = toplevel_output(toplevel);
+#if WLR_HAS_XWAYLAND
+    if (toplevel->unmanaged)
+        return;
+#endif
+    if (!to || !from || to == from)
+        return;
+    if (server->grabbed_toplevel == toplevel)
+        reset_cursor_mode(server);
+    struct sh_rect area = usable_area(server, from);
+    ++server->reflow_held;
+    relocate_toplevel(toplevel, (struct wlr_box){area.x, area.y, area.width, area.height}, to,
+                      true, false);
+    if (toplevel_mapped(toplevel) && wants_tiling(toplevel, to))
+        tile_toplevel_at(toplevel, to, NULL, false, 0, 0);
+    --server->reflow_held;
+    show_workspaces(server);
+    reflow_output(server, from);
+    reflow_output(server, to);
+    refit_fullscreen(server);
+    refresh_frame(toplevel);
+    wlr_log(WLR_INFO, "Window moved from %s to %s", from->name, to->name);
 }
 
 /* An output is going away: its windows move to the nearest one that is left, keeping their

@@ -136,6 +136,7 @@ void unpublish_toplevel(struct sh_toplevel *toplevel) {
     unlist_toplevel(toplevel);
     if (!toplevel->foreign)
         return;
+    window_objects_forget(toplevel);
     wl_list_remove(&toplevel->foreign_activate.link);
     wl_list_remove(&toplevel->foreign_close.link);
     wl_list_remove(&toplevel->foreign_maximize.link);

@@ -679,15 +679,37 @@ int main(int argc, char **argv) {
     }
     // Context menus: a task's, then the bar's. Stand-in tasks replace the Wayland ones.
     auto *tasks = view.rootObject()->findChild<QQuickItem *>("taskList");
+    // It notes what the taskbar's menus ask of the windows, as "minimize 7".
     QQmlComponent fakeTasks(view.engine());
-    fakeTasks.setData("import QtQml.Models\nListModel { ListElement { taskId: 7; title: 'Fake'; "
-                      "appId: 'fake'; active: false; minimized: false; urgent: false } }",
+    fakeTasks.setData(R"(import QtQml.Models
+ListModel {
+    property var requests: []
+    function note(request) { requests = requests.concat([request]) }
+    function activate(id) { note("activate " + id) }
+    function minimize(id) { note("minimize " + id) }
+    function maximize(id) { note("maximize " + id) }
+    function setFullscreen(id, on) { note("fullscreen " + id + " " + on) }
+    function close(id) { note("close " + id) }
+    function moveToWorkspace(id, number) { note("workspace " + id + " " + number) }
+    function moveToOutput(id, output) { note("output " + id + " " + output) }
+    function setSticky(id, on) { note("sticky " + id + " " + on) }
+    function setFloating(id, on) { note("floating " + id + " " + on) }
+    ListElement { taskId: 7; title: 'Fake'; appId: 'fake'; active: false; minimized: false; urgent: false
+                  maximized: false; fullscreen: false; output: 'TEST-1'; workspace: 2; sticky: false
+                  floating: false; tiling: false }
+})",
                       QUrl());
     QObject *fakeModel = fakeTasks.create();
     if (!tasks || !fakeModel)
         return fail("the task models did not load");
     QQmlEngine::setObjectOwnership(fakeModel, QQmlEngine::CppOwnership);
     view.rootObject()->setProperty("taskSource", QVariant::fromValue(fakeModel));
+    // What the menus asked of the stand-in windows since the last call, joined by "|".
+    auto taskRequests = [&] {
+        const auto asked = fakeModel->property("requests").value<QJSValue>().toVariant().toStringList();
+        fakeModel->setProperty("requests", QVariant::fromValue(view.engine()->newArray()));
+        return asked.join("|");
+    };
     // ListModel's methods take JavaScript arguments, so they are reached through the engine.
     auto editTasks = [&](const QString &body) {
         view.engine()
@@ -731,11 +753,13 @@ int main(int argc, char **argv) {
         editTasks("model.remove(1)");
     }
     auto *menu = find(view.rootObject(), "contextMenu");
-    // Repeater delegates are visual children only, so walk the item tree.
+    // Repeater delegates are visual children only, so walk the item tree. Rows of the task
+    // menus are named contextMenuItem, contextMenuTitle, contextMenuAction and the like.
     std::function<QQuickItem *(QQuickItem *, const QString &)> findMenuItem =
         [&](QQuickItem *parent, const QString &text) -> QQuickItem * {
         for (auto *item : parent->childItems()) {
-            if (item->objectName() == "contextMenuItem" && item->property("text") == text)
+            if (item->objectName().startsWith("contextMenu") && item->objectName() != "contextMenu" &&
+                item->property("text") == text)
                 return item;
             if (auto *found = findMenuItem(item, text))
                 return found;
@@ -753,7 +777,7 @@ int main(int argc, char **argv) {
     if (!QTest::qWaitFor([&] {
             return view.rootObject()->property("taskMenuId").toInt() == 7 && menuShown();
         }) ||
-        !menuItem("Maximize / restore") || !menuItem("Minimize") || !menuItem("Close window")) {
+        !menuItem("Maximize") || !menuItem("Minimize") || !menuItem("Close window")) {
         std::cerr << "right-clicking a task did not show its menu\n";
         return 1;
     }
@@ -762,6 +786,184 @@ int main(int argc, char **argv) {
         !QTest::qWaitFor([&] { return !popover->isVisible(); })) {
         std::cerr << "choosing a task menu item did not close the menu\n";
         return 1;
+    }
+    if (const auto asked = taskRequests(); asked != "minimize 7") {
+        std::cerr << "minimizing from a task's menu asked " << asked.toStdString() << '\n';
+        return 1;
+    }
+    // The window's entries follow its state, while the menu is open too: maximized, it offers to
+    // restore it, and fullscreen is checked; minimized, it offers only to restore it.
+    {
+        auto checked = [&](const QString &text) {
+            return menuItem(text) && menuItem(text)->property("marked").toBool();
+        };
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Maximize"); }) ||
+            !menuItem("Fullscreen") || checked("Fullscreen") || menuItem("Restore"))
+            return fail("a window's menu does not offer to maximize it and make it fullscreen");
+        editTasks("model.setProperty(0, 'maximized', true); model.setProperty(0, 'fullscreen', true)");
+        if (!QTest::qWaitFor([&] {
+                return menuItem("Restore") && !menuItem("Maximize") && checked("Fullscreen") &&
+                       menuItem("Restore")->property("modelData").toMap()["icon"] == "copy";
+            }))
+            return fail("the window's menu did not follow it maximized and fullscreen");
+        click(menuItem("Fullscreen"));
+        if (const auto asked = taskRequests(); asked != "fullscreen 7 false") {
+            std::cerr << "leaving fullscreen from a task's menu asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        editTasks("model.setProperty(0, 'minimized', true)");
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Restore"); }) ||
+            menuItem("Minimize") || menuItem("Maximize") || menuItem("Fullscreen"))
+            return fail("a minimized window's menu offers more than to restore it");
+        click(menuItem("Restore"));
+        if (const auto asked = taskRequests(); asked != "activate 7") {
+            std::cerr << "restoring from a task's menu asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        editTasks("model.setProperty(0, 'minimized', false); model.setProperty(0, 'maximized', false); "
+                  "model.setProperty(0, 'fullscreen', false)");
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the popover did not close after restoring");
+    }
+    // Moving the window: its monitor's workspaces, by name where they have one, the one it is on
+    // marked; a sticky window is on none of them.
+    {
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Move to workspace"); }))
+            return fail("a window's menu does not offer to move it to another workspace");
+        click(menuItem("Move to workspace"));
+        auto marked = [&](const QString &text) {
+            return menuItem(text) && menuItem(text)->property("marked").toBool();
+        };
+        if (!QTest::qWaitFor([&] {
+                return menuItem("web") && menuItem("Workspace 2") && menuItem("Workspace 3") &&
+                       menuItem("mail") && marked("Workspace 2") && !marked("web");
+            }))
+            return fail("the workspace submenu does not list the workspaces, the window's marked");
+        editTasks("model.setProperty(0, 'sticky', true)");
+        if (!QTest::qWaitFor([&] { return menuItem("mail") && !marked("Workspace 2"); }))
+            return fail("the workspace submenu marks a workspace for a sticky window");
+        click(menuItem("mail"));
+        if (const auto asked = taskRequests(); asked != "workspace 7 4") {
+            std::cerr << "moving to a workspace from a task's menu asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        editTasks("model.setProperty(0, 'sticky', false)");
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the popover did not close after moving the window");
+        // With one monitor there is no other to move it to; with two, its own is marked.
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Move to workspace"); }) ||
+            menuItem("Move to monitor"))
+            return fail("a window's menu offers other monitors with only one");
+        subscriber->write(state(toggled, currentWorkspace) + "output OTHER-1 1 - off\n");
+        if (!QTest::qWaitFor([&] { return menuItem("Move to monitor"); }))
+            return fail("a window's menu does not offer to move it to another monitor");
+        click(menuItem("Move to monitor"));
+        if (!QTest::qWaitFor([&] { return menuItem("OTHER-1") && marked(output); }) || marked("OTHER-1"))
+            return fail("the monitor submenu does not list the monitors, the window's marked");
+        click(menuItem("OTHER-1"));
+        if (const auto asked = taskRequests(); asked != "output 7 OTHER-1") {
+            std::cerr << "moving to a monitor from a task's menu asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        subscriber->write(state(toggled, currentWorkspace));
+        if (!QTest::qWaitFor([&] { return !popover->isVisible() && controller.workspaces().size() == 1; }))
+            return fail("the popover did not close after moving the window to another monitor");
+    }
+    // Keeping it on every workspace, and floating it where its workspace tiles.
+    {
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Keep on all workspaces"); }) ||
+            menuItem("Keep on all workspaces")->property("marked").toBool() || menuItem("Float"))
+            return fail("a window's menu does not offer to keep it on all workspaces, or floats it "
+                        "where nothing tiles");
+        editTasks("model.setProperty(0, 'tiling', true)");
+        if (!QTest::qWaitFor([&] { return menuItem("Float"); }) ||
+            menuItem("Float")->property("marked").toBool())
+            return fail("a tiled window's menu does not offer to float it");
+        click(menuItem("Float"));
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Keep on all workspaces"); }))
+            return fail("the window's menu did not open again");
+        click(menuItem("Keep on all workspaces"));
+        if (const auto asked = taskRequests(); asked != "floating 7 true|sticky 7 true") {
+            std::cerr << "floating and sticking from a task's menu asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        editTasks("model.setProperty(0, 'tiling', false)");
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the popover did not close after making the window sticky");
+    }
+    // Closing the window comes last, in the danger colour.
+    {
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Close window"); }))
+            return fail("the window's menu did not open to close it");
+        const auto entries = menu->property("entries").value<QJSValue>();
+        const auto last = entries.property(entries.property("length").toUInt() - 1);
+        if (last.property("text").toString() != "Close window" ||
+            !menuItem("Close window")->property("danger").toBool() ||
+            menuItem("Close window")->objectName() != "contextMenuClose")
+            return fail("closing a window is not the last entry of its menu, in the danger colour");
+        click(menuItem("Close window"));
+        if (const auto asked = taskRequests(); asked != "close 7") {
+            std::cerr << "closing from a task's menu asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the popover did not close after closing the window");
+    }
+    // A stacked button's menu is about all its windows: counted under the title, minimized or
+    // restored, moved and closed together, the workspace they share marked.
+    {
+        editTasks("model.append({ taskId: 9, title: 'Second', appId: 'fake', active: false, "
+                  "minimized: false, urgent: false, maximized: false, fullscreen: false, "
+                  "output: 'TEST-1', workspace: 2, sticky: false, floating: false, tiling: false })");
+        if (!QTest::qWaitFor([&] { return task->property("stacked").toBool(); }))
+            return fail("the application's two windows did not stack");
+        auto title = [&] { return find(view.rootObject(), "contextMenuTitle"); };
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] {
+                return menuShown() && title() && menuItem("Close all 2 windows") && menuItem("Minimize all");
+            }) ||
+            title()->property("modelData").toMap()["secondary"] != "2 windows" || menuItem("Maximize") ||
+            menuItem("Fullscreen") || menuItem("Close window"))
+            return fail("a stacked button's menu is not about all its windows");
+        click(menuItem("Move to workspace"));
+        if (!QTest::qWaitFor([&] {
+                return menuItem("Workspace 2") && menuItem("Workspace 2")->property("marked").toBool();
+            }))
+            return fail("the workspace both windows are on is not marked");
+        click(menuItem("web"));
+        if (const auto asked = taskRequests(); asked != "workspace 7 1|workspace 9 1") {
+            std::cerr << "moving a stack to a workspace asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Close all 2 windows"); }))
+            return fail("the stacked button's menu did not open again");
+        click(menuItem("Close all 2 windows"));
+        if (const auto asked = taskRequests(); asked != "close 7|close 9") {
+            std::cerr << "closing a stack asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        editTasks("model.setProperty(0, 'minimized', true); model.setProperty(1, 'minimized', true)");
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Restore all"); }) ||
+            menuItem("Minimize all"))
+            return fail("a stack of minimized windows does not offer to restore them");
+        click(menuItem("Restore all"));
+        if (const auto asked = taskRequests(); asked != "activate 7|activate 9") {
+            std::cerr << "restoring a stack asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        editTasks("model.remove(1); model.setProperty(0, 'minimized', false)");
+        QMetaObject::invokeMethod(tasks, "forceLayout");
+        if (!QTest::qWaitFor([&] { return !popover->isVisible() && !task->property("stacked").toBool(); }))
+            return fail("the popover did not close after restoring the stack");
     }
     // The task's window belongs to an installed application, which its menu pins. Pinned, the
     // window takes over the application's slot instead of adding a button; with no window left
@@ -830,9 +1032,43 @@ int main(int argc, char **argv) {
     }
     click(pinned(), Qt::RightButton);
     if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Unpin from taskbar"); }) ||
-        !menuItem("Open Fake app")) {
+        !menuItem("Open") || !menuItem("Fake app") ||
+        menuItem("Fake app")->objectName() != "contextMenuTitle") {
         std::cerr << "a pinned application's menu did not offer to unpin it\n";
         return 1;
+    }
+    // One with desktop actions offers them before opening it, and nothing of a window's.
+    {
+        QTest::keyClick(popover, Qt::Key_Escape);
+        controller.pin("shaodesk-test-actions.desktop");
+        auto withActions = [&] { return find(view.rootObject(), "pinned:shaodesk-test-actions.desktop"); };
+        if (!QTest::qWaitFor([&] { return withActions() && withActions()->isVisible() && !popover->isVisible(); }))
+            return fail("the application with desktop actions was not pinned");
+        click(withActions(), Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Touch a file"); }) ||
+            !menuItem("Missing program") || !menuItem("Open") || !menuItem("Unpin from taskbar") ||
+            menuItem("New window") || menuItem("Minimize") || menuItem("Close window"))
+            return fail("a pinned application's menu does not offer its desktop actions and to open it");
+        const auto entries = menu->property("entries").value<QJSValue>();
+        QStringList order; // the title or text of each entry, "-" for a separator
+        for (quint32 i = 0; i < entries.property("length").toUInt(); ++i) {
+            const auto entry = entries.property(i);
+            order << (entry.property("separator").toBool() ? QString("-")
+                      : entry.property("title").isString() ? entry.property("title").toString()
+                                                           : entry.property("text").toString());
+        }
+        if (order.join("|") != "Action app|-|Touch a file|Missing program|Open|-|Unpin from taskbar") {
+            std::cerr << "a pinned application's menu is in the wrong order: "
+                      << order.join("|").toStdString() << '\n';
+            return 1;
+        }
+        QTest::keyClick(popover, Qt::Key_Escape);
+        controller.unpin("shaodesk-test-actions.desktop");
+        if (!QTest::qWaitFor([&] { return !withActions() && !popover->isVisible(); }))
+            return fail("the application with desktop actions was not unpinned");
+        click(pinned(), Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Unpin from taskbar"); }))
+            return fail("the pinned application's menu did not open again");
     }
     click(menuItem("Unpin from taskbar"));
     if (!QTest::qWaitFor([&] { return pinned() == nullptr; }) || !readPins().isEmpty() ||
@@ -848,6 +1084,50 @@ int main(int argc, char **argv) {
               "minimized: false, urgent: false })");
     if (!(task = listedTask(0)))
         return fail("the re-added task is not listed");
+    // A window's menu is headed by its application's name and the window's title. One of an
+    // application with desktop actions offers them, with their icons, and to start it again.
+    {
+        auto title = [&] { return find(view.rootObject(), "contextMenuTitle"); };
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && title(); }) ||
+            title()->property("text") != "Fake app" ||
+            title()->property("modelData").toMap()["secondary"] != "Fake" || !menuItem("New window")) {
+            std::cerr << "a window's menu is not headed by its application and title\n";
+            return 1;
+        }
+        // The keyboard passes over the title.
+        QTest::keyClick(popover, Qt::Key_Home);
+        if (!QTest::qWaitFor([&] { return menuItem("New window")->property("highlighted").toBool(); }) ||
+            title()->property("highlighted").toBool())
+            return fail("Home did not go to the first entry under the title");
+        QTest::keyClick(popover, Qt::Key_Escape);
+        editTasks("model.append({ taskId: 8, title: 'Report', appId: 'shaodesk-test-actions', "
+                  "active: false, minimized: false, urgent: false })");
+        QQuickItem *withActions = listedTask(1);
+        if (!withActions)
+            return fail("the window with desktop actions is not listed");
+        click(withActions, Qt::RightButton);
+        if (!QTest::qWaitFor([&] {
+                return menuShown() && title() && title()->property("text") == "Action app" &&
+                       menuItem("Touch a file") && menuItem("Missing program") &&
+                       menuItem("New window");
+            }) ||
+            menuItem("Touch a file")->objectName() != "contextMenuAction" ||
+            menuItem("Touch a file")->property("modelData").toMap()["icon"] != "document-new") {
+            std::cerr << "a window's menu does not offer its application's desktop actions\n";
+            return 1;
+        }
+        QFile::remove(actionMarker);
+        click(menuItem("Touch a file"));
+        if (!QTest::qWaitFor([&] { return QFile::exists(actionMarker); }) ||
+            !QTest::qWaitFor([&] { return !view.rootObject()->property("menuOpen").toBool(); })) {
+            std::cerr << "a desktop action in a window's menu did not run\n";
+            return 1;
+        }
+        editTasks("model.remove(1)");
+        // The list drops the button when it next lays itself out.
+        QMetaObject::invokeMethod(tasks, "forceLayout");
+    }
     // Empty bar space, right of the only task, opens the bar menu.
     const QPoint empty =
         task->mapToScene(QPointF(task->width() + 40, task->height() / 2)).toPoint();

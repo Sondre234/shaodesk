@@ -128,11 +128,16 @@ PreviewData::PreviewData(ShellController &controller)
     QQmlComponent component(controller.engine());
     component.setData(R"(import QtQml.Models
 ListModel {
-    ListElement { taskId: 1; title: "Release notes - Mozilla Firefox"; appId: "firefox"; active: true; minimized: false; urgent: false }
-    ListElement { taskId: 2; title: "~/dev/shaodesk"; appId: "foot"; active: false; minimized: false; urgent: false }
-    ListElement { taskId: 3; title: "htop"; appId: "foot"; active: false; minimized: false; urgent: false }
-    ListElement { taskId: 4; title: "Downloads - Dolphin"; appId: "org.kde.dolphin"; active: false; minimized: true; urgent: false }
-    ListElement { taskId: 5; title: "Build finished"; appId: "kitty"; active: false; minimized: false; urgent: true }
+    ListElement { taskId: 1; title: "Release notes - Mozilla Firefox"; appId: "firefox"; active: true; minimized: false; urgent: false
+                  maximized: false; fullscreen: false; output: ""; workspace: 1; sticky: false; floating: false; tiling: true }
+    ListElement { taskId: 2; title: "~/dev/shaodesk"; appId: "foot"; active: false; minimized: false; urgent: false
+                  maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: false; tiling: true }
+    ListElement { taskId: 3; title: "htop"; appId: "foot"; active: false; minimized: false; urgent: false
+                  maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: true; tiling: true }
+    ListElement { taskId: 4; title: "Downloads - Dolphin"; appId: "org.kde.dolphin"; active: false; minimized: true; urgent: false
+                  maximized: true; fullscreen: false; output: ""; workspace: 3; sticky: false; floating: false; tiling: false }
+    ListElement { taskId: 5; title: "Build finished"; appId: "kitty"; active: false; minimized: false; urgent: true
+                  maximized: false; fullscreen: false; output: ""; workspace: 1; sticky: true; floating: true; tiling: true }
 })",
                       QUrl());
     tasks_ = component.create();

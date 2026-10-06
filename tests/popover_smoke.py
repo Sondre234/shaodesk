@@ -22,6 +22,8 @@ CONFIG = """return {
 }"""
 WIDTH, HEIGHT, BAR = 1280, 720, 52
 PANEL = (21, 30, 44)  # shell.panel_color, which popups are drawn in
+# A point of the bar menu, opened at x 700: in its last entry, between the icon and the text.
+MENU = (738, HEIGHT - BAR - 8 - 20)
 
 with harness.Compositor(compositor, CONFIG, start=False) as desktop:
     root, env, msg = desktop.root, desktop.env, desktop.msg
@@ -76,18 +78,18 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
     desktop.wait_for(lambda: layers().get(popover) == ["3", "1"] and not focused(),
                      "the popover on the overlay layer with the keyboard")
     assert "shaodesk popover shown on HEADLESS-1" in log()
-    desktop.wait_for(lambda: drawn(720, HEIGHT - BAR - 8 - 20), "the bar menu drawn above the bar")
+    desktop.wait_for(lambda: drawn(*MENU), "the bar menu drawn above the bar")
 
     # The start button, pressed while the menu is open, opens the launcher at once: the bar's
     # strip is not the popover's.
     pointer("move", "30", str(bar_y), "click", "left")
-    desktop.wait_for(lambda: drawn(200, 300) and not_drawn(720, HEIGHT - BAR - 8 - 20),
+    desktop.wait_for(lambda: drawn(200, 300) and not_drawn(*MENU),
                      "the launcher in place of the bar menu")
     assert layers()[popover] == ["3", "1"] and not focused(), layers()
 
     # And a right click on the bar, the bar menu again.
     pointer("move", "700", str(bar_y), "click", "right")
-    desktop.wait_for(lambda: drawn(720, HEIGHT - BAR - 8 - 20) and not_drawn(200, 300),
+    desktop.wait_for(lambda: drawn(*MENU) and not_drawn(200, 300),
                      "the bar menu in place of the launcher")
 
     # A press beside the menu, over the window, closes it and does not reach the window: it
@@ -99,7 +101,7 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
     desktop.wait_for(lambda: len(focused()) == 1, "the keyboard back with the window")
     assert windows()[0][4:8] == window, (window, windows())
     desktop.wait_for(lambda: layers().get(popover, ["3", "0"])[1] == "0" and
-                     not_drawn(720, HEIGHT - BAR - 8 - 20), "the popover unmapped")
+                     not_drawn(*MENU), "the popover unmapped")
     assert layers()[panel] == ["2", "1"], layers()
     desktop.stays(lambda: windows()[0][4:8] == window, "the window moved after the popover closed")
 
