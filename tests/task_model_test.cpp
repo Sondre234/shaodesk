@@ -39,6 +39,14 @@ int main(int argc, char **argv) {
             value(TaskModel::AppId).toString() != "shaodesk-probe")
             throw std::runtime_error("task metadata incorrect");
         int id = value(TaskModel::TaskId).toInt();
+        // Where it is comes from the compositor's window control: its only output, the first
+        // workspace, floating since the example configuration does not tile.
+        wait([&] { return value(TaskModel::Workspace).toInt() == 1; }, "no workspace arrived");
+        if (value(TaskModel::Output).toString() != "HEADLESS-1" ||
+            value(TaskModel::Sticky).toBool() || value(TaskModel::Tiling).toBool() ||
+            model.roleNames().value(TaskModel::Workspace) != "workspace" ||
+            model.roleNames().value(TaskModel::Tiling) != "tiling")
+            throw std::runtime_error("the window's place is not as the compositor has it");
         model.activate(id); // Clicking the active task minimizes it.
         wait([&] { return value(TaskModel::Minimized).toBool(); }, "minimize failed");
         model.activate(id);

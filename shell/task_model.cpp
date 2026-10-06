@@ -8,8 +8,13 @@ TaskModel::TaskModel(QObject *parent) : QAbstractListModel(parent) {}
 TaskModel::~TaskModel() {
     read_.reset();
     write_.reset();
-    for (auto &task : tasks_)
+    for (auto &task : tasks_) {
+        if (task->window)
+            shaodesk_window_v1_destroy(task->window);
         zwlr_foreign_toplevel_handle_v1_destroy(task->handle);
+    }
+    if (control_)
+        shaodesk_window_control_v1_destroy(control_);
     if (manager_)
         zwlr_foreign_toplevel_manager_v1_destroy(manager_);
     if (seat_)
@@ -79,6 +84,16 @@ QVariant TaskModel::data(const QModelIndex &index, int role) const {
         return state.urgent;
     case Fullscreen:
         return state.fullscreen;
+    case Output:
+        return state.output;
+    case Workspace:
+        return state.workspace;
+    case Sticky:
+        return state.sticky;
+    case Floating:
+        return state.floating;
+    case Tiling:
+        return state.tiling;
     default:
         return {};
     }
@@ -86,7 +101,9 @@ QVariant TaskModel::data(const QModelIndex &index, int role) const {
 QHash<int, QByteArray> TaskModel::roleNames() const {
     return {{TaskId, "taskId"},        {Title, "title"},         {AppId, "appId"},
             {Active, "active"},        {Minimized, "minimized"}, {Maximized, "maximized"},
-            {Urgent, "urgent"},        {Fullscreen, "fullscreen"}};
+            {Urgent, "urgent"},        {Fullscreen, "fullscreen"}, {Output, "output"},
+            {Workspace, "workspace"},  {Sticky, "sticky"},         {Floating, "floating"},
+            {Tiling, "tiling"}};
 }
 TaskModel::Task *TaskModel::find(int id) {
     for (auto &task : tasks_)
@@ -202,6 +219,11 @@ void TaskModel::changed(Task *task) {
             compare(&State::maximized, Maximized);
             compare(&State::fullscreen, Fullscreen);
             compare(&State::urgent, Urgent);
+            compare(&State::output, Output);
+            compare(&State::workspace, Workspace);
+            compare(&State::sticky, Sticky);
+            compare(&State::floating, Floating);
+            compare(&State::tiling, Tiling);
             if (roles.isEmpty())
                 return;
             task->shown = task->state;
@@ -213,6 +235,8 @@ void TaskModel::removed(Task *task) {
     for (int i = 0; i < rowCount(); ++i)
         if (tasks_[i].get() == task) {
             beginRemoveRows({}, i, i);
+            if (task->window)
+                shaodesk_window_v1_destroy(task->window);
             zwlr_foreign_toplevel_handle_v1_destroy(task->handle);
             tasks_.erase(tasks_.begin() + i);
             endRemoveRows();
@@ -230,7 +254,20 @@ void TaskModel::global(void *data, wl_registry *registry, uint32_t name, const c
     } else if (!std::strcmp(interface, "wl_seat") && !self.seat_) {
         self.seat_ =
             static_cast<wl_seat *>(wl_registry_bind(registry, name, &wl_seat_interface, 1));
+    } else if (!std::strcmp(interface, shaodesk_window_control_v1_interface.name) && !self.control_) {
+        self.control_ = static_cast<shaodesk_window_control_v1 *>(
+            wl_registry_bind(registry, name, &shaodesk_window_control_v1_interface, 1));
+        for (auto &task : self.tasks_)
+            self.watch(task.get());
     }
+}
+void TaskModel::watch(Task *task) {
+    if (!control_ || task->window)
+        return;
+    task->window = shaodesk_window_control_v1_get_window(control_, task->handle);
+    static const shaodesk_window_v1_listener listener{windowOutput, windowWorkspace, windowState,
+                                                      windowDone};
+    shaodesk_window_v1_add_listener(task->window, &listener, task);
 }
 void TaskModel::globalRemoved(void *, wl_registry *, uint32_t) {}
 void TaskModel::newTask(void *data, zwlr_foreign_toplevel_manager_v1 *,
@@ -243,6 +280,7 @@ void TaskModel::newTask(void *data, zwlr_foreign_toplevel_manager_v1 *,
     static const zwlr_foreign_toplevel_handle_v1_listener listener{title, appId, output, output,
                                                                    state, done,  closed, nullptr};
     zwlr_foreign_toplevel_handle_v1_add_listener(handle, &listener, task.get());
+    self.watch(task.get());
     int row = self.rowCount();
     self.beginInsertRows({}, row, row);
     self.tasks_.push_back(std::move(task));
@@ -276,4 +314,20 @@ void TaskModel::done(void *data, zwlr_foreign_toplevel_handle_v1 *) {
 void TaskModel::closed(void *data, zwlr_foreign_toplevel_handle_v1 *) {
     auto *task = static_cast<Task *>(data);
     task->model->removed(task);
+}
+void TaskModel::windowOutput(void *data, shaodesk_window_v1 *, const char *name) {
+    static_cast<Task *>(data)->state.output = QString::fromUtf8(name);
+}
+void TaskModel::windowWorkspace(void *data, shaodesk_window_v1 *, uint32_t number) {
+    static_cast<Task *>(data)->state.workspace = static_cast<int>(number);
+}
+void TaskModel::windowState(void *data, shaodesk_window_v1 *, uint32_t flags) {
+    auto &state = static_cast<Task *>(data)->state;
+    state.sticky = flags & SHAODESK_WINDOW_V1_STATE_STICKY;
+    state.floating = flags & SHAODESK_WINDOW_V1_STATE_FLOATING;
+    state.tiling = flags & SHAODESK_WINDOW_V1_STATE_TILING;
+}
+void TaskModel::windowDone(void *data, shaodesk_window_v1 *) {
+    auto *task = static_cast<Task *>(data);
+    task->model->changed(task);
 }
