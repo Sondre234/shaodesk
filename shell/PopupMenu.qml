@@ -41,7 +41,7 @@ Item {
     property rect bounds: Qt.rect(0, 0, width, height)
     property real minimumWidth: 200
     property real maximumWidth: 420
-    property real rowHeight: 36
+    property real rowHeight: Theme.rowHeight
     // The entry highlighted as it opens: -1 for none, as when it is opened with the pointer.
     property int initialIndex: -1
     property int submenuDelay: 250
@@ -288,7 +288,8 @@ Item {
         readonly property real naturalHeight: {
             var sum = 0
             for (var i = 0; i < entries.length; ++i)
-                sum += entries[i].separator ? 9 : entries[i].header ? 30 : level.menu.rowHeight
+                sum += entries[i].separator ? 2 * Theme.spacingS + 1
+                     : entries[i].header ? Theme.headingHeight : level.menu.rowHeight
             return Math.max(level.menu.rowHeight, sum)
         }
         implicitWidth: Math.min(level.menu.maximumWidth, Math.max(level.menu.minimumWidth, naturalWidth + 2 * padding))

@@ -16,7 +16,7 @@ AbstractButton {
     property bool expanded: false
     // Whether the menu's rows keep a column for icons and marks, so that labels line up.
     property bool iconColumn: false
-    property real rowHeight: 36
+    property real rowHeight: Theme.rowHeight
     property real labelStart: Theme.spacingL
     property real labelEnd: Theme.spacingM
 
@@ -35,7 +35,7 @@ AbstractButton {
     enabled: available
     hoverEnabled: true
     focusPolicy: Qt.NoFocus
-    implicitHeight: separator ? 9 : header ? 30 : rowHeight
+    implicitHeight: separator ? 2 * Theme.spacingS + 1 : header ? Theme.headingHeight : rowHeight
     Accessible.role: separator ? Accessible.Separator : Accessible.MenuItem
     Accessible.name: text
     Accessible.checkable: toggle !== ""
@@ -70,7 +70,7 @@ AbstractButton {
             Rectangle {
                 visible: row.toggle === "radio" && row.marked
                 anchors.centerIn: parent
-                width: 8; height: 8; radius: 4
+                width: Theme.spacingM; height: Theme.spacingM; radius: Theme.spacingS
                 color: Theme.accent
             }
             Icon {

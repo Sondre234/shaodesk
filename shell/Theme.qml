@@ -83,6 +83,10 @@ QtObject {
     readonly property int spacingXL: 16
     readonly property int spacingXXL: 20
 
+    // A row of a menu or a list, and a section's heading over rows.
+    readonly property int rowHeight: 36
+    readonly property int headingHeight: 30
+
     // Line icons in menus, line icons on the bar, applications' icons on the bar and in lists,
     // and in the launcher.
     readonly property int iconSizeSmall: 16
