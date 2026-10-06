@@ -144,50 +144,12 @@ Rectangle {
         visible: panel.powerOpen
         onPressed: panel.powerOpen = false
     }
-    // The power menu, above the power button. Restart, power off and log out ask
-    // first (PowerDialog.qml).
-    Rectangle {
+    // The power menu, above the power button.
+    PowerMenu {
         id: powerMenu
-        objectName: "powerMenu"
+        panel: launcher.panel
         z: 2
-        // The entry Up and Down move to and Enter runs.
-        property int current: 0
-        function run(index) {
-            var entry = shell.power.entries[index]
-            // Closing the launcher first hands the keyboard back before it runs.
-            panel.closeMenus()
-            if (entry)
-                shell.power.request(entry.action, launcher.panel.outputName)
-        }
-        visible: panel.powerOpen
-        Keys.onUpPressed: current = (current + shell.power.entries.length - 1) % Math.max(1, shell.power.entries.length)
-        Keys.onDownPressed: current = (current + 1) % Math.max(1, shell.power.entries.length)
-        Keys.onReturnPressed: run(current)
-        Keys.onEnterPressed: run(current)
-        width: 220; height: 12 + shell.power.entries.length * 44 + Math.max(0, shell.power.entries.length - 1) * 2
         anchors.right: parent.right; anchors.rightMargin: 14
         anchors.bottom: parent.bottom; anchors.bottomMargin: 20 + launcherFooter.height + 6
-        color: Qt.lighter(shell.panelColor, 1.2); radius: 10
-        border.color: Qt.lighter(shell.panelColor, 1.8)
-        MouseArea { anchors.fill: parent }
-        Column {
-            anchors.fill: parent; anchors.margins: 6; spacing: 2
-            Repeater {
-                model: shell.power.entries
-                delegate: Button {
-                    id: powerItem
-                    required property var modelData
-                    required property int index
-                    objectName: "powerItem:" + modelData.action
-                    width: parent.width; height: 44
-                    text: modelData.title
-                    focusPolicy: Qt.NoFocus
-                    palette.buttonText: shell.textColor
-                    onClicked: powerMenu.run(index)
-                    onHoveredChanged: if (hovered) powerMenu.current = index
-                    background: Rectangle { color: powerItem.hovered || powerMenu.current === powerItem.index ? Qt.lighter(shell.panelColor, 1.6) : "transparent"; radius: 6 }
-                }
-            }
-        }
     }
 }
