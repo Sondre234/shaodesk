@@ -477,6 +477,17 @@ const char *sh_tiling_output(const sh_tiling *tiling, const void *window) {
     return found == tiling->leaves.end() ? nullptr : found->second.second.first.c_str();
 }
 
+int sh_tiling_count(const sh_tiling *tiling, const char *output, int workspace) {
+    if (!tiling || !output)
+        return 0;
+    auto found = tiling->roots.find({output, workspace});
+    if (found == tiling->roots.end())
+        return 0;
+    std::vector<Node *> order;
+    collect(found->second.get(), order);
+    return static_cast<int>(order.size());
+}
+
 void sh_tiling_arrange(sh_tiling *tiling, const char *output, int workspace, sh_rect area, int gap,
                        sh_tile_place place, void *userdata) {
     if (!tiling || !output || !place || area.width < 1 || area.height < 1)
