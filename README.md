@@ -294,7 +294,10 @@ cmake --build build-preview
 ```
 
 Preview windows show the UI and can launch applications, but do not manage windows or reserve
-space on the host desktop.
+space on the host desktop. `--preview-popup NAME` opens one of the taskbar's popups on stand-in
+windows, sound and notifications, and `tools/shell_gallery.py build OUT_DIR` saves a picture of
+every popup in a light and a dark theme (see
+[docs/architecture.md](docs/architecture.md#seeing-a-change)).
 
 Work happens on short-lived branches off `main` that are merged back with `--no-ff`. See
 [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md) for notable changes, and
