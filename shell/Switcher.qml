@@ -20,10 +20,24 @@ Item {
     readonly property var current: windows[selected] || ({})
     width: card.width + 2 * Theme.shadowMargin
     height: card.height + 2 * Theme.shadowMargin
+    // How far it has come in, from 0 to 1, each time its window shows: the card's opacity and
+    // growth. It goes at once, as the switch it ends does.
+    property real progress: 0
+    states: State {
+        name: "shown"
+        when: switcher.Window.window !== null && switcher.Window.window.visible
+        PropertyChanges { switcher.progress: 1 }
+    }
+    transitions: Transition {
+        to: "shown"
+        NumberAnimation { property: "progress"; duration: Theme.durationNormal; easing.type: Theme.easing }
+    }
 
     Item {
         id: card
         x: Theme.shadowMargin; y: Theme.shadowMargin
+        opacity: switcher.progress
+        scale: 0.94 + 0.06 * switcher.progress
         width: switcher.columns * switcher.cell + 2 * switcher.padding
         height: switcher.rows * switcher.cell + 2 * switcher.padding + caption.height + 8
         Loader {
