@@ -88,6 +88,8 @@ class ShellController : public QObject {
     Q_PROPERTY(bool tiling READ tiling NOTIFY tilingChanged)
     Q_PROPERTY(bool tilingAvailable READ tilingAvailable NOTIFY tilingChanged)
     Q_PROPERTY(int workspaceCount READ workspaceCount NOTIFY configChanged)
+    // shell.workspaces_shown: how many the indicator shows around the current one; 0: all.
+    Q_PROPERTY(int workspacesShown READ workspacesShown NOTIFY configChanged)
     // layout.workspace_names, padded with "" to workspaceCount.
     Q_PROPERTY(QStringList workspaceNames READ workspaceNames NOTIFY configChanged)
     Q_PROPERTY(QVariantMap workspaces READ workspaces NOTIFY workspacesChanged)
@@ -193,6 +195,7 @@ class ShellController : public QObject {
     bool tiling() const { return tiling_; }
     bool tilingAvailable() const { return subscribed_; }
     int workspaceCount() const { return config_.settings.workspaces; }
+    int workspacesShown() const { return config_.shell.workspaces_shown; }
     QStringList workspaceNames() const {
         QStringList names;
         for (int i = 0; i < workspaceCount(); ++i)

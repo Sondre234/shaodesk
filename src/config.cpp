@@ -310,6 +310,7 @@ void read_shell(lua_State *L, ShellConfig &shell) {
     lua_pop(L, 1);
     boolean(L, "icons_only", "shell.icons_only", shell.icons_only);
     boolean(L, "group_windows", "shell.group_windows", shell.group_windows);
+    shell.workspaces_shown = integer(L, "workspaces_shown", 0, 0, 10);
     if (section(L, "widgets", "shell.widgets")) {
         for (auto [key, target] : {std::pair{"workspaces", &shell.widgets.workspaces},
                                    {"battery", &shell.widgets.battery},

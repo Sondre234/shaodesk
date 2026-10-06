@@ -4,13 +4,18 @@ import QtQuick.Layouts
 
 // This output's workspaces: the current one highlighted, a dot under those with
 // windows. Clicking a number switches to it; scrolling pages through them, as it does
-// anywhere on the bar.
+// anywhere on the bar. With shell.workspacesShown set, only that many show, around the
+// current one.
 Row {
     id: workspaceIndicator
     required property var panel
     required property real barHeight
     objectName: "workspaceIndicator"
     readonly property var workspaceState: shell.workspaces[workspaceIndicator.panel.outputName] || ({ current: 1, occupied: [] })
+    // The workspaces shown, first to first + shown - 1: the current one in the middle, except
+    // near either end, where the range stops at the first or last workspace.
+    readonly property int shown: shell.workspacesShown > 0 ? Math.min(shell.workspacesShown, shell.workspaceCount) : shell.workspaceCount
+    readonly property int first: Math.max(1, Math.min(shell.workspaceCount - shown + 1, workspaceState.current - Math.floor((shown - 1) / 2)))
     function show(number) {
         if (number >= 1 && number <= shell.workspaceCount && number !== workspaceState.current)
             shell.showWorkspace(workspaceIndicator.panel.outputName, number)
@@ -19,16 +24,16 @@ Row {
     spacing: 2
     Layout.alignment: Qt.AlignVCenter
     Repeater {
-        model: shell.workspaceCount
+        model: workspaceIndicator.shown
         delegate: FlatButton {
             id: workspaceButton
             required property int index
-            readonly property int number: index + 1
+            readonly property int number: workspaceIndicator.first + index
             readonly property bool current: workspaceIndicator.workspaceState.current === number
             readonly property bool occupied: workspaceIndicator.workspaceState.occupied.indexOf(number) >= 0
             // A window on this workspace is asking for attention.
             readonly property bool urgent: (workspaceIndicator.workspaceState.urgent || []).indexOf(number) >= 0
-            readonly property string label: shell.workspaceNames[index] || ""
+            readonly property string label: shell.workspaceNames[number - 1] || ""
             objectName: "workspace" + number
             active: current
             width: label ? Math.max(26, workspaceText.implicitWidth + 14) : 26

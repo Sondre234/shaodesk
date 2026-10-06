@@ -513,17 +513,18 @@ int main(int argc, char **argv) {
         auto bar = shaodesk::parse_config(
             "return {shell={panel_position='top',panel_margin={top=6,left=10,right=10},"
             "panel_radius=12,font='JetBrainsMono Nerd Font',font_size=13,icons_only=false,"
-            "group_windows=false,panel_color='#151e2ccc'}}");
+            "group_windows=false,workspaces_shown=3,panel_color='#151e2ccc'}}");
         require(bar.shell.panel_top && bar.shell.panel_margin[0] == 6 &&
                     bar.shell.panel_margin[1] == 10 && bar.shell.panel_margin[2] == 0 &&
                     bar.shell.panel_margin[3] == 10 && bar.shell.panel_radius == 12 &&
                     bar.shell.font == "JetBrainsMono Nerd Font" && bar.shell.font_size == 13 &&
                     bar.shell.panel_color == "#151e2ccc" && !bar.shell.icons_only &&
-                    !bar.shell.group_windows,
+                    !bar.shell.group_windows && bar.shell.workspaces_shown == 3,
                 "bar settings not parsed");
         auto even = shaodesk::parse_config("return {shell={panel_margin=8}}");
         require(even.shell.panel_margin[0] == 8 && even.shell.panel_margin[3] == 8 &&
-                    !even.shell.panel_top && even.shell.icons_only && even.shell.group_windows,
+                    !even.shell.panel_top && even.shell.icons_only && even.shell.group_windows &&
+                    even.shell.workspaces_shown == 0,
                 "single panel margin not parsed");
         require(!even.shell.software_renderer, "the shell does not draw through the GPU by default");
         require(!shaodesk::parse_config("return {shell={renderer='gpu'}}").shell.software_renderer &&
@@ -531,6 +532,7 @@ int main(int argc, char **argv) {
                         .shell.software_renderer,
                 "renderer not parsed");
         rejects("return {shell={renderer='vulkan'}}");
+        rejects("return {shell={workspaces_shown=11}}");
         rejects("return {shell={renderer=true}}");
         rejects("return {shell={panel_position='left'}}");
         rejects("return {shell={panel_margin=-1}}");

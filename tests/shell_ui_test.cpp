@@ -374,6 +374,41 @@ int main(int argc, char **argv) {
         std::cerr << "the workspace marks did not go when the windows stopped asking\n";
         return 1;
     }
+    auto rewrite = [&config](const QString &source) {
+        QFile again(config);
+        return again.open(QIODevice::WriteOnly | QIODevice::Truncate) &&
+               again.write(source.toUtf8()) >= 0;
+    };
+    // shell.workspaces_shown = 3 shows the current workspace with its neighbours, the last
+    // three on the last one, and the names follow their workspaces.
+    if (!rewrite(QString(lua).replace("shell={", "shell={workspaces_shown=3,")))
+        return fail("could not rewrite the configuration");
+    controller.reload();
+    if (!QTest::qWaitFor([&] { return controller.workspacesShown() == 3 && !workspace(1); }) ||
+        !workspace(2) || !workspace(3) || !workspace(4) || !workspace(4)->property("current").toBool() ||
+        workspace(4)->property("label").toString() != "mail") {
+        std::cerr << "shell.workspaces_shown = 3 did not show the last three workspaces\n";
+        return 1;
+    }
+    // The bar's layout moves the narrower indicator on its next polish, which a grab runs.
+    view.grabWindow();
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(workspace(2)));
+    if (!QTest::qWaitFor([&] { return workspace(1) && !workspace(4); }) ||
+        !workspace(2)->property("current").toBool() || !workspace(3) ||
+        workspace(1)->property("label").toString() != "web") {
+        std::cerr << "shell.workspaces_shown = 3 did not show the workspaces around the current one\n";
+        for (int n = 1; n <= 4; ++n)
+        return 1;
+    }
+    if (!rewrite(lua))
+        return fail("could not restore the configuration");
+    controller.reload();
+    if (!QTest::qWaitFor([&] { return workspace(4) != nullptr; }) || !workspace(1))
+        return fail("the workspace indicator did not show every workspace again");
+    view.grabWindow();
+    QTest::mouseClick(&view, Qt::LeftButton, Qt::NoModifier, centre(workspace(4)));
+    if (!QTest::qWaitFor([&] { return workspace(4)->property("current").toBool(); }))
+        return fail("could not switch back to the last workspace");
     // The window switcher's list says which windows are asking for attention (an older
     // five-field line means none).
     subscriber->write(("switcher " + output + " 0 3\n"
@@ -425,11 +460,6 @@ int main(int argc, char **argv) {
             std::cerr << "clicking the keyboard layout did not switch to the next\n";
             return 1;
         }
-        auto rewrite = [&config](const QString &source) {
-            QFile again(config);
-            return again.open(QIODevice::WriteOnly | QIODevice::Truncate) &&
-                   again.write(source.toUtf8()) >= 0;
-        };
         if (!controller.widgets()["keyboard_layout"].toBool() ||
             !rewrite(QString(lua).replace("shell={", "shell={widgets={keyboard_layout=false},")))
             return fail("the keyboard layout widget was off, or the configuration could not be rewritten");
@@ -2006,12 +2036,7 @@ int main(int argc, char **argv) {
             std::cerr << "Theme did not load: " << probe.errorString().toStdString() << '\n';
             return 1;
         }
-        auto rewrite = [&config](const QString &source) {
-            QFile again(config);
-            return again.open(QIODevice::WriteOnly | QIODevice::Truncate) &&
-                   again.write(source.toUtf8()) >= 0;
-        };
-        auto token = [&](const char *name) { return theme->property(name); };
+        auto token =[&](const char *name) { return theme->property(name); };
         if (token("durationFast").toInt() != 120 || token("light").toBool() ||
             token("surface").value<QColor>() != controller.panelColor())
             return fail("Theme does not follow the default configuration");
