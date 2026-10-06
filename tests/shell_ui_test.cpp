@@ -467,6 +467,35 @@ int main(int argc, char **argv) {
         std::cerr << "the switcher did not close\n";
         return 1;
     }
+    // The switcher, the overview and the command palette opening on this output close what is
+    // open here: the popover would be over them.
+    {
+        auto openLauncher = [&] {
+            view.rootObject()->setProperty("launcherOpen", true);
+            return QTest::qWaitFor([&] { return popover->isVisible(); });
+        };
+        auto closed = [&] {
+            return QTest::qWaitFor([&] { return !view.rootObject()->property("menuOpen").toBool(); });
+        };
+        if (!openLauncher())
+            return fail("the launcher did not open");
+        subscriber->write(("switcher " + output + " 0 0\n").toUtf8());
+        if (!closed())
+            return fail("the window switcher opening did not close the launcher");
+        subscriber->write("switcher-close\n");
+        if (!openLauncher())
+            return fail("the launcher did not open again");
+        subscriber->write(("overview " + output + " 0 0 1 0 0 0 1100 668 -\n").toUtf8());
+        if (!closed())
+            return fail("the overview opening did not close the launcher");
+        subscriber->write("overview-close\n");
+        if (!openLauncher())
+            return fail("the launcher did not open a third time");
+        controller.palette()->open(output);
+        if (!closed())
+            return fail("the command palette opening did not close the launcher");
+        controller.palette()->close();
+    }
     // The keyboard layout indicator: the active layout's short name while there are two or
     // more; clicking it asks for the next; shell.widgets.keyboard_layout = false hides it.
     {

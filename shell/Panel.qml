@@ -318,6 +318,18 @@ Item {
                 root.trayMenuKey = ""
         }
     }
+    // The overview, the window switcher and the command palette come up over the output's
+    // windows, and the popups' surface is above them: what is open here closes, as the start
+    // menu does on Windows.
+    Connections {
+        target: shell
+        function onOverviewChanged() { if (shell.overviewOutput === root.outputName) root.closeMenus() }
+        function onSwitcherChanged() { if (shell.switcherOutput === root.outputName) root.closeMenus() }
+    }
+    Connections {
+        target: shell.palette
+        function onOpenChanged() { if (shell.palette.output === root.outputName) root.closeMenus() }
+    }
     function pinAction(appId) {
         // Reading shell.pinned re-evaluates the menu when pins change. Pinning waits until
         // the click is handled: the change rebuilds the menu, destroying the clicked item.
