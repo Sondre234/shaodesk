@@ -111,7 +111,7 @@ PopupCard {
         background: Item {
             Rectangle {
                 anchors.centerIn: parent
-                width: Math.min(parent.width, parent.height) - 2 * Theme.spacingL; height: width; radius: width / 2
+                width: Math.min(parent.width, parent.height) - 2 * Theme.spacingXL; height: width; radius: width / 2
                 color: pick.current ? (pick.hovered ? Theme.accentHover : Theme.accent)
                        : pick.pressed ? Theme.pressed : pick.hovered ? Theme.hover : "transparent"
             }
