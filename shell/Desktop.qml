@@ -68,11 +68,17 @@ Rectangle {
     }
     Rectangle {
         anchors.fill: parent
-        visible: shell.wallpaper.toString().length === 0 || wallpaper.status === Image.Error
+        visible: !Theme.macos && (shell.wallpaper.toString().length === 0 || wallpaper.status === Image.Error)
         gradient: Gradient {
             GradientStop { position: 0; color: Qt.lighter(shell.background, 1.45) }
             GradientStop { position: 1; color: shell.background }
         }
+    }
+    // The macOS style draws a wallpaper of its own in the gradient's place.
+    Loader {
+        anchors.fill: parent
+        active: Theme.macos && (shell.wallpaper.toString().length === 0 || wallpaper.status === Image.Error)
+        sourceComponent: DrawnWallpaper {}
     }
     // A right press opens the desktop's menu where it was; any other press closes it.
     MouseArea {

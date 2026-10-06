@@ -4,7 +4,8 @@ import QtQuick.Effects
 
 // The window switcher: every window's icon and title in a grid, most recently focused first,
 // with the selected one's full title and place below, on a card with room around it for its
-// shadow. A click picks a window.
+// shadow. A click picks a window. In the macOS style the icons are large, without their titles,
+// on a rounded translucent card, as macOS switches applications.
 Item {
     id: switcher
     required property size screenSize
@@ -19,7 +20,8 @@ Item {
     onWindowsChanged: if (windows.length > 0) listed = windows
     onSelectedChanged: if (windows.length > 0) listedSelected = selected
     // A window's cell: its icon over two lines of its title.
-    readonly property int cell: Theme.appIconSizeDisplay + 10 * Theme.spacingM
+    readonly property int cell: Theme.macos ? Theme.switcherIconSize + 3 * Theme.spacingL
+                                            : Theme.appIconSizeDisplay + 10 * Theme.spacingM
     readonly property int padding: Theme.spacingXL
     // As many columns as fit in most of the output's width, and rows up to most of its height;
     // the grid scrolls to the selection past that.
@@ -61,7 +63,7 @@ Item {
             anchors.fill: parent
             active: Theme.effects
             sourceComponent: RectangularShadow {
-                radius: Theme.radiusLarge
+                radius: Theme.switcherRadius
                 blur: Theme.shadowBlur
                 offset: Qt.vector2d(0, Theme.shadowOffset)
                 color: Theme.shadow
@@ -69,9 +71,9 @@ Item {
         }
         Rectangle {
             anchors.fill: parent
-            radius: Theme.radiusLarge
-            color: Theme.surface
-            border.color: Theme.border
+            radius: Theme.switcherRadius
+            color: Theme.switcherSurface
+            border.color: Theme.popupOutline
         }
         GridView {
             id: grid
@@ -88,9 +90,9 @@ Item {
             highlight: Item {
                 Rectangle {
                     anchors.fill: parent; anchors.margins: Theme.spacingXS
-                    radius: Theme.radiusMedium
-                    color: Theme.accentSubtle
-                    border.color: Theme.accent; border.width: 2
+                    radius: Theme.macos ? Theme.radiusLarge : Theme.radiusMedium
+                    color: Theme.switcherSelection
+                    border.color: Theme.macos ? "transparent" : Theme.accent; border.width: 2
                 }
             }
             delegate: Item {
@@ -115,14 +117,15 @@ Item {
                 Image {
                     id: icon
                     anchors.horizontalCenter: parent.horizontalCenter
-                    y: Theme.spacingXL
-                    width: Theme.appIconSizeDisplay; height: Theme.appIconSizeDisplay
-                    sourceSize: Qt.size(2 * Theme.appIconSizeDisplay, 2 * Theme.appIconSizeDisplay)
+                    y: Theme.macos ? (parent.height - height) / 2 : Theme.spacingXL
+                    width: Theme.switcherIconSize; height: width
+                    sourceSize: Qt.size(2 * width, 2 * height)
                     source: "image://icons/" + shell.iconFor(entry.modelData.appId)
                     // A minimized window's is faded.
                     opacity: entry.minimized ? 0.45 : 1
                 }
                 Text {
+                    visible: !Theme.macos
                     anchors.top: icon.bottom; anchors.topMargin: Theme.spacingM + Theme.spacingXS
                     anchors.left: parent.left; anchors.right: parent.right; anchors.margins: Theme.spacingM
                     text: entry.modelData.title.length > 0 ? entry.modelData.title : entry.modelData.appId

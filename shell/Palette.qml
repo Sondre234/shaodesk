@@ -6,6 +6,10 @@ import QtQuick.Effects
 // sessions. Up and Down (or Ctrl+N and Ctrl+P) select, Enter runs, Escape closes; a leading
 // > @ # or % narrows the search to actions, windows, workspaces or sessions. It is a card with
 // room around it for its shadow, coming in each time its window shows.
+//
+// In the macOS style it is Spotlight: a large field along the card's top, and under a line the
+// results in groups under small headings (the first, the top hit), the one chosen filled with the
+// accent.
 Item {
     id: root
     required property size screenSize
@@ -14,6 +18,29 @@ Item {
     readonly property int rowHeight: Theme.rowHeight + Theme.spacingL
     readonly property int visibleRows: Math.max(1, Math.min(8, Math.floor((screenSize.height * 0.6 - 3 * padding - input.height) / rowHeight)))
     readonly property var kindLabels: ({ window: "Window", app: "App", workspace: "Workspace", action: "Action", session: "Session" })
+    // Spotlight's headings: the top hit's over the first result of a search, and a kind's over the
+    // first of a run of it.
+    readonly property var groupLabels: ({ window: "Windows", app: "Applications", workspace: "Workspaces",
+                                          action: "Actions", session: "Sessions" })
+    // The results, read from the palette once each time they change.
+    readonly property var results: shell.palette.results
+    function heading(index) {
+        var results = root.results
+        var searching = shell.palette.query.trim() !== ""
+        if (index === 0)
+            return searching ? "Top Hit" : groupLabels[results[0].kind] || ""
+        return results[index].kind !== results[index - 1].kind || (index === 1 && searching)
+            ? groupLabels[results[index].kind] || "" : ""
+    }
+    // How tall Spotlight's results are, as far as most of the output's height leaves room for.
+    readonly property real spotlightHeight: {
+        var results = root.results
+        var most = screenSize.height * 0.6 - Theme.spotlightFieldHeight - 2 * Theme.spacingM
+        var sum = 0
+        for (var i = 0; i < results.length && sum < most; ++i)
+            sum += Theme.spotlightRowHeight + (heading(i) !== "" ? Theme.spotlightHeadingHeight : 0)
+        return Math.min(sum, Math.max(Theme.spotlightRowHeight, most))
+    }
     width: card.width + 2 * Theme.shadowMargin
     height: card.height + 2 * Theme.shadowMargin
     // Set by its view as it shows and cleared as it goes (a preview sets it from the start).
@@ -50,7 +77,8 @@ Item {
         id: card
         x: Theme.shadowMargin; y: Theme.shadowMargin
         width: Math.min(680, root.screenSize.width - 32)
-        height: input.height + (list.count > 0 ? list.height : empty.height) + 3 * root.padding
+        height: Theme.macos ? input.height + 1 + 2 * Theme.spacingM + (list.count > 0 ? list.height : empty.height)
+                            : input.height + (list.count > 0 ? list.height : empty.height) + 3 * root.padding
         opacity: root.progress
         scale: 0.97 + 0.03 * root.progress
         transform: Translate { y: (root.progress - 1) * Theme.spacingM }
@@ -58,7 +86,7 @@ Item {
             anchors.fill: parent
             active: Theme.effects
             sourceComponent: RectangularShadow {
-                radius: Theme.radiusLarge
+                radius: Theme.spotlightRadius
                 blur: Theme.shadowBlur
                 offset: Qt.vector2d(0, Theme.shadowOffset)
                 color: Theme.shadow
@@ -66,19 +94,26 @@ Item {
         }
         Rectangle {
             anchors.fill: parent
-            radius: Theme.radiusLarge
-            color: Theme.surface
-            border.color: Theme.border
+            radius: Theme.spotlightRadius
+            color: Theme.popupSurface
+            border.color: Theme.popupOutline
+            Rectangle {
+                visible: Theme.popupInnerEdge.a > 0
+                anchors.fill: parent; anchors.margins: 1
+                radius: parent.radius - 1
+                color: "transparent"
+                border.color: Theme.popupInnerEdge
+            }
         }
 
-        // The start menu's field, larger.
+        // The start menu's field, larger; Spotlight's along the card's top, a line under it.
         SearchInput {
             id: input
             objectName: "paletteInput"
-            x: root.padding; y: root.padding
-            width: card.width - 2 * root.padding
+            x: Theme.macos ? Theme.spacingXS : root.padding; y: Theme.macos ? 0 : root.padding
+            width: card.width - 2 * x
             large: true
-            placeholderText: "Search windows, apps, workspaces, actions, sessions"
+            placeholderText: Theme.macos ? "Spotlight Search" : "Search windows, apps, workspaces, actions, sessions"
             onTextChanged: shell.palette.query = text
             Keys.onPressed: function(event) {
                 const ctrl = (event.modifiers & Qt.ControlModifier) !== 0
@@ -98,26 +133,38 @@ Item {
             }
         }
 
+        Rectangle {
+            visible: Theme.macos
+            y: input.height; width: card.width; height: 1
+            color: Theme.divider
+        }
+
         ListView {
             id: list
             objectName: "paletteList"
-            x: root.padding; y: input.y + input.height + root.padding
-            width: card.width - 2 * root.padding
-            height: Math.min(count, root.visibleRows) * root.rowHeight
+            x: Theme.macos ? Theme.spacingM : root.padding
+            y: input.y + input.height + (Theme.macos ? 1 + Theme.spacingM : root.padding)
+            width: card.width - 2 * x
+            height: Theme.macos ? root.spotlightHeight : Math.min(count, root.visibleRows) * root.rowHeight
             clip: true
             interactive: false
             model: shell.palette.results
             currentIndex: shell.palette.selected
             // The selection is shaded as a menu's row is, it being what Enter runs; it moves at
-            // once, as fast as the keys go.
+            // once, as fast as the keys go. Spotlight's row fills itself.
             highlightMoveDuration: 0
             highlight: Rectangle {
+                visible: !Theme.macos
                 radius: Theme.radiusSmall
                 color: Theme.selected
             }
             onCurrentIndexChanged: positionViewAtIndex(currentIndex, ListView.Contain)
-            // A result: its icon, its title over what it is, and its kind on a pill at the end.
-            delegate: Item {
+            delegate: Theme.macos ? spotlightRow : paletteRow
+        }
+        // A result: its icon, its title over what it is, and its kind on a pill at the end.
+        Component {
+            id: paletteRow
+            Item {
                 id: row
                 required property var modelData
                 required property int index
@@ -180,12 +227,79 @@ Item {
                 }
             }
         }
+        // Spotlight's result: its group's heading over the first of a group, then its icon, its
+        // title and, muted at the end, what it is; filled with the accent while it is chosen.
+        Component {
+            id: spotlightRow
+            Column {
+                id: result
+                required property var modelData
+                required property int index
+                readonly property bool chosen: index === shell.palette.selected
+                readonly property string heading: root.heading(index)
+                width: list.width
+                Text {
+                    visible: result.heading !== ""
+                    width: parent.width; height: Theme.spotlightHeadingHeight
+                    leftPadding: Theme.spacingM
+                    verticalAlignment: Text.AlignVCenter
+                    text: result.heading
+                    color: Theme.textMuted
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeCaption; font.weight: Font.DemiBold
+                }
+                Rectangle {
+                    width: parent.width; height: Theme.spotlightRowHeight
+                    radius: Theme.radiusSmall
+                    color: result.chosen ? Theme.accent : "transparent"
+                    Image {
+                        id: glyph
+                        x: Theme.spacingS; anchors.verticalCenter: parent.verticalCenter
+                        width: Theme.spotlightIconSize; height: width
+                        sourceSize: Qt.size(2 * width, 2 * height)
+                        source: "image://icons/" + result.modelData.icon
+                    }
+                    // A window asking for attention has a dot in the urgent colour on its icon.
+                    Rectangle {
+                        visible: result.modelData.urgent === true
+                        x: glyph.x + glyph.width - width + Theme.spacingXS; y: glyph.y - Theme.spacingXS
+                        width: Theme.spacingM + Theme.spacingXS; height: width; radius: width / 2
+                        color: Theme.urgent
+                        border.width: 2; border.color: result.chosen ? Theme.accent : Theme.popupSurface
+                    }
+                    Text {
+                        anchors.left: glyph.right; anchors.leftMargin: Theme.spacingM
+                        anchors.right: what.left; anchors.rightMargin: Theme.spacingL
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: result.modelData.title; textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                        color: result.chosen ? Theme.textOnAccentFill : Theme.text
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeLarge
+                    }
+                    Text {
+                        id: what
+                        anchors.right: parent.right; anchors.rightMargin: Theme.spacingM
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.min(implicitWidth, parent.width / 3)
+                        text: result.modelData.subtitle; textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                        color: result.chosen ? Theme.alpha(Theme.textOnAccentFill, 0.8) : Theme.textMuted
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onEntered: shell.palette.selected = result.index
+                        onClicked: shell.palette.activate(result.index)
+                    }
+                }
+            }
+        }
         // What to try when nothing matches: the prefixes that narrow a search.
         EmptyState {
             id: empty
             objectName: "paletteEmpty"
             visible: list.count === 0
-            x: root.padding; y: input.y + input.height + root.padding
+            x: root.padding; y: list.y
             width: card.width - 2 * root.padding
             icon: "search"
             title: "Nothing matches"

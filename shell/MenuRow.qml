@@ -16,9 +16,9 @@ AbstractButton {
     property bool expanded: false
     // Whether the menu's rows keep a column for icons and marks, so that labels line up.
     property bool iconColumn: false
-    property real rowHeight: Theme.rowHeight
+    property real rowHeight: Theme.menuRowHeight
     property real titleHeight: rowHeight
-    property real labelStart: Theme.spacingL
+    property real labelStart: Theme.menuLabelInset
     property real labelEnd: Theme.spacingM
 
     readonly property bool separator: modelData.separator === true
@@ -31,13 +31,18 @@ AbstractButton {
     // Whether it can be chosen: drawn from the entry, so that a menu fading out, which takes no
     // input, does not grey its rows.
     readonly property bool available: !separator && !header && !title && modelData.enabled !== false
-    readonly property color ink: !available ? Theme.textDisabled : danger ? Theme.danger : Theme.text
+    // Whether it is filled with the macOS style's accent, its text then white.
+    readonly property bool lit: Theme.macos && available && (pressed || highlighted || expanded)
+    readonly property color ink: !available ? Theme.textDisabled : lit ? Theme.menuHighlightText
+                                 : danger ? Theme.danger : Theme.text
+    readonly property color muted: lit ? Theme.alpha(Theme.menuHighlightText, 0.8)
+                                   : available ? Theme.textMuted : Theme.textDisabled
 
     text: header ? modelData.header : title ? modelData.title : (modelData.text || "")
     enabled: available
     hoverEnabled: true
     focusPolicy: Qt.NoFocus
-    implicitHeight: separator ? 2 * Theme.spacingS + 1 : header ? Theme.headingHeight
+    implicitHeight: separator ? 2 * Theme.spacingS + 1 : header ? Theme.menuHeadingHeight
                     : title ? titleHeight : rowHeight
     Accessible.role: separator ? Accessible.Separator : title ? Accessible.StaticText : Accessible.MenuItem
     Accessible.description: title ? (modelData.secondary || "") : ""
@@ -46,10 +51,10 @@ AbstractButton {
     Accessible.checked: marked
 
     background: Rectangle {
-        radius: Theme.radiusSmall
+        radius: Theme.menuRowRadius
         color: !row.available ? "transparent"
-               : row.pressed ? Theme.pressed
-               : row.highlighted || row.expanded ? Theme.hover : "transparent"
+               : row.pressed ? Theme.menuPressed
+               : row.highlighted || row.expanded ? Theme.menuHighlight : "transparent"
         Rectangle {
             visible: row.separator
             anchors.verticalCenter: parent.verticalCenter
@@ -107,23 +112,24 @@ AbstractButton {
         RowLayout {
             anchors.fill: parent
             visible: !row.separator && !row.title
-            spacing: Theme.spacingL
+            spacing: Theme.menuIconGap
             // A check mark, a radio button's dot, or the entry's icon: a line icon Icon knows, else
             // a theme icon's name or an image's URL.
             Item {
                 visible: row.iconColumn && !row.header
                 Layout.leftMargin: row.labelStart
                 Layout.preferredWidth: Theme.iconSizeSmall; Layout.preferredHeight: Theme.iconSizeSmall
+                // macOS marks the chosen one of a group with a check mark too.
                 Icon {
-                    visible: row.toggle === "check" && row.marked
+                    visible: (row.toggle === "check" || (Theme.macos && row.toggle === "radio")) && row.marked
                     anchors.centerIn: parent
-                    name: "check"; size: Theme.iconSizeSmall; color: Theme.accent
+                    name: "check"; size: Theme.iconSizeSmall; color: row.lit ? row.ink : Theme.menuMark
                 }
                 Rectangle {
-                    visible: row.toggle === "radio" && row.marked
+                    visible: !Theme.macos && row.toggle === "radio" && row.marked
                     anchors.centerIn: parent
                     width: Theme.spacingM; height: Theme.spacingM; radius: Theme.spacingS
-                    color: Theme.accent
+                    color: row.lit ? row.ink : Theme.menuMark
                 }
                 Icon {
                     id: glyph
@@ -146,21 +152,22 @@ AbstractButton {
                 Layout.leftMargin: row.iconColumn && !row.header ? 0 : row.labelStart
                 text: row.text; textFormat: Text.PlainText; elide: Text.ElideRight
                 color: row.header ? Theme.textMuted : row.ink
-                font.pixelSize: row.header ? Theme.fontSizeSmall : Theme.fontSize
+                font.pixelSize: row.header ? Theme.menuHeadingSize : Theme.fontSize
+                font.weight: row.header && Theme.macos ? Font.DemiBold : Font.Normal
                 font.family: Theme.fontFamily
             }
             Text {
                 visible: text !== "" && !row.header
                 Layout.rightMargin: row.submenu ? 0 : row.labelEnd
                 text: row.modelData.secondary || ""; textFormat: Text.PlainText
-                color: row.available ? Theme.textMuted : Theme.textDisabled
+                color: row.muted
                 font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
             }
             Icon {
                 visible: row.submenu && !row.header
                 Layout.rightMargin: row.labelEnd
                 name: "chevron-right"; size: Theme.iconSizeSmall
-                color: row.available ? Theme.textMuted : Theme.textDisabled
+                color: row.muted
             }
         }
     }

@@ -140,7 +140,9 @@ what was there.
 | `PopupMenu.qml`, `MenuRow.qml` | A menu of plain entries on popup cards, with cascading submenus and keyboard navigation, and one row of it. |
 | `AudioSlider.qml`, `MuteButton.qml`, `StreamRow.qml` | Controls the mixer and Quick Settings use: a volume's slider, a mute button, and an application playing sound. |
 | `StartHome.qml`, `StartAllApps.qml`, `StartSearch.qml`, `StartBestMatch.qml`, `StartTile.qml`, `StartRow.qml`, `UserAvatar.qml` | Parts of the start menu (`Launcher.qml`): its pinned and recent applications, every application from A to Z, what its search finds and the best match of it, a pinned application, a row of its lists, the user's picture. |
+| `Launchpad.qml` | The launcher of the macOS style, in the start menu's place: every application on pages of a grid over the whole output, with a search. |
 | `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |
+| `DrawnWallpaper.qml` | The wallpaper the macOS style draws while none is set, light or dark, from the background colour and the accent. |
 | `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |
 
 The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `task_filter.cpp`
@@ -154,14 +156,17 @@ The start menu (`Launcher.qml` and its `Start*.qml` parts) reads `shell.startMen
 (`launch_history.cpp`, which the controller tells of every launch); every application by letter;
 its search, which takes the palette's windows, workspaces and actions from `Palette::entries` and
 runs them with `Palette::run`; and the user's name and picture. It tells the controller to read
-the applications again when GIO's monitor says they changed.
+the applications again when GIO's monitor says they changed. Launchpad (`Launchpad.qml`), the
+launcher of the macOS style, which the launcher's loader in `Panel.qml` makes in the start menu's
+place, reads it too: every application by name, and what its search finds of them.
 
 ### Popups and menus
 
 A popup is a `PopupCard`; a menu is a `PopupMenu` of plain entries. Both place themselves beside
 an anchor rectangle, so a popup of the bar only says what it belongs to.
 
-`PopupCard` draws the card (`Theme.surface`, outline, `radius`, a shadow when `Theme.effects`) and
+`PopupCard` draws the card (`Theme.popupSurface`, outline, `radius`, a shadow when `Theme.effects`;
+none with `framed: false`, for content that draws cards of its own) and
 fades in with a few pixels' slide from its anchor while `open`, out again when it is cleared,
 staying visible until it has; `progress` is how far open it is. Its content goes inside it and
 fills it. It places itself beside `anchorRect` (in its parent's coordinates) on the anchor's
@@ -194,7 +199,8 @@ card's: `anchorRect`, `side`, `alignment`, `gap`, `bounds`; `minimumWidth`, `max
 `submenuDelay` milliseconds, on a click, or with Right, Enter or Space; the pointer heading for an
 open submenu across other entries (inside the triangle from where it was to the submenu's near
 edge) leaves it open until it rests on one. Up, Down, Home and End move, Left or Escape closes a
-submenu and Escape in the first level emits `dismissed()`.
+submenu and Escape in the first level emits `dismissed()`. In the macOS style the rows are denser and
+the highlighted one is filled with the accent, its text white, as macOS draws menus (`Theme.menu*`).
 `initialIndex` highlights an entry as it opens (-1, none, for a menu opened with the pointer).
 `openEntries` lists the entries whose submenus are open, `openSubmenu(index)` opens one,
 `closeSubmenus()` closes them, and `card` is the first level's card. Rows are `MenuRow`s, named
@@ -242,6 +248,15 @@ these. A button without a frame of its own is a `FlatButton`, one with a frame a
 `PushButton`, a tooltip for something on the bar is a `BarTip`, a popup is a `PopupCard` and a
 menu a `PopupMenu`.
 
+`macos` says whether the macOS style (`shell.style`) is in use. Its popups have tokens of their
+own, after `shadowMargin`: `popupSurface`, `popupOutline` and `popupInnerEdge` for a popup's card,
+`textOnAccentFill` for text on the accent, and `menu*`, `launchpad*`, `spotlight*`, `module*`
+(Control Center's cards), `notification*`, `switcher*`, `button*`, `field*`, `slider*`, `knob`
+and `switchTrack`. One that stands for a token above is that token in the taskbar style, so a part
+draws with it in both styles and the taskbar's keeps its look; branch on `Theme.macos` only where
+the macOS layout differs (Control Center's modules, Spotlight's groups), and give a popup a file of
+its own only where all of it does (Launchpad).
+
 ### Seeing a change
 
 `shaodesk-shell --config FILE --preview-popup NAME --screenshot OUT.png --quit-after 400`
@@ -251,6 +266,8 @@ surfaces have names there too (`osd-volume`, `osd-text`, `cards`, `power-dialog`
 `palette-empty`, `switcher`, `overview`): `PreviewData` in `preview.cpp` shows one in a window of its own over the
 bar alone, with stand-ins for what the compositor would tell it, and the screenshot draws it where
 its layer surface would be (the overview over stand-ins for the compositor's thumbnails).
+`--preview --preview-desktop` draws the desktop instead (the gallery's `desktop`, without the
+wallpaper it sets for the others, so that the macOS style's drawn one shows).
 `tools/shell_gallery.py BUILD_DIR OUT_DIR` does that for every popup in a light and a dark
 theme of each style (`light`, `dark`, `macos-light`, `macos-dark`), both with the software renderer (`light-launcher.png`) and through the GPU
 (`light-launcher-gpu.png`: Qt's OpenGL on Mesa's software implementation, in a private headless

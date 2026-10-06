@@ -9,7 +9,8 @@ import QtQuick.Layouts
 // be used now (`interactive` false, as tiling where it cannot be) is greyed out. A tile that only
 // tells something (`status`, as the network's) is no button at all: its icon sits on a disc in
 // the face's place, tinted with the accent colour while `checked` (connected), and it takes no
-// clicks.
+// clicks. In the macOS style it is a module of Control Center instead, its round button beside the
+// label.
 AbstractButton {
     id: tile
     property string glyph
@@ -28,14 +29,67 @@ AbstractButton {
     Accessible.name: label + (detail ? ", " + detail : "")
     Accessible.checkable: !expandable && !status
     Accessible.checked: checked
-    implicitHeight: face.height + Theme.spacingS + caption.implicitHeight
+    implicitHeight: Theme.macos ? Theme.moduleTileHeight : face.height + Theme.spacingS + caption.implicitHeight
     // Tiles in a row line up by their buttons, whether or not they have a second line.
     Layout.alignment: Qt.AlignTop
     readonly property bool on: checked && !status
     readonly property bool greyed: !interactive && !status
+    // In the macOS style a module of Control Center: the label and the detail beside a round
+    // button, filled with the accent while on (or, for a status, while connected).
+    Rectangle {
+        visible: Theme.macos
+        anchors.fill: parent
+        radius: Theme.moduleRadius
+        color: tile.pressed ? Theme.mix(Theme.moduleColor, Theme.text, 0.1)
+             : tile.hovered && tile.enabled ? Theme.mix(Theme.moduleColor, Theme.text, 0.05) : Theme.moduleColor
+        border.color: Theme.moduleOutline
+        Behavior on color { ColorAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
+        Rectangle {
+            id: disc
+            readonly property bool lit: tile.on || (tile.status && tile.checked)
+            x: Theme.modulePadding; anchors.verticalCenter: parent.verticalCenter
+            width: Theme.moduleButtonSize; height: width; radius: width / 2
+            color: lit ? Theme.accent : Theme.alpha(Theme.text, 0.1)
+            Behavior on color { ColorAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
+            Icon {
+                anchors.centerIn: parent
+                name: tile.glyph; size: Theme.iconSizeSmall
+                color: disc.lit ? Theme.textOnAccentFill : tile.greyed ? Theme.textDisabled : Theme.text
+            }
+        }
+        Column {
+            anchors.left: disc.right; anchors.leftMargin: Theme.spacingM
+            anchors.right: chevron.visible ? chevron.left : parent.right
+            anchors.rightMargin: chevron.visible ? Theme.spacingXS : Theme.modulePadding
+            anchors.verticalCenter: parent.verticalCenter
+            Text {
+                width: parent.width
+                text: tile.label; textFormat: Text.PlainText; elide: Text.ElideRight
+                color: tile.greyed ? Theme.textDisabled : Theme.text
+                font.pixelSize: Theme.fontSize; font.weight: Font.DemiBold; font.family: Theme.fontFamily
+            }
+            Text {
+                visible: text.length > 0
+                width: parent.width
+                text: tile.detail; textFormat: Text.PlainText; elide: Text.ElideRight
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily
+            }
+        }
+        Icon {
+            id: chevron
+            visible: tile.expandable
+            anchors.right: parent.right; anchors.rightMargin: Theme.spacingS
+            anchors.verticalCenter: parent.verticalCenter
+            name: "chevron-right"; size: Theme.iconSizeSmall; rotation: tile.expanded ? 90 : 0
+            color: Theme.textMuted
+            Behavior on rotation { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
+        }
+    }
     // The button, or for a status the place it would be.
     Rectangle {
         id: face
+        visible: !Theme.macos
         width: parent.width; height: Theme.rowHeight + Theme.spacingL
         radius: Theme.radiusMedium
         color: tile.status ? "transparent"
@@ -68,6 +122,7 @@ AbstractButton {
     }
     Column {
         id: caption
+        visible: !Theme.macos
         y: face.height + Theme.spacingS
         width: parent.width
         Text {

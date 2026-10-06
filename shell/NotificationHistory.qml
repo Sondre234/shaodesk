@@ -8,11 +8,18 @@ import QtQuick.Layouts
 // button that clears them all. An application with many shows its newest two until asked for the
 // rest. A click on a notification runs its default action, and the cross that shows while the
 // pointer is over it removes it.
+//
+// In the macOS style it is Notification Center's: no card of its own, but each notification on a
+// card, with its application's icon beside it, the heading on a card above them and an
+// application's name and the button for the rest on a pill over its stack.
 PopupCard {
     id: history
     required property var panel
     readonly property var center: shell.notifications
     objectName: "notificationHistory"
+    framed: !Theme.macos
+    // As tall as it may be, for the flyout to leave room for the calendar beside it.
+    property real maximumHeight: Infinity
     // Looking at the list is reading it, also when it was made open.
     onOpened: { now = new Date(); expanded = {}; center.markAllRead() }
     Connections { target: history.center; function onUnreadChanged() { if (history.open) history.center.markAllRead() } }
@@ -34,7 +41,9 @@ PopupCard {
         var known = n.desktopEntry.length > 0 ? n.desktopEntry : n.app.toLowerCase()
         return shell.appFor(known).length > 0 ? "image://icons/" + shell.iconFor(known) : ""
     }
-    readonly property real padding: Theme.spacingL
+    readonly property real padding: Theme.macos ? 0 : Theme.spacingL
+    // The room inside the macOS style's heading card.
+    readonly property real inset: Theme.macos ? Theme.spacingS : 0
     // How many of an application's notifications show until it is expanded, and the applications
     // expanded (by group key) since the card opened.
     readonly property int collapsedCount: 2
@@ -44,8 +53,8 @@ PopupCard {
         if (next[key]) delete next[key]; else next[key] = true
         expanded = next
     }
-    implicitHeight: 2 * padding + heading.implicitHeight + Theme.spacingM +
-                    (center.history.count > 0 ? list.contentHeight : empty.implicitHeight)
+    implicitHeight: Math.min(maximumHeight, 2 * padding + heading.implicitHeight + inset + layout.spacing +
+                                            (center.history.count > 0 ? list.contentHeight : empty.implicitHeight))
     side: panel.popupSide
     alignment: Qt.AlignRight
     bounds: panel.popupArea
@@ -65,13 +74,26 @@ PopupCard {
             GradientStop { position: 1; color: Theme.alpha(history.color, fromTop ? 0 : 1) }
         }
     }
+    // The macOS style's heading card, which takes the presses beside its buttons.
+    Rectangle {
+        visible: Theme.macos
+        y: layout.y + heading.y - history.inset
+        width: parent.width; height: heading.height + 2 * history.inset
+        radius: Theme.radiusLarge
+        color: Theme.popupSurface
+        border.color: Theme.popupOutline
+        MouseArea { anchors.fill: parent }
+    }
     ColumnLayout {
+        id: layout
         anchors.fill: parent; anchors.margins: history.padding
-        spacing: Theme.spacingM
+        spacing: Theme.macos ? history.inset + Theme.spacingM : Theme.spacingM
         RowLayout {
             id: heading
             Layout.fillWidth: true; Layout.preferredHeight: Theme.rowHeight
-            Layout.leftMargin: Theme.spacingS
+            Layout.leftMargin: Theme.macos ? Theme.spacingL : Theme.spacingS
+            Layout.rightMargin: history.inset
+            Layout.topMargin: history.inset
             spacing: Theme.spacingM
             Text {
                 Layout.fillWidth: true
@@ -88,11 +110,12 @@ PopupCard {
                 indicator: Rectangle {
                     x: dnd.leftPadding; y: parent.height / 2 - height / 2
                     width: 2 * height; height: Theme.iconSize; radius: height / 2
-                    color: dnd.checked ? Theme.accent : Theme.selected
+                    color: dnd.checked ? Theme.accent : Theme.macos ? Theme.switchTrack : Theme.selected
                     Rectangle {
                         x: dnd.checked ? parent.width - width - Theme.spacingXS : Theme.spacingXS
                         y: Theme.spacingXS; width: parent.height - 2 * Theme.spacingXS; height: width; radius: width / 2
-                        color: dnd.checked ? Theme.textOnAccent : Theme.text
+                        color: Theme.macos ? Theme.knob : dnd.checked ? Theme.textOnAccent : Theme.text
+                        border.color: Theme.macos ? Theme.knobOutline : "transparent"
                         Behavior on x { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
                     }
                 }
@@ -119,6 +142,14 @@ PopupCard {
             visible: history.center.history.count === 0
             Layout.fillWidth: true; Layout.fillHeight: true
             implicitHeight: emptyState.implicitHeight + 2 * Theme.spacingS
+            Rectangle {
+                visible: Theme.macos
+                anchors.fill: parent
+                radius: Theme.radiusLarge
+                color: Theme.popupSurface
+                border.color: Theme.popupOutline
+                MouseArea { anchors.fill: parent }
+            }
             EmptyState {
                 id: emptyState
                 anchors.verticalCenter: parent.verticalCenter
@@ -136,7 +167,7 @@ PopupCard {
                 id: list
                 objectName: "notificationList"
                 anchors.fill: parent
-                clip: true; spacing: Theme.spacingL
+                clip: true; spacing: Theme.macos ? Theme.spacingM : Theme.spacingL
                 boundsBehavior: Flickable.StopAtBounds
                 model: history.visible ? history.center.history.groups : []
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
@@ -149,31 +180,47 @@ PopupCard {
                     readonly property bool open: !collapsible || history.expanded[modelData.key] === true
                     width: ListView.view.width
                     spacing: Theme.spacingS
-                    RowLayout {
+                    // In the macOS style on a pill over a stack, and for one notification left out:
+                    // its card shows its application's icon.
+                    Item {
+                        visible: !Theme.macos || group.notifications.length > 1
                         width: parent.width; height: Theme.headingHeight
-                        spacing: Theme.spacingM
-                        Image {
-                            readonly property string icon: history.iconSource(Object.assign({}, group.notifications[0], { hasImage: false }))
-                            visible: icon.length > 0
-                            Layout.leftMargin: Theme.spacingS
-                            Layout.preferredWidth: Theme.iconSizeSmall; Layout.preferredHeight: Theme.iconSizeSmall
-                            sourceSize: Qt.size(2 * Theme.iconSizeSmall, 2 * Theme.iconSizeSmall)
-                            fillMode: Image.PreserveAspectFit; source: icon; cache: false
+                        Rectangle {
+                            visible: Theme.macos
+                            anchors.fill: parent
+                            radius: height / 2
+                            color: Theme.popupSurface
+                            border.color: Theme.popupOutline
+                            MouseArea { anchors.fill: parent }
                         }
-                        Text {
-                            Layout.fillWidth: true
-                            text: group.modelData.app; textFormat: Text.PlainText; elide: Text.ElideRight
-                            color: Theme.textMuted
-                            font.pixelSize: Theme.fontSizeSmall; font.weight: Font.DemiBold; font.family: Theme.fontFamily
-                        }
-                        TextButton {
-                            objectName: "groupToggle"
-                            visible: group.collapsible
-                            Layout.preferredHeight: Theme.headingHeight - Theme.spacingS
-                            text: group.open ? "Show less" : (group.notifications.length - history.collapsedCount) + " more"
-                            chevron: true
-                            chevronRotation: group.open ? -90 : 90
-                            onClicked: history.toggleGroup(group.modelData.key)
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: Theme.macos ? Theme.spacingXS : 0
+                            anchors.rightMargin: Theme.macos ? Theme.spacingXS : 0
+                            spacing: Theme.spacingM
+                            Image {
+                                readonly property string icon: history.iconSource(Object.assign({}, group.notifications[0], { hasImage: false }))
+                                visible: icon.length > 0
+                                Layout.leftMargin: Theme.spacingS
+                                Layout.preferredWidth: Theme.iconSizeSmall; Layout.preferredHeight: Theme.iconSizeSmall
+                                sourceSize: Qt.size(2 * Theme.iconSizeSmall, 2 * Theme.iconSizeSmall)
+                                fillMode: Image.PreserveAspectFit; source: icon; cache: false
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                text: group.modelData.app; textFormat: Text.PlainText; elide: Text.ElideRight
+                                color: Theme.textMuted
+                                font.pixelSize: Theme.fontSizeSmall; font.weight: Font.DemiBold; font.family: Theme.fontFamily
+                            }
+                            TextButton {
+                                objectName: "groupToggle"
+                                visible: group.collapsible
+                                Layout.preferredHeight: Theme.headingHeight - Theme.spacingS
+                                text: group.open ? "Show less" : (group.notifications.length - history.collapsedCount) + " more"
+                                chevron: true
+                                chevronRotation: group.open ? -90 : 90
+                                onClicked: history.toggleGroup(group.modelData.key)
+                            }
                         }
                     }
                     Repeater {
@@ -185,9 +232,10 @@ PopupCard {
                             readonly property var n: modelData
                             width: group.width
                             height: rowContent.implicitHeight + 2 * Theme.spacingM
-                            radius: Theme.radiusMedium
-                            color: rowHover.hovered ? Theme.surfaceRaisedHover : Theme.surfaceRaised
-                            border.color: n.urgency === 2 ? Theme.danger : "transparent"
+                            radius: Theme.macos ? Theme.radiusLarge : Theme.radiusMedium
+                            color: Theme.macos ? (rowHover.hovered ? Theme.mix(Theme.popupSurface, Theme.text, 0.04) : Theme.popupSurface)
+                                 : rowHover.hovered ? Theme.surfaceRaisedHover : Theme.surfaceRaised
+                            border.color: n.urgency === 2 ? Theme.danger : Theme.macos ? Theme.popupOutline : "transparent"
                             HoverHandler { id: rowHover }
                             // Under its buttons, which take their own clicks.
                             MouseArea {
@@ -199,15 +247,17 @@ PopupCard {
                                 x: Theme.spacingL; y: Theme.spacingM
                                 width: parent.width - 2 * Theme.spacingL
                                 spacing: Theme.spacingL
-                                // The notification's own picture (a sender's face, a screenshot).
+                                // The notification's own picture (a sender's face, a screenshot);
+                                // in the macOS style else its icon or its application's.
                                 Image {
                                     objectName: "notificationImage"
-                                    visible: row.n.hasImage
+                                    readonly property real size: Theme.macos ? Theme.notificationIconSize : Theme.rowHeight
+                                    visible: row.n.hasImage || (Theme.macos && source.toString() !== "")
                                     Layout.alignment: Qt.AlignTop; Layout.topMargin: Theme.spacingXS
-                                    Layout.preferredWidth: Theme.rowHeight; Layout.preferredHeight: Theme.rowHeight
-                                    sourceSize: Qt.size(2 * Theme.rowHeight, 2 * Theme.rowHeight)
+                                    Layout.preferredWidth: size; Layout.preferredHeight: size
+                                    sourceSize: Qt.size(2 * size, 2 * size)
                                     fillMode: Image.PreserveAspectCrop; cache: false
-                                    source: row.n.hasImage ? history.iconSource(row.n) : ""
+                                    source: row.n.hasImage || Theme.macos ? history.iconSource(row.n) : ""
                                 }
                                 ColumnLayout {
                                     Layout.fillWidth: true
@@ -246,8 +296,9 @@ PopupCard {
                                     Text {
                                         Layout.fillWidth: true; visible: text.length > 0
                                         text: row.n.body
-                                        color: Theme.textMuted
-                                        font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+                                        color: Theme.macos ? Theme.text : Theme.textMuted
+                                        font.pixelSize: Theme.macos ? Theme.fontSize : Theme.fontSizeSmall
+                                        font.family: Theme.fontFamily
                                         textFormat: Text.StyledText; linkColor: Theme.accent
                                         wrapMode: Text.Wrap; maximumLineCount: 4; elide: Text.ElideRight
                                         onLinkActivated: (link) => history.center.openLink(link)
@@ -285,16 +336,17 @@ PopupCard {
                     }
                 }
             }
+            // None between the macOS style's cards, which have no card under them to fade into.
             EdgeFade {
                 objectName: "notificationFadeTop"
                 anchors.top: parent.top
                 fromTop: true
-                shown: !list.atYBeginning
+                shown: !Theme.macos && !list.atYBeginning
             }
             EdgeFade {
                 objectName: "notificationFadeBottom"
                 anchors.bottom: parent.bottom
-                shown: !list.atYEnd
+                shown: !Theme.macos && !list.atYEnd
             }
         }
     }
