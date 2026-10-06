@@ -770,38 +770,7 @@ Item {
             BatteryWidget { panel: root; barHeight: bar.height }
             VolumeButton { id: audioWidget; panel: root; barHeight: bar.height }
             KeyboardLayout { panel: root; barHeight: bar.height }
-            // The time and date. Clicking it opens the month calendar.
-            Button {
-                id: clockButton
-                objectName: "clockButton"
-                visible: shell.widgets.clock
-                Layout.preferredWidth: clock.implicitWidth + 12; Layout.preferredHeight: bar.height - 10
-                hoverEnabled: true
-                enabled: shell.widgets.calendar
-                onClicked: root.toggleAudioPopup("calendar", clockButton)
-                Accessible.name: Qt.formatDateTime(clock.now, "dddd d MMMM yyyy, HH:mm")
-                background: Rectangle {
-                    radius: 7
-                    color: root.audioPopup === "calendar" ? Qt.lighter(shell.panelColor, 1.8) : (clockButton.hovered && clockButton.enabled ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
-                }
-                BarTip { panel: root; owner: clockButton; text: Qt.formatDate(clock.now, "dddd d MMMM yyyy") }
-                contentItem: Text {
-                    id: clock
-                    objectName: "clock"
-                    property date now: new Date()
-                    text: Qt.formatTime(now, "HH:mm")
-                    color: shell.textColor; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
-                    font.pixelSize: shell.fontSize; font.weight: Font.DemiBold; font.family: root.uiFont
-                    // The clock shows minutes, so it wakes once a minute, just after the minute changes.
-                    Timer {
-                        id: tick
-                        objectName: "clockTick"
-                        function untilMinute() { var d = new Date(); return 60050 - d.getSeconds() * 1000 - d.getMilliseconds() }
-                        interval: untilMinute(); running: true; repeat: true
-                        onTriggered: { clock.now = new Date(); interval = untilMinute() }
-                    }
-                }
-            }
+            ClockButton { id: clockButton; panel: root; barHeight: bar.height }
             Button {
                 id: showDesktopButton
                 Layout.preferredWidth: 14; Layout.fillHeight: true
