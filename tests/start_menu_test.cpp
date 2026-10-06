@@ -246,6 +246,10 @@ class StartMenuTest : public QObject {
                       described("org.gnome.clocks.desktop", "Clocks", "World clocks", {}, ""),
                       described("kalk.desktop", "Kalk", "Calculator", {}, ""),
                       described("kate.desktop", "Kate", "Text Editor", {}, ""),
+                      described("writer.desktop", "LibreOffice Writer", "Word Processor",
+                                {"Text", "Letter"}, "Create and edit text in letters and reports"),
+                      described("calc.desktop", "Calculator", "Calculator", {},
+                                "Perform arithmetic, scientific or financial calculations"),
                       app("pinned:0", "Files", true)},
                      {});
         auto entry = [](const QString &kind, const QString &title, const QString &subtitle) {
@@ -275,6 +279,11 @@ class StartMenuTest : public QObject {
         QCOMPARE(found("prompt"), QStringList{"best:Foot"});
         QCOMPARE(found("gnome"), QStringList{"best:Clocks"});
         QCOMPARE(found("world wide"), QStringList{"best:Firefox"});
+        QCOMPARE(found("letter"), QStringList{"best:LibreOffice Writer"});
+        // What describes an application is searched by its words, not by letters strewn through
+        // it ("perform arithmetic, scientific or financial"), and a name with the letters strewn
+        // through it ("LibreOffice Writer") is far behind the best match, and left out.
+        QCOMPARE(found("fire").join("|"), QString("best:Firefox|windows:Release notes - Mozilla Firefox"));
         // A configured launcher by its name only.
         QCOMPARE(found("files"), QStringList{"best:Files"});
         QCOMPARE(found("pinned"), QStringList{});

@@ -6,6 +6,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QLocale>
+#include <QRegularExpression>
 #include <QSaveFile>
 #include <QTimer>
 #include <algorithm>
@@ -30,9 +31,22 @@ QString defaultStateDir() {
     return state + "/shaodesk";
 }
 
-// How well an application's record matches `query`, negative when it does not: its name counts
-// in full and what else says what it is for less, as the palette counts a subtitle; words found
-// only across them ("firefox browser") count least.
+// Whether every word of `query` starts a word of `text`, as what describes an application is
+// searched: by the words it says, not by letters strewn through a sentence.
+bool startsWords(const QString &query, const QString &text) {
+    static const QRegularExpression space("\\s+"), separators("[^\\w]+");
+    const auto words = text.toCaseFolded().split(separators, Qt::SkipEmptyParts);
+    const auto parts = query.toCaseFolded().split(space, Qt::SkipEmptyParts);
+    return std::all_of(parts.begin(), parts.end(), [&](const QString &part) {
+        return std::any_of(words.begin(), words.end(),
+                           [&](const QString &word) { return word.startsWith(part); });
+    });
+}
+
+// How well an application's record matches `query`, negative when it does not. Its name and id
+// are matched as the palette matches, letter by letter; its generic name, keywords and comment
+// by their words, and count less, as the palette counts a subtitle; words found only across them
+// ("firefox browser") count least.
 double appScore(const QString &query, const QVariantMap &app) {
     const auto name = app["name"].toString(), generic = app["genericName"].toString(),
                keywords = app["keywords"].toStringList().join(' '),
@@ -41,16 +55,20 @@ double appScore(const QString &query, const QVariantMap &app) {
     auto id = app["configured"].toBool() ? QString() : app["appId"].toString();
     if (id.endsWith(".desktop"))
         id.chop(8);
-    const std::pair<const QString &, double> fields[] = {
-        {name, 1}, {generic, 0.8}, {keywords, 0.7}, {id, 0.6}, {description, 0.5}};
+    const std::tuple<const QString &, double, bool> fields[] = {
+        {name, 1, false}, {generic, 0.8, true}, {keywords, 0.7, true}, {id, 0.6, false},
+        {description, 0.5, true}};
     double best = -1;
-    for (const auto &[text, weight] : fields) {
-        const double value = text.isEmpty() ? -1 : fuzzy::score(query, text);
+    for (const auto &[text, weight, byWords] : fields) {
+        if (text.isEmpty() || (byWords && !startsWords(query, text)))
+            continue;
+        const double value = fuzzy::score(query, text);
         if (value >= 0)
             best = std::max(best, value * weight);
     }
-    if (best < 0) {
-        const double value = fuzzy::score(query, QStringList{name, generic, keywords, id}.join(' '));
+    const auto all = QStringList{name, generic, keywords, id}.join(' ');
+    if (best < 0 && startsWords(query, all)) {
+        const double value = fuzzy::score(query, all);
         if (value >= 0)
             best = value * 0.4;
     }
@@ -278,6 +296,15 @@ QVariantList StartMenu::search(const QString &query, const QVariantList &others)
         if (group.size() < 5)
             group.push_back(item);
     }
+    // What matched far worse than the best is left out: letters strewn through a long name.
+    const double best = std::max({apps.empty() ? 0.0 : apps.front().score,
+                                  windows.isEmpty() ? 0.0 : windows.first().toMap()["score"].toDouble(),
+                                  actions.isEmpty() ? 0.0 : actions.first().toMap()["score"].toDouble()});
+    const double least = best * 0.5;
+    std::erase_if(apps, [least](const Found &found) { return found.score < least; });
+    auto weak = [least](const QVariant &item) { return item.toMap()["score"].toDouble() < least; };
+    windows.removeIf(weak);
+    actions.removeIf(weak);
     QVariantList results;
     auto add = [&results](QVariantMap entry, const char *group) {
         entry["group"] = QString(group);
