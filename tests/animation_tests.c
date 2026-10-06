@@ -190,6 +190,23 @@ static void test_open_restores_rest_values(void) {
     teardown(&rig);
 }
 
+/* Nodes that adjoin, as the slices of a shadow do, stay adjoined at every step of an opening. */
+static void test_open_keeps_neighbours_adjoined(void) {
+    struct rig rig;
+    setup(&rig, config(100, SH_CURVE_LINEAR));
+    float color[4] = {0, 0, 0, 1};
+    struct wlr_scene_rect *right = wlr_scene_rect_create(rig.content, 7, 100, color);
+    wlr_scene_node_set_position(&right->node, 210, 20); // just right of rig.rect's 10..210
+    sh_anim_open(rig.animator, &rig.anim, rig.content, 103, 57);
+    int gaps = 0;
+    for (int step = 0; step < 12; ++step) {
+        gaps += rig.rect->node.x + rig.rect->width != right->node.x;
+        advance(&rig, 10);
+    }
+    CHECK(gaps == 0, "%d steps with a gap or an overlap between neighbours", gaps);
+    teardown(&rig);
+}
+
 static void test_close_leaves_nothing(void) {
     struct rig rig;
     setup(&rig, config(100, SH_CURVE_EASE_OUT));
@@ -410,6 +427,7 @@ int main(void) {
     test_glide_kind_uses_its_own_style();
     test_speed_and_disabled();
     test_open_restores_rest_values();
+    test_open_keeps_neighbours_adjoined();
     test_close_leaves_nothing();
     test_late_frame_skips();
     test_rest_for_input();
