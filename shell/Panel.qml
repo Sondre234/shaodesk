@@ -21,6 +21,9 @@ Item {
     // when barMenuOpen is set. A task's menu offers to pin the application it belongs to.
     property int taskMenuId: -1
     property string taskMenuApp: ""
+    // A stacked button's menu is about all its windows: where its hover list finds them, as
+    // {slot, windowApp}; null for one window's.
+    property var taskMenuGroup: null
     property var pinMenuApp: null
     property bool barMenuOpen: false
     property real contextMenuX: 0
@@ -116,6 +119,7 @@ Item {
     // closes, so the popover stays up in between.
     function openContextMenu(item, x, taskId, app) {
         contextMenuX = item.mapToItem(root, x, 0).x
+        taskMenuGroup = taskId >= 0 && item.stacked === true ? { slot: item.groupSlot, windowApp: item.groupWindowApp } : null
         if (taskId >= 0) { taskMenuId = taskId; taskMenuApp = shell.appFor(app || ""); pinMenuApp = null; barMenuOpen = false }
         else if (app) { pinMenuApp = app; taskMenuId = -1; barMenuOpen = false }
         else { barMenuOpen = true; taskMenuId = -1; pinMenuApp = null }

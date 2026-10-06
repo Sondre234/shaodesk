@@ -21,13 +21,17 @@ PopupMenu {
     // Closing only this menu: an entry may have opened the launcher.
     onDismissed: { panel.taskMenuId = -1; panel.pinMenuApp = null; panel.barMenuOpen = false }
 
-    // The window a task menu is about, as data from the panel's windows, which follows its
-    // changes while the menu is open.
+    // The windows a task menu is about, as data from the panel's windows, which follows their
+    // changes while the menu is open: the one right-clicked, or those of a stacked button, found
+    // where its hover list finds them.
     TaskFilter {
         id: menuWindows
+        readonly property var group: contextMenu.panel.taskMenuGroup
         controller: shell
         sourceModel: contextMenu.panel.taskMenuId >= 0 ? contextMenu.panel.taskSource : null
-        taskId: contextMenu.panel.taskMenuId
+        app: group ? group.slot : ""
+        windowApp: group ? group.windowApp : ""
+        taskId: group ? -1 : contextMenu.panel.taskMenuId
     }
     // The application a window belongs to, as shell.apps lists it: the one whose pinned slot it
     // takes (a configured launcher too), else the installed one; null when there is none.
@@ -62,6 +66,36 @@ PopupMenu {
         return open === "New window" && newWindow ? entries
             : entries.concat([{ text: open, icon: open === "Open" ? "app-window" : "plus",
                                 run: function() { shell.launch(record.appId) } }])
+    }
+    // The menu of window `task`, or of a stacked button, which acts on all its windows: its
+    // title counts them, and it minimizes or restores, moves and closes them together.
+    function taskEntries(task, tasks) {
+        var windows = menuWindows.windows
+        var lead = windows.filter(function(w) { return w.taskId === task })[0] || windows[0] ||
+                   { taskId: task, appId: "", title: "" }
+        var record = appRecord(lead.appId)
+        var stacked = windows.length > 1
+        var close = stacked
+            ? { text: "Close all " + windows.length + " windows", icon: "x", danger: true,
+                objectName: "contextMenuClose",
+                run: function() { windows.forEach(function(w) { tasks.close(w.taskId) }) } }
+            : { text: "Close window", icon: "x", danger: true, objectName: "contextMenuClose",
+                run: function() { tasks.close(lead.taskId) } }
+        return sections([[titleEntry(record, lead.appId, stacked ? windows.length + " windows" : lead.title)],
+                         launchEntries(record, "New window"),
+                         stacked ? stackEntries(windows, tasks) : windowEntries(lead, tasks),
+                         (panel.taskMenuApp ? [panel.pinAction(panel.taskMenuApp)] : []).concat([close])])
+    }
+    // What can be done to every window of a stack at once.
+    function stackEntries(windows, tasks) {
+        var minimized = windows.every(function(w) { return w.minimized })
+        return [minimized
+                ? { text: "Restore all", icon: "app-window",
+                    run: function() { windows.forEach(function(w) { tasks.activate(w.taskId) }) } }
+                : { text: "Minimize all", icon: "minus",
+                    run: function() {
+                        windows.forEach(function(w) { if (!w.minimized) tasks.minimize(w.taskId) })
+                    } }].concat(placeEntries(windows, tasks))
     }
     // What can be done to the window `window` (its roles, as menuWindows lists them), labelled
     // by its state, through `tasks`, the panel's source of windows: a minimized one is only
@@ -149,19 +183,8 @@ PopupMenu {
     // A task menu acts on the windows through the panel's source of them, which the tests replace
     // with one that notes what it is asked.
     entries: {
-        var task = panel.taskMenuId
-        var tasks = panel.taskSource
-        if (task >= 0) {
-            var window = menuWindows.windows[0] || { taskId: task, appId: "", title: "" }
-            var record = appRecord(window.appId)
-            return sections([[titleEntry(record, window.appId, window.title)],
-                             launchEntries(record, "New window"),
-                             windowEntries(window, tasks),
-                             (panel.taskMenuApp ? [panel.pinAction(panel.taskMenuApp)] : [])
-                                 .concat([{ text: "Close window", icon: "x", danger: true,
-                                            objectName: "contextMenuClose",
-                                            run: function() { tasks.close(task) } }])])
-        }
+        if (panel.taskMenuId >= 0)
+            return taskEntries(panel.taskMenuId, panel.taskSource)
         // A pinned application without windows.
         var app = panel.pinMenuApp
         if (app !== null)

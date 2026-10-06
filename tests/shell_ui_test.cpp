@@ -916,6 +916,55 @@ ListModel {
         if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
             return fail("the popover did not close after closing the window");
     }
+    // A stacked button's menu is about all its windows: counted under the title, minimized or
+    // restored, moved and closed together, the workspace they share marked.
+    {
+        editTasks("model.append({ taskId: 9, title: 'Second', appId: 'fake', active: false, "
+                  "minimized: false, urgent: false, maximized: false, fullscreen: false, "
+                  "output: 'TEST-1', workspace: 2, sticky: false, floating: false, tiling: false })");
+        if (!QTest::qWaitFor([&] { return task->property("stacked").toBool(); }))
+            return fail("the application's two windows did not stack");
+        auto title = [&] { return find(view.rootObject(), "contextMenuTitle"); };
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] {
+                return menuShown() && title() && menuItem("Close all 2 windows") && menuItem("Minimize all");
+            }) ||
+            title()->property("modelData").toMap()["secondary"] != "2 windows" || menuItem("Maximize") ||
+            menuItem("Fullscreen") || menuItem("Close window"))
+            return fail("a stacked button's menu is not about all its windows");
+        click(menuItem("Move to workspace"));
+        if (!QTest::qWaitFor([&] {
+                return menuItem("Workspace 2") && menuItem("Workspace 2")->property("marked").toBool();
+            }))
+            return fail("the workspace both windows are on is not marked");
+        click(menuItem("web"));
+        if (const auto asked = taskRequests(); asked != "workspace 7 1|workspace 9 1") {
+            std::cerr << "moving a stack to a workspace asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Close all 2 windows"); }))
+            return fail("the stacked button's menu did not open again");
+        click(menuItem("Close all 2 windows"));
+        if (const auto asked = taskRequests(); asked != "close 7|close 9") {
+            std::cerr << "closing a stack asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        editTasks("model.setProperty(0, 'minimized', true); model.setProperty(1, 'minimized', true)");
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Restore all"); }) ||
+            menuItem("Minimize all"))
+            return fail("a stack of minimized windows does not offer to restore them");
+        click(menuItem("Restore all"));
+        if (const auto asked = taskRequests(); asked != "activate 7|activate 9") {
+            std::cerr << "restoring a stack asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        editTasks("model.remove(1); model.setProperty(0, 'minimized', false)");
+        QMetaObject::invokeMethod(tasks, "forceLayout");
+        if (!QTest::qWaitFor([&] { return !popover->isVisible() && !task->property("stacked").toBool(); }))
+            return fail("the popover did not close after restoring the stack");
+    }
     // The task's window belongs to an installed application, which its menu pins. Pinned, the
     // window takes over the application's slot instead of adding a button; with no window left
     // the slot's launcher returns, and its own menu unpins it. Pins are remembered in the state
