@@ -147,6 +147,38 @@ void TaskModel::setFullscreen(int id, bool fullscreen) {
     }
     flush();
 }
+void TaskModel::moveToWorkspace(int id, int number) {
+    auto *task = find(id);
+    if (task && task->window && number > 0)
+        shaodesk_window_v1_move_to_workspace(task->window, static_cast<uint32_t>(number));
+    flush();
+}
+void TaskModel::moveToOutput(int id, const QString &output) {
+    auto *task = find(id);
+    if (task && task->window && !output.isEmpty())
+        shaodesk_window_v1_move_to_output(task->window, output.toUtf8().constData());
+    flush();
+}
+void TaskModel::setSticky(int id, bool sticky) {
+    auto *task = find(id);
+    if (task && task->window) {
+        if (sticky)
+            shaodesk_window_v1_set_sticky(task->window);
+        else
+            shaodesk_window_v1_unset_sticky(task->window);
+    }
+    flush();
+}
+void TaskModel::setFloating(int id, bool floating) {
+    auto *task = find(id);
+    if (task && task->window) {
+        if (floating)
+            shaodesk_window_v1_set_floating(task->window);
+        else
+            shaodesk_window_v1_unset_floating(task->window);
+    }
+    flush();
+}
 void TaskModel::close(int id) {
     if (auto *task = find(id))
         zwlr_foreign_toplevel_handle_v1_close(task->handle);

@@ -40,6 +40,13 @@ class TaskModel : public QAbstractListModel {
     Q_INVOKABLE void minimize(int id);
     Q_INVOKABLE void maximize(int id);
     Q_INVOKABLE void setFullscreen(int id, bool fullscreen);
+    // Through the window control, which these need: to workspace `number` (from 1) of the output
+    // the window is on, onto another output, shown on every workspace, kept out of the tiling.
+    // None of them focuses the window.
+    Q_INVOKABLE void moveToWorkspace(int id, int number);
+    Q_INVOKABLE void moveToOutput(int id, const QString &output);
+    Q_INVOKABLE void setSticky(int id, bool sticky);
+    Q_INVOKABLE void setFloating(int id, bool floating);
     Q_INVOKABLE void close(int id);
     Q_INVOKABLE void showDesktop();
     // The windows the compositor says are asking for attention, as {appId, title} pairs: the
