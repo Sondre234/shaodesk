@@ -163,7 +163,9 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
     return opened.toBool();
 }
 
-QStringList PreviewData::surfaces() { return {"osd-volume", "osd-text", "cards"}; }
+QStringList PreviewData::surfaces() {
+    return {"osd-volume", "osd-text", "cards", "power-dialog"};
+}
 
 bool PreviewData::showSurface(QScreen *screen, const QString &name) {
     // What each surface is, as the view in view.cpp that shows it on an output makes it.
@@ -211,6 +213,10 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
         message.actions = {{"default", "Open"}, {"reply", "Reply"}, {"read", "Mark as read"}};
         message.timeout = 60000;
         controller_.notifications()->notify(message);
+    } else if (name == "power-dialog") {
+        file = "PowerDialog.qml";
+        mode = QQuickView::SizeRootObjectToView;
+        controller_.power()->request("poweroff", screen->name());
     } else {
         return false;
     }
@@ -228,6 +234,9 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
     if (surface_->status() != QQuickView::Ready)
         return false;
     surface_->show();
+    // As PowerView does once it shows.
+    if (name == "power-dialog")
+        QMetaObject::invokeMethod(surface_->rootObject(), "reset");
     return true;
 }
 
