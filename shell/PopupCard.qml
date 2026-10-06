@@ -29,7 +29,7 @@ Item {
     property real gap: Theme.spacingM
     property real margin: Theme.spacingM
     property bool anchored: true
-    property color color: Theme.surface
+    property color color: Theme.popupSurface
     property real radius: Theme.radiusMedium
     property Item initialFocus: card
     default property alias content: body.data
@@ -139,7 +139,14 @@ Item {
         anchors.fill: parent
         color: card.color
         radius: card.radius
-        border.color: Theme.border
+        border.color: Theme.popupOutline
+        Rectangle {
+            visible: Theme.popupInnerEdge.a > 0 && card.color.a > 0
+            anchors.fill: parent; anchors.margins: 1
+            radius: card.radius - 1
+            color: "transparent"
+            border.color: Theme.popupInnerEdge
+        }
     }
     MouseArea {
         anchors.fill: parent

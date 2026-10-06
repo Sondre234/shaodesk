@@ -134,6 +134,35 @@ QtObject {
     // none without effects.
     readonly property int shadowMargin: effects ? shadowBlur + shadowOffset : 0
 
+    // The macOS style's popups. A token here that stands for one above is that token in the
+    // taskbar style, so that a part uses it in both and the taskbar's looks as it always has.
+    //
+    // Text and icons on an accent fill: white, as macOS has them, unless the accent is too light.
+    readonly property color textOnAccentFill: macos && luminance(accent) < 0.5 ? "#ffffff" : textOnAccent
+    // A menu: its card's corners and the room inside its edge, a row and a section's heading
+    // (in the caption's size, bold), the highlight's corners, where a row's label starts and how
+    // far it is from an icon before it. The highlighted row is filled with the accent and its text
+    // is white, and a check mark is in the text colour.
+    readonly property int menuRadius: macos ? 8 : radiusMedium
+    readonly property int menuPadding: macos ? 5 : spacingS
+    readonly property int menuRowHeight: macos ? 24 : rowHeight
+    readonly property int menuHeadingHeight: macos ? 24 : headingHeight
+    readonly property int menuHeadingSize: macos ? fontSizeCaption : fontSizeSmall
+    readonly property int menuRowRadius: macos ? 4 : radiusSmall
+    readonly property int menuLabelInset: macos ? 9 : spacingL
+    readonly property int menuIconGap: macos ? 7 : spacingL
+    readonly property color menuHighlight: macos ? accent : hover
+    readonly property color menuPressed: macos ? accentHover : pressed
+    readonly property color menuHighlightText: macos ? textOnAccentFill : text
+    readonly property color menuMark: macos ? text : accent
+    // A popup's card: in a dark macOS appearance a little lighter than the bar, as macOS draws
+    // menus and popovers over a dark window.
+    readonly property color popupSurface: macos && !light ? mix(surface, Qt.rgba(1, 1, 1, 1), 0.035) : surface
+    // A popup's outline, and in a dark macOS appearance a faint light line inside it, as macOS
+    // edges a dark popup on a dark window.
+    readonly property color popupOutline: macos && !light ? Qt.rgba(0, 0, 0, 0.6) : border
+    readonly property color popupInnerEdge: macos && !light ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
+
     // `milliseconds` at the animation speed, 0 with animations off.
     function duration(milliseconds) { return Math.round(milliseconds * motionScale) }
     function alpha(color, opacity) { return Qt.rgba(color.r, color.g, color.b, color.a * opacity) }
