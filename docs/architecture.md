@@ -89,6 +89,22 @@ The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `t
 `power.cpp`, `palette.cpp`. `preview.cpp` has stand-ins for all of them for
 `--preview-popup`.
 
+### Drawing something in the shell
+
+Take every colour, size and duration from `Theme`: `bar`, `surface`, `surfaceRaised` and
+`surfaceRaisedHover` for backgrounds; `hover`, `pressed` and `selected` laid over them for
+states; `border` and `divider`; `text`, `textMuted` and `textDisabled`; `accent`,
+`accentHover`, `accentSubtle` and `textOnAccent`; `danger`, `dangerFill`, `textOnDanger` and
+`dangerSurface`; `urgent` and `urgentSubtle`; `scrim`. Type is `fontFamily` with `fontSize`,
+`fontSizeCaption`, `fontSizeSmall`, `fontSizeLarge`, `fontSizeTitle` and `fontSizeDisplay`;
+shapes `radiusSmall`, `radiusMedium` and `radiusLarge`; spacing `spacingXS` to `spacingXXL`
+(2, 4, 8, 12, 16, 20); icons `iconSizeSmall`, `iconSize`, `appIconSize` and
+`appIconSizeLarge`. Animations use `durationFast`, `durationNormal`, `durationSlow` or
+`duration(ms)` with `easing` or `easingExit`, all 0 while `animations.enabled` is off.
+`effects` says whether shader effects (shadows) can be drawn: only through the GPU, so draw
+them only when it is true. `alpha()` and `mix()` derive a colour from these. A button without a
+frame of its own is a `FlatButton`, and a tooltip for something on the bar is a `BarTip`.
+
 ### Seeing a change
 
 `shaodesk-shell --config FILE --preview-popup NAME --screenshot OUT.png --quit-after 400`
