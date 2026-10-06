@@ -5,6 +5,48 @@
 #include <QUrl>
 #include <algorithm>
 
+NotificationModel::NotificationModel(QObject *parent) : QAbstractListModel(parent) {
+    connect(this, &QAbstractItemModel::rowsInserted, this, &NotificationModel::touchGroups);
+    connect(this, &QAbstractItemModel::rowsRemoved, this, &NotificationModel::touchGroups);
+    connect(this, &QAbstractItemModel::dataChanged, this, &NotificationModel::touchGroups);
+    connect(this, &QAbstractItemModel::modelReset, this, &NotificationModel::touchGroups);
+}
+void NotificationModel::touchGroups() {
+    if (groupsPending_)
+        return;
+    groupsPending_ = true;
+    QMetaObject::invokeMethod(this, [this] {
+        groupsPending_ = false;
+        Q_EMIT groupsChanged();
+    }, Qt::QueuedConnection);
+}
+QVariantList NotificationModel::groups() const {
+    QVariantList groups;
+    QHash<QString, qsizetype> found;
+    const auto roles = roleNames();
+    for (int row = 0; row < int(items_.size()); ++row) {
+        const auto &n = items_[size_t(row)];
+        const QString key = n.desktopEntry.isEmpty() ? n.app : n.desktopEntry;
+        QVariantMap entry;
+        for (auto role = roles.begin(); role != roles.end(); ++role)
+            entry.insert(QString::fromUtf8(role.value()), data(index(row), role.key()));
+        auto at = found.find(key);
+        if (at == found.end()) {
+            at = found.insert(key, groups.size());
+            groups.push_back(QVariantMap{{"key", key},
+                                         {"app", n.app},
+                                         {"icon", n.icon},
+                                         {"desktopEntry", n.desktopEntry},
+                                         {"notifications", QVariantList()}});
+        }
+        auto group = groups[*at].toMap();
+        auto list = group["notifications"].toList();
+        list.push_back(entry);
+        group["notifications"] = list;
+        groups[*at] = group;
+    }
+    return groups;
+}
 int NotificationModel::rowCount(const QModelIndex &parent) const {
     return parent.isValid() ? 0 : int(items_.size());
 }
