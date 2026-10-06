@@ -602,9 +602,13 @@ Item {
                 active: root.launcherOpen
                 onClicked: root.launcherOpen = !root.launcherOpen
                 Accessible.name: "Applications"
+                // Four squares in the accent colour, which shrink a little while pressed as an
+                // application's icon does.
                 contentItem: Item {
                     Grid {
                         anchors.centerIn: parent; columns: 2; spacing: 3
+                        scale: start.pressed ? Theme.pressScale : 1
+                        Behavior on scale { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
                         Repeater { model: 4; Rectangle { width: 9; height: 9; radius: 2; color: Theme.accent } }
                     }
                 }
