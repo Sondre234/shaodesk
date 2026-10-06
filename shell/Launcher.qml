@@ -15,7 +15,15 @@ PopupCard {
     open: panel.launcherOpen
     // The keyboard goes to the power menu while it is open, else to the search field.
     initialFocus: null
-    onOpened: { search.text = ""; takeFocus() }
+    onOpened: {
+        search.text = ""
+        allApps = false
+        now = new Date()
+        home.reset()
+        // Once it is in its place: the first time, it opens while its loader is still making it,
+        // and the keyboard would stay with the loader it then leaves.
+        Qt.callLater(takeFocus)
+    }
     function takeFocus() {
         if (panel.powerOpen) powerMenu.forceActiveFocus()
         else search.forceActiveFocus()
@@ -35,6 +43,18 @@ PopupCard {
     radius: Theme.radiusLarge
     // The space between the card's edges and what is on it.
     readonly property real padding: Theme.spacingXXL + Theme.spacingL
+    // What it shows: the pinned and recent applications ("home"), all of them ("all"), or what
+    // the search finds ("search") while there is text to search for.
+    property bool allApps: false
+    readonly property string view: search.text !== "" ? "search" : allApps ? "all" : "home"
+    // The time the recent applications' "5 min ago" is told from.
+    property date now: new Date()
+    Timer { interval: 30000; repeat: true; running: launcher.open; onTriggered: launcher.now = new Date() }
+
+    function launch(id) {
+        if (shell.launch(id))
+            panel.closeMenus()
+    }
 
     TextField {
         id: search
@@ -64,12 +84,26 @@ PopupCard {
         }
         Keys.onEscapePressed: panel.closeMenus()
     }
-    ListView {
-        id: applications
+    // The views, between the search field and the footer, across the card's whole width.
+    Item {
+        id: views
         anchors.left: parent.left; anchors.right: parent.right
         anchors.top: search.bottom; anchors.bottom: footer.top
+        anchors.topMargin: Theme.spacingL; anchors.bottomMargin: Theme.spacingM
+        clip: true
+        StartHome {
+            id: home
+            anchors.fill: parent
+            launcher: launcher
+            inset: launcher.padding - Theme.spacingM
+            visible: launcher.view === "home"
+        }
+    }
+    ListView {
+        id: applications
+        visible: launcher.view !== "home"
+        anchors.fill: views
         anchors.leftMargin: launcher.padding - Theme.spacingM; anchors.rightMargin: anchors.leftMargin
-        anchors.topMargin: Theme.spacingXL; anchors.bottomMargin: Theme.spacingM
         clip: true
         spacing: 3
         model: shell.apps.filter(function(app) {
