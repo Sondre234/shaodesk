@@ -67,7 +67,8 @@ int main(int argc, char **argv) {
                       "Preview the taskbar with one popup open, on stand-in windows, sound, "
                       "tray items and notifications: bar (none), launcher, power, bar-menu, "
                       "bar-submenu, task-menu, pin-menu, group, tray-menu, tray-submenu, "
-                      "calendar, mixer, outputs, profiles, wallpapers or notifications",
+                      "calendar, clock-empty, calendar-years, mixer, outputs, profiles, wallpapers "
+                      "or notifications",
                       "name"});
     parser.addOption(
         {"quit-after",

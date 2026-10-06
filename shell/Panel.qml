@@ -198,7 +198,14 @@ Item {
                 }
             return false
         case "calendar":
+        case "clock-empty":
+        case "calendar-years":
+            // The flyout; with no notifications kept, or with the calendar zoomed out to the years.
+            if (name === "clock-empty")
+                shell.notifications.clearHistory()
             toggleAudioPopup("clock", clockButton)
+            if (name === "calendar-years")
+                Qt.callLater(function() { clockFlyoutLoader.item.calendar.view = "years" })
             return clockButton.visible
         case "mixer":
         case "outputs":

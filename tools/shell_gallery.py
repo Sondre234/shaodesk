@@ -31,7 +31,7 @@ import zlib
 # The names previewPopup in shell/Panel.qml knows.
 POPUPS = ["bar", "launcher", "power", "bar-menu", "bar-submenu", "task-menu", "pin-menu",
           "group", "tray-menu", "tray-submenu", "calendar", "mixer", "outputs", "profiles",
-          "wallpapers", "notifications"]
+          "wallpapers", "notifications", "clock-empty", "calendar-years"]
 
 # Translucent bars, as appearance profiles often have them.
 THEMES = {
