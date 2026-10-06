@@ -67,7 +67,8 @@ int main(int argc, char **argv) {
                       "Preview the taskbar with one popup open, on stand-in windows, sound, "
                       "tray items and notifications: bar (none), launcher, power, bar-menu, "
                       "bar-submenu, task-menu, pin-menu, group, tray-menu, tray-submenu, "
-                      "calendar, mixer, outputs, profiles, wallpapers or notifications",
+                      "calendar, mixer, outputs, profiles, wallpapers or notifications; or an "
+                      "overlay over the bar: osd-volume or osd-text",
                       "name"});
     parser.addOption(
         {"quit-after",
@@ -152,6 +153,8 @@ int main(int argc, char **argv) {
                                         popover && popover->isVisible() ? popover->grabWindow()
                                                                         : QImage(),
                                         controller.panelTop(), controller);
+                if (previewData)
+                    shot = previewData->withSurface(shot);
             }
             if (!shot.save(parser.value("screenshot")))
                 app.exit(1);
@@ -191,7 +194,7 @@ int main(int argc, char **argv) {
                         view.get(), &QQuickWindow::frameSwapped, &app,
                         [&, root = view->rootObject()] {
                             const auto name = parser.value("preview-popup");
-                            if (!PreviewData::open(root, name)) {
+                            if (!previewData->open(root, name)) {
                                 std::cerr << "shaodesk-shell: no popup to preview called "
                                           << name.toStdString() << '\n';
                                 app.exit(1);

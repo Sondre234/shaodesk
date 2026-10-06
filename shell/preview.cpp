@@ -11,6 +11,8 @@
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickItem>
+#include <QQuickView>
+#include <QScreen>
 
 namespace {
 // A sound server that takes every request and does nothing with it.
@@ -63,7 +65,7 @@ Notification notification(const QString &app, const QString &icon, const QString
 } // namespace
 
 PreviewData::PreviewData(ShellController &controller)
-    : QObject(&controller), audio_(std::make_unique<PreviewAudio>()) {
+    : QObject(&controller), controller_(controller), audio_(std::make_unique<PreviewAudio>()) {
     audio_->update({"speakers",
                     {{"speakers", "Speakers", 64, false},
                      {"headphones", "USB headphones", 40, false},
@@ -153,10 +155,75 @@ void PreviewData::fill(QQuickItem *panel) {
 }
 
 bool PreviewData::open(QQuickItem *panel, const QString &name) {
+    if (surfaces().contains(name))
+        return open(panel, "bar") && panel->window() && showSurface(panel->window()->screen(), name);
     QVariant opened;
     QMetaObject::invokeMethod(panel, "previewPopup", Q_RETURN_ARG(QVariant, opened),
                               Q_ARG(QVariant, name));
     return opened.toBool();
+}
+
+QStringList PreviewData::surfaces() { return {"osd-volume", "osd-text"}; }
+
+bool PreviewData::showSurface(QScreen *screen, const QString &name) {
+    // What each surface is, as the view in view.cpp that shows it on an output makes it.
+    QString file;
+    QVariantMap properties;
+    auto mode = QQuickView::SizeViewToRootObject;
+    if (name.startsWith("osd-")) {
+        file = "Osd.qml";
+        properties = {{"outputName", screen->name()}};
+        // Long enough for a slow screenshot, not cut short by the display fading away.
+        auto config = controller_.osd()->config();
+        config.timeout = 60000;
+        controller_.osd()->configure(config);
+        if (name == "osd-volume")
+            controller_.osd()->show(screen->name(), "Volume", 64, "volume");
+        else
+            controller_.osd()->show(screen->name(), "Do not disturb", -1, "dnd");
+    } else {
+        return false;
+    }
+    surfaceName_ = name;
+    surface_ = std::make_unique<QQuickView>(controller_.engine(), nullptr);
+    surface_->setScreen(screen);
+    surface_->setTitle("shaodesk preview " + name);
+    surface_->setColor(Qt::transparent);
+    surface_->setFlags(Qt::FramelessWindowHint);
+    surface_->setResizeMode(mode);
+    if (mode == QQuickView::SizeRootObjectToView)
+        surface_->resize(ShellView::previewSize());
+    surface_->setInitialProperties(properties);
+    surface_->setSource(QUrl("qrc:/shell/ShaodeskShell/" + file));
+    if (surface_->status() != QQuickView::Ready)
+        return false;
+    surface_->show();
+    return true;
+}
+
+QImage PreviewData::withSurface(QImage desktop) const {
+    if (!surface_ || !surface_->rootObject())
+        return desktop;
+    // In the desktop's pixels, which are the preview's scaled by the device pixel ratio.
+    const qreal scale = desktop.width() / qreal(ShellView::previewSize().width());
+    const QSizeF root = surface_->rootObject()->size();
+    QImage image = surface_->grabWindow();
+    image.setDevicePixelRatio(1);
+    image = image.copy(0, 0, qRound(root.width() * scale), qRound(root.height() * scale));
+    // Placed as its layer surface is: by the edges it is anchored to, inside the area the
+    // panel leaves when it keeps clear of it (an exclusive zone of 0), over the whole output when
+    // it does not (-1).
+    const QRect output(QPoint(0, 0), ShellView::previewSize());
+    const QSize size = root.toSize();
+    QPoint at;
+    if (surfaceName_.startsWith("osd-")) {
+        // OsdView: centred, 48 pixels from the bottom edge or from the top.
+        at = QPoint((output.width() - size.width()) / 2,
+                    controller_.osd()->top() ? 48 : output.height() - 48 - size.height());
+    }
+    QPainter painter(&desktop);
+    painter.drawImage(QPointF(at) * scale, image);
+    return desktop;
 }
 
 QImage previewOnDesktop(QImage panel, QImage popover, bool panelTop,

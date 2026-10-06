@@ -2,11 +2,15 @@
 #pragma once
 #include <QImage>
 #include <QObject>
+#include <QStringList>
 #include <QTemporaryDir>
+#include <QVariantMap>
 #include <memory>
 
 class Audio;
 class QQuickItem;
+class QQuickView;
+class QScreen;
 class ShellController;
 class SystemStatus;
 
@@ -25,10 +29,23 @@ class PreviewData : public QObject {
     // out with them.
     void fill(QQuickItem *panel);
     // Opens popup `name` on the panel, as a click on its button would (see previewPopup in
-    // Panel.qml for the names); false for a name it does not know.
-    static bool open(QQuickItem *panel, const QString &name);
+    // Panel.qml for the names), or shows overlay surface `name` (see surfaces()) over the bar
+    // alone; false for a name it does not know.
+    bool open(QQuickItem *panel, const QString &name);
+    // The overlay surfaces it shows, each in a window of its own with stand-ins for what the
+    // compositor would tell it: the on-screen display, the notification cards, the switcher,
+    // the palette, the power dialog and the overview.
+    static QStringList surfaces();
+    // `desktop`, a picture from previewOnDesktop, with the overlay surface shown drawn over it
+    // where the compositor would place it; unchanged when none is.
+    QImage withSurface(QImage desktop) const;
 
   private:
+    ShellController &controller_;
+    std::unique_ptr<QQuickView> surface_;
+    QString surfaceName_;
+    QVariantMap surfaceState_;
+    bool showSurface(QScreen *screen, const QString &name);
     QTemporaryDir sysfs_;
     std::unique_ptr<Audio> audio_;
     std::unique_ptr<SystemStatus> status_;
