@@ -174,6 +174,9 @@ def render(shell, env, root, popup, out, wait, icons):
                              "--screenshot", str(out)],
                             env=env, capture_output=True, text=True, timeout=60)
     problems = [line for line in result.stderr.splitlines() if QML_WARNING.search(line)]
+    drawn = "drawn on the GPU" if env.get("QT_QPA_PLATFORM") == "wayland" else "drawn in software"
+    if result.returncode == 0 and drawn not in result.stderr:
+        problems.append(f"not {drawn}")
     if result.returncode != 0:
         problems.append(f"exit code {result.returncode}: {result.stderr.strip()[-500:]}")
     elif not out.exists() or out.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
