@@ -885,7 +885,9 @@ int main(int argc, char **argv) {
     }
     // The keyboard: nothing is highlighted after a right click; Down and Up move, wrapping and
     // skipping nothing that can be chosen; End and Home go to the ends; Right opens a submenu at
-    // its first entry, Left closes it; Escape closes a submenu, then the menu.
+    // its first entry, Left closes it; Escape closes a submenu, then the menu. The pointer rests
+    // away from the menu, where it would select what opens under it.
+    QTest::mouseMove(popover, QPoint(5, 5));
     {
         auto highlighted = [&] {
             QStringList rows;
@@ -902,7 +904,7 @@ int main(int argc, char **argv) {
         };
         auto key = [&](Qt::Key key, const QString &expected) {
             QTest::keyClick(popover, key);
-            return QTest::qWaitFor([&] { return highlighted() == expected; }, 1000);
+            return QTest::qWaitFor([&] { return highlighted() == expected; });
         };
         if (!highlighted().isEmpty() || !key(Qt::Key_Down, "Turn tiling on") ||
             !key(Qt::Key_Up, "Appearance") || !key(Qt::Key_Up, "Show desktop") ||
@@ -921,7 +923,9 @@ int main(int argc, char **argv) {
         }
         if (!key(Qt::Key_Return, "Appearance|dark") || !key(Qt::Key_Escape, "Appearance") ||
             !view.rootObject()->property("barMenuOpen").toBool()) {
-            std::cerr << "Enter did not open the submenu, or Escape closed more than it\n";
+            std::cerr << "Enter did not open the submenu, or Escape closed more than it: "
+                      << highlighted().toStdString() << " "
+                      << view.rootObject()->property("barMenuOpen").toBool() << '\n';
             return 1;
         }
         QTest::keyClick(popover, Qt::Key_Escape);
