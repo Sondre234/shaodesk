@@ -81,7 +81,8 @@ coordinates are the output's), above fullscreen windows too, and hidden while no
 While a menu or popup is open it holds the keyboard and takes every press but those on the bar's
 strip, where `inputRects` leaves a hole: a press on another bar button still switches popups in
 one press, and a press beside the popups closes them. The windows of a stacked button, shown on
-hover, take only the pointer over their list. Losing the keyboard while it holds it (`dismissed`)
+hover, take only the pointer over their list and down to the bar (`hoverArea`), and leave the
+keyboard where it is. Losing the keyboard while it holds it (`dismissed`)
 closes the popups. Without layer shell (`--preview-popup`, `shell_ui_test`) it is an ordinary
 window as large as `ShellView::previewSize()`, and a preview's screenshot draws it over the bar.
 
