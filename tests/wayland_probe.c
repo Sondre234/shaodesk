@@ -57,6 +57,7 @@ struct probe {
     struct zwlr_foreign_toplevel_handle_v1 *close_target;
     struct xdg_activation_v1 *activation;
     struct zxdg_decoration_manager_v1 *decorations;
+    struct zxdg_toplevel_decoration_v1 *decoration; // with SHAODESK_PROBE_SSD
     bool commands; // --commands: an external-control window that obeys lines on standard input
     bool print_keymap, keymap_seen; // --keymap
 };
@@ -579,10 +580,12 @@ int main(int argc, char **argv) {
     probe.toplevel = xdg_surface_get_toplevel(probe.xdg_surface);
     xdg_toplevel_add_listener(probe.toplevel, &toplevel_listener, &probe);
     // SHAODESK_PROBE_SSD leaves the frame to the compositor, as kitty does.
-    if (getenv("SHAODESK_PROBE_SSD") && probe.decorations)
-        zxdg_toplevel_decoration_v1_set_mode(
-            zxdg_decoration_manager_v1_get_toplevel_decoration(probe.decorations, probe.toplevel),
-            ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+    if (getenv("SHAODESK_PROBE_SSD") && probe.decorations) {
+        probe.decoration =
+            zxdg_decoration_manager_v1_get_toplevel_decoration(probe.decorations, probe.toplevel);
+        zxdg_toplevel_decoration_v1_set_mode(probe.decoration,
+                                             ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+    }
     if (getenv("SHAODESK_PROBE_MOVE") || getenv("SHAODESK_PROBE_RESIZE")) {
         const char *edge = getenv("SHAODESK_PROBE_RESIZE");
         if (edge) { // top, bottom, left, right, or two of them joined by "_"
@@ -609,6 +612,8 @@ int main(int argc, char **argv) {
     wl_surface_commit(probe.surface);
     if (wl_display_roundtrip(display) < 0)
         die("unmap failed");
+    if (probe.decoration) // it must go before its toplevel
+        zxdg_toplevel_decoration_v1_destroy(probe.decoration);
     xdg_toplevel_destroy(probe.toplevel);
     xdg_surface_destroy(probe.xdg_surface);
     wl_surface_destroy(probe.surface);
