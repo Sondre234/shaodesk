@@ -7,7 +7,29 @@ release; the dated sections below it record the work that led up to it, and all 
 ## Unreleased
 
 The shell, redesigned after Windows 11: a start menu, a clock flyout, Quick Settings, restyled
-menus and overlays, and motion throughout.
+menus and overlays, and motion throughout. And a second style after macOS, where shaodesk now
+starts: a menu bar, a dock, Launchpad and Spotlight, traffic-light window controls and window
+shadows.
+
+### The macOS style
+
+- The shipped configuration starts in the macOS style, with the profiles `macos-light` (the
+  first) and `macos-dark`; `default` and `light` are the taskbar as before. A file with
+  `extends = "default"` and no `profiles` of its own starts there too unless it sets `profile`,
+  and one with profiles of its own keeps its look.
+- `shell.style = "macos"` lays the shell out as macOS does: a menu bar along the top with a
+  system menu, the focused application's name and menu, a Window menu, the widgets, search,
+  Control Center and the date; and a centred floating dock with the Launchpad button, pinned and
+  running applications, dots under the running ones, name tags, a bounce while one starts and
+  when one asks for attention, per-application menus (Keep in Dock, Hide, Quit) and a Trash.
+  Switching profiles re-lays the shell out at once.
+- In that style the launcher is Launchpad, a paged full-screen grid of every application with a
+  search; the command palette is Spotlight; Quick Settings is Control Center; the clock's flyout
+  is Notification Center; and menus, notification banners, buttons, sliders and the window
+  switcher look like macOS's, in a light and a dark appearance. With no wallpaper set it draws
+  one of its own.
+- The shipped configuration no longer names one machine's monitors in `outputs.order` and
+  `outputs.primary`; they are examples now.
 
 ### The look
 

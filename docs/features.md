@@ -6,15 +6,63 @@ and every Lua setting, with its type, default and range, is in the
 
 ## Shell
 
-`shaodesk-shell` draws the desktop, a taskbar on every monitor with its [start menu](#start-menu),
-[Quick Settings](#quick-settings), the [clock's flyout](#clock-and-calendar) and the
-[system tray](#system-tray), and the overlays the compositor asks for: the
+`shaodesk-shell` draws the desktop and, on every monitor, either a menu bar and a dock in
+[the macOS style](#the-macos-style), where the shipped configuration starts, or a taskbar with its
+[start menu](#start-menu) (`shell.style = "taskbar"`, the profiles `default` and `light`). Both
+have [Quick Settings](#quick-settings), the [clock's flyout](#clock-and-calendar) and the
+[system tray](#system-tray), and the shell draws the overlays the compositor asks for: the
 [window switcher](#window-switcher), the [overview](#overview)'s text, the
 [command palette](#command-palette), the [power](#power) dialog, and the
 [notification cards and on-screen display](#notifications-and-on-screen-display). The desktop
 shows the wallpaper and the configured launchers as shortcuts, which open on a double-click; a
 right click on it offers Show desktop and the appearance profiles. Installed applications are read
 from desktop entries through GIO, and again as soon as one is installed or removed.
+
+### The macOS style
+
+With `shell.style = "macos"`, as in the shipped `macos-light` and `macos-dark` profiles, the
+shell is laid out and drawn as macOS's, in the profile's colours, and the panel settings apply to
+the dock.
+
+- **Menu bar**, along the top of every monitor. A spiral at the left opens the system menu:
+  Appearance (the profiles), Wallpaper…, Sleep, Restart…, Shut Down…, Lock Screen and Log Out…;
+  the `power_menu` action opens it too. The focused application's name, in bold ("Desktop" when
+  no window has focus), opens its menu: its desktop actions, New Window, Hide, Hide Others and
+  Quit. The **Window** menu acts on the focused window: Minimize, Zoom, Tile Window to Left or
+  Right of Screen, Enter Full Screen, Float, Keep on All Workspaces, Move to a workspace or
+  monitor, the application's other windows, and Close Window. While one menu is open, pointing at
+  another title or pressing Left and Right switches to it. At the right are the widgets
+  `shell.widgets` puts on the bar, a search button (the command palette, drawn as Spotlight), a
+  Control Center button (Quick Settings) and the date and time, which open Notification Center:
+  the notifications as cards with the calendar under them, and the unread count beside the time.
+  Applications' own menus (File, Edit, ...) are not shown.
+- **Dock**, centred along the bottom: the Launchpad button, the pinned applications, the running
+  ones that are not pinned, and the Trash (which opens `trash:///`). A dot sits under each running
+  application and its name shows above it on hover. A click starts an application, its icon
+  bouncing until a window opens, or brings its windows forward; one asking for attention bounces
+  three times. A right click lists its windows and actions, Keep in Dock or Remove from Dock, Hide
+  and Quit. `panel_height` sets its height (the icons are 16 pixels smaller), `panel_radius` its
+  corners and `panel_margin.bottom` how far it floats above the edge; it is always at the bottom
+  and as wide as its icons, and the desktop beside it takes clicks.
+- **Launchpad** (Super + R, the `launcher` action, or the dock's first button): every application
+  on pages of a 7 × 5 grid over the whole screen. Type to search, use the arrows, Page Up and
+  Page Down, the wheel, dragging or the dots to page, Enter to launch, and right-click for an
+  application's actions or Keep in Dock; Escape clears the search and then closes it, as does a
+  click beside the icons.
+- **Spotlight** is the command palette (Super + P) as a large search field a quarter of the way
+  down the screen, its results grouped under headings; **Control Center** is Quick Settings as
+  rounded modules, with Display and Sound under their own headings; notifications show as banners
+  at the top-right, and Alt + Tab shows large application icons in a row.
+- **Menus** have dense rows, the highlighted one filled with the accent colour.
+- **Wallpaper**: without `shell.wallpaper`, the shell draws an abstract one of soft hills in the
+  accent's hues over a sky in `appearance.background`'s, light or dark with the profile.
+
+The shipped macOS profiles also give windows macOS's controls and shadows
+(`windows.controls = "traffic_lights"`, `round = "always"`, `shadow = { enabled = true }`, see
+[Decorations](#decorations-focus-and-fullscreen)) and put GTK's close, minimize and maximize on
+the left (`windows.buttons`, read as shaodesk starts). They name the Inter font, the closest free
+match for macOS's; without it the default sans-serif stands in. Switching to or from a macOS
+profile re-lays the shell out at once.
 
 ### Taskbar
 
@@ -980,8 +1028,10 @@ configuration, so the compositor and the shell change together, and it stays aft
 While that file names a profile the configuration still has, it wins over `profile`; delete it
 to go back to `profile`. Every profile is checked when the configuration loads, so a mistake in
 one that is not in use is still reported, with its line. The example configuration ships
-`default` and `light`; a file with `extends = "default"` gets them only when it defines no
-`profiles` of its own.
+`macos-light`, where it starts, and `macos-dark` ([the macOS style](#the-macos-style)), and the
+taskbar's `default` and `light`; a file with `extends = "default"` gets them, and starts on
+`macos-light` unless it sets `profile`, only when it defines no `profiles` of its own. A profile
+wins over a theme.lua that `shaodesk import` wrote, so pick `default` to see that.
 
 ## Importing a Hyprland setup
 

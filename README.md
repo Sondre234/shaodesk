@@ -3,8 +3,9 @@
 # shaodesk
 
 A mouse-first Wayland desktop.<br>
-Floating windows, edge snapping and optional Hyprland-style tiling, a Qt Quick shell with a
-taskbar, launcher and notifications, and a Lua configuration that reloads when you save it.
+Floating windows, edge snapping and optional Hyprland-style tiling, a Qt Quick shell laid out
+as macOS's (menu bar, dock, Launchpad) or as a taskbar, and a Lua configuration that reloads when
+you save it.
 
 [![license](https://img.shields.io/badge/license-GPL--3.0--or--later-blue)](LICENSE)
 [![wlroots](https://img.shields.io/badge/wlroots-0.20-teal)](https://gitlab.freedesktop.org/wlroots/wlroots)
@@ -31,7 +32,9 @@ taskbar, launcher and notifications, and a Lua configuration that reloads when y
   and a niri/PaperWM-style scrolling layout.
 - **Per-monitor workspaces**, a scratchpad, sticky windows, tab groups, window rules,
   terminal swallowing, and saved sessions you can restore.
-- **A Qt Quick shell** on every monitor: taskbar, start menu, workspace indicator,
+- **A Qt Quick shell** on every monitor, in [the macOS style](docs/features.md#the-macos-style)
+  (a menu bar and a dock, Launchpad, Spotlight, Control Center, Notification Center, in light and
+  dark) or as a taskbar with a start menu; either way: workspace indicator,
   Quick Settings (network, volume, brightness, battery, night light, tiling, appearance; each
   can sit on the bar instead), keyboard layout, a clock with the notifications and a calendar,
   a system tray, a notification daemon with history and do-not-disturb, an on-screen display,
@@ -157,7 +160,9 @@ started a D-Bus session bus, as is usual without systemd, it starts one with `db
 notifications, the tray and portals need one.
 
 Without `~/.config/shaodesk/init.lua`, the installed [config/init.lua](config/init.lua) is
-used. Super + R opens the start menu, Super + Q opens a terminal, Super + C closes the
+used. It starts in the macOS style; the profiles in the system menu (the spiral at the top left)
+switch to dark or to the taskbar. Super + R opens Launchpad (the start menu in the taskbar),
+Super + Q opens a terminal, Super + C closes the
 focused window, and Super + M quits; [Default bindings](#default-bindings) lists the rest. The
 terminal is `$TERMINAL` when that is set, else the first one installed (kitty, foot, alacritty,
 ...). To choose it, write a configuration that extends the default:
