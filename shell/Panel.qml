@@ -401,66 +401,7 @@ Item {
         // Once made, a popup stays, so closing it never destroys the item its handler runs in.
         property bool used: false
         onLoaded: used = true
-        sourceComponent: Component {
-            Rectangle {
-                id: contextMenu
-                parent: root
-                objectName: "contextMenu"
-                readonly property var actions: root.taskMenuId >= 0
-                    ? [{ text: "Maximize / restore", run: function(id) { shell.tasks.maximize(id) } },
-                       { text: "Minimize", run: function(id) { shell.tasks.minimize(id) } }]
-                      .concat(root.taskMenuApp ? [root.pinAction(root.taskMenuApp)] : [])
-                      .concat([{ text: "Close window", run: function(id) { shell.tasks.close(id) } }])
-                    : root.pinMenuApp !== null
-                    ? [{ text: "Open " + root.pinMenuApp.name, run: function() { shell.launch(root.pinMenuApp.appId) } }]
-                      .concat(root.pinMenuApp.configured ? [] : [root.pinAction(root.pinMenuApp.appId)])
-                    : root.profileMenu
-                    ? [{ text: "‹ Back", run: function() { root.profileMenu = false; return true } }]
-                      .concat(shell.profiles.map(function(name) {
-                          return { text: (name === shell.profile ? "✓ " : "") + name,
-                                   run: function() { shell.pickProfile(name) } } }))
-                    : [{ text: root.tiling ? "Turn tiling off" : "Turn tiling on", enabled: shell.tilingAvailable,
-                         run: function() { shell.toggleTiling(outputName) } },
-                       { text: "Applications", run: function() { root.launcherOpen = true } },
-                       { text: "Show desktop", run: function() { shell.tasks.showDesktop() } }]
-                      .concat(shell.profiles.length > 0
-                          ? [{ text: "Appearance: " + (shell.profile || "none") + " …",
-                               run: function() { root.profileMenu = true; return true } }]
-                          : [])
-                visible: root.taskMenuId >= 0 || root.pinMenuApp !== null || root.barMenuOpen
-                width: 220; height: 12 + actions.length * 44 + (actions.length - 1) * 2
-                x: Math.max(8, Math.min(root.contextMenuX, root.width - width - 8))
-                y: root.onTop ? bar.y + bar.height + 8 : bar.y - height - 8
-                color: shell.panelColor; radius: 10
-                border.color: Qt.lighter(shell.panelColor, 1.6)
-                MouseArea { anchors.fill: parent }
-                Column {
-                    anchors.fill: parent; anchors.margins: 6; spacing: 2
-                    Repeater {
-                        model: contextMenu.actions
-                        delegate: Button {
-                            required property var modelData
-                            objectName: "contextMenuItem"
-                            width: parent.width; height: 44
-                            text: modelData.text
-                            enabled: modelData.enabled !== false
-                            opacity: enabled ? 1 : 0.4
-                            palette.buttonText: shell.textColor
-                            background: Rectangle { color: parent.hovered ? Qt.lighter(shell.panelColor, 1.5) : "transparent"; radius: 6 }
-                            // Run before closing, so opening the launcher keeps the surface expanded.
-                            onClicked: {
-                                // Running an entry can rebuild the entries, destroying this button.
-                                var panel = root
-                                // An entry that leads to more entries returns true to stay open.
-                                if (modelData.run(panel.taskMenuId) === true)
-                                    return
-                                panel.taskMenuId = -1; panel.pinMenuApp = null; panel.barMenuOpen = false
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        sourceComponent: Component { TaskbarMenu { panel: root; barItem: bar } }
     }
 
     // A tray item's menu, in the style of the bar's own: a submenu's entries take the place of
