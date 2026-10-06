@@ -15,7 +15,8 @@ FlatButton {
     readonly property var audio: panel.audioSource
     readonly property var status: panel.statusSource
     readonly property bool showNetwork: widgets.network === "quick" && status.networkState !== "none"
-    readonly property bool showVolume: widgets.volume === "quick" && audio.available
+    // The sound server the panel follows, which a test may take away as it ends.
+    readonly property bool showVolume: widgets.volume === "quick" && !!audio && audio.available
     readonly property bool showBattery: widgets.battery === "quick" && status.batteryPresent
     readonly property string description: {
         var lines = []
@@ -48,8 +49,9 @@ FlatButton {
             SpeakerIcon {
                 visible: button.showVolume
                 anchors.verticalCenter: parent.verticalCenter
-                level: button.audio.volume; muted: button.audio.muted
-                color: button.audio.muted ? Theme.textMuted : Theme.text
+                level: button.showVolume ? button.audio.volume : 0
+                muted: button.showVolume && button.audio.muted
+                color: muted ? Theme.textMuted : Theme.text
             }
             BatteryIcon {
                 visible: button.showBattery
@@ -67,12 +69,12 @@ FlatButton {
     MouseArea {
         anchors.fill: parent
         acceptedButtons: Qt.MiddleButton
-        onClicked: if (button.audio.available) button.audio.toggleMute()
+        onClicked: if (button.showVolume) button.audio.toggleMute()
     }
     // Five percent a wheel notch, up for louder.
     WheelHandler {
         property real travel: 0
-        enabled: button.audio.available
+        enabled: button.showVolume
         onWheel: (event) => {
             travel += event.angleDelta.y !== 0 ? event.angleDelta.y : -event.angleDelta.x
             var steps = travel > 0 ? Math.floor(travel / 120) : Math.ceil(travel / 120)
