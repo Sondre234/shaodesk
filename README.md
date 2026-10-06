@@ -32,9 +32,10 @@ taskbar, launcher and notifications, and a Lua configuration that reloads when y
 - **Per-monitor workspaces**, a scratchpad, sticky windows, tab groups, window rules,
   terminal swallowing, and saved sessions you can restore.
 - **A Qt Quick shell** on every monitor: taskbar, application menu, workspace indicator,
-  battery, network, volume, keyboard layout, clock and calendar, a system tray, a notification
-  daemon with history and do-not-disturb, an on-screen display, an Alt + Tab switcher, an
-  Exposé-style overview, a command palette, and a power menu.
+  Quick Settings (network, volume, brightness, battery, night light, tiling, appearance; each
+  can sit on the bar instead), keyboard layout, a clock with the notifications and a calendar,
+  a system tray, a notification daemon with history and do-not-disturb, an on-screen display,
+  an Alt + Tab switcher, an Exposé-style overview, a command palette, and a power menu.
 - **Power controls** through logind (systemd-logind or elogind): lock, suspend, hibernate,
   restart, power off and log out, locking before any sleep and closing windows first so that
   applications can save.
