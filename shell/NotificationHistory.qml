@@ -10,7 +10,6 @@ Rectangle {
     required property var panel
     required property Item barItem
     readonly property var center: shell.notifications
-    readonly property string uiFont: panel.uiFont
     objectName: "notificationHistory"
     parent: panel
     visible: panel.audioPopup === "notifications"
@@ -29,8 +28,8 @@ Rectangle {
     height: Math.min(460, 56 + Math.max(90, list.contentHeight) + 8)
     x: Math.max(8, Math.min(panel.audioPopupX - width / 2, panel.width - width - 8))
     y: panel.onTop ? barItem.y + barItem.height + 8 : barItem.y - height - 8
-    color: shell.panelColor; radius: 12
-    border.color: Qt.lighter(shell.panelColor, 1.6)
+    color: Theme.surface; radius: Theme.radiusLarge
+    border.color: Theme.border
     MouseArea { anchors.fill: parent }
     ColumnLayout {
         anchors.fill: parent; anchors.margins: 10; spacing: 6
@@ -39,7 +38,7 @@ Rectangle {
             Text {
                 Layout.fillWidth: true; leftPadding: 4
                 text: "Notifications"
-                color: shell.textColor; font.pixelSize: shell.fontSize + 2; font.bold: true; font.family: history.uiFont
+                color: Theme.text; font.pixelSize: Theme.fontSizeTitle; font.bold: true; font.family: Theme.fontFamily
             }
             Switch {
                 id: dnd
@@ -50,13 +49,13 @@ Rectangle {
                 indicator: Rectangle {
                     x: dnd.leftPadding; y: parent.height / 2 - height / 2
                     width: 34; height: 18; radius: 9
-                    color: dnd.checked ? shell.accent : Qt.lighter(shell.panelColor, 1.8)
-                    Rectangle { x: dnd.checked ? parent.width - width - 2 : 2; y: 2; width: 14; height: 14; radius: 7; color: shell.textColor }
+                    color: dnd.checked ? Theme.accent : Theme.selected
+                    Rectangle { x: dnd.checked ? parent.width - width - 2 : 2; y: 2; width: 14; height: 14; radius: 7; color: Theme.text }
                 }
                 contentItem: Text {
                     leftPadding: dnd.indicator.width + 8
-                    text: dnd.text; color: shell.textColor; opacity: 0.85
-                    font.pixelSize: shell.fontSize - 1; font.family: history.uiFont
+                    text: dnd.text; color: Theme.text; opacity: 0.85
+                    font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
                     verticalAlignment: Text.AlignVCenter
                 }
             }
@@ -67,10 +66,13 @@ Rectangle {
                 enabled: history.center.history.count > 0
                 onClicked: history.center.clearHistory()
                 padding: 6; leftPadding: 12; rightPadding: 12
-                background: Rectangle { radius: 6; color: clear.hovered && clear.enabled ? Qt.lighter(shell.panelColor, 1.9) : Qt.lighter(shell.panelColor, 1.5) }
+                background: Rectangle {
+                    radius: Theme.radiusSmall
+                    color: clear.pressed ? Theme.pressed : clear.hovered && clear.enabled ? Theme.selected : Theme.hover
+                }
                 contentItem: Text {
-                    text: clear.text; color: shell.textColor; opacity: clear.enabled ? 1 : 0.4
-                    font.pixelSize: shell.fontSize - 1; font.family: history.uiFont
+                    text: clear.text; color: clear.enabled ? Theme.text : Theme.textDisabled
+                    font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
                     horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
                 }
             }
@@ -79,8 +81,8 @@ Rectangle {
             visible: history.center.history.count === 0
             Layout.fillWidth: true; Layout.fillHeight: true
             text: "No notifications"
-            color: shell.textColor; opacity: 0.55
-            font.pixelSize: shell.fontSize; font.family: history.uiFont
+            color: Theme.textMuted
+            font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
             horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
         }
         ListView {
@@ -105,9 +107,9 @@ Rectangle {
                 required property var time
                 width: list.width - 8
                 height: rowContent.implicitHeight + 16
-                radius: 8
-                color: rowArea.containsMouse ? Qt.lighter(shell.panelColor, 1.35) : Qt.lighter(shell.panelColor, 1.18)
-                border.color: row.urgency === 2 ? "#ff6b6b" : "transparent"
+                radius: Theme.radiusMedium
+                color: rowArea.containsMouse ? Theme.surfaceRaisedHover : Theme.surfaceRaised
+                border.color: row.urgency === 2 ? Theme.danger : "transparent"
                 readonly property string iconSource: {
                     if (hasImage) return "image://notify/" + notificationId + "/" + Number(time)
                     if (icon.length > 0) return "image://icons/" + icon
@@ -136,14 +138,14 @@ Rectangle {
                             Text {
                                 Layout.fillWidth: true
                                 text: row.app + " · " + history.ago(row.time)
-                                color: shell.textColor; opacity: 0.6
-                                font.pixelSize: Math.max(6, shell.fontSize - 2); font.family: history.uiFont
+                                color: Theme.textMuted
+                                font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily
                                 textFormat: Text.PlainText; elide: Text.ElideRight
                             }
                             Text {
                                 objectName: "removeNotification"
                                 text: "×"
-                                color: shell.textColor; opacity: removeArea.containsMouse ? 1 : 0.55
+                                color: removeArea.containsMouse ? Theme.text : Theme.textMuted
                                 font.pixelSize: 16
                                 MouseArea {
                                     id: removeArea
@@ -155,16 +157,16 @@ Rectangle {
                         Text {
                             Layout.fillWidth: true; visible: text.length > 0
                             text: row.summary
-                            color: shell.textColor; font.bold: !row.read
-                            font.pixelSize: shell.fontSize; font.family: history.uiFont
+                            color: Theme.text; font.bold: !row.read
+                            font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
                             textFormat: Text.PlainText; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
                         }
                         Text {
                             Layout.fillWidth: true; visible: text.length > 0
                             text: row.body
-                            color: shell.textColor; opacity: 0.8
-                            font.pixelSize: Math.max(6, shell.fontSize - 1); font.family: history.uiFont
-                            textFormat: Text.StyledText; linkColor: shell.accent
+                            color: Theme.text; opacity: 0.8
+                            font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+                            textFormat: Text.StyledText; linkColor: Theme.accent
                             wrapMode: Text.Wrap; maximumLineCount: 3; elide: Text.ElideRight
                             onLinkActivated: (link) => history.center.openLink(link)
                         }

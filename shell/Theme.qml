@@ -16,7 +16,8 @@ QtObject {
     readonly property color bar: shell.panelColor
     readonly property color surface: Qt.rgba(bar.r, bar.g, bar.b, 1)
     // A card, field or other block inside a popup.
-    readonly property color surfaceRaised: mix(surface, text, 0.06)
+    readonly property color surfaceRaised: mix(surface, text, 0.04)
+    readonly property color surfaceRaisedHover: mix(surface, text, 0.09)
     // Whether the surfaces are light, for the few colours that cannot be derived from them.
     readonly property bool light: luminance(surface) > 0.5
 
