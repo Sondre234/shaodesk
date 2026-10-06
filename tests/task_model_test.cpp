@@ -40,9 +40,8 @@ int main(int argc, char **argv) {
             value(TaskModel::AppId).toString() != "shaodesk-probe")
             throw std::runtime_error("task metadata incorrect");
         int id = value(TaskModel::TaskId).toInt();
-        // A window has no picture until it is watched. Through a window control older than
-        // version 2 it never has one, and watching asks the compositor nothing, so everything
-        // below still works.
+        // A window has no picture until it is watched, and watching what is not there is
+        // harmless.
         if (model.roleNames().value(TaskModel::Picture) != "picture" ||
             !value(TaskModel::Picture).toString().isEmpty() || !model.picture(id).isNull())
             throw std::runtime_error("the window has a picture before one was asked for");
@@ -129,18 +128,88 @@ int main(int argc, char **argv) {
             throw std::runtime_error("clearing the urgent list did not unmark the task");
         if (model.roleNames().value(TaskModel::Urgent) != "urgent")
             throw std::runtime_error("the urgent role is not named for QML");
+        // The window's picture, copied by the compositor from its capture source: the probe draws
+        // 320 by 240 pixels, a dark strip 36 high over blue, which fits 160 pixels wide at 133 by
+        // 100. A new picture announces its role alone.
+        QList<QList<int>> pictureRoles;
+        QObject::connect(&model, &QAbstractItemModel::dataChanged, &model,
+                         [&](const QModelIndex &, const QModelIndex &, const QList<int> &roles) {
+                             if (roles.contains(TaskModel::Picture))
+                                 pictureRoles.push_back(roles);
+                         });
+        auto url = [&] { return value(TaskModel::Picture).toString(); };
+        auto pictured = [&](const QString &before, const char *message) {
+            wait([&] { return !url().isEmpty() && url() != before; }, message);
+        };
+        auto isProbe = [](const QImage &picture) {
+            auto near = [](QRgb actual, QRgb expected) {
+                return qAlpha(actual) == 0xff && std::abs(qRed(actual) - qRed(expected)) <= 2 &&
+                       std::abs(qGreen(actual) - qGreen(expected)) <= 2 &&
+                       std::abs(qBlue(actual) - qBlue(expected)) <= 2;
+            };
+            const int x = picture.width() / 2;
+            return near(picture.pixel(x, 2), 0x23314a) &&
+                   near(picture.pixel(x, picture.height() * 3 / 4), 0x417bc4);
+        };
+        model.watchPicture(id, 160, false);
+        pictured({}, "no picture of the window arrived");
+        const QString prefix = QString("image://windows/%1/").arg(id);
+        if (!url().startsWith(prefix) || model.picture(id).size() != QSize(133, 100) ||
+            !isProbe(model.picture(id)))
+            throw std::runtime_error("the window's picture is not the probe's window at 133 by 100");
+        if (WindowImages(model).requestImage(url().mid(QString("image://windows/").size()), &served,
+                                             {}) != model.picture(id))
+            throw std::runtime_error("the image provider did not serve the window's picture");
+        model.unwatchPicture(id);
+        // Watched live, it follows the window as it redraws: maximized, at another size, and back.
+        QString last = url();
+        model.watchPicture(id, 160, true);
+        pictured(last, "watching again took no new picture");
+        model.maximize(id);
+        wait(
+            [&] {
+                const QSize size = model.picture(id).size();
+                return size != QSize(133, 100) && (size.width() == 160 || size.height() == 100);
+            },
+            "the live picture did not follow the maximized window");
+        if (!isProbe(model.picture(id)))
+            throw std::runtime_error("the maximized window's picture is not the probe's window");
+        model.maximize(id);
+        wait([&] { return model.picture(id).size() == QSize(133, 100); },
+             "the live picture did not follow the window back");
+        model.unwatchPicture(id);
+        // Unwatched, the last picture stays; a minimized window is pictured too.
+        if (url().isEmpty() || model.picture(id).isNull())
+            throw std::runtime_error("unwatching dropped the window's picture");
+        model.minimize(id);
+        wait([&] { return value(TaskModel::Minimized).toBool(); }, "minimizing for a picture failed");
+        last = url();
+        model.watchPicture(id, 160, false);
+        pictured(last, "a minimized window gave no picture");
+        if (!isProbe(model.picture(id)))
+            throw std::runtime_error("the minimized window's picture is not the probe's window");
+        model.unwatchPicture(id);
+        for (const auto &roles : pictureRoles)
+            if (roles != QList<int>{TaskModel::Picture})
+                throw std::runtime_error("a new picture announced other roles than its own");
+        model.activate(id);
+        wait([&] { return value(TaskModel::Active).toBool(); }, "activating after the pictures failed");
         model.setUrgent({{"shaodesk-probe", "shaodesk protocol probe"}});
         model.close(id);
         wait([&] { return model.rowCount() == 0; }, "closed task was not removed");
         if ((client.state() != QProcess::NotRunning && !client.waitForFinished(2000)) ||
             client.exitStatus() != QProcess::NormalExit || client.exitCode() != 0)
             throw std::runtime_error("probe did not exit cleanly");
-        // Stale IDs must be harmless after a window closes.
+        // Stale IDs must be harmless after a window closes, and its picture has gone with it.
         model.activate(id);
         model.close(id);
+        model.watchPicture(id, 160, true);
+        model.unwatchPicture(id);
+        if (!model.picture(id).isNull())
+            throw std::runtime_error("a closed window's picture stayed");
         std::cout
             << "Task model metadata, place, minimize, restore, maximize, fullscreen, show desktop, "
-               "close passed\n";
+               "pictures, close passed\n";
         return 0;
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n' << client.readAllStandardError().toStdString();
