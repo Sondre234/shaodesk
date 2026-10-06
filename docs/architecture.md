@@ -73,11 +73,11 @@ which lists every file).
 
 | File | Covers |
 | --- | --- |
-| `Panel.qml` | The taskbar and all its popups (launcher, menus, mixer, calendar, ...), drawn in the bar's own surface, which `view.cpp` grows while one is open. |
+| `Panel.qml` | The taskbar: which popup is open and where, the bar and its smaller buttons, and a loader for each popup. The popups are drawn in the bar's own surface, which `view.cpp` grows while one is open. Every part below takes the panel as `panel` (and the bar's height, or the bar as `barItem`) and reaches its state and functions through it. |
 | `PinnedSlots.qml`, `TaskList.qml`, `TaskButton.qml`, `TrayButton.qml`, `WorkspaceIndicator.qml`, `VolumeButton.qml`, `ClockButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `BarTip.qml` | Parts of the bar: widgets, and the tooltip for things on it. |
 | `NotificationHistory.qml`, `AudioMixer.qml`, `CalendarPopup.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
 | `Icon.qml`, `SpeakerIcon.qml` | Line icons (Lucide), drawn as vectors in any colour, and the loudspeaker for a volume. |
-| `AudioSlider.qml`, `MuteButton.qml` | Controls the volume widget and the mixer share. |
+| `AudioSlider.qml`, `MuteButton.qml` | Controls the mixer uses. |
 | `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |
 | `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |
 
