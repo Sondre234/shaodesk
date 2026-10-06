@@ -327,7 +327,9 @@ Item {
             }
             return false
         case "group":
-            // A stacked button, in the task list or in a pinned slot.
+        case "thumbnails":
+            // A stacked button, in the task list or in a pinned slot: its list, or with
+            // shell.thumbnails the pictures of its windows (the gallery's group turns them off).
             var buttons = []
             for (i = 0; i < taskList.count; ++i)
                 buttons.push(taskList.itemAtIndex(i))
@@ -336,7 +338,7 @@ Item {
             for (i = 0; i < buttons.length; ++i)
                 if (buttons[i] && buttons[i].stacked) {
                     openGroup(buttons[i])
-                    return true
+                    return name === "group" || thumbnailsOpen
                 }
             return false
         case "tray-menu":
@@ -426,8 +428,10 @@ Item {
             return icon !== null
         case "stack-menu":
         case "group":
+        case "thumbnails":
+            // The dock lists a stack's windows, pictures or not.
             icon = find(function(icon) { return icon.stacked })
-            if (icon && name === "group")
+            if (icon && name !== "stack-menu")
                 openGroup(icon)
             else if (icon)
                 dock.openMenu(icon, icon.modelData || null, "")

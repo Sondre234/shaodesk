@@ -11,6 +11,7 @@
 #include <QPainter>
 #include <QQmlComponent>
 #include <QQmlEngine>
+#include <QQuickImageProvider>
 #include <QQuickItem>
 #include <QQuickView>
 #include <QScreen>
@@ -79,6 +80,112 @@ QVariantList overviewStrip(const QRect &area) {
                                     {"windows", windows[i]}});
     return cells;
 }
+
+// A stand-in for the picture of stand-in window `id`, as the task model's `windows` provider
+// serves the real ones: the window's content without the frame, drawn as a picture of it shows
+// it (lines of text as bars), scaled down to fit within 480 by 300 pixels, the most a picture of
+// shell.thumbnails takes. A web page for the browser, a shell for the first terminal and a tall
+// htop for the second; null for the other windows, which have no picture yet.
+QImage windowPicture(int id) {
+    if (id < 1 || id > 3)
+        return {};
+    const QSize window = id == 1 ? QSize(1440, 900) : id == 2 ? QSize(1600, 900) : QSize(700, 1000);
+    QImage image(window.scaled(480, 300, Qt::KeepAspectRatio), QImage::Format_ARGB32_Premultiplied);
+    QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.scale(image.width() / qreal(window.width()), image.height() / qreal(window.height()));
+    painter.setPen(Qt::NoPen);
+    // A line of words from (x, y): each a bar as wide as given, in its colour.
+    auto words = [&painter](qreal x, qreal y, qreal height, std::initializer_list<std::pair<const char *, int>> line) {
+        for (auto [color, width] : line) {
+            painter.setBrush(QColor(color));
+            painter.drawRoundedRect(QRectF(x, y, width, height), height / 3, height / 3);
+            x += width + height * 0.6;
+        }
+    };
+    if (id == 1) {
+        painter.fillRect(QRect(QPoint(0, 0), window), QColor("#ffffff"));
+        painter.fillRect(0, 0, window.width(), 48, QColor("#e3e4ea"));
+        painter.fillRect(16, 8, 260, 40, QColor("#ffffff"));
+        words(36, 22, 12, {{"#8a8d99", 150}});
+        painter.fillRect(0, 48, window.width(), 52, QColor("#f7f7fa"));
+        painter.setBrush(QColor("#e6e7ec"));
+        painter.drawRoundedRect(QRectF(160, 58, 1120, 32), 16, 16);
+        words(184, 68, 12, {{"#5b5e6b", 280}});
+        painter.fillRect(0, 100, window.width(), 1, QColor("#d5d7de"));
+        words(220, 170, 34, {{"#1f2330", 380}, {"#1f2330", 210}});
+        words(220, 230, 14, {{"#7a7e8c", 90}, {"#7a7e8c", 140}});
+        QLinearGradient gradient(220, 280, 1220, 560);
+        gradient.setColorAt(0, QColor("#5b7cfa"));
+        gradient.setColorAt(1, QColor("#b06ad9"));
+        painter.setBrush(gradient);
+        painter.drawRoundedRect(QRectF(220, 280, 1000, 280), 12, 12);
+        for (int line = 0; line < 6; ++line)
+            words(220, 600 + line * 40, 14,
+                  {{"#a4a8b5", 160 + (line * 70) % 130}, {"#a4a8b5", 220}, {"#a4a8b5", 110 + (line * 50) % 160},
+                   {"#a4a8b5", line == 5 ? 90 : 240}});
+    } else if (id == 2) {
+        painter.fillRect(QRect(QPoint(0, 0), window), QColor("#1e1f29"));
+        // Prompts and what they printed.
+        const qreal height = 18, step = 40;
+        qreal y = 30;
+        auto prompt = [&](std::initializer_list<std::pair<const char *, int>> command) {
+            words(30, y, height, {{"#7ec699", 110}, {"#79b8ff", 190}});
+            words(30 + 110 + 190 + 2 * height * 0.6, y, height, command);
+            y += step;
+        };
+        auto output = [&](std::initializer_list<std::pair<const char *, int>> line) {
+            words(30, y, height, line);
+            y += step;
+        };
+        prompt({{"#e6e9f0", 70}, {"#e6e9f0", 160}});
+        output({{"#c9ccd6", 380}, {"#c9ccd6", 160}, {"#c9ccd6", 520}});
+        output({{"#c9ccd6", 240}, {"#c9ccd6", 610}, {"#c9ccd6", 130}});
+        output({{"#7ec699", 90}, {"#c9ccd6", 450}, {"#c9ccd6", 210}});
+        prompt({{"#e6e9f0", 90}, {"#e6e9f0", 70}, {"#e6e9f0", 230}});
+        for (int line = 0; line < 9; ++line)
+            output({{"#6c7086", 120}, {line == 6 ? "#f28b82" : "#c9ccd6", 340 + (line * 130) % 560},
+                    {"#c9ccd6", 160 + (line * 90) % 300}});
+        output({{"#7ec699", 190}, {"#c9ccd6", 420}});
+        prompt({});
+        painter.fillRect(QRectF(30 + 110 + 190 + 2 * height * 0.6, y - step, height * 0.7, height * 1.3),
+                         QColor("#e6e9f0"));
+    } else {
+        painter.fillRect(QRect(QPoint(0, 0), window), QColor("#1e1f29"));
+        // Meters for the processors and the memory, then the processes, one of them chosen.
+        for (int meter = 0; meter < 6; ++meter) {
+            const qreal y = 24 + meter * 34;
+            words(24, y, 16, {{"#79b8ff", 40}});
+            painter.fillRect(QRectF(84, y, 580, 16), QColor("#2b2d3a"));
+            const int used = 120 + (meter * 157) % 380;
+            painter.fillRect(QRectF(84, y, used, 16), QColor(meter < 4 ? "#7ec699" : "#e5c07b"));
+            painter.fillRect(QRectF(84 + used, y, 40 + meter * 9, 16), QColor("#f28b82"));
+        }
+        painter.fillRect(QRectF(0, 250, window.width(), 30), QColor("#7ec699"));
+        words(24, 257, 16, {{"#1e1f29", 50}, {"#1e1f29", 70}, {"#1e1f29", 40}, {"#1e1f29", 60}, {"#1e1f29", 140}});
+        for (int row = 0; row < 19; ++row) {
+            const qreal y = 292 + row * 36;
+            if (row == 2)
+                painter.fillRect(QRectF(0, y - 8, window.width(), 32), QColor("#3b5b8c"));
+            words(24, y, 16,
+                  {{"#c9ccd6", 50}, {"#8a8fa3", 70}, {"#c9ccd6", 40}, {"#c9ccd6", 60},
+                   {row % 4 == 0 ? "#7ec699" : "#c9ccd6", 120 + (row * 83) % 260}});
+        }
+    }
+    return image;
+}
+
+// The stand-in windows' pictures, image://preview-windows/ID.
+class PreviewWindows : public QQuickImageProvider {
+  public:
+    PreviewWindows() : QQuickImageProvider(QQuickImageProvider::Image) {}
+    QImage requestImage(const QString &id, QSize *size, const QSize &) override {
+        QImage image = windowPicture(id.section('/', 0, 0).toInt());
+        if (size)
+            *size = image.size();
+        return image;
+    }
+};
 
 Notification notification(const QString &app, const QString &icon, const QString &summary,
                           const QString &body, int urgency = Notification::Normal) {
@@ -186,20 +293,30 @@ PreviewData::PreviewData(ShellController &controller)
                                            {"org.kde.kate.desktop", 5, now.addDays(-12)}});
     controller.startMenu()->setUser("Robin Lee", QUrl());
 
-    // The windows, as the tests' stand-in model: a ListModel with the roles TaskModel has.
+    // The windows, as the tests' stand-in model: a ListModel with the roles TaskModel has. The
+    // terminals' are stacked, with pictures of two and none yet of the third.
+    controller.engine()->addImageProvider("preview-windows", new PreviewWindows);
     QQmlComponent component(controller.engine());
     component.setData(R"(import QtQml.Models
 ListModel {
     ListElement { taskId: 1; title: "Release notes - Mozilla Firefox"; appId: "firefox"; active: true; minimized: false; urgent: false
-                  maximized: false; fullscreen: false; output: ""; workspace: 1; sticky: false; floating: false; tiling: true }
+                  maximized: false; fullscreen: false; output: ""; workspace: 1; sticky: false; floating: false; tiling: true
+                  picture: "image://preview-windows/1" }
     ListElement { taskId: 2; title: "~/dev/shaodesk"; appId: "foot"; active: false; minimized: false; urgent: false
-                  maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: false; tiling: true }
+                  maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: false; tiling: true
+                  picture: "image://preview-windows/2" }
     ListElement { taskId: 3; title: "htop"; appId: "foot"; active: false; minimized: false; urgent: false
-                  maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: true; tiling: true }
+                  maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: true; tiling: true
+                  picture: "image://preview-windows/3" }
+    ListElement { taskId: 6; title: "man shaodesk"; appId: "foot"; active: false; minimized: false; urgent: false
+                  maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: false; tiling: true
+                  picture: "" }
     ListElement { taskId: 4; title: "Downloads - Dolphin"; appId: "org.kde.dolphin"; active: false; minimized: true; urgent: false
-                  maximized: true; fullscreen: false; output: ""; workspace: 3; sticky: false; floating: false; tiling: false }
+                  maximized: true; fullscreen: false; output: ""; workspace: 3; sticky: false; floating: false; tiling: false
+                  picture: "" }
     ListElement { taskId: 5; title: "Build finished"; appId: "kitty"; active: false; minimized: false; urgent: true
-                  maximized: false; fullscreen: false; output: ""; workspace: 1; sticky: true; floating: true; tiling: true }
+                  maximized: false; fullscreen: false; output: ""; workspace: 1; sticky: true; floating: true; tiling: true
+                  picture: "" }
 })",
                       QUrl());
     tasks_ = component.create();
