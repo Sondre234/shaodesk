@@ -28,7 +28,7 @@ Item {
         panel: flyout.panel
         open: flyout.open && flyout.showCalendar
         anchorRect: flyout.barEnd
-        compact: flyout.showNotifications && fullHeight + notifications.implicitHeight > flyout.room
+        compact: flyout.showNotifications && calendar.fullHeight + notifications.implicitHeight > flyout.room
     }
     NotificationHistory {
         id: notifications
