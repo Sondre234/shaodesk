@@ -9,7 +9,6 @@ Rectangle {
     readonly property var windows: shell.switcherWindows
     readonly property int cell: 132
     readonly property int padding: 16
-    readonly property string uiFont: shell.fontFamily.length > 0 ? shell.fontFamily : Qt.application.font.family
     // As many columns as fit in most of the output's width, and rows up to most of its height;
     // the grid scrolls to the selection past that.
     readonly property int columns: Math.max(1, Math.min(windows.length, Math.floor((screenSize.width * 0.9 - 2 * padding) / cell)))
@@ -17,9 +16,9 @@ Rectangle {
     readonly property var current: windows[shell.switcherSelected] || ({})
     width: columns * cell + 2 * padding
     height: rows * cell + 2 * padding + caption.height + 8
-    radius: 14
-    color: shell.panelColor
-    border.color: Qt.lighter(shell.panelColor, 1.6)
+    radius: Theme.radiusLarge
+    color: Theme.surface
+    border.color: Theme.border
 
     GridView {
         id: grid
@@ -33,9 +32,9 @@ Rectangle {
         currentIndex: shell.switcherSelected
         highlightMoveDuration: 0
         highlight: Rectangle {
-            radius: 10
-            color: Qt.rgba(shell.accent.r, shell.accent.g, shell.accent.b, 0.28)
-            border.color: shell.accent; border.width: 2
+            radius: Theme.radiusMedium
+            color: Theme.accentSubtle
+            border.color: Theme.accent; border.width: 2
         }
         delegate: Item {
             id: entry
@@ -54,7 +53,7 @@ Rectangle {
                 anchors.left: parent.left; anchors.right: parent.right; anchors.margins: 8
                 text: entry.modelData.title.length > 0 ? entry.modelData.title : entry.modelData.appId
                 textFormat: Text.PlainText
-                color: shell.textColor; font.family: switcher.uiFont; font.pixelSize: 12
+                color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
             }
@@ -64,7 +63,7 @@ Rectangle {
                 visible: entry.modelData.urgent === true
                 anchors.right: icon.right; anchors.top: icon.top
                 width: 12; height: 12; radius: 6
-                color: shell.urgentColor; border.width: 2; border.color: shell.panelColor
+                color: Theme.urgent; border.width: 2; border.color: Theme.surface
             }
             MouseArea { anchors.fill: parent; onClicked: shell.switcherPick(entry.index) }
         }
@@ -77,13 +76,13 @@ Rectangle {
             width: parent.width
             text: switcher.current.title || switcher.current.appId || ""
             textFormat: Text.PlainText
-            color: shell.textColor; font.family: switcher.uiFont; font.pixelSize: 14; font.bold: true
+            color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeLarge; font.bold: true
             horizontalAlignment: Text.AlignHCenter; elide: Text.ElideMiddle
         }
         Text {
             width: parent.width
             text: switcher.current.output ? "Workspace " + switcher.current.workspace + " on " + switcher.current.output + (switcher.current.minimized ? " · minimized" : "") + (switcher.current.urgent ? " · needs attention" : "") : ""
-            color: shell.textColor; opacity: 0.65; font.family: switcher.uiFont; font.pixelSize: 12
+            color: Theme.textMuted; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize
             horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight
         }
     }
