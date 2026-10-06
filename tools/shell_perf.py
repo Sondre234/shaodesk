@@ -2,15 +2,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Measure shaodesk-shell startup and idle cost against a private headless compositor.
 
-usage: tools/shell_perf.py BUILD_DIR [--runs N] [--idle SECONDS] [--private-bus]
+usage: tools/shell_perf.py BUILD_DIR [--runs N] [--idle SECONDS] [--renderer gpu|software]
+                           [--private-bus]
 
 Reports, as medians over the runs: time from spawning the shell to its first rendered frame
 per surface, resident and proportional memory, mapped libraries, threads, and while idle the
 CPU time and context switches per second (a context switch is what a wakeup costs). Uses
-only /proc, so it needs no perf or strace. Set QT_QUICK_BACKEND (e.g. rhi for the GPU path; the shell defaults to software) or
-QSG_RENDER_LOOP to compare rendering choices. The shell never sees the real session bus: without
---private-bus it has none, so it serves no notifications; with it, a dbus-daemon of its own (killed
-afterwards) carries the shell's notification service, as in a session.
+only /proc, so it needs no perf or strace. --renderer picks how the shell draws, as
+shell.renderer does (the GPU by default; here Mesa's software OpenGL, since the private
+compositor has no GPU buffers), and the environment is the one the compositor gives a shell
+drawing that way; --env QSG_RENDER_LOOP=... and the like compare other rendering choices. The
+shell never sees the real session bus: without --private-bus it has none, so it serves no
+notifications; with it, a dbus-daemon of its own (killed afterwards) carries the shell's
+notification service, as in a session.
 """
 import argparse
 import os
@@ -67,7 +71,7 @@ def wait_for_text(path, text, process, timeout=20):
     raise SystemExit(f"timed out waiting for {text!r}")
 
 
-def run(build, idle, extra_env, private_bus=False):
+def run(build, idle, extra_env, renderer, private_bus=False):
     compositor, shell = build / "shaodesk", build / "shaodesk-shell"
     example = Path(__file__).resolve().parent.parent / "config" / "init.lua"
     with tempfile.TemporaryDirectory(prefix="shaodesk-perf-") as directory:
@@ -76,9 +80,13 @@ def run(build, idle, extra_env, private_bus=False):
                    QT_QPA_PLATFORM="wayland", QT_FORCE_STDERR_LOGGING="1",
                    XDG_DATA_HOME=directory, XDG_STATE_HOME=directory, XDG_CACHE_HOME=directory,
                    DBUS_SESSION_BUS_ADDRESS="disabled:")  # never the real session bus
-        if os.environ.get("__GLX_VENDOR_LIBRARY_NAME"):
-            env["SHAODESK_GLX_VENDOR"] = os.environ["__GLX_VENDOR_LIBRARY_NAME"]
-        env["__GLX_VENDOR_LIBRARY_NAME"] = "shaodesk-none"  # as the compositor starts the shell
+        env.pop("QT_QUICK_BACKEND", None)
+        if renderer == "software":
+            # As the compositor starts a shell that draws in software: no GPU vendor's GLX.
+            if os.environ.get("__GLX_VENDOR_LIBRARY_NAME"):
+                env["SHAODESK_GLX_VENDOR"] = os.environ["__GLX_VENDOR_LIBRARY_NAME"]
+            env["__GLX_VENDOR_LIBRARY_NAME"] = "shaodesk-none"
+            env["QT_QUICK_BACKEND"] = "software"
         env.update(extra_env)
         bus = None
         if private_bus:
@@ -140,10 +148,13 @@ def main():
     parser.add_argument("--idle", type=float, default=10)
     parser.add_argument("--private-bus", action="store_true",
                         help="give the shell a session bus of its own (it serves notifications)")
+    parser.add_argument("--renderer", choices=["gpu", "software"], default="gpu",
+                        help="how the shell draws, as shell.renderer (default: gpu)")
     parser.add_argument("--env", action="append", default=[], metavar="NAME=VALUE")
     args = parser.parse_args()
     extra = dict(item.split("=", 1) for item in args.env)
-    runs = [run(args.build.resolve(), args.idle, extra, args.private_bus) for _ in range(args.runs)]
+    runs = [run(args.build.resolve(), args.idle, extra, args.renderer, args.private_bus)
+            for _ in range(args.runs)]
     for key in runs[0]:
         values = [r[key] for r in runs]
         print(f"{key:18} median {statistics.median(values):9.2f}   min {min(values):9.2f}"
