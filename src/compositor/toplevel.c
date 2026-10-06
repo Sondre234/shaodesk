@@ -228,11 +228,10 @@ static bool initial_tile_size(struct sh_toplevel *toplevel, int *width, int *hei
     struct wlr_output *output = new_tile_split(toplevel, new_window_output(toplevel), &target);
     if (!output_tiles(server, output))
         return false;
-    const struct sh_settings *settings = server_settings(server);
-    struct sh_rect area = gap_area(settings, usable_area(server, output), SH_TILE), rect;
-    if (!sh_tiling_preview(server->tiling, output->name, *output_workspace(server, output->name),
-                           toplevel, target, true, server->cursor->x, server->cursor->y, area,
-                           settings->gap_inner, &rect))
+    int workspace = *output_workspace(server, output->name), gap;
+    struct sh_rect area = tiling_area(server, output, workspace, 1, &gap), rect;
+    if (!sh_tiling_preview(server->tiling, output->name, workspace, toplevel, target, true,
+                           server->cursor->x, server->cursor->y, area, gap, &rect))
         return false;
     rect = inside_border(server, rect);
     *width = rect.width;
