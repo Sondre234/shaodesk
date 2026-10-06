@@ -513,6 +513,10 @@ const Option options[] = {
      "Taskbar buttons show only the window icon, the title as a tooltip."},
     {"shell.group_windows", "boolean", "true", "true", none, none,
      "One taskbar button per application; `false` gives every window its own."},
+    {"shell.workspaces_shown", "integer", "0", "3", 0, 10,
+     "How many of the monitor's workspaces the workspace indicator shows, the current one in "
+     "the middle: `3` shows it with the one before and the one after, or the first or last "
+     "three at either end. 0 shows them all. Scrolling still reaches every workspace."},
     {"shell.accent", "color", "\"#7da8ff\"", "\"#7da8ff\"", none, none,
      "Accent color, `#RRGGBB` or `#RRGGBBAA`."},
     {"shell.panel_color", "color", "\"#151e2c\"", "\"#151e2c\"", none, none,

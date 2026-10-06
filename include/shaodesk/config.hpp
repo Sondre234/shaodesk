@@ -95,6 +95,7 @@ struct ShellConfig {
     bool icons_only = true; // taskbar buttons show the window's icon, its title as a tooltip
     bool software_renderer = false; // renderer = "software": Qt Quick without the GPU, faster to start
     bool group_windows = true; // one taskbar button per application, its windows listed on hover
+    int workspaces_shown = 0;  // the workspace indicator shows this many, around the current; 0: all
     std::string accent = "#7da8ff";
     std::string panel_color = "#151e2c";
     std::string text_color = "#edf2fa";
