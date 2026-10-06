@@ -9,7 +9,8 @@ usage: tools/shell_gallery.py BUILD_DIR OUT_DIR [--renderer software|gpu|both]
 
 Each picture is `shaodesk-shell --preview-popup NAME --screenshot`: the taskbar with that popup
 open, or with that overlay (the on-screen display, the cards, the switcher, ...) over it, on
-stand-in windows, sound, tray items and notifications, over a wallpaper made for the purpose. They are written as OUT_DIR/THEME-NAME.png, and OUT_DIR/THEME-NAME-gpu.png for the GPU
+stand-in windows, sound, tray items and notifications, over a wallpaper made for the purpose;
+"desktop" is the desktop alone (`--preview-desktop`), without that wallpaper. They are written as OUT_DIR/THEME-NAME.png, and OUT_DIR/THEME-NAME-gpu.png for the GPU
 renderer. The software renderer runs offscreen; the GPU one (Qt's OpenGL, on Mesa's software
 implementation here) needs a display, so it runs against a private headless compositor from
 BUILD_DIR. Nothing touches a real session: no display, session bus, configuration or state of
@@ -42,6 +43,8 @@ POPUPS += ["quick-settings", "quick-settings-mixer", "bar-all"]
 # The menus of the macOS style's menu bar, which only its themes picture.
 MACOS_POPUPS = ["system-menu", "app-menu", "window-menu", "window-submenu"]
 POPUPS += MACOS_POPUPS
+# The desktop alone, without the wallpaper made for the gallery: the style's own background.
+POPUPS += ["desktop"]
 
 # Pictures taken with settings of their own, put in the shell table: name -> (popup, settings).
 # The volume's and the profiles' popups belong to buttons Quick Settings holds by default.
@@ -103,6 +106,18 @@ APPS += [("code", "Visual Studio Code", "code"), ("libreoffice-writer", "LibreOf
          ("chromium", "Chromium", "chromium"), ("vlc", "VLC media player", "vlc"),
          ("signal-desktop", "Signal", "signal-desktop"), ("htop", "htop", "htop"),
          ("org.gnome.SystemMonitor", "System Monitor", "org.gnome.SystemMonitor")]
+
+# More still in the macOS themes, so that Launchpad has a second page to show.
+LAUNCHPAD_APPS = [("audacity", "Audacity", "audacity"), ("brave-browser", "Brave", "brave-browser"),
+                  ("calibre", "calibre", "calibre"), ("darktable", "darktable", "darktable"),
+                  ("evince", "Document Viewer", "evince"), ("gnome-calendar", "Calendar", "gnome-calendar"),
+                  ("org.gnome.Maps", "Maps", "org.gnome.Maps"),
+                  ("org.gnome.Weather", "Weather", "org.gnome.Weather"),
+                  ("org.gnome.clocks", "Clocks", "org.gnome.clocks"), ("kdenlive", "Kdenlive", "kdenlive"),
+                  ("rhythmbox", "Rhythmbox", "rhythmbox"), ("shotwell", "Shotwell", "shotwell"),
+                  ("telegram", "Telegram", "telegram"), ("transmission", "Transmission", "transmission"),
+                  ("virt-manager", "Virtual Machine Manager", "virt-manager"),
+                  ("wireshark", "Wireshark", "wireshark")]
 
 # What a search finds some of them by besides their names: desktop id, then the generic name,
 # comment and keywords.
@@ -222,7 +237,8 @@ def prepare(root, theme_name):
             lambda x, y, c=rgb(color): tuple(min(255, v + x + y) for v in c))
     data = root / "data"
     (data / "applications").mkdir(parents=True)
-    for desktop_id, name, icon in APPS:
+    macos = 'style = "macos"' in theme.get("shell", "")
+    for desktop_id, name, icon in APPS + (LAUNCHPAD_APPS if macos else []):
         actions = ACTIONS.get(desktop_id, [])
         entry = f"[Desktop Entry]\nType=Application\nName={name}\nIcon={icon}\nExec=true\n"
         if desktop_id in DETAILS:
@@ -271,7 +287,13 @@ def render(shell, env, root, popup, out, wait, icons):
         config = root / f"init-{out.stem}.lua"
         config.write_text((root / "init.lua").read_text().replace(
             "    shell = {\n", "    shell = {\n        " + settings + "\n", 1))
-    result = subprocess.run([shell, "--config", str(config), "--preview-popup", popup,
+    shown = ["--preview-popup", popup]
+    if popup == "desktop":
+        config = root / f"init-{out.stem}.lua"
+        config.write_text("".join(line for line in (root / "init.lua").read_text().splitlines(True)
+                                  if not line.strip().startswith("wallpaper = ")))
+        shown = ["--preview", "--preview-desktop"]
+    result = subprocess.run([shell, "--config", str(config), *shown,
                              "--icon-theme", icons, "--quit-after", str(wait),
                              "--screenshot", str(out)],
                             env=env, capture_output=True, text=True, timeout=60)

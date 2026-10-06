@@ -12,6 +12,7 @@
 #include "shaodesk/animation.h"
 #include "shaodesk/curve.h"
 #include "shaodesk/decoration.h"
+#include "shaodesk/shadow.h"
 #include "shaodesk/session.h"
 #include "shaodesk/overview.h"
 #include "shaodesk/overview_scene.h"
@@ -128,6 +129,15 @@ struct sh_node {
 };
 
 #define SH_FRAME_RING 4096
+
+/* A shadow image, painted for a look, a window size and a scale (sh_shadow_image_size's) and
+ * shared by the windows showing it; `used` orders them for the cache to drop the oldest. */
+struct sh_shadow_image {
+    struct sh_shadow look;
+    int width, height, scale;
+    struct wlr_buffer *buffer;
+    unsigned used;
+};
 
 /* Counters `get stats` reports, for the benchmark in tools/bench; cheap enough to keep on. */
 struct sh_stats {
@@ -409,9 +419,14 @@ struct sh_server {
     double grab_x, grab_y;
     struct wlr_box grab_geobox;
     uint32_t resize_edges;
-    /* Window controls: shared buffers, the window whose controls are hovered (and which
+    /* Window controls: shared buffers by style, focus, hovered and pressed part, drawn at
+     * deco_scale pixels per logical pixel; the window whose controls are hovered (and which
      * button) or revealed, and a button pressed but not yet released. */
-    struct wlr_buffer *deco_buffers[SH_DECO_FULLSCREEN + 1]; // by hovered part
+    struct wlr_buffer *deco_buffers[2 * 2 * (SH_DECO_FULLSCREEN + 1) * (SH_DECO_FULLSCREEN + 1)];
+    int deco_scale;
+    /* The last few shadow images painted; windows' slices keep the ones they show. */
+    struct sh_shadow_image shadow_images[8];
+    unsigned shadow_uses;
     /* Peek: 0 to 1, how far windows have faded toward the desktop. It is held by the key with
      * evdev code `peek_keycode` on `peek_keyboard`, or toggled without one. */
     struct sh_fade peek_fade;
@@ -553,6 +568,16 @@ struct sh_toplevel {
     struct wlr_scene_buffer *deco;    // window controls; NULL when the client decorates itself
     struct wlr_scene_rect *border[4]; // top, bottom, left, right; NULL without a border
     int frame_hole; // with rounded corners, the width of the frame border[0] draws; else 0
+    int corner_radius; // of the rounded clip on `content`; 0 while the window is square
+    /* The shadow: a tree at the bottom of `content` holding the slices of a shared image, NULL
+     * without one; the image and the size of frame they were laid out for, and for `get frames`
+     * the box they cover (from the window's top-left corner) and how dark they are at most. */
+    struct wlr_scene_tree *shadow;
+    struct wlr_scene_buffer *shadow_slices[SH_SHADOW_SLICES];
+    struct wlr_buffer *shadow_image;
+    int shadow_width, shadow_height;
+    struct wlr_box shadow_box;
+    float shadow_alpha;
     float opacity;                    // last applied to the window's buffers
     struct wlr_scene_buffer *dim;     // black over the window while it is dimmed, else NULL
     struct sh_fade dim_fade;          // how opaque that black is, and where it is heading
@@ -723,6 +748,7 @@ void unpublish_toplevel(struct sh_toplevel *toplevel);
 enum wlr_xdg_toplevel_decoration_v1_mode
 decoration_mode(struct wlr_xdg_toplevel_decoration_v1 *decoration);
 bool wants_decoration(struct sh_toplevel *toplevel);
+enum sh_deco_style deco_style(struct sh_server *server);
 bool in_deco_corner(struct sh_toplevel *toplevel, double x, double y);
 void refresh_decoration(struct sh_toplevel *toplevel);
 void refresh_tabs(struct sh_toplevel *toplevel);

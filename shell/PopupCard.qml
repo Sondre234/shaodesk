@@ -19,7 +19,9 @@ import QtQuick.Effects
 // Qt.AlignTop starts it at the anchor's left or top edge, Qt.AlignRight or Qt.AlignBottom ends it
 // at the other. Its size is its implicit size, cut down to the room there is (availableWidth and
 // availableHeight), so set implicitWidth and implicitHeight rather than width and height. With
-// `anchored` false it leaves its place to whoever uses it.
+// `anchored` false it leaves its place to whoever uses it. With `framed` false it draws no card
+// of its own, for what it holds to draw its own cards (the macOS style's Notification Center); a
+// press between them then goes to what is under it.
 Item {
     id: card
     property bool open: false
@@ -29,7 +31,8 @@ Item {
     property real gap: Theme.spacingM
     property real margin: Theme.spacingM
     property bool anchored: true
-    property color color: Theme.surface
+    property bool framed: true
+    property color color: Theme.popupSurface
     property real radius: Theme.radiusMedium
     property Item initialFocus: card
     default property alias content: body.data
@@ -127,7 +130,7 @@ Item {
 
     Loader {
         anchors.fill: parent
-        active: Theme.effects
+        active: Theme.effects && card.framed
         sourceComponent: RectangularShadow {
             radius: card.radius
             blur: Theme.shadowBlur
@@ -136,14 +139,22 @@ Item {
         }
     }
     Rectangle {
+        visible: card.framed
         anchors.fill: parent
         color: card.color
         radius: card.radius
-        border.color: Theme.border
+        border.color: Theme.popupOutline
+        Rectangle {
+            visible: Theme.popupInnerEdge.a > 0 && card.color.a > 0
+            anchors.fill: parent; anchors.margins: 1
+            radius: card.radius - 1
+            color: "transparent"
+            border.color: Theme.popupInnerEdge
+        }
     }
     MouseArea {
         anchors.fill: parent
-        enabled: card.open
+        enabled: card.open && card.framed
         acceptedButtons: Qt.AllButtons
     }
     Item {

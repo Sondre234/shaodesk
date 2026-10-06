@@ -160,6 +160,100 @@ QtObject {
     // none without effects.
     readonly property int shadowMargin: effects ? shadowBlur + shadowOffset : 0
 
+    // The macOS style's popups. A token here that stands for one above is that token in the
+    // taskbar style, so that a part uses it in both and the taskbar's looks as it always has.
+    //
+    // Text and icons on an accent fill: white, as macOS has them, unless the accent is too light.
+    readonly property color textOnAccentFill: macos && luminance(accent) < 0.5 ? "#ffffff" : textOnAccent
+    // A menu: its card's corners and the room inside its edge, a row and a section's heading
+    // (in the caption's size, bold), the highlight's corners, where a row's label starts and how
+    // far it is from an icon before it. The highlighted row is filled with the accent and its text
+    // is white, and a check mark is in the text colour.
+    readonly property int menuRadius: macos ? 8 : radiusMedium
+    readonly property int menuPadding: macos ? 5 : spacingS
+    readonly property int menuRowHeight: macos ? 24 : rowHeight
+    readonly property int menuHeadingHeight: macos ? 24 : headingHeight
+    readonly property int menuHeadingSize: macos ? fontSizeCaption : fontSizeSmall
+    readonly property int menuRowRadius: macos ? 4 : radiusSmall
+    readonly property int menuLabelInset: macos ? 9 : spacingL
+    readonly property int menuIconGap: macos ? 7 : spacingL
+    readonly property color menuHighlight: macos ? accent : hover
+    readonly property color menuPressed: macos ? accentHover : pressed
+    readonly property color menuHighlightText: macos ? textOnAccentFill : text
+    readonly property color menuMark: macos ? text : accent
+    // A popup's card: in a dark macOS appearance a little lighter than the bar, as macOS draws
+    // menus and popovers over a dark window.
+    readonly property color popupSurface: macos && !light ? mix(surface, Qt.rgba(1, 1, 1, 1), 0.035) : surface
+    // A popup's outline, and in a dark macOS appearance a faint light line inside it, as macOS
+    // edges a dark popup on a dark window.
+    readonly property color popupOutline: macos && !light ? Qt.rgba(0, 0, 0, 0.6) : border
+    readonly property color popupInnerEdge: macos && !light ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
+    // Launchpad: its grid, columns by rows a page, and an application's icon there at most; the
+    // scrim over the wallpaper behind it; its text, white in both appearances as on macOS; the
+    // application the keyboard is at; its search field; and a dot for each page.
+    readonly property int launchpadColumns: 7
+    readonly property int launchpadRows: 5
+    readonly property int launchpadIconSize: 96
+    readonly property color launchpadScrim: Qt.rgba(0, 0, 0, light ? 0.28 : 0.42)
+    readonly property color launchpadText: "#ffffff"
+    readonly property color launchpadHighlight: Qt.rgba(1, 1, 1, 0.2)
+    readonly property color launchpadField: Qt.rgba(1, 1, 1, 0.16)
+    readonly property int launchpadFieldWidth: 240
+    readonly property int launchpadFieldHeight: 28
+    readonly property int launchpadDot: 7
+    // Spotlight, the command palette of the macOS style: its card's corners; its field, without a
+    // frame of its own, with the text and the magnifier large; a result's row and icon, the one
+    // chosen filled with the accent; and a group's heading over its results.
+    readonly property int spotlightRadius: macos ? 12 : radiusLarge
+    readonly property int spotlightFieldHeight: 52
+    readonly property int spotlightFontSize: Math.round(fontSize * 1.7)
+    readonly property int spotlightGlyph: 22
+    readonly property int spotlightRowHeight: 40
+    readonly property int spotlightIconSize: 28
+    readonly property int spotlightHeadingHeight: 26
+    // Control Center, Quick Settings in the macOS style: its width and surface, and its modules,
+    // cards lighter than the surface under them, with their corners, the room inside them, a
+    // heading's height, a tile's height and its round button.
+    readonly property int controlCenterWidth: 344
+    readonly property color controlCenterSurface: macos && light ? mix(popupSurface, text, 0.05) : popupSurface
+    readonly property color moduleColor: light ? Qt.rgba(1, 1, 1, 0.92) : mix(popupSurface, Qt.rgba(1, 1, 1, 1), 0.07)
+    readonly property color moduleOutline: alpha(text, light ? 0.07 : 0.06)
+    readonly property int moduleRadius: 12
+    readonly property int modulePadding: 10
+    readonly property int moduleHeadingHeight: 22
+    readonly property int moduleTileHeight: 52
+    readonly property int moduleButtonSize: 28
+    // Notification Center, the clock's flyout in the macOS style, and its banners: how wide it is,
+    // and a notification's icon beside it.
+    readonly property int notificationCenterWidth: 344
+    readonly property int notificationIconSize: 32
+    // A switch's track while off, and the knob of a switch or a slider: white, as macOS has them,
+    // with a faint outline that keeps it apart from a light surface.
+    readonly property color switchTrack: alpha(text, light ? 0.14 : 0.2)
+    readonly property color knob: macos ? "#ffffff" : accent
+    readonly property color knobOutline: Qt.rgba(0, 0, 0, light ? 0.14 : 0.3)
+    // A slider's track and knob.
+    readonly property int sliderTrack: macos ? 6 : 4
+    readonly property int sliderKnob: macos ? 18 : 14
+    // A framed button: its height and its face, white in a light macOS appearance and lighter than
+    // the surface in a dark one, its outline, and the ring that says the keyboard is at it.
+    readonly property int buttonHeight: macos ? 28 : rowHeight - spacingS
+    readonly property color buttonFace: !macos ? surfaceRaised : light ? Qt.rgba(1, 1, 1, 1)
+                                                                 : mix(popupSurface, Qt.rgba(1, 1, 1, 1), 0.16)
+    readonly property color buttonFaceHover: !macos ? surfaceRaisedHover : mix(buttonFace, text, 0.05)
+    readonly property color buttonOutline: !macos ? border : light ? Qt.rgba(0, 0, 0, 0.14) : Qt.rgba(1, 1, 1, 0.06)
+    readonly property color focusRing: macos ? alpha(accent, 0.55) : accent
+    readonly property int focusRingWidth: macos ? 3 : 2
+    // A search field: its height and its fill.
+    readonly property int fieldHeight: macos ? 28 : rowHeight + spacingS
+    readonly property color fieldFill: macos ? alpha(text, light ? 0.06 : 0.1) : surfaceRaised
+    // The window switcher, in the macOS style as macOS's application switcher: large icons on a
+    // rounded, translucent card, the one chosen on a light square, its title only under them.
+    readonly property int switcherIconSize: macos ? 96 : appIconSizeDisplay
+    readonly property int switcherRadius: macos ? 24 : radiusLarge
+    readonly property color switcherSurface: macos ? alpha(popupSurface, 0.88) : surface
+    readonly property color switcherSelection: macos ? alpha(text, 0.16) : accentSubtle
+
     // `milliseconds` at the animation speed, 0 with animations off.
     function duration(milliseconds) { return Math.round(milliseconds * motionScale) }
     function alpha(color, opacity) { return Qt.rgba(color.r, color.g, color.b, color.a * opacity) }

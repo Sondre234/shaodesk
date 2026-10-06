@@ -229,10 +229,12 @@ class Translator {
                          "rounded corners need a renderer shaodesk lacks so far");
         for (const char *effect : {"blur", "shadow"}) {
             auto prefix = std::string("decoration:") + effect + ":";
+            bool blur = std::string_view(effect) == "blur";
             if (auto *enabled = option(prefix + "enabled");
                 enabled && parse_bool(enabled->text).value_or(false))
                 report_.skip(files_, enabled->origin,
-                             std::string(effect) + " needs a renderer shaodesk lacks so far");
+                             blur ? "blur needs a renderer shaodesk lacks so far"
+                                  : "shadows are not imported; set windows.shadow by hand");
             for (const auto &[name, value] : hypr.options)
                 if (name.starts_with(prefix))
                     used_.insert(name);

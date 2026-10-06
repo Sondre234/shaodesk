@@ -122,11 +122,15 @@ static void apply_node(struct sh_anim *anim, struct wlr_scene_node *node, int ox
         memcpy(r->paint, current, sizeof(current));
     }
     if (sized) {
+        // Both edges are scaled and rounded, so that nodes that adjoin (the slices of a window's
+        // shadow, its surfaces) stay adjoined at every scale.
         double left = anim->cx + (ox + r->x - anim->cx) * scale;
         double top = anim->cy + (oy + r->y - anim->cy) * scale;
+        double right = anim->cx + (ox + r->x + r->width - anim->cx) * scale;
+        double bottom = anim->cy + (oy + r->y + r->height - anim->cy) * scale;
         r->set_x = (int)lround(left) - ox, r->set_y = (int)lround(top) - oy;
-        r->set_width = (int)fmax(1, lround(r->width * scale));
-        r->set_height = (int)fmax(1, lround(r->height * scale));
+        r->set_width = (int)fmax(1, lround(right) - lround(left));
+        r->set_height = (int)fmax(1, lround(bottom) - lround(top));
         set_geometry(node, r->set_x, r->set_y, r->set_width, r->set_height);
     } else {
         r->set_x = r->x, r->set_y = r->y, r->set_width = width, r->set_height = height;

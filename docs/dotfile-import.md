@@ -120,7 +120,7 @@ shaodesk before it can be imported, **won't** = deliberately not carried over.
 | Active / inactive opacity | `decoration:active_opacity`, `inactive_opacity` | `windows.opacity`, `inactive_opacity` | done | yes |
 | Per-app opacity | `windowrule = opacity A B, class:…` | `windows.rules` (`app_id` regex) | done | yes |
 | Blur | `decoration:blur` | — | blocked: needs scenefx or a custom renderer | no |
-| Shadows | `decoration:shadow` | — | blocked: needs scenefx or a custom renderer | no |
+| Shadows | `decoration:shadow` | `windows.shadow` | missing (set by hand) | no |
 | Animations on/off | `animations:enabled` | `animations.enabled` | done | yes |
 | Focus a window that asks for it | `misc:focus_on_activate` | `windows.activation` (`"focus"`; unset keeps the default `"urgent"`, which marks the window instead) | done | yes |
 | Animation styles, speeds, curves | `animation`, `bezier` | — (fixed fade, scale, and glide; `animations.duration`) | won't (for now) | — |

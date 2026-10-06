@@ -70,6 +70,10 @@ return {
     windows = {
         -- border_width = 0, -- drawn around each window; tiles shrink to keep it in their slot
         -- corner_radius = 10, -- rounds windows on monitors that tile, and their border; 0: square
+        -- round = "tiling", -- or "always": floating windows on any monitor too
+        -- controls = "flat", -- or "traffic_lights": macOS's red, yellow and green, top-left
+        -- shadow = { enabled = false, color = "#00000059", inactive_color = "#00000033",
+        --            blur = 30, offset = 10 },
         -- border_color = "#7da8ff", -- the focused window; #RRGGBBAA also works
         -- border_inactive_color = "#404a5c",
         -- opacity = 1.0,
@@ -126,9 +130,9 @@ return {
     -- animations = { enabled = true, duration = 120, speed = 1, curve = "ease-out",
     --                move = { curve = "spring" }, open = { duration = 160 } },
     outputs = {
-        -- Left to right by connector name; unlisted monitors follow on the right.
-        order = { "HDMI-A-1", "DP-3", "DP-1" },
-        primary = "DP-3", -- the cursor starts here; without it, the leftmost monitor
+        -- Left to right by connector name; unlisted monitors follow on the right, e.g.:
+        -- order = { "HDMI-A-1", "DP-3", "DP-1" },
+        -- primary = "DP-3", -- the cursor starts here; without it, the leftmost monitor
         -- Per-monitor mode, scale, position, rotation (0-7), vrr, tiling, or enabled = false,
         -- keyed by connector or by "desc:" and the start of "make model serial", e.g.:
         -- monitors = { ["DP-3"] = { mode = "2560x1440@200", scale = 1.25, tiling = true } },

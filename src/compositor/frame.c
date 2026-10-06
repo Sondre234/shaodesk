@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
-/* What the compositor draws on and around a window: its border, opacity and rounded corners,
- * the window controls (and the xdg-decoration requests that ask for them), and a group's tab
- * strip. */
+/* What the compositor draws on and around a window: its border, opacity, rounded corners and
+ * shadow, the window controls (and the xdg-decoration requests that ask for them), and a
+ * group's tab strip. */
 #include "server.h"
 
 static void fade_update(void *data);
@@ -28,22 +28,66 @@ bool wants_decoration(struct sh_toplevel *toplevel) {
 #endif
 }
 
-static struct wlr_buffer *deco_buffer(struct sh_server *server, enum sh_deco_part hovered) {
-    if (!server->deco_buffers[hovered]) {
-        float scale = 1;
-        struct sh_output *output;
-        wl_list_for_each(output, &server->outputs, link) {
-            if (output->wlr_output->scale > scale)
-                scale = output->wlr_output->scale;
-        }
-        server->deco_buffers[hovered] = sh_decoration_render((int)ceilf(scale), hovered);
+/* Pixels per logical pixel of what the compositor draws itself: enough for the densest output. */
+static int pixel_scale(struct sh_server *server) {
+    float scale = 1;
+    struct sh_output *output;
+    wl_list_for_each(output, &server->outputs, link) {
+        if (output->wlr_output->scale > scale)
+            scale = output->wlr_output->scale;
     }
-    return server->deco_buffers[hovered];
+    return (int)ceilf(scale);
 }
 
-/* The controls' place inside the window's scene tree: its top-right corner. */
-static void deco_position(struct sh_toplevel *toplevel, int *x, int *y) {
+/* The style of window controls windows.controls asks for. */
+enum sh_deco_style deco_style(struct sh_server *server) {
+    return server_settings(server)->window_controls == SH_CONTROLS_TRAFFIC_LIGHTS
+               ? SH_DECO_TRAFFIC_LIGHTS
+               : SH_DECO_FLAT;
+}
+
+/* Whether the window draws around its geometry, as a client-side frame draws its shadow: its
+ * surface reaches past the geometry it gives. */
+static bool draws_own_shadow(struct sh_toplevel *toplevel) {
+    if (!toplevel->xdg_toplevel || wants_decoration(toplevel))
+        return false;
+    struct wlr_xdg_surface *base = toplevel->xdg_toplevel->base;
+    struct wlr_box g = base->geometry;
+    return g.x > 0 || g.y > 0 || g.x + g.width < base->surface->current.width ||
+           g.y + g.height < base->surface->current.height;
+}
+
+/* The shared buffer for a look of the controls, drawn when first needed and again once an
+ * output's scale asks for more pixels. */
+static struct wlr_buffer *deco_buffer(struct sh_server *server, struct sh_deco_look look) {
+    int scale = pixel_scale(server);
+    if (scale != server->deco_scale) {
+        for (size_t i = 0; i < sizeof(server->deco_buffers) / sizeof(*server->deco_buffers); ++i) {
+            wlr_buffer_drop(server->deco_buffers[i]); // windows showing one keep it till replaced
+            server->deco_buffers[i] = NULL;
+        }
+        server->deco_scale = scale;
+    }
+    if (look.style == SH_DECO_FLAT) // the strip shows neither focus nor a press
+        look.focused = true, look.pressed = SH_DECO_NONE;
+    enum { PARTS = SH_DECO_FULLSCREEN + 1 };
+    size_t index = (((size_t)look.style * 2 + look.focused) * PARTS + look.hovered) * PARTS +
+                   look.pressed;
+    if (!server->deco_buffers[index])
+        server->deco_buffers[index] = sh_decoration_render(scale, &look);
+    return server->deco_buffers[index];
+}
+
+/* The controls' place inside the window's scene tree: the flat strip at its top-right corner,
+ * the traffic lights at its top-left. */
+static void deco_position(struct sh_toplevel *toplevel, enum sh_deco_style style, int *x,
+                          int *y) {
     struct wlr_box geometry = toplevel_geometry(toplevel);
+    if (style == SH_DECO_TRAFFIC_LIGHTS) {
+        *x = geometry.x;
+        *y = geometry.y;
+        return;
+    }
     *x = geometry.x + geometry.width - SH_DECO_MARGIN - SH_DECO_WIDTH;
     if (*x < geometry.x + SH_DECO_MARGIN)
         *x = geometry.x + SH_DECO_MARGIN;
@@ -52,12 +96,20 @@ static void deco_position(struct sh_toplevel *toplevel, int *x, int *y) {
 
 /* The controls sit over the window's content, so they hide until the pointer nears its corner. */
 bool in_deco_corner(struct sh_toplevel *toplevel, double x, double y) {
-    int dx, dy;
-    deco_position(toplevel, &dx, &dy);
+    enum sh_deco_style style = deco_style(toplevel->server);
+    int dx, dy, width, height;
+    deco_position(toplevel, style, &dx, &dy);
+    sh_decoration_size(style, &width, &height);
     double left = toplevel->scene_tree->node.x + dx - SH_DECO_MARGIN;
     double top = toplevel->scene_tree->node.y + dy - SH_DECO_MARGIN;
-    return x >= left && y >= top && x < left + 2 * SH_DECO_MARGIN + SH_DECO_WIDTH &&
-           y < top + 2 * SH_DECO_MARGIN + SH_DECO_HEIGHT;
+    return x >= left && y >= top && x < left + 2 * SH_DECO_MARGIN + width &&
+           y < top + 2 * SH_DECO_MARGIN + height;
+}
+
+/* Traffic lights take the pointer only on and around their circles; between and below them it
+ * reaches the window. */
+static bool lights_accept_input(struct wlr_scene_buffer *buffer, double *sx, double *sy) {
+    return sh_decoration_part_at(SH_DECO_TRAFFIC_LIGHTS, *sx, *sy) != SH_DECO_NONE;
 }
 
 /* Keeps the controls and the border above the window's surfaces. A new node starts on top and
@@ -86,24 +138,167 @@ void refresh_decoration(struct sh_toplevel *toplevel) {
         toplevel->deco = NULL;
         return;
     }
-    enum sh_deco_part hovered =
-        server->deco_hovered == toplevel ? server->deco_hovered_part : SH_DECO_NONE;
-    struct wlr_buffer *buffer = deco_buffer(server, hovered);
+    struct sh_deco_look look = {
+        .style = deco_style(server),
+        .focused = server->focused_toplevel == toplevel,
+        .hovered = server->deco_hovered == toplevel ? server->deco_hovered_part : SH_DECO_NONE,
+    };
+    // A held button looks pressed while the pointer stays on it.
+    if (server->deco_pressed == toplevel && look.hovered == server->deco_pressed_part)
+        look.pressed = server->deco_pressed_part;
+    struct wlr_buffer *buffer = deco_buffer(server, look);
     if (!buffer)
         return;
     if (!toplevel->deco) {
         toplevel->deco = wlr_scene_buffer_create(toplevel->content, buffer);
         if (!toplevel->deco)
             return;
-        wlr_scene_buffer_set_dest_size(toplevel->deco, SH_DECO_WIDTH, SH_DECO_HEIGHT);
     } else if (toplevel->deco->buffer != buffer) {
         wlr_scene_buffer_set_buffer(toplevel->deco, buffer);
     }
+    int width, height;
+    sh_decoration_size(look.style, &width, &height);
+    wlr_scene_buffer_set_dest_size(toplevel->deco, width, height);
+    toplevel->deco->point_accepts_input =
+        look.style == SH_DECO_TRAFFIC_LIGHTS ? lights_accept_input : NULL;
     int x, y;
-    deco_position(toplevel, &x, &y);
+    deco_position(toplevel, look.style, &x, &y);
     wlr_scene_node_set_position(&toplevel->deco->node, x, y);
     raise_frame_node(toplevel, &toplevel->deco->node);
     wlr_scene_node_set_enabled(&toplevel->deco->node, server->deco_revealed == toplevel);
+}
+
+static bool no_input(struct wlr_scene_buffer *buffer, double *sx, double *sy) { return false; }
+
+static bool same_look(const struct sh_shadow *a, const struct sh_shadow *b) {
+    return a->radius == b->radius && a->blur == b->blur && a->offset_x == b->offset_x &&
+           a->offset_y == b->offset_y && !memcmp(a->color, b->color, sizeof(a->color));
+}
+
+/* The shadow image of a look for windows of `width` by `height` (sh_shadow_image_size's) at
+ * the scale the outputs ask for, painted when first needed. */
+static struct sh_shadow_image *shadow_image(struct sh_server *server, const struct sh_shadow *look,
+                                            int width, int height) {
+    int scale = pixel_scale(server);
+    struct sh_shadow_image *images = server->shadow_images, *oldest = &images[0];
+    size_t count = sizeof(server->shadow_images) / sizeof(*server->shadow_images);
+    for (size_t i = 0; i < count; ++i) {
+        struct sh_shadow_image *image = &images[i];
+        if (image->buffer && image->scale == scale && image->width == width &&
+            image->height == height && same_look(&image->look, look)) {
+            image->used = ++server->shadow_uses;
+            return image;
+        }
+        if (oldest->buffer && (!image->buffer || image->used < oldest->used))
+            oldest = image;
+    }
+    struct sh_shadow_layout layout;
+    sh_shadow_layout(look, &layout);
+    int pixel_width = (layout.left + width + layout.right) * scale;
+    int pixel_height = (layout.top + height + layout.bottom) * scale;
+    uint32_t *pixels = malloc((size_t)pixel_width * pixel_height * sizeof(*pixels));
+    if (!pixels || !sh_shadow_paint(pixels, look, width, height, scale)) {
+        free(pixels);
+        return NULL;
+    }
+    struct wlr_buffer *buffer = sh_pixel_buffer(pixels, pixel_width, pixel_height);
+    if (!buffer)
+        return NULL; // it freed the pixels
+    wlr_buffer_drop(oldest->buffer); // windows showing it keep it until they change
+    *oldest = (struct sh_shadow_image){*look, width, height, scale, buffer, ++server->shadow_uses};
+    return oldest;
+}
+
+static void remove_shadow(struct sh_toplevel *toplevel) {
+    if (toplevel->shadow)
+        wlr_scene_node_destroy(&toplevel->shadow->node);
+    toplevel->shadow = NULL;
+    memset(toplevel->shadow_slices, 0, sizeof(toplevel->shadow_slices));
+    toplevel->shadow_image = NULL;
+}
+
+/* The shadow under a window whose frame reaches `outset` past its geometry (its border) with
+ * corners of `radius`: slices of a shared image laid out around the frame, in a tree at the
+ * bottom of the window's. It takes no input, and nothing that places or measures the window
+ * counts it. The tree has a clip of its own as large as the shadow, since the one rounding the
+ * window would hide it (only the nearest clip applies). Laid out again only when the frame's
+ * size or the image changes, so a running animation keeps what it set. */
+static void refresh_shadow(struct sh_toplevel *toplevel, bool on, int outset, int radius) {
+    struct sh_server *server = toplevel->server;
+    const struct sh_settings *settings = server_settings(server);
+    struct wlr_box g = toplevel_geometry(toplevel);
+    int width = g.width + 2 * outset, height = g.height + 2 * outset;
+    if (!on || width < 1 || height < 1) {
+        remove_shadow(toplevel);
+        return;
+    }
+    struct sh_shadow look = {
+        .radius = radius > 0 ? radius + outset : 0,
+        .blur = settings->shadow_blur,
+        .offset_x = settings->shadow_x,
+        .offset_y = settings->shadow_y,
+    };
+    bool focused = server->focused_toplevel == toplevel;
+    memcpy(look.color, focused ? settings->shadow_color : settings->shadow_inactive_color,
+           sizeof(look.color));
+    struct sh_shadow_layout layout;
+    sh_shadow_layout(&look, &layout);
+    int image_width, image_height;
+    sh_shadow_image_size(&layout, width, height, &image_width, &image_height);
+    struct sh_shadow_image *image = shadow_image(server, &look, image_width, image_height);
+    if (!image)
+        return;
+    if (!toplevel->shadow) {
+        toplevel->shadow = wlr_scene_tree_create(toplevel->content);
+        if (!toplevel->shadow)
+            return;
+        wlr_scene_node_lower_to_bottom(&toplevel->shadow->node);
+        for (int i = 0; i < SH_SHADOW_SLICES; ++i) {
+            struct wlr_scene_buffer *slice = wlr_scene_buffer_create(toplevel->shadow, NULL);
+            if (!slice) {
+                remove_shadow(toplevel);
+                return;
+            }
+            slice->point_accepts_input = no_input;
+            wlr_scene_buffer_set_opacity(slice, toplevel->opacity);
+            toplevel->shadow_slices[i] = slice;
+        }
+    }
+    wlr_scene_node_set_position(&toplevel->shadow->node, -outset, -outset);
+    toplevel->shadow_box = (struct wlr_box){-outset - layout.left, -outset - layout.top,
+                                            layout.left + width + layout.right,
+                                            layout.top + height + layout.bottom};
+    toplevel->shadow_alpha = look.color[3];
+#ifdef SHAODESK_ROUNDED_CORNERS
+    wlr_scene_tree_set_rounded_clip(toplevel->shadow,
+                                    &(struct wlr_box){-layout.left, -layout.top,
+                                                      toplevel->shadow_box.width,
+                                                      toplevel->shadow_box.height},
+                                    0);
+#endif
+    if (toplevel->shadow_image == image->buffer && toplevel->shadow_width == width &&
+        toplevel->shadow_height == height)
+        return;
+    toplevel->shadow_image = image->buffer;
+    toplevel->shadow_width = width;
+    toplevel->shadow_height = height;
+    struct sh_shadow_slice slices[SH_SHADOW_SLICES];
+    sh_shadow_slices(&layout, image_width, image_height, width, height, slices);
+    for (int i = 0; i < SH_SHADOW_SLICES; ++i) {
+        struct wlr_scene_buffer *slice = toplevel->shadow_slices[i];
+        const struct sh_shadow_slice *s = &slices[i];
+        wlr_scene_node_set_enabled(&slice->node, s->width > 0);
+        if (s->width <= 0)
+            continue;
+        if (slice->buffer != image->buffer)
+            wlr_scene_buffer_set_buffer(slice, image->buffer);
+        int scale = image->scale;
+        wlr_scene_buffer_set_source_box(slice, &(struct wlr_fbox){s->x * scale, s->y * scale,
+                                                                  s->width * scale,
+                                                                  s->height * scale});
+        wlr_scene_buffer_set_dest_size(slice, s->to_width, s->to_height);
+        wlr_scene_node_set_position(&slice->node, s->to_x, s->to_y);
+    }
 }
 
 /* The tab strip of a group's shown window: one segment per member, the shown one lit. */
@@ -121,25 +316,19 @@ void refresh_tabs(struct sh_toplevel *toplevel) {
     struct wlr_box g = toplevel_geometry(toplevel);
     int count = group_size(server, toplevel->group), active = group_index(toplevel);
     int hover = server->tabs_hovered == toplevel ? server->tabs_hovered_index : -1;
-    float scale = 1;
-    struct sh_output *output;
-    wl_list_for_each(output, &server->outputs, link) {
-        if (output->wlr_output->scale > scale)
-            scale = output->wlr_output->scale;
-    }
-    int pixel_scale = (int)ceilf(scale);
+    int scale = pixel_scale(server);
     if (g.width < 1)
         return;
     if (!toplevel->tabs || toplevel->tabs_width != g.width || toplevel->tabs_count != count ||
         toplevel->tabs_active != active || toplevel->tabs_hover != hover ||
-        toplevel->tabs_scale != pixel_scale) {
-        size_t pixels = (size_t)g.width * pixel_scale * SH_TABS_HEIGHT * pixel_scale;
+        toplevel->tabs_scale != scale) {
+        size_t pixels = (size_t)g.width * scale * SH_TABS_HEIGHT * scale;
         uint32_t *data = calloc(pixels, sizeof(*data));
         if (!data)
             return;
-        sh_tabs_paint(data, g.width, pixel_scale, count, active, hover);
+        sh_tabs_paint(data, g.width, scale, count, active, hover);
         struct wlr_buffer *buffer =
-            sh_pixel_buffer(data, g.width * pixel_scale, SH_TABS_HEIGHT * pixel_scale);
+            sh_pixel_buffer(data, g.width * scale, SH_TABS_HEIGHT * scale);
         if (!buffer)
             return; // it freed the pixels
         if (!toplevel->tabs)
@@ -153,7 +342,7 @@ void refresh_tabs(struct sh_toplevel *toplevel) {
         toplevel->tabs_count = count;
         toplevel->tabs_active = active;
         toplevel->tabs_hover = hover;
-        toplevel->tabs_scale = pixel_scale;
+        toplevel->tabs_scale = scale;
         wlr_scene_buffer_set_dest_size(toplevel->tabs, g.width, SH_TABS_HEIGHT);
     }
     wlr_scene_node_set_position(&toplevel->tabs->node, g.x, g.y);
@@ -248,19 +437,29 @@ void refresh_frame(struct sh_toplevel *toplevel) {
     refresh_decoration(toplevel); // the controls follow the window's width
     refresh_tabs(toplevel);
 
-    // Windows on an output that tiles get rounded corners, floating ones too, clipping
-    // everything drawn for them but the border, which rounds itself to match.
+    // Windows on an output that tiles get rounded corners, floating ones too, and with
+    // windows.round = "always" so does every other window but one that draws a shadow of its
+    // own, which has corners of its own too (and would lose that shadow to the clip). The clip
+    // takes in everything drawn for them but the border, which rounds itself to match.
     struct wlr_box g = toplevel_geometry(toplevel);
     struct wlr_output *output = toplevel_output(toplevel);
-    int radius = mapped && tiles_for(toplevel, output) && !frameless(toplevel, output)
-                     ? settings->corner_radius
-                     : 0;
+    bool rounded = mapped && !frameless(toplevel, output) &&
+                   (tiles_for(toplevel, output) ||
+                    (settings->round_always && !draws_own_shadow(toplevel)));
+    int radius = rounded ? settings->corner_radius : 0;
 #ifdef SHAODESK_ROUNDED_CORNERS
     wlr_scene_tree_set_rounded_clip(
         toplevel->content, radius > 0 ? &(struct wlr_box){0, 0, g.width, g.height} : NULL, radius);
 #else
     radius = 0;
 #endif
+    toplevel->corner_radius = radius;
+    // A shadow under every window that has none of its own, or whose own the clip cut away;
+    // none under a fullscreen or maximized one.
+    refresh_shadow(toplevel,
+                   settings->shadow && mapped && !frameless(toplevel, output) &&
+                       (radius > 0 || !draws_own_shadow(toplevel)),
+                   shown && !inset ? b : 0, radius);
 
     // xdg-shell windows keep their scene tree while unmapped; the border must not.
     for (int i = 0; i < 4; ++i) {

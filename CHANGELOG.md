@@ -115,6 +115,16 @@ menus and overlays, and motion throughout.
 
 ### The compositor
 
+- `windows.controls = "traffic_lights"` draws the controls of the windows shaodesk decorates as
+  red, yellow and green circles at their top-left, as macOS does: grey while the window has no
+  focus, their symbols shown while the pointer is on one, darker while pressed.
+- `windows.round = "always"` rounds floating windows too, on monitors that do not tile, except
+  one that draws a shadow of its own (a GTK frame), which keeps its own corners.
+- `windows.shadow = { enabled = true }` draws soft shadows under windows, darker under the
+  focused one, following their corners and leaving out fullscreen and maximized windows; they
+  take no input and are no part of a window's size. `shaodesk msg get frames` tells each
+  window's controls, corners and shadow.
+- Windows no longer show thin seams between their parts while they scale open or closed.
 - A tiled window alone on its workspace has no gaps around it and fills the space the panels
   leave, inside its border; a second tile brings the gaps back for both. `layout.smart_gaps =
   false` keeps them around a lone tile as before.

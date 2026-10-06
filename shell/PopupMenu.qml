@@ -46,7 +46,7 @@ Item {
     property rect bounds: Qt.rect(0, 0, width, height)
     property real minimumWidth: 200
     property real maximumWidth: 420
-    property real rowHeight: Theme.rowHeight
+    property real rowHeight: Theme.menuRowHeight
     // The entry highlighted as it opens: -1 for none, as when it is opened with the pointer.
     property int initialIndex: -1
     property int submenuDelay: 250
@@ -154,8 +154,9 @@ Item {
         property int current: -1
         property int openIndex: -1
         property Item child: null
-        readonly property real padding: Theme.spacingS
+        readonly property real padding: Theme.menuPadding
 
+        radius: Theme.menuRadius
         initialFocus: null
         onOpened: level.menu.forceActiveFocus()
 
@@ -320,6 +321,11 @@ Item {
         FontMetrics { id: labelFont; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
         FontMetrics { id: smallFont; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily }
         FontMetrics {
+            id: headingFont
+            font.pixelSize: Theme.menuHeadingSize; font.family: Theme.fontFamily
+            font.weight: Theme.macos ? Font.DemiBold : Font.Normal
+        }
+        FontMetrics {
             id: titleFont
             font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily; font.weight: Font.DemiBold
         }
@@ -336,13 +342,13 @@ Item {
                 if (e.separator)
                     continue
                 if (e.header) {
-                    label = Math.max(label, smallFont.advanceWidth(e.header))
+                    label = Math.max(label, headingFont.advanceWidth(e.header))
                     continue
                 }
                 if (e.title) {
                     // Its large icon in place of the icon column; its secondary text is elided.
                     label = Math.max(label, Theme.appIconSizeLarge + Theme.spacingL + titleFont.advanceWidth(e.title) -
-                                     (iconColumn ? Theme.iconSizeSmall + Theme.spacingL : 0))
+                                     (iconColumn ? Theme.iconSizeSmall + Theme.menuIconGap : 0))
                     continue
                 }
                 label = Math.max(label, labelFont.advanceWidth(e.text || ""))
@@ -350,7 +356,7 @@ Item {
                     secondary = Math.max(secondary, smallFont.advanceWidth(e.secondary))
                 submenu = submenu || !!e.submenu
             }
-            return Theme.spacingL + (iconColumn ? Theme.iconSizeSmall + Theme.spacingL : 0) + label +
+            return Theme.menuLabelInset + (iconColumn ? Theme.iconSizeSmall + Theme.menuIconGap : 0) + label +
                    (secondary > 0 ? Theme.spacingL + secondary : 0) +
                    (submenu ? Theme.spacingL + Theme.iconSizeSmall : 0) + Theme.spacingM + 2
         }
@@ -358,7 +364,7 @@ Item {
             var sum = 0
             for (var i = 0; i < entries.length; ++i)
                 sum += entries[i].separator ? 2 * Theme.spacingS + 1
-                     : entries[i].header ? Theme.headingHeight
+                     : entries[i].header ? Theme.menuHeadingHeight
                      : entries[i].title ? titleHeight : level.menu.rowHeight
             return Math.max(level.menu.rowHeight, sum)
         }

@@ -7,6 +7,9 @@ import QtQuick.Layouts
 // shell.widgets puts in it ("quick") and for night light, the volume with the outputs and the
 // applications' volumes a click away, the screen's brightness where it has a backlight, and the
 // battery along its foot. What sits on the bar instead keeps its own button there.
+//
+// In the macOS style it is Control Center: the tiles are modules two to a row, and the brightness
+// and the sound are modules of their own under a heading, each a raised card on the flyout.
 PopupCard {
     id: quick
     required property var panel
@@ -23,15 +26,16 @@ PopupCard {
     property string expanded: ""
     function toggle(list) { expanded = expanded === list ? "" : list }
     onOpened: expanded = ""
-    readonly property real padding: Theme.spacingXL
+    readonly property real padding: Theme.macos ? Theme.spacingL : Theme.spacingXL
     // As wide as the clock's flyout, which it lines up with.
-    implicitWidth: 7 * (Theme.rowHeight + Theme.spacingL) + 2 * padding
+    implicitWidth: Theme.macos ? Theme.controlCenterWidth : 7 * (Theme.rowHeight + Theme.spacingL) + 2 * padding
     implicitHeight: content.implicitHeight + 2 * padding + (footer.visible ? footer.height : 0)
     anchorRect: panel.barAnchor(barItem.x + barItem.width, 0)
     side: panel.popupSide
     alignment: Qt.AlignRight
     bounds: panel.popupArea
     radius: Theme.radiusLarge
+    color: Theme.controlCenterSurface
     readonly property string outputName: {
         var outputs = audio.outputs
         for (var i = 0; i < outputs.length; ++i)
@@ -55,6 +59,31 @@ PopupCard {
         }
     }
 
+    // A module of Control Center: a raised card around `section`, and `heading` over it, under the
+    // content; none in the taskbar style.
+    component Module: Rectangle {
+        required property Item section
+        property string heading
+        readonly property real inset: Theme.modulePadding
+        readonly property real headingRoom: heading !== "" ? Theme.moduleHeadingHeight : 0
+        visible: Theme.macos && section.visible
+        x: content.x + section.x - inset
+        y: content.y + section.y - inset - headingRoom
+        width: section.width + 2 * inset
+        height: section.height + 2 * inset + headingRoom
+        radius: Theme.moduleRadius
+        color: Theme.moduleColor
+        border.color: Theme.moduleOutline
+        Text {
+            x: parent.inset; y: parent.inset - Theme.spacingXS
+            height: Theme.moduleHeadingHeight
+            verticalAlignment: Text.AlignVCenter
+            text: parent.heading
+            color: Theme.text
+            font.pixelSize: Theme.fontSize; font.weight: Font.DemiBold; font.family: Theme.fontFamily
+        }
+    }
+
     // What does not fit scrolls, above the foot.
     Flickable {
         anchors.fill: parent
@@ -64,16 +93,24 @@ PopupCard {
         interactive: contentHeight > height
         boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+        Module { section: profileList }
+        Module { section: brightness; heading: "Display" }
+        Module { section: sound; heading: "Sound" }
         ColumnLayout {
             id: content
-            x: quick.padding; y: quick.padding
-            width: quick.width - 2 * quick.padding
-            spacing: Theme.spacingL
+            // Room for the modules' cards around what they hold.
+            readonly property real inset: Theme.macos ? Theme.modulePadding : 0
+            x: quick.padding + inset; y: quick.padding
+            width: quick.width - 2 * x
+            spacing: Theme.macos ? 2 * inset + Theme.spacingM : Theme.spacingL
             GridLayout {
                 id: tiles
                 Layout.fillWidth: true
-                columns: 3
-                columnSpacing: Theme.spacingM; rowSpacing: Theme.spacingL
+                // The modules reach out to the cards' edges.
+                Layout.leftMargin: -content.inset; Layout.rightMargin: -content.inset
+                Layout.bottomMargin: -content.inset
+                columns: Theme.macos ? 2 : 3
+                columnSpacing: Theme.spacingM; rowSpacing: Theme.macos ? Theme.spacingM : Theme.spacingL
                 QuickTile {
                     objectName: "quickTile:dnd"
                     visible: quick.widgets.notifications === "quick" && quick.center.serving
@@ -139,6 +176,7 @@ PopupCard {
             }
             // The appearance profiles, under their tile.
             Column {
+                id: profileList
                 objectName: "quickProfiles"
                 visible: quick.expanded === "profiles"
                 Layout.fillWidth: true
@@ -156,9 +194,11 @@ PopupCard {
             }
             // The screen's brightness, where it has a backlight.
             RowLayout {
+                id: brightness
                 objectName: "quickBrightness"
                 visible: quick.backlight.present
                 Layout.fillWidth: true
+                Layout.topMargin: Theme.macos ? Theme.moduleHeadingHeight : 0
                 spacing: Theme.spacingS
                 Item {
                     Layout.preferredWidth: Theme.rowHeight - Theme.spacingS; Layout.preferredHeight: Theme.rowHeight - Theme.spacingS
@@ -172,6 +212,7 @@ PopupCard {
                     onMoved: quick.backlight.setPercent(Math.round(value))
                 }
                 Text {
+                    visible: !Theme.macos
                     Layout.preferredWidth: Theme.rowHeight
                     // Level with the volume's percentage, whose row has a chevron after it.
                     Layout.rightMargin: Theme.rowHeight + Theme.spacingS
@@ -182,9 +223,11 @@ PopupCard {
             // The default output's volume, the outputs to play through and each application's
             // volume.
             ColumnLayout {
+                id: sound
                 objectName: "quickSound"
                 visible: quick.widgets.volume === "quick" && quick.audio.available
                 Layout.fillWidth: true
+                Layout.topMargin: Theme.macos ? Theme.moduleHeadingHeight : 0
                 spacing: Theme.spacingXS
                 RowLayout {
                     Layout.fillWidth: true
@@ -203,6 +246,7 @@ PopupCard {
                         onMoved: quick.audio.setVolume(Math.round(value))
                     }
                     Text {
+                        visible: !Theme.macos
                         Layout.preferredWidth: Theme.rowHeight
                         text: quick.audio.volume + "%"; horizontalAlignment: Text.AlignRight
                         color: Theme.text; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
@@ -292,7 +336,7 @@ PopupCard {
         anchors.margins: 1
         height: Theme.rowHeight + Theme.spacingL
         bottomLeftRadius: quick.radius - 1; bottomRightRadius: quick.radius - 1
-        color: Theme.surfaceRaised
+        color: Theme.macos ? "transparent" : Theme.surfaceRaised
         Rectangle { width: parent.width; height: 1; color: Theme.divider }
         Row {
             anchors.left: parent.left; anchors.leftMargin: quick.padding

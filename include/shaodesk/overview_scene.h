@@ -8,14 +8,19 @@
 
 struct wlr_scene_tree;
 
+struct wlr_scene_node;
+
 /* A number that changes whenever something drawn below `tree` does: which buffers, where, how
- * big, how opaque. It says nothing about scale. */
-uint64_t sh_thumb_fingerprint(const struct wlr_scene_tree *tree);
+ * big, how opaque. It says nothing about scale, nor about `skip` and what is below it (NULL for
+ * nothing to skip). */
+uint64_t sh_thumb_fingerprint(const struct wlr_scene_tree *tree,
+                              const struct wlr_scene_node *skip);
 
 /* Copies what is visible below `source` into `target`, everything scaled by `scale` about
- * `source`'s origin and multiplied by `opacity`. Returns how many nodes were made. */
+ * `source`'s origin and multiplied by `opacity`, but for `skip` and what is below it (NULL for
+ * nothing to skip). Returns how many nodes were made. */
 int sh_thumb_clone(struct wlr_scene_tree *target, const struct wlr_scene_tree *source,
-                   double scale, float opacity);
+                   double scale, float opacity, const struct wlr_scene_node *skip);
 
 /* Removes what sh_thumb_clone made. */
 void sh_thumb_clear(struct wlr_scene_tree *target);
