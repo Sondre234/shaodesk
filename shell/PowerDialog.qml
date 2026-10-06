@@ -6,7 +6,9 @@ import QtQuick.Layouts
 
 // The confirmation of power off, restart and log out, over a dimmed screen: the action goes
 // ahead when the countdown runs out, on its button or on Enter; Escape, Cancel or a click
-// beside the dialog gives it up. The screen dims and the dialog grows in each time it shows.
+// beside the dialog gives it up. The keyboard starts on the action's button, and Tab moves it
+// to Cancel and back, Enter pressing the one it is on. The screen dims and the dialog grows in
+// each time it shows.
 Item {
     id: root
     objectName: "powerDialog"
@@ -25,10 +27,10 @@ Item {
         NumberAnimation { property: "progress"; duration: Theme.durationNormal; easing.type: Theme.easing }
     }
     Keys.onEscapePressed: root.power.cancel()
-    Keys.onReturnPressed: root.power.confirm()
-    Keys.onEnterPressed: root.power.confirm()
+    Keys.onReturnPressed: cancel.activeFocus ? root.power.cancel() : root.power.confirm()
+    Keys.onEnterPressed: cancel.activeFocus ? root.power.cancel() : root.power.confirm()
 
-    function reset() { forceActiveFocus() }
+    function reset() { confirm.forceActiveFocus() }
 
     Rectangle {
         anchors.fill: parent
@@ -129,7 +131,8 @@ Item {
     }
 
     // A button of the dialog: framed on the raised surface, or for the action itself, which
-    // cannot be taken back, filled with the danger colour.
+    // cannot be taken back, filled with the danger colour. A ring in the accent colour around it
+    // says that the keyboard is on it.
     component DialogButton: Button {
         id: button
         property bool danger: false
@@ -146,6 +149,13 @@ Item {
                 anchors.fill: parent
                 radius: parent.radius
                 color: button.pressed ? Theme.pressed : "transparent"
+            }
+            Rectangle {
+                visible: button.activeFocus
+                anchors.fill: parent; anchors.margins: -Theme.spacingS
+                radius: parent.radius + Theme.spacingS
+                color: "transparent"
+                border.color: Theme.accent; border.width: 2
             }
         }
         contentItem: Text {

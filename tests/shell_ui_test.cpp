@@ -1688,6 +1688,17 @@ int main(int argc, char **argv) {
             std::cerr << "Enter did not log out\n";
             return 1;
         }
+        // The keyboard starts on the action's button; Tab takes it to Cancel, where Enter gives
+        // up.
+        requests.clear();
+        if (!ask("reboot") || !dialogItem("powerConfirm")->hasActiveFocus())
+            return fail("the power dialog's keyboard is not on its action's button");
+        QTest::keyClick(&dialog, Qt::Key_Tab);
+        if (!QTest::qWaitFor([&] { return dialogItem("powerCancel")->hasActiveFocus(); }))
+            return fail("Tab did not take the power dialog's keyboard to Cancel");
+        QTest::keyClick(&dialog, Qt::Key_Return);
+        if (!gaveUp() || !requests.isEmpty())
+            return fail("Enter on Cancel did not give up the restart");
         requests.clear();
         if (!ask("poweroff"))
             return fail("the power off was not asked about");
