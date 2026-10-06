@@ -74,7 +74,7 @@ which lists every file).
 | File | Covers |
 | --- | --- |
 | `Panel.qml` | The taskbar and all its popups (launcher, menus, mixer, calendar, ...), drawn in the bar's own surface, which `view.cpp` grows while one is open. |
-| `TaskButton.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `BarTip.qml` | Parts of the bar: widgets, and the tooltip for things on it. |
+| `TaskButton.qml`, `TrayButton.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `BarTip.qml` | Parts of the bar: widgets, and the tooltip for things on it. |
 | `NotificationHistory.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
 | `Icon.qml` | Line icons (Lucide), drawn as vectors in any colour. |
 | `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |

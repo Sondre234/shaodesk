@@ -41,7 +41,7 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/ShaodeskShell
     NO_PLUGIN NO_GENERATE_QMLTYPES
     QML_FILES Panel.qml Icon.qml Desktop.qml Switcher.qml Palette.qml Overview.qml NotificationCards.qml Osd.qml ConfigError.qml NotificationBell.qml NotificationHistory.qml
-    KeyboardLayout.qml BarTip.qml TaskButton.qml
+    KeyboardLayout.qml BarTip.qml TaskButton.qml TrayButton.qml
 
     PowerDialog.qml)
 add_executable(shaodesk-shell main.cpp ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp task_model.cpp task_model.hpp
