@@ -6,6 +6,19 @@ release; the dated sections below it record the work that led up to it, and all 
 
 ## Unreleased
 
+- The taskbar's popups open in a surface of their own over the whole monitor instead of growing
+  the bar's, so the bar never resizes and a popup can be as tall as the monitor allows: the
+  application menu is now up to 720 pixels tall. They show over fullscreen windows (the
+  application menu Super + R opens shows over a video), fade in with a short slide from the bar,
+  cast a shadow when drawn through the GPU, and close when the overview, the window switcher or
+  the command palette opens. A press on the bar while one is open still opens another in one
+  press, and one beside it closes it without reaching the window under it.
+- Menus share one look and the keyboard: Up, Down, Home and End move, Enter or Space chooses, and
+  Escape closes. Submenus open beside their entries instead of in their place: the bar menu's
+  appearance profiles, and a tray item's submenus, whose application hears of each level as it
+  opens and closes. Escape in the power menu closes only it.
+- The shell can list an installed application's desktop actions ("New window", "New private
+  window") and run one, a failure shown across the panel as for the application itself.
 - The shell needs Qt 6.9 or newer: its popups' shadows are Qt Quick Effects'
   `RectangularShadow`, new in 6.9.
 - The shell draws through the GPU by default; `shell.renderer = "software"` keeps the CPU
