@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 import QtQuick.Controls.Basic
+import QtQuick.Effects
 import QtQuick.Layouts
 
 // The notification cards: a stack of them from a corner of the focused monitor, each sliding in
@@ -9,7 +10,10 @@ Item {
     id: cards
     required property string outputName
     readonly property var center: shell.notifications
-    readonly property int margin: 12
+    // The gap between the cards and the screen's edges, and the room on their other sides, where
+    // their shadows fall when there are any.
+    readonly property int margin: Theme.spacingL
+    readonly property int spread: Math.max(margin, Theme.shadowMargin)
     // The output the cards are on; the surface stays while the last ones slide away.
     readonly property bool targeted: shell.cardsOutput === outputName
     property int settled: 0
@@ -22,8 +26,8 @@ Item {
     // The surface follows the cards' height up at once but down only after they have left, or a
     // card sliding out would be cut off.
     Timer { id: shrink; interval: 320; onTriggered: cards.settled = cards.shown }
-    width: center.cardWidth + 2 * margin
-    height: active ? Math.max(1, settled + 2 * margin) : 1
+    width: center.cardWidth + margin + spread
+    height: active ? Math.max(1, settled + margin + spread) : 1
 
     ListView {
         id: list
@@ -32,12 +36,12 @@ Item {
         // height; the surface, not the list, bounds what is drawn. Cards start at the edge of
         // the corner they stack from.
         readonly property int room: 4000
-        x: cards.margin
+        x: center.left ? cards.margin : cards.spread
         y: center.bottom ? cards.height - cards.margin - room : cards.margin
         width: center.cardWidth
         height: room
         interactive: false
-        spacing: 10
+        spacing: Theme.spacingL
         // Newest nearest the screen edge the stack starts from.
         verticalLayoutDirection: center.bottom ? ListView.BottomToTop : ListView.TopToBottom
         model: cards.active ? center.cards : null
@@ -79,15 +83,28 @@ Item {
             width: list.width
             height: card.height
 
-            Rectangle {
+            Item {
                 id: card
                 objectName: "notificationCard"
                 width: parent.width
                 height: content.implicitHeight + 24
-                radius: Theme.radiusLarge
-                color: Theme.surface
-                border.color: entry.critical ? Theme.danger : Theme.border
-                border.width: entry.critical ? 2 : 1
+                Loader {
+                    anchors.fill: parent
+                    active: Theme.effects
+                    sourceComponent: RectangularShadow {
+                        radius: Theme.radiusLarge
+                        blur: Theme.shadowBlur
+                        offset: Qt.vector2d(0, Theme.shadowOffset)
+                        color: Theme.shadow
+                    }
+                }
+                Rectangle {
+                    anchors.fill: parent
+                    radius: Theme.radiusLarge
+                    color: Theme.surface
+                    border.color: entry.critical ? Theme.danger : Theme.border
+                    border.width: entry.critical ? 2 : 1
+                }
                 MouseArea {
                     id: hover
                     anchors.fill: parent
