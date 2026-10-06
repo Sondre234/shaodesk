@@ -700,13 +700,19 @@ Item {
             KeyboardLayout { panel: root; barHeight: bar.height }
             QuickSettingsButton { id: quickButton; panel: root; barHeight: bar.height }
             ClockButton { id: clockButton; panel: root; barHeight: bar.height }
+            // A sliver at the bar's end, its line taking the accent colour under the pointer.
             Button {
                 id: showDesktopButton
-                Layout.preferredWidth: 14; Layout.fillHeight: true
+                Layout.preferredWidth: Theme.spacingL + Theme.spacingXS; Layout.fillHeight: true
                 onClicked: { root.closeMenus(); shell.tasks.showDesktop() }
                 Accessible.name: "Show desktop"
                 BarTip { panel: root; owner: showDesktopButton; text: "Show desktop" }
-                background: Rectangle { color: parent.hovered ? Theme.accent : Theme.border; width: 3; anchors.right: parent.right }
+                background: Rectangle {
+                    anchors.right: parent.right
+                    width: 3
+                    color: showDesktopButton.pressed ? Theme.accentHover : showDesktopButton.hovered ? Theme.accent : Theme.border
+                    Behavior on color { ColorAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
+                }
             }
         }
         Rectangle {
