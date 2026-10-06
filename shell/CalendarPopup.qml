@@ -18,7 +18,7 @@ PopupCard {
     }
     function today() { var d = new Date(); year = d.getFullYear(); month = d.getMonth() }
     open: panel.audioPopup === "calendar"
-    onOpenChanged: if (open) today()
+    onOpened: today()
     implicitWidth: 288; implicitHeight: 330
     anchorRect: panel.barAnchor(panel.audioPopupX, 0)
     side: panel.popupSide

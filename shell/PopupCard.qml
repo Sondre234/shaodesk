@@ -5,9 +5,10 @@ import QtQuick.Effects
 // A popup's card: Theme's opaque surface with an outline and rounded corners, and a shadow under
 // it when the GPU draws (Theme.effects). Setting `open` fades it in with a few pixels' slide from
 // the side it opens from; clearing it fades it out the same way, and it stays visible until it
-// has. Both are instant with animations off. What it holds goes inside it, filling it, and the
-// item `initialFocus` takes the keyboard when it opens. Presses on it stay with it, so that they
-// do not close it.
+// has. Both are instant with animations off. What it holds goes inside it, filling it. As it
+// opens it emits opened(), where what it shows is reset, and `initialFocus` (the card itself
+// unless set; null for none) takes the keyboard. Presses on it stay with it, so that they do not
+// close it.
 //
 // It places itself beside `anchorRect`, a rectangle in its parent's coordinates (a bar item's,
 // from panel.barAnchor): on the anchor's `side` (Qt.TopEdge above it, Qt.BottomEdge below it,
@@ -82,7 +83,23 @@ Item {
 
     visible: open || progress > 0
     opacity: progress
-    onVisibleChanged: if (visible && open && initialFocus) initialFocus.forceActiveFocus()
+    // Once each time it opens, when it is visible: made open, opened, or opened again while it
+    // was still fading out.
+    signal opened()
+    onOpened: if (initialFocus) initialFocus.forceActiveFocus()
+    property bool announced: false
+    function announce() {
+        if (open && visible && !announced) {
+            announced = true
+            opened()
+        }
+    }
+    onOpenChanged: {
+        if (!open) announced = false
+        announce()
+    }
+    onVisibleChanged: announce()
+    Component.onCompleted: announce()
     states: State {
         name: "open"
         when: card.open
