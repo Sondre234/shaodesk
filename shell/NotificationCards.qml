@@ -113,12 +113,23 @@ Item {
                         color: Theme.shadow
                     }
                 }
+                // A critical notification, which stays until it is dismissed, is outlined in the
+                // danger colour, with a band of it down its side.
                 Rectangle {
                     anchors.fill: parent
                     radius: Theme.radiusLarge
-                    color: Theme.surface
+                    color: entry.critical ? Theme.mix(Theme.surface, Theme.dangerFill, 0.06) : Theme.surface
                     border.color: entry.critical ? Theme.danger : Theme.border
-                    border.width: entry.critical ? 2 : 1
+                }
+                Item {
+                    visible: entry.critical
+                    width: Theme.spacingS; height: parent.height
+                    clip: true
+                    Rectangle {
+                        width: 2 * Theme.radiusLarge; height: parent.height
+                        radius: Theme.radiusLarge
+                        color: Theme.danger
+                    }
                 }
                 // The pointer anywhere on the card, its buttons too, holds its timer.
                 HoverHandler {
