@@ -195,10 +195,10 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 
 | Setting | Type | Default | Range | Description |
 | --- | --- | --- | --- | --- |
-| `animations` | table | - | - | Window animations. |
-| `animations.enabled` | boolean | true | - | Windows fade in and out and tiles glide into place. |
+| `animations` | table | - | - | Window and shell animations. |
+| `animations.enabled` | boolean | true | - | Windows fade in and out and tiles glide into place; `false` also stills the shell's animations. |
 | `animations.duration` | integer | 120 | 10 to 1000 | Animation length in milliseconds. |
-| `animations.speed` | number | 1.0 | 0.1 to 10 | Speed multiplier for every animation: 2 makes them twice as fast, 0.5 half as fast. |
+| `animations.speed` | number | 1.0 | 0.1 to 10 | Speed multiplier for every animation, the shell's too: 2 makes them twice as fast, 0.5 half as fast. |
 | `animations.curve` | enum | per kind | - | Easing for every animation that does not set its own: `"linear"`, `"ease-in"`, `"ease-out"`, `"ease-in-out"`, `"ease-out-quint"`, `"overshoot"`, `"spring"`, or `"bezier(x1, y1, x2, y2)"` (x between 0 and 1, y between -2 and 3). Unset, moves use `"spring"`, workspace slides `"ease-out-quint"`, and the rest `"ease-out"`. |
 | `animations.late_frame_ms` | integer | 80 | 0 to 1000 | A frame later than this finishes running animations instead of stuttering through them; 0 never skips. |
 | `animations.open` | table | - | - | A window appearing. Overrides the animation-wide settings. |
