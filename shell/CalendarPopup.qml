@@ -74,6 +74,21 @@ PopupCard {
             }
             Item { Layout.fillWidth: true }
             FlatButton {
+                id: todayButton
+                objectName: "calendarToday"
+                Layout.preferredHeight: Theme.rowHeight
+                leftPadding: Theme.spacingM; rightPadding: Theme.spacingM
+                enabled: calendar.month !== calendar.now.getMonth() || calendar.year !== calendar.now.getFullYear()
+                onClicked: calendar.today()
+                Accessible.name: "Go to today"
+                contentItem: Text {
+                    text: "Today"
+                    color: todayButton.enabled ? Theme.accent : Theme.textDisabled
+                    font.pixelSize: Theme.fontSizeSmall; font.weight: Font.DemiBold; font.family: Theme.fontFamily
+                    verticalAlignment: Text.AlignVCenter
+                }
+            }
+            FlatButton {
                 objectName: "calendarPrevious"
                 Layout.preferredWidth: Theme.rowHeight; Layout.preferredHeight: Theme.rowHeight
                 onClicked: calendar.step(-1)

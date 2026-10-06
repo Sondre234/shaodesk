@@ -666,9 +666,13 @@ int main(int argc, char **argv) {
             std::cerr << "the calendar did not page to the next month\n";
             return 1;
         }
-        click(find(view.rootObject(), "calendarTitle"));
-        if (!QTest::qWaitFor([&] { return calendar->property("month").toInt() == month; })) {
-            std::cerr << "the calendar title did not return to this month\n";
+        auto *today = find(view.rootObject(), "calendarToday");
+        if (!today || !today->isEnabled())
+            return fail("the calendar has no Today button, or it does nothing on another month");
+        click(today);
+        if (!QTest::qWaitFor([&] { return calendar->property("month").toInt() == month; }) ||
+            today->isEnabled()) {
+            std::cerr << "Today did not return the calendar to this month\n";
             return 1;
         }
         click(clock);
