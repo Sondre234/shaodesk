@@ -107,6 +107,13 @@ The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `t
 `power.cpp`, `palette.cpp`. `preview.cpp` has stand-ins for all of them for
 `--preview-popup`.
 
+The start menu (`Launcher.qml` and its `Start*.qml` parts) reads `shell.startMenu`, a `StartMenu`
+(`start_menu.cpp`): its own pins, seeded from the taskbar's; the applications launched lately
+(`launch_history.cpp`, which the controller tells of every launch); every application by letter;
+its search, which takes the palette's windows, workspaces and actions from `Palette::entries` and
+runs them with `Palette::run`; and the user's name and picture. It tells the controller to read
+the applications again when GIO's monitor says they changed.
+
 ### Popups and menus
 
 A popup is a `PopupCard`; a menu is a `PopupMenu` of plain entries. Both place themselves beside
