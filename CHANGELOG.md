@@ -6,6 +6,16 @@ release; the dated sections below it record the work that led up to it, and all 
 
 ## Unreleased
 
+- The application menu is now a start menu after Windows 11's: a search field on top; pages of
+  pinned tiles, which drag into place, and the applications launched lately with how long ago;
+  All apps from A to Z with a letter jump; and along the bottom the user's name and picture
+  beside the power button. Its search finds applications by name, generic name, keywords and
+  comment, and open windows, workspaces and actions as the command palette does, grouped under a
+  best match with the application's desktop actions. The keyboard moves through all of it, and
+  each application has a menu to open it, run its desktop actions and pin it to the start menu or
+  the taskbar. The start menu keeps pins of its own (`$XDG_STATE_HOME/shaodesk/start-pinned`,
+  seeded from the taskbar's) and counts launches (`$XDG_STATE_HOME/shaodesk/launches`).
+  Applications installed or removed show at once: the Refresh button is gone.
 - The taskbar's popups open in a surface of their own over the whole monitor instead of growing
   the bar's, so the bar never resizes and a popup can be as tall as the monitor allows: the
   application menu is now up to 720 pixels tall. They show over fullscreen windows (the
