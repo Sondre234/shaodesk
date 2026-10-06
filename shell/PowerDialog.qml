@@ -6,19 +6,35 @@ import QtQuick.Layouts
 
 // The confirmation of power off, restart and log out, over a dimmed screen: the action goes
 // ahead when the countdown runs out, on its button or on Enter; Escape, Cancel or a click
-// beside the dialog gives it up.
-Rectangle {
+// beside the dialog gives it up. The screen dims and the dialog grows in each time it shows.
+Item {
     id: root
     objectName: "powerDialog"
     readonly property var power: shell.power
-    color: Theme.scrim
     focus: true
+    // How far it has come in, from 0 to 1: the scrim's and the dialog's opacity, and what is left
+    // of the dialog's growth. It goes at once, as the action or the cancelling does.
+    property real progress: 0
+    states: State {
+        name: "shown"
+        when: root.Window.window !== null && root.Window.window.visible
+        PropertyChanges { root.progress: 1 }
+    }
+    transitions: Transition {
+        to: "shown"
+        NumberAnimation { property: "progress"; duration: Theme.durationNormal; easing.type: Theme.easing }
+    }
     Keys.onEscapePressed: root.power.cancel()
     Keys.onReturnPressed: root.power.confirm()
     Keys.onEnterPressed: root.power.confirm()
 
     function reset() { forceActiveFocus() }
 
+    Rectangle {
+        anchors.fill: parent
+        color: Theme.scrim
+        opacity: root.progress
+    }
     MouseArea {
         objectName: "powerBackdrop"
         anchors.fill: parent
@@ -28,6 +44,8 @@ Rectangle {
         id: box
         objectName: "powerBox"
         anchors.centerIn: parent
+        opacity: root.progress
+        scale: 0.94 + 0.06 * root.progress
         width: Math.min(420, root.width - 2 * Theme.spacingXL)
         height: column.implicitHeight + 2 * column.anchors.margins
         Loader {
