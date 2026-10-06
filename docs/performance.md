@@ -278,8 +278,43 @@ a 1920x1080 shell and the display 0.4 MB; after 300 notifications in a row the s
 had not grown. `tools/shell_perf.py --private-bus` measures with a session bus of its own; the
 tool never lets the shell see the real one.
 
+## After the redesign
+
+The shell after its redesign (the start menu, the clock flyout, Quick Settings, the restyled
+menus and overlays, and the motion of the bar and the overlays), against `main` just before the
+last part of it (`173d8a6`, which had everything but the motion and the consistency pass), both
+built RelWithDebInfo and measured with `tools/shell_perf.py BUILD --runs 5` and
+`--renderer software`, one build after the other and then again, on the development desktop
+with its own session running (24 threads, NVIDIA proprietary driver, Qt 6.11.2, two surfaces on
+one headless output, the example configuration). Medians, the range of the two sets where they
+differ:
+
+| | GPU (llvmpipe), before | GPU (llvmpipe), now | software, before | software, now |
+|---|---|---|---|---|
+| first frame, panel | 411 ms | 423 to 444 ms | 200 ms | 216 to 223 ms |
+| RSS | 320 MB | 325 MB | 98 MB | 92 MB |
+| PSS | 272 MB | 275 MB | 71 MB | 67 to 68 MB |
+| mapped libraries | 120 | 120 | 90 | 90 |
+| threads | 59 | 59 | 7 | 7 |
+| idle CPU, context switches per second | 0 | 0 | 0 | 0 |
+
+As before, "GPU" here is Qt's OpenGL renderer on Mesa's llvmpipe, drawn on the CPU, because the
+private compositor offers no GPU buffers: its memory and threads are llvmpipe's, and its first
+frame includes compiling llvmpipe's shaders. A real GPU's cost was not measured. The first frame
+is 10 to 30 ms later with the motion and the shared components, the QML of a few more files to
+create; memory moved by a few megabytes either way, within what the session around the
+measurement moves it by (the figures in the earlier tables were taken on a quieter machine, and
+PSS falls as other processes share the same libraries). Idle stays at nothing: every animation
+is a transition or a `Behavior` that runs only as something changes, and the one that runs by
+itself, the urgent pulse, stops after a few beats. In one run of five through the GPU, both
+before and now, the clock's once-a-minute tick fell inside the ten seconds measured, which shows
+as one frame's worth of wakeups (about 9 a second over the ten seconds, llvmpipe's threads
+drawing it); the software renderer draws that frame with less than one wakeup a second.
+
 ## Not verified
 
+- The shell's motion on a real GPU at 144 or 200 Hz, and what it costs there per frame: the
+  measurements above are llvmpipe's, and only say that nothing animates while idle.
 - Real GPU drawing, now the default. `renderer = "gpu"` was measured only on the software GL
   implementation, and software rendering was not compared with a GPU on a 4K output, where the
   desktop surface's buffers (three of 33 MB each) are the largest memory cost either way.
