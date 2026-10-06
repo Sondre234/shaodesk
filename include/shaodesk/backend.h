@@ -231,6 +231,7 @@ struct sh_settings {
     int repeat_delay;
     int gap_inner; /* between neighbouring windows */
     int gap_outer; /* between windows and the edges of the usable area */
+    bool smart_gaps; /* a workspace's only tile has no gaps */
     char keyboard_layout[128];
     char keyboard_variant[128];
     char keyboard_model[128];
@@ -448,6 +449,8 @@ void sh_tiling_insert(struct sh_tiling *tiling, const char *output, int workspac
 void sh_tiling_remove(struct sh_tiling *tiling, const void *window);
 /* The output name of the window's tree, or NULL when it is not tiled. */
 const char *sh_tiling_output(const struct sh_tiling *tiling, const void *window);
+/* How many windows the tree of `workspace` on `output` holds; a window group is one. */
+int sh_tiling_count(const struct sh_tiling *tiling, const char *output, int workspace);
 typedef void (*sh_tile_place)(void *userdata, void *window, struct sh_rect rect);
 void sh_tiling_arrange(struct sh_tiling *tiling, const char *output, int workspace,
                        struct sh_rect area, int gap, sh_tile_place place, void *userdata);

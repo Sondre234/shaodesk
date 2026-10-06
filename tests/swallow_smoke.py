@@ -9,8 +9,10 @@ import harness
 
 compositor, probe, example = (str(Path(p).resolve()) for p in sys.argv[1:4])
 
+# A lone tile keeps its gaps, which tell it from a fullscreen window.
 base = (Path(example).read_text().replace("xwayland = true", "xwayland = false")
-        .replace("tiling = false,", "tiling = true,", 1))
+        .replace("tiling = false,", "tiling = true,", 1)
+        .replace("    layout = {\n", "    layout = {\n        smart_gaps = false,\n", 1))
 assert "    windows = {\n" in base
 
 

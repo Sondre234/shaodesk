@@ -833,6 +833,8 @@ bool overview_axis(struct sh_server *server, const struct wlr_pointer_axis_event
 /* placement.c */
 struct sh_rect gap_area(const struct sh_settings *settings, struct sh_rect area,
                         enum sh_action action);
+struct sh_rect tiling_area(struct sh_server *server, struct wlr_output *output, int workspace,
+                           int joining, int *gap);
 bool frameless(struct sh_toplevel *toplevel, struct wlr_output *output);
 struct sh_rect inside_border(struct sh_server *server, struct sh_rect rect);
 struct wlr_output *toplevel_output(struct sh_toplevel *toplevel);

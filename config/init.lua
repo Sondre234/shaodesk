@@ -55,6 +55,7 @@ return {
     -- touchpad = { natural_scroll = true, tap_to_click = true, disable_while_typing = true },
     layout = {
         -- gap = 8, -- sets both; or gap_inner (between windows) and gap_outer (at the edges)
+        -- smart_gaps = true, -- no gaps around a tiled window alone on its workspace
         workspaces = 4,
         tiling = false, -- automatic tiling on every monitor; outputs.monitors can override it,
         -- and each monitor's panel button toggles it there

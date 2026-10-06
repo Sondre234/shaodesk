@@ -156,6 +156,7 @@ struct Config {
                          .repeat_delay = 600,
                          .gap_inner = 8,
                          .gap_outer = 8,
+                         .smart_gaps = true,
                          .keyboard_layout = "us",
                          .keyboard_variant = "",
                          .keyboard_model = "",

@@ -60,14 +60,14 @@ with harness.Compositor(compositor, Path(example).read_text()
     desktop.wait_for(lambda: windows()[0][2] and boxes()[0][2] > 320,
                      "single window fills the output")
     full = boxes()[0]
-    assert full[0] == GAP and full[1] == GAP, full
+    assert full[0] == 0 and full[1] == 0, full  # a lone tile has no gaps (layout.smart_gaps)
 
     # A new window splits the focused one; both share the height.
     launch()
     desktop.wait_for(lambda: len(boxes()) == 2 and side_by_side(*boxes()),
                      "second window tiled beside the first")
     left, right = boxes()
-    assert left[0] == GAP and right[0] + right[2] == full[0] + full[2], boxes()
+    assert left[0] == GAP and right[0] + right[2] == full[0] + full[2] - GAP, boxes()
     assert all(w[2] for w in windows())
 
     # Moving a tile to another workspace gives the space back and tiles it there.
@@ -75,7 +75,7 @@ with harness.Compositor(compositor, Path(example).read_text()
     # Every probe adds a test panel, so compare across the width only.
     def fills(workspace=1):
         found = boxes(workspace)
-        return len(found) == 1 and found[0][0] == GAP and found[0][2] == full[2]
+        return len(found) == 1 and found[0][0] == 0 and found[0][2] == full[2]
     desktop.wait_for(fills, "remaining window refilled")
     assert [w[2] for w in windows() if w[0] == 2] == [True]
     msg("workspace", "2")

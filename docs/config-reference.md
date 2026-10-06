@@ -68,6 +68,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `layout.gap` | integer | 8 | 0 to 100 | Pixels between windows and at the screen edges; `gap_inner` and `gap_outer` override it. |
 | `layout.gap_inner` | integer | `gap` | 0 to 100 | Pixels between tiled windows. |
 | `layout.gap_outer` | integer | `gap` | 0 to 100 | Pixels between tiles and the edges. |
+| `layout.smart_gaps` | boolean | true | - | No gaps around a tiled window that is alone on its workspace. |
 | `layout.workspaces` | integer | 4 | 1 to 10 | Workspaces per monitor. |
 | `layout.workspace_names` | list of strings | unset | - | Names for workspaces 1, 2, ...; at most `workspaces` of them, each up to 32 characters, not a number and not repeated ("" leaves one unnamed). The panel shows them, and `workspace` and `move_to_workspace` (bindings with `workspace = "web"`, or `shaodesk msg workspace web`) accept them. |
 | `layout.tiling` | boolean | false | - | Start every monitor with automatic tiling; `outputs.monitors.<name>.tiling` overrides it. |

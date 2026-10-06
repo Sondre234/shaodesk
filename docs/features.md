@@ -241,7 +241,8 @@ it flips between two windows.
 ### Borders, opacity and rounded corners
 
 `layout.gap` sets the space around tiles; `gap_inner` (between windows) and `gap_outer`
-(at the output's edges) set them separately. Hyprland's `gaps_in` is half of `gap_inner`,
+(at the output's edges) set them separately, and a tile alone on its workspace has none unless
+`layout.smart_gaps = false` (see [Tiling](#tiling)). Hyprland's `gaps_in` is half of `gap_inner`,
 since Hyprland adds it on both sides. The `windows` table draws a border around each window
 (`border_width`, `border_color` for the focused one, `border_inactive_color`) and sets
 `opacity` and `inactive_opacity`, per application too with `rules`. Fullscreen windows have no
@@ -569,6 +570,13 @@ its space along the longer side, and a new window opens on the output under the
 pointer, splitting the focused window there (or the one under the pointer) on the side
 nearer the pointer. Floating windows also open on the pointer's output. Closing a window gives its
 space back to its neighbour.
+
+A tile alone on its workspace has no gaps: it fills the space the panels leave, inside its
+border. A second tile brings `gap_inner` and `gap_outer` back for both, and they go again when it
+closes, floats or leaves (`layout.smart_gaps`, on by default, like sway's `smart_gaps`; `false`
+keeps the gaps around a lone tile too). A window group is one tile; floating, sticky and
+maximized windows are not tiles, and two windows in monocle keep their gaps. A lone column of the
+scroll layout loses its gaps and keeps its width.
 
 - Mod + right drag on a tile, or dragging its edge, moves the split lines around it.
 - Moving a tile (Mod + left drag or its title bar) lifts it out; dropping it splits

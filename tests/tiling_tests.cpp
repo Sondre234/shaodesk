@@ -42,6 +42,9 @@ int main() {
         sh_tiling *tiling = sh_tiling_create();
         require(tiling, "cannot create tiling");
         require(arrange(tiling, area, 8).empty(), "empty tree placed windows");
+        require(sh_tiling_count(tiling, "DP-1", 0) == 0 && sh_tiling_count(nullptr, "DP-1", 0) == 0 &&
+                    sh_tiling_count(tiling, nullptr, 0) == 0,
+                "an empty tree counts windows");
 
         sh_tiling_insert(tiling, "DP-1", 0, &windows[0], nullptr, false, 0, 0);
         auto placed = arrange(tiling, area, 8);
@@ -84,6 +87,7 @@ int main() {
         for (int i = 11; i >= 1; --i)
             sh_tiling_remove(tiling, &windows[i]);
         require(!sh_tiling_output(tiling, &windows[1]), "removed window still tiled");
+        require(sh_tiling_count(tiling, "DP-1", 0) == 1, "removal did not count down");
         placed = arrange(tiling, area, 8);
         require(placed.size() == 1 && placed[&windows[0]].width == full.width &&
                     placed[&windows[0]].height == full.height,
@@ -135,6 +139,12 @@ int main() {
         require(arrange(tiling, area, 8).size() == 3, "other trees changed this one");
         sh_tiling_insert(tiling, "DP-1", 0, &windows[3], nullptr, false, 0, 0);
         require(arrange(tiling, area, 8).size() == 3, "a window was tiled twice");
+        // Each tree counts its own windows.
+        require(sh_tiling_count(tiling, "DP-1", 0) == 3 && sh_tiling_count(tiling, "DP-1", 1) == 1 &&
+                    sh_tiling_count(tiling, "HDMI-A-1", 0) == 1 &&
+                    sh_tiling_count(tiling, "HDMI-A-1", 1) == 0 &&
+                    sh_tiling_count(tiling, "DP-2", 0) == 0,
+                "tile counts wrong");
 
         // Keyboard resizing moves a split beside the tile in the arrow's direction: the tile's
         // own edge on that side when it is a split (growing it), else the opposite one.
@@ -301,6 +311,7 @@ int main() {
                     "replace kept the wrong window tiled");
             back = arrange(lay, screen, 0);
             require(back[&w[7]] == dwindle[&w[1]] && !back.count(&w[1]), "replacement moved the slot");
+            require(sh_tiling_count(lay, "DP-1", 0) == 5, "a replacement changed the count");
             require(!sh_tiling_replace(lay, &w[1], &w[8]) && !sh_tiling_replace(lay, &w[7], &w[0]) &&
                         !sh_tiling_replace(lay, &w[7], &w[7]),
                     "invalid replace accepted");

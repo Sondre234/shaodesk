@@ -115,6 +115,9 @@ menus and overlays, and motion throughout.
 
 ### The compositor
 
+- A tiled window alone on its workspace has no gaps around it and fills the space the panels
+  leave, inside its border; a second tile brings the gaps back for both. `layout.smart_gaps =
+  false` keeps them around a lone tile as before.
 - The compositor tells the shell whether night light is on and whether the schedule decides
   (`night-light ACTIVE MODE` on the control socket's state stream).
 - `shaodesk msg get layers` says which layer surface holds the keyboard, in a fifth column.

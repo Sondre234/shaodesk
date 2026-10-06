@@ -16,6 +16,23 @@ struct sh_rect gap_area(const struct sh_settings *settings, struct sh_rect area,
     return (struct sh_rect){area.x + d, area.y + d, area.width - 2 * d, area.height - 2 * d};
 }
 
+/* The area the tiling of `workspace` on `output` is arranged in, and in `gap` the gap between
+ * its tiles, while it holds its windows and `joining` more. With layout.smart_gaps a lone tile
+ * has no gaps and fills the usable area. Every arrangement of a workspace's tiling and the
+ * preview of a new tile take them from here, so a lone window stays where it is however it is
+ * arranged, and the gaps come and go with its neighbours. */
+struct sh_rect tiling_area(struct sh_server *server, struct wlr_output *output, int workspace,
+                           int joining, int *gap) {
+    const struct sh_settings *settings = server_settings(server);
+    if (settings->smart_gaps &&
+        sh_tiling_count(server->tiling, output->name, workspace) + joining == 1) {
+        *gap = 0;
+        return usable_area(server, output);
+    }
+    *gap = settings->gap_inner;
+    return gap_area(settings, usable_area(server, output), SH_TILE);
+}
+
 /* Fullscreen windows have no border, nor do maximized ones on an output that does not tile:
  * their top edge is the screen's, so the pointer pushed against it lands on the window's drag
  * strip rather than a border. */
@@ -241,9 +258,9 @@ void reflow_output(struct sh_server *server, struct wlr_output *output) {
                              &target))
                 place_toplevel(toplevel, action, target);
         }
-        sh_tiling_arrange(server->tiling, output->name, workspace,
-                          gap_area(settings, area, SH_TILE), settings->gap_inner, place_tiled,
-                          NULL);
+        int gap;
+        struct sh_rect tiles = tiling_area(server, output, workspace, 0, &gap);
+        sh_tiling_arrange(server->tiling, output->name, workspace, tiles, gap, place_tiled, NULL);
     }
     struct sh_toplevel *toplevel;
     wl_list_for_each(toplevel, &server->toplevels, link) {

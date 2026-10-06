@@ -267,13 +267,13 @@ static void find_tile(void *data, void *window, struct sh_rect rect) {
 void move_tile(struct sh_toplevel *toplevel, struct sh_toplevel *neighbour,
                struct wlr_output *output, bool horizontal, int sign) {
     struct sh_server *server = toplevel->server;
-    const struct sh_settings *settings = server_settings(server);
-    struct sh_rect area = gap_area(settings, usable_area(server, output), SH_TILE);
     struct tile_lookup lookup = {neighbour, {0}, false};
     sh_tiling_remove(server->tiling, toplevel);
     // Arranging without the window gives the neighbour the box it is split from.
-    sh_tiling_arrange(server->tiling, output->name, toplevel->workspace, area, settings->gap_inner,
-                      find_tile, &lookup);
+    int gap;
+    struct sh_rect area = tiling_area(server, output, toplevel->workspace, 0, &gap);
+    sh_tiling_arrange(server->tiling, output->name, toplevel->workspace, area, gap, find_tile,
+                      &lookup);
     struct sh_rect r = lookup.rect;
     double x = r.x + r.width / 2.0, y = r.y + r.height / 2.0;
     if (horizontal)

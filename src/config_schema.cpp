@@ -90,6 +90,8 @@ const Option options[] = {
      "Pixels between windows and at the screen edges; `gap_inner` and `gap_outer` override it."},
     {"layout.gap_inner", "integer", "`gap`", "8", 0, 100, "Pixels between tiled windows."},
     {"layout.gap_outer", "integer", "`gap`", "8", 0, 100, "Pixels between tiles and the edges."},
+    {"layout.smart_gaps", "boolean", "true", "false", none, none,
+     "No gaps around a tiled window that is alone on its workspace."},
     {"layout.workspaces", "integer", "4", "4", 1, 10, "Workspaces per monitor."},
     {"layout.workspace_names", "list of strings", "unset", "{ \"web\", \"code\" }", none, none,
      "Names for workspaces 1, 2, ...; at most `workspaces` of them, each up to 32 characters, "
