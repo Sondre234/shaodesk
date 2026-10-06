@@ -134,6 +134,7 @@ PreviewData::PreviewData(ShellController &controller)
     center->notify(message);
 
     controller.power()->setAvailable("lock,suspend,hibernate,reboot,poweroff,logout");
+    controller.setNightLight(true, "auto");
 
     // The windows, as the tests' stand-in model: a ListModel with the roles TaskModel has.
     QQmlComponent component(controller.engine());

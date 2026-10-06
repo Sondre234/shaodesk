@@ -56,6 +56,8 @@ Item {
     // The surface the popups are drawn in, and the bar's edges in its coordinates: the bar's
     // surface lies along its top or bottom edge, across its width.
     readonly property Item popupLayer: popupLayer
+    // What Quick Settings opens the wallpaper picker by.
+    readonly property Item quickSettingsButton: quickButton
     readonly property real barTop: (onTop ? 0 : popover.height - height) + bar.y
     readonly property real barBottom: barTop + bar.height
     // A popup of the bar opens away from the screen edge the bar is on (PopupCard's side), beside
@@ -217,6 +219,9 @@ Item {
         case "wallpapers":
             toggleAudioPopup("wallpapers", wallpapersButton)
             return wallpapersButton.visible
+        case "quick-settings":
+            toggleAudioPopup("quick", quickButton)
+            return quickButton.visible
         case "notifications":
             // The flyout with the mail application's notifications expanded.
             toggleAudioPopup("clock", clockButton)
@@ -502,6 +507,17 @@ Item {
                 onLoaded: used = true
                 sourceComponent: Component { GroupList { panel: root; barItem: bar } }
             }
+
+            // The Quick Settings button: tiles, the volume and brightness, the battery.
+            Loader {
+                id: quickSettingsLoader
+                asynchronous: !(root.audioPopup === "quick")
+                active: root.audioPopup === "quick" || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { QuickSettings { panel: root; barItem: bar } }
+            }
         }
     }
 
@@ -645,6 +661,7 @@ Item {
             BatteryWidget { panel: root; barHeight: bar.height }
             VolumeButton { id: audioWidget; panel: root; barHeight: bar.height }
             KeyboardLayout { panel: root; barHeight: bar.height }
+            QuickSettingsButton { id: quickButton; panel: root; barHeight: bar.height }
             ClockButton { id: clockButton; panel: root; barHeight: bar.height }
             Button {
                 id: showDesktopButton
