@@ -58,13 +58,12 @@ Item {
     // opens under a window being typed in.
     readonly property bool expanded: menuOpen || groupOpen
     onMenuOpenChanged: if (menuOpen) groupOpen = false
-    // The surface the popups are drawn in, and the bar's edges in its coordinates: the bar's
+    // The surface the popups are drawn in, and the bar's top edge in its coordinates: the bar's
     // surface lies along its top or bottom edge, across its width.
     readonly property Item popupLayer: popupLayer
     // What Quick Settings opens the wallpaper picker by.
     readonly property Item quickSettingsButton: quickButton
     readonly property real barTop: (onTop ? 0 : popover.height - height) + bar.y
-    readonly property real barBottom: barTop + bar.height
     // A popup of the bar opens away from the screen edge the bar is on (PopupCard's side), beside
     // the rectangle barAnchor gives: from `x`, `width` wide, and across the bar.
     readonly property int popupSide: onTop ? Qt.BottomEdge : Qt.TopEdge
