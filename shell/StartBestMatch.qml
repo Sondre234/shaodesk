@@ -5,15 +5,24 @@ import QtQuick.Controls.Basic
 // The best match of the start menu's search, on a card of its own: its icon large, its name,
 // what it is and what its entry says of it, and buttons for what it can do: an application's
 // Open and its desktop actions, a window's Switch to, an action's Run. `current` says the
-// keyboard is at it.
+// keyboard is at it, and `button` at which of its buttons (-1 for the card itself, 0 for Open,
+// then the actions), which press() presses.
 AbstractButton {
     id: card
     required property var result
     required property Item launcher
     property bool current: false
+    property int button: -1
     readonly property bool app: result.kind === "app"
     // Read from its desktop entry only while it shows.
     readonly property var actions: visible && app && !result.configured ? shell.appActions(result.appId) : []
+    readonly property int buttons: 1 + actions.length
+    function press(index) {
+        if (index <= 0)
+            launcher.run(result)
+        else if (index <= actions.length)
+            launcher.launchAction(result.appId, actions[index - 1].action)
+    }
     objectName: "startBestMatch"
     focusPolicy: Qt.NoFocus
     hoverEnabled: true
@@ -87,18 +96,21 @@ AbstractButton {
                 objectName: "startBestOpen"
                 primary: true
                 chevron: false
+                current: card.current && card.button === 0
                 text: card.app ? "Open" : card.result.kind === "window" ? "Switch to" : "Run"
-                onClicked: card.launcher.run(card.result)
+                onClicked: card.press(0)
             }
             Repeater {
                 model: card.actions
                 delegate: StartButton {
                     required property var modelData
+                    required property int index
                     objectName: "startBestAction:" + modelData.action
                     chevron: false
+                    current: card.current && card.button === index + 1
                     iconName: modelData.icon
                     text: modelData.name
-                    onClicked: card.launcher.launchAction(card.result.appId, modelData.action)
+                    onClicked: card.press(index + 1)
                 }
             }
         }

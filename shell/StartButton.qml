@@ -5,12 +5,14 @@ import QtQuick.Controls.Basic
 // A small button of the start menu, as "All apps ›" and "‹ Back" above its views and those of
 // the best match of a search: its text on a raised fill, an icon before it (a line icon Icon.qml
 // draws, else a theme icon's name or an image's path), and a chevron after it, or before it with
-// `back` set. `primary` fills it with the accent colour, for what a click mostly does.
+// `back` set. `primary` fills it with the accent colour, for what a click mostly does. `current`
+// says the keyboard is at it, which a ring in the accent colour around it shows.
 AbstractButton {
     id: button
     property bool back: false
     property bool chevron: true
     property bool primary: false
+    property bool current: false
     property string iconName
     focusPolicy: Qt.NoFocus
     hoverEnabled: true
@@ -25,6 +27,13 @@ AbstractButton {
              : button.pressed ? Theme.mix(Theme.surfaceRaisedHover, Theme.text, 0.05)
              : button.hovered ? Theme.surfaceRaisedHover : Theme.surfaceRaised
         border.color: button.primary ? "transparent" : Theme.border
+        Rectangle {
+            visible: button.current
+            anchors.fill: parent; anchors.margins: -Theme.spacingXS - 1
+            radius: parent.radius + Theme.spacingXS + 1
+            color: "transparent"
+            border.color: Theme.accent; border.width: 2
+        }
     }
     contentItem: Row {
         spacing: Theme.spacingS

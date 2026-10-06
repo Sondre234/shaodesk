@@ -2279,6 +2279,26 @@ ListModel {
         if (!QTest::qWaitFor([&] { return shown("startBestMatch") && shown("startBestAction:touch"); }) ||
             item("startBestMatch")->property("result").toMap()["title"] != "Action app")
             return fail("an application found as the best match does not offer its desktop actions");
+        // The keyboard reaches the best match's buttons: Right or Tab moves on to Open and then
+        // its actions, Left back; Enter presses the one it is at.
+        auto atButton = [&](const QString &name) { return item(name)->property("current").toBool(); };
+        key(Qt::Key_Right);
+        if (!QTest::qWaitFor([&] { return atButton("startBestOpen"); }))
+            return fail("Right did not move from the best match to its Open button");
+        key(Qt::Key_Tab);
+        if (!QTest::qWaitFor([&] { return atButton("startBestAction:touch"); }) || atButton("startBestOpen"))
+            return fail("Tab did not move on to the best match's first action");
+        key(Qt::Key_Left);
+        if (!QTest::qWaitFor([&] { return atButton("startBestOpen"); }) || atButton("startBestAction:touch"))
+            return fail("Left did not move back to the best match's Open button");
+        key(Qt::Key_Right);
+        QFile::remove(actionMarker);
+        key(Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return QFile::exists(actionMarker); }) ||
+            !QTest::qWaitFor([&] { return !launcherOpen(); }))
+            return fail("Enter did not run the best match's action the keyboard was at");
+        if (!openStart())
+            return fail("the start menu did not open after running the best match's action");
         search->setProperty("text", "");
         type("app");
         // Every application's name has it (and "Applications menu", an action): the model says

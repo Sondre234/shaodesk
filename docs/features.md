@@ -135,8 +135,9 @@ buttons beside Open. Among equal matches, what is launched more often comes firs
 far worse than the best match is left out.
 
 The arrows, Tab and Page Up and Page Down move through the tiles, the lists and the results, and
-Enter opens what the keyboard is at (the best match, as the search starts); Escape clears the
-search, then closes the menu. Right-clicking an application, or the menu key, gives its menu:
+Enter opens what the keyboard is at (the best match, as the search starts); at the best match,
+Right and Tab move on to its buttons (Open, then its desktop actions) and Left back, Enter
+pressing the one ringed. Escape clears the search, then closes the menu. Right-clicking an application, or the menu key, gives its menu:
 Open, its desktop actions, Pin to Start or Unpin from Start, a tile's Move to front, and Pin to
 taskbar or Unpin from taskbar.
 

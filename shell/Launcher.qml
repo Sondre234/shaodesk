@@ -83,8 +83,9 @@ PopupCard {
         }
     }
     // The keys the search field leaves: what moves through the view shown (the arrows, Tab, the
-    // page keys), Enter, which runs what the keyboard is at, and Escape, which closes the letters
-    // of All apps, else clears the search, else closes the menu.
+    // page keys), Enter, which runs what the keyboard is at (in the search, the best match's
+    // button it is at), and Escape, which closes the letters of All apps, else clears the
+    // search, else closes the menu.
     function key(event) {
         var shown = view === "search" ? searchView : view === "all" ? allView : home
         if (event.key === Qt.Key_Escape) {
@@ -96,9 +97,9 @@ PopupCard {
                 panel.closeMenus()
             event.accepted = true
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (shown === searchView && searchView.currentResult)
-                run(searchView.currentResult)
-            else if (shown !== searchView && shown.currentApp)
+            if (shown === searchView)
+                searchView.activate()
+            else if (shown.currentApp)
                 launch(shown.currentApp.appId)
             event.accepted = true
         } else if (event.key === Qt.Key_Menu || (event.key === Qt.Key_F10 && (event.modifiers & Qt.ShiftModifier))) {
@@ -108,7 +109,8 @@ PopupCard {
             event.accepted = true
         } else {
             // Tab stays in the menu, whatever there is to move through.
-            event.accepted = shown.key(event) || event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab
+            event.accepted = shown.key(event, search.cursorPosition === search.length) ||
+                             event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab
         }
     }
     // Opens it at (x, y) in `item`, as a right press there does, or by `item`'s bottom-left
