@@ -13,12 +13,13 @@ Item {
     property var strip: shell.overviewStrip
     property string filter: shell.overviewFilter
     property rect area: shell.overviewArea
-    // The search box's text and place, held as they were while it goes: the compositor forgets
-    // them as the overview closes.
+    // The search box's text, held as it was while it goes: the controller forgets it as the
+    // overview closes, before the view hears that it should go, so only an open overview's is
+    // taken, and it starts afresh each time it shows.
     property string shownFilter: ""
-    property rect shownArea
-    Binding on shownFilter { when: overview.shown; value: overview.filter; restoreMode: Binding.RestoreNone }
-    Binding on shownArea { when: overview.shown; value: overview.area; restoreMode: Binding.RestoreNone }
+    Component.onCompleted: shownFilter = filter
+    onShownChanged: if (shown) shownFilter = filter
+    onFilterChanged: if (shell.overviewOutput !== "") shownFilter = filter
     property int selected: shell.overviewSelected
     property int viewed: shell.overviewViewed
     // The workspaces with a window asking for attention.
@@ -54,7 +55,7 @@ Item {
     Rectangle {
         id: search
         anchors.horizontalCenter: parent.horizontalCenter
-        y: overview.shownArea.y + Theme.spacingS
+        y: overview.area.y + Theme.spacingS
         width: Math.min(460, overview.width - 2 * Theme.spacingXL); height: Theme.rowHeight
         radius: height / 2
         color: Theme.surface
@@ -174,7 +175,7 @@ Item {
     // then what it does.
     Rectangle {
         anchors.horizontalCenter: parent.horizontalCenter
-        y: overview.shownArea.y + overview.shownArea.height - height - Theme.spacingXS
+        y: overview.area.y + overview.area.height - height - Theme.spacingXS
         width: hints.implicitWidth + 2 * Theme.spacingL
         height: hints.implicitHeight + 2 * Theme.spacingXS
         radius: height / 2

@@ -550,7 +550,10 @@ int main(int argc, char **argv) {
     if (!QTest::qWaitFor([&] { return workspace(4)->property("current").toBool(); }))
         return fail("could not switch back to the last workspace");
     // The window switcher's list says which windows are asking for attention (an older
-    // five-field line means none).
+    // five-field line means none). Its overlay shows them, and goes on showing them as it fades
+    // out once the switcher has closed, though the controller has forgotten them by then.
+    SwitcherView switcherView(controller, app.primaryScreen());
+    auto overlayListed = [&] { return switcherView.rootObject()->property("listed").toList().size(); };
     subscriber->write(("switcher " + output + " 0 3\n"
                        "switcher-window fake\tFake\t" + output + "\t3\t0\t1\n"
                        "switcher-window \tNo app id\t" + output + "\t1\t1\t0\n"
@@ -566,11 +569,16 @@ int main(int argc, char **argv) {
         std::cerr << "the switcher does not say which windows are urgent\n";
         return 1;
     }
+    if (!QTest::qWaitFor([&] { return switcherView.isVisible() && overlayListed() == 3; }))
+        return fail("the switcher's overlay did not show its windows");
     subscriber->write("switcher-close\n");
     if (!QTest::qWaitFor([&] { return controller.switcherWindows().isEmpty(); })) {
         std::cerr << "the switcher did not close\n";
         return 1;
     }
+    if (overlayListed() != 3 || !QTest::qWaitFor([&] { return !switcherView.isVisible(); }) ||
+        overlayListed() != 3)
+        return fail("the switcher's overlay did not hold its windows as it went");
     // The switcher, the overview and the command palette opening on this output close what is
     // open here: the popover would be over them.
     {
@@ -2524,8 +2532,10 @@ ListModel {
             return 1;
         }
         QTest::keyClick(&dialog, Qt::Key_Escape);
-        if (!gaveUp()) {
-            std::cerr << "Escape did not give up the power off\n";
+        // It says what it asked as it fades out, the question over by then.
+        if (!gaveUp() || dialog.rootObject()->property("pendingTitle") != "Power off" ||
+            dialog.rootObject()->property("pending") != "poweroff") {
+            std::cerr << "Escape did not give up the power off, or the dialog forgot its question as it went\n";
             return 1;
         }
         if (!ask("reboot") || power->message() != "The computer restarts in 2 seconds.")

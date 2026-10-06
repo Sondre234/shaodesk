@@ -33,13 +33,24 @@ Item {
             NumberAnimation { property: "progress"; duration: Theme.durationFast; easing.type: Theme.easingExit }
         }
     ]
-    // What it asks about, held as it was while it goes: the question is over by then.
+    // What it asks about, held as it was while it goes: the question is over before the view hears
+    // that it should go, so only a question still pending is taken.
     property string pending: ""
     property string pendingTitle: ""
     property string message: ""
-    Binding on pending { when: root.shown; value: root.power.pending; restoreMode: Binding.RestoreNone }
-    Binding on pendingTitle { when: root.shown; value: root.power.pendingTitle; restoreMode: Binding.RestoreNone }
-    Binding on message { when: root.shown; value: root.power.message; restoreMode: Binding.RestoreNone }
+    function hold() {
+        if (power.pending === "")
+            return
+        pending = power.pending
+        pendingTitle = power.pendingTitle
+        message = power.message
+    }
+    Component.onCompleted: hold()
+    Connections {
+        target: root.power
+        function onPendingChanged() { root.hold() }
+        function onCountdownChanged() { root.hold() }
+    }
     Keys.onEscapePressed: root.power.cancel()
     Keys.onReturnPressed: cancel.activeFocus ? root.power.cancel() : root.power.confirm()
     Keys.onEnterPressed: cancel.activeFocus ? root.power.cancel() : root.power.confirm()

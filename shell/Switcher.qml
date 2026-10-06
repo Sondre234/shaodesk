@@ -12,11 +12,12 @@ Item {
     property var windows: shell.switcherWindows
     property int selected: shell.switcherSelected
     // What it lists, held as it was while it goes: the compositor forgets the windows as the
-    // switcher closes.
+    // switcher closes, before the view hears that it should go, so an empty list is not taken.
     property var listed: []
     property int listedSelected: 0
-    Binding on listed { when: switcher.shown; value: switcher.windows; restoreMode: Binding.RestoreNone }
-    Binding on listedSelected { when: switcher.shown; value: switcher.selected; restoreMode: Binding.RestoreNone }
+    Component.onCompleted: { listed = windows; listedSelected = selected }
+    onWindowsChanged: if (windows.length > 0) listed = windows
+    onSelectedChanged: if (windows.length > 0) listedSelected = selected
     // A window's cell: its icon over two lines of its title.
     readonly property int cell: Theme.appIconSizeDisplay + 10 * Theme.spacingM
     readonly property int padding: Theme.spacingXL
