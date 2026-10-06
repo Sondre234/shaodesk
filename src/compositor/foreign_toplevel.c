@@ -97,23 +97,27 @@ static void unlist_toplevel(struct sh_toplevel *toplevel) {
     toplevel->capture_scene = NULL;
     toplevel->capture_source = NULL;
 }
+/* The window's capture source, made from its capture scene when first asked for, or NULL when
+ * there is none to give: the session is locked, the window has no scene, or making the source
+ * failed. Every client capturing the window shares it, and it ends with the scene. */
+struct wlr_ext_image_capture_source_v1 *toplevel_capture_source(struct sh_toplevel *toplevel) {
+    struct sh_server *server = toplevel->server;
+    if (server->locked || !toplevel->capture_scene)
+        return NULL;
+    if (!toplevel->capture_source)
+        toplevel->capture_source = wlr_ext_image_capture_source_v1_create_with_scene_node(
+            &toplevel->capture_scene->tree.node, wl_display_get_event_loop(server->wl_display),
+            server->allocator, server->renderer);
+    return toplevel->capture_source;
+}
 void server_new_capture_request(struct wl_listener *listener, void *data) {
-    struct sh_server *server = wl_container_of(listener, server, new_capture_request);
     struct wlr_ext_foreign_toplevel_image_capture_source_manager_v1_request *request = data;
     struct sh_toplevel *toplevel = request->toplevel_handle->data;
-    struct wlr_ext_image_capture_source_v1 *source = NULL;
-    if (toplevel && toplevel->capture_scene && !server->locked) {
-        if (!toplevel->capture_source)
-            toplevel->capture_source = wlr_ext_image_capture_source_v1_create_with_scene_node(
-                &toplevel->capture_scene->tree.node,
-                wl_display_get_event_loop(server->wl_display), server->allocator,
-                server->renderer);
-        source = toplevel->capture_source;
-    }
     // With none to give, the client still gets the source it asked for, an inert one whose
     // sessions stop at once: refused, its next request would name an object that does not
     // exist, a protocol error that disconnects it.
-    wlr_ext_foreign_toplevel_image_capture_source_manager_v1_request_accept(request, source);
+    wlr_ext_foreign_toplevel_image_capture_source_manager_v1_request_accept(
+        request, toplevel ? toplevel_capture_source(toplevel) : NULL);
 }
 void publish_toplevel(struct sh_toplevel *toplevel) {
     list_toplevel(toplevel);
