@@ -148,6 +148,7 @@ PopupCard {
                 radius: Theme.radiusLarge
                 color: Theme.popupSurface
                 border.color: Theme.popupOutline
+                MouseArea { anchors.fill: parent }
             }
             EmptyState {
                 id: emptyState
@@ -190,6 +191,7 @@ PopupCard {
                             radius: height / 2
                             color: Theme.popupSurface
                             border.color: Theme.popupOutline
+                            MouseArea { anchors.fill: parent }
                         }
                     RowLayout {
                         anchors.fill: parent

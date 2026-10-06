@@ -22,8 +22,10 @@ Item {
     // first of a run of it.
     readonly property var groupLabels: ({ window: "Windows", app: "Applications", workspace: "Workspaces",
                                           action: "Actions", session: "Sessions" })
+    // The results, read from the palette once each time they change.
+    readonly property var results: shell.palette.results
     function heading(index) {
-        var results = shell.palette.results
+        var results = root.results
         var searching = shell.palette.query.trim() !== ""
         if (index === 0)
             return searching ? "Top Hit" : groupLabels[results[0].kind] || ""
@@ -32,7 +34,7 @@ Item {
     }
     // How tall Spotlight's results are, as far as most of the output's height leaves room for.
     readonly property real spotlightHeight: {
-        var results = shell.palette.results
+        var results = root.results
         var most = screenSize.height * 0.6 - Theme.spotlightFieldHeight - 2 * Theme.spacingM
         var sum = 0
         for (var i = 0; i < results.length && sum < most; ++i)
