@@ -75,7 +75,7 @@ which lists every file).
 | --- | --- |
 | `Panel.qml` | The taskbar and all its popups (launcher, menus, mixer, calendar, ...), drawn in the bar's own surface, which `view.cpp` grows while one is open. |
 | `TaskButton.qml`, `TrayButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `BarTip.qml` | Parts of the bar: widgets, and the tooltip for things on it. |
-| `NotificationHistory.qml`, `AudioMixer.qml`, `CalendarPopup.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
+| `NotificationHistory.qml`, `AudioMixer.qml`, `CalendarPopup.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
 | `Icon.qml`, `SpeakerIcon.qml` | Line icons (Lucide), drawn as vectors in any colour, and the loudspeaker for a volume. |
 | `AudioSlider.qml`, `MuteButton.qml` | Controls the volume widget and the mixer share. |
 | `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |
