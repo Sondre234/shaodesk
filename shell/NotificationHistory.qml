@@ -193,35 +193,35 @@ PopupCard {
                             border.color: Theme.popupOutline
                             MouseArea { anchors.fill: parent }
                         }
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: Theme.macos ? Theme.spacingXS : 0
-                        anchors.rightMargin: Theme.macos ? Theme.spacingXS : 0
-                        spacing: Theme.spacingM
-                        Image {
-                            readonly property string icon: history.iconSource(Object.assign({}, group.notifications[0], { hasImage: false }))
-                            visible: icon.length > 0
-                            Layout.leftMargin: Theme.spacingS
-                            Layout.preferredWidth: Theme.iconSizeSmall; Layout.preferredHeight: Theme.iconSizeSmall
-                            sourceSize: Qt.size(2 * Theme.iconSizeSmall, 2 * Theme.iconSizeSmall)
-                            fillMode: Image.PreserveAspectFit; source: icon; cache: false
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: Theme.macos ? Theme.spacingXS : 0
+                            anchors.rightMargin: Theme.macos ? Theme.spacingXS : 0
+                            spacing: Theme.spacingM
+                            Image {
+                                readonly property string icon: history.iconSource(Object.assign({}, group.notifications[0], { hasImage: false }))
+                                visible: icon.length > 0
+                                Layout.leftMargin: Theme.spacingS
+                                Layout.preferredWidth: Theme.iconSizeSmall; Layout.preferredHeight: Theme.iconSizeSmall
+                                sourceSize: Qt.size(2 * Theme.iconSizeSmall, 2 * Theme.iconSizeSmall)
+                                fillMode: Image.PreserveAspectFit; source: icon; cache: false
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                text: group.modelData.app; textFormat: Text.PlainText; elide: Text.ElideRight
+                                color: Theme.textMuted
+                                font.pixelSize: Theme.fontSizeSmall; font.weight: Font.DemiBold; font.family: Theme.fontFamily
+                            }
+                            TextButton {
+                                objectName: "groupToggle"
+                                visible: group.collapsible
+                                Layout.preferredHeight: Theme.headingHeight - Theme.spacingS
+                                text: group.open ? "Show less" : (group.notifications.length - history.collapsedCount) + " more"
+                                chevron: true
+                                chevronRotation: group.open ? -90 : 90
+                                onClicked: history.toggleGroup(group.modelData.key)
+                            }
                         }
-                        Text {
-                            Layout.fillWidth: true
-                            text: group.modelData.app; textFormat: Text.PlainText; elide: Text.ElideRight
-                            color: Theme.textMuted
-                            font.pixelSize: Theme.fontSizeSmall; font.weight: Font.DemiBold; font.family: Theme.fontFamily
-                        }
-                        TextButton {
-                            objectName: "groupToggle"
-                            visible: group.collapsible
-                            Layout.preferredHeight: Theme.headingHeight - Theme.spacingS
-                            text: group.open ? "Show less" : (group.notifications.length - history.collapsedCount) + " more"
-                            chevron: true
-                            chevronRotation: group.open ? -90 : 90
-                            onClicked: history.toggleGroup(group.modelData.key)
-                        }
-                    }
                     }
                     Repeater {
                         model: group.open ? group.notifications : group.notifications.slice(0, history.collapsedCount)
