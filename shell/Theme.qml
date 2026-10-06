@@ -206,6 +206,21 @@ QtObject {
     readonly property color switchTrack: alpha(text, light ? 0.14 : 0.2)
     readonly property color knob: macos ? "#ffffff" : accent
     readonly property color knobOutline: Qt.rgba(0, 0, 0, light ? 0.14 : 0.3)
+    // A slider's track and knob.
+    readonly property int sliderTrack: macos ? 6 : 4
+    readonly property int sliderKnob: macos ? 18 : 14
+    // A framed button: its height and its face, white in a light macOS appearance and lighter than
+    // the surface in a dark one, its outline, and the ring that says the keyboard is at it.
+    readonly property int buttonHeight: macos ? 28 : rowHeight - spacingS
+    readonly property color buttonFace: !macos ? surfaceRaised : light ? Qt.rgba(1, 1, 1, 1)
+                                                                 : mix(popupSurface, Qt.rgba(1, 1, 1, 1), 0.16)
+    readonly property color buttonFaceHover: !macos ? surfaceRaisedHover : mix(buttonFace, text, 0.05)
+    readonly property color buttonOutline: !macos ? border : light ? Qt.rgba(0, 0, 0, 0.14) : Qt.rgba(1, 1, 1, 0.06)
+    readonly property color focusRing: macos ? alpha(accent, 0.55) : accent
+    readonly property int focusRingWidth: macos ? 3 : 2
+    // A search field: its height and corners, and its fill.
+    readonly property int fieldHeight: macos ? 28 : rowHeight + spacingS
+    readonly property color fieldFill: macos ? alpha(text, light ? 0.06 : 0.1) : surfaceRaised
 
     // `milliseconds` at the animation speed, 0 with animations off.
     function duration(milliseconds) { return Math.round(milliseconds * motionScale) }
