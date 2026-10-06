@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "view.hpp"
 #include "task_filter.hpp"
+#include <QGuiApplication>
 #include <QQuickItem>
 #include <QSGRendererInterface>
 #include <QScreen>
@@ -124,9 +125,15 @@ PopoverWindow::PopoverWindow(QWindow *parent) : QQuickWindow(parent) {
     setTitle("shaodesk popover");
     setColor(Qt::transparent);
     setFlags(Qt::FramelessWindowHint);
-    // Losing the keyboard while holding it means something else was chosen.
+    // Losing the keyboard while holding it means something else was chosen. The menu bar never
+    // takes it as a layer surface, but a preview's platform may give it the focus as it shows:
+    // the popover takes it back.
     connect(this, &QWindow::activeChanged, this, [this] {
-        if (!isActive() && open_ && keyboard_)
+        if (isActive() || !open_ || !keyboard_)
+            return;
+        if (panel_ && QGuiApplication::focusWindow() && QGuiApplication::focusWindow() == panel_->menuBar())
+            requestActivate();
+        else
             Q_EMIT dismissed();
     });
 }
