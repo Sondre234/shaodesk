@@ -2237,7 +2237,73 @@ int main(int argc, char **argv) {
         controller.pickProfile("dark");
         if (!QTest::qWaitFor([&] { return controller.profile() == "dark"; }))
             return fail("the dark profile did not come back");
+        // The volume: its slider and mute, the outputs to pick from, and the applications'.
+        auto *sound = find(quick, "quickSound");
+        auto *volumeSlider = find(quick, "quickVolumeSlider");
+        if (!sound || !sound->isVisible() || !volumeSlider)
+            return fail("Quick Settings has no volume");
+        audio.requests.clear();
+        const auto volumeTrack =
+            volumeSlider->mapRectToScene(QRectF(0, 0, volumeSlider->width(), volumeSlider->height()));
+        QTest::mouseClick(popover, Qt::LeftButton, Qt::NoModifier,
+                          QPointF(volumeTrack.left() + volumeTrack.width() * 0.25, volumeTrack.center().y()).toPoint());
+        if (audio.requests.size() != 1 || !audio.requests[0].startsWith("volume headset ") ||
+            std::abs(audio.requests[0].section(' ', 2).toInt() - 25) > 6) {
+            std::cerr << "the Quick Settings volume slider did not set the volume: "
+                      << audio.requests.join(", ").toStdString() << '\n';
+            return 1;
+        }
+        click(find(quick, "quickMute"));
+        if (!QTest::qWaitFor([&] { return audio.muted(); }))
+            return fail("the Quick Settings mute button did not mute");
+        click(find(quick, "quickMute"));
+        auto *outputsList = find(quick, "quickOutputs");
+        click(find(quick, "quickOutputsToggle"));
+        if (!outputsList || !QTest::qWaitFor([&] { return outputsList->isVisible() && outputsList->height() > 0; }))
+            return fail("the outputs did not open under the volume");
+        audio.requests.clear();
+        click(findNamed(outputsList, "quickOutputItem", "Speakers"));
+        if (!QTest::qWaitFor([&] { return audio.output() == "speakers"; }) ||
+            audio.requests != QStringList{"output speakers 2"}) {
+            std::cerr << "picking an output in Quick Settings did not switch to it: "
+                      << audio.requests.join(", ").toStdString() << '\n';
+            return 1;
+        }
+        auto *streamsList = find(quick, "quickStreams");
+        click(find(quick, "quickMixerToggle"));
+        if (!streamsList || !QTest::qWaitFor([&] { return streamsList->isVisible() && !outputsList->isVisible(); }))
+            return fail("the applications' volumes did not open in place of the outputs");
+        QQuickItem *quickStream = nullptr;
+        if (!QTest::qWaitFor([&] { return (quickStream = findNamed(streamsList, "quickStreamSlider", {})); }))
+            return fail("no application's slider in Quick Settings");
+        QTest::qWait(50); // laid out
+        audio.requests.clear();
+        const auto streamTrack =
+            quickStream->mapRectToScene(QRectF(0, 0, quickStream->width(), quickStream->height()));
+        QTest::mouseClick(popover, Qt::LeftButton, Qt::NoModifier,
+                          QPointF(streamTrack.left() + streamTrack.width() * 0.5, streamTrack.center().y()).toPoint());
+        if (audio.requests.size() != 1 || !audio.requests[0].startsWith("stream 41 ")) {
+            std::cerr << "the Quick Settings application slider did not set its volume: "
+                      << audio.requests.join(", ").toStdString() << '\n';
+            return 1;
+        }
+        // The button's wheel changes the volume and a middle click mutes, as on the bar's.
+        audio.requests.clear();
+        const int before = audio.volume();
+        QWheelEvent notch(centre(button), view.mapToGlobal(centre(button)), {}, {0, 120},
+                          Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+        QGuiApplication::sendEvent(&view, &notch);
+        if (audio.volume() != before + 5)
+            return fail("the wheel on the Quick Settings button did not raise the volume");
+        click(button, Qt::MiddleButton);
+        if (!QTest::qWaitFor([&] { return audio.muted(); }))
+            return fail("a middle click on the Quick Settings button did not mute");
+        audio.toggleMute();
         // The wallpaper tile opens the bar's own picker in its place.
+        if (!quick->isVisible())
+            click(button);
+        if (!QTest::qWaitFor([&] { return inPopover(quick); }))
+            return fail("Quick Settings did not open again");
         click(tile("wallpapers"));
         auto *picker = find(view.rootObject(), "wallpaperPicker");
         if (!QTest::qWaitFor([&] { return picker && inPopover(picker) && !quick->isVisible(); }))
