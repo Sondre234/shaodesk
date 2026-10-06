@@ -58,6 +58,9 @@ struct probe {
     struct xdg_activation_v1 *activation;
     struct zxdg_decoration_manager_v1 *decorations;
     struct zxdg_toplevel_decoration_v1 *decoration; // with SHAODESK_PROBE_SSD
+    // SHAODESK_PROBE_SHADOW=N: a translucent margin N pixels wide around the window, outside its
+    // geometry, as a client-side frame draws its shadow.
+    int margin;
     bool commands; // --commands: an external-control window that obeys lines on standard input
     bool print_keymap, keymap_seen; // --keymap
 };
@@ -338,7 +341,9 @@ static void frame_done(void *data, struct wl_callback *callback, uint32_t time) 
     }
 }
 static const struct wl_callback_listener frame_listener = {.done = frame_done};
-static struct wl_buffer *make_buffer(struct probe *probe, int width, int height) {
+/* A buffer of `width` by `height` filled as the probe's window, `margin` pixels of it all
+ * around a translucent shadow. */
+static struct wl_buffer *make_buffer(struct probe *probe, int width, int height, int margin) {
     struct buffer *buffer = calloc(1, sizeof(*buffer));
     if (!buffer)
         die("out of memory");
@@ -352,10 +357,14 @@ static struct wl_buffer *make_buffer(struct probe *probe, int width, int height)
     uint32_t *pixels = buffer->pixels;
     for (int y = 0; y < height; ++y)
         for (int x = 0; x < width; ++x)
-            pixels[y * width + x] = y < 36 ? 0xff23314a : 0xff417bc4;
+            pixels[y * width + x] =
+                x < margin || y < margin || x >= width - margin || y >= height - margin
+                    ? 0x30000000
+                : y < margin + 36 ? 0xff23314a
+                                  : 0xff417bc4;
     struct wl_shm_pool *pool = wl_shm_create_pool(probe->shm, fd, (int)buffer->size);
-    buffer->object =
-        wl_shm_pool_create_buffer(pool, 0, width, height, width * 4, WL_SHM_FORMAT_XRGB8888);
+    buffer->object = wl_shm_pool_create_buffer(
+        pool, 0, width, height, width * 4, margin ? WL_SHM_FORMAT_ARGB8888 : WL_SHM_FORMAT_XRGB8888);
     wl_shm_pool_destroy(pool);
     close(fd);
     buffer->next = probe->buffers;
@@ -368,7 +377,7 @@ static void panel_configure(void *data, struct zwlr_layer_surface_v1 *panel, uin
     zwlr_layer_surface_v1_ack_configure(panel, serial);
     if (height != 48 || width < 1 || width > 8192)
         die("panel configure geometry invalid");
-    struct wl_buffer *buffer = make_buffer(probe, width, height);
+    struct wl_buffer *buffer = make_buffer(probe, width, height, 0);
     wl_surface_attach(probe->panel_surface, buffer, 0, 0);
     wl_surface_damage_buffer(probe->panel_surface, 0, 0, width, height);
     wl_surface_commit(probe->panel_surface);
@@ -388,9 +397,13 @@ static void surface_configure(void *data, struct xdg_surface *surface, uint32_t 
     xdg_surface_ack_configure(surface, serial);
     if (probe->width < 1 || probe->height < 1 || probe->width > 8192 || probe->height > 8192)
         die("unexpected configure dimensions");
-    struct wl_buffer *buffer = make_buffer(probe, probe->width, probe->height);
+    int margin = probe->margin, width = probe->width + 2 * margin;
+    int height = probe->height + 2 * margin;
+    struct wl_buffer *buffer = make_buffer(probe, width, height, margin);
+    if (margin)
+        xdg_surface_set_window_geometry(surface, margin, margin, probe->width, probe->height);
     wl_surface_attach(probe->surface, buffer, 0, 0);
-    wl_surface_damage_buffer(probe->surface, 0, 0, probe->width, probe->height);
+    wl_surface_damage_buffer(probe->surface, 0, 0, width, height);
     if (!probe->frame) {
         probe->frame = wl_surface_frame(probe->surface);
         wl_callback_add_listener(probe->frame, &frame_listener, probe);
@@ -580,6 +593,8 @@ int main(int argc, char **argv) {
     probe.toplevel = xdg_surface_get_toplevel(probe.xdg_surface);
     xdg_toplevel_add_listener(probe.toplevel, &toplevel_listener, &probe);
     // SHAODESK_PROBE_SSD leaves the frame to the compositor, as kitty does.
+    if (getenv("SHAODESK_PROBE_SHADOW"))
+        probe.margin = atoi(getenv("SHAODESK_PROBE_SHADOW"));
     if (getenv("SHAODESK_PROBE_SSD") && probe.decorations) {
         probe.decoration =
             zxdg_decoration_manager_v1_get_toplevel_decoration(probe.decorations, probe.toplevel);
