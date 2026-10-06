@@ -1056,7 +1056,8 @@ workspace, focused, minimized, tiled, x, y, width, height, app ID, title, monito
 visible, scratchpad (a window hidden there is also minimized), sticky, and its window group
 (a number; 0 for none). `shaodesk msg get pid_at X Y` prints the process ID of the window
 drawn at that layout point, or nothing over bare desktop. `shaodesk msg get layers` prints one line per panel or other layer-shell surface:
-namespace, output, layer (0 background to 3 overlay), and whether it is shown.
+namespace, output, layer (0 background to 3 overlay), whether it is shown, and whether it holds
+the keyboard.
 `shaodesk msg get power` prints one line per power action logind carries out (`poweroff`,
 `reboot`, `suspend`, `hibernate`) with its answer: `yes`, `no`, `challenge` (after a password),
 `na`, `unknown` until it has answered, or `unavailable` without logind.

@@ -37,7 +37,7 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
         return shell_log.read_text()
 
     def layers():
-        return {(row[0], row[1]): row[2:] for row in desktop.rows("layers")}
+        return {(row[0], row[1]): row[2:4] for row in desktop.rows("layers")}
 
     def windows():
         return desktop.rows("windows")
