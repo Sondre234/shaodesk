@@ -2,6 +2,11 @@
 #include "backlight.hpp"
 #include <QDir>
 #include <QFile>
+#if SHAODESK_DBUS
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusPendingCallWatcher>
+#endif
 #include <algorithm>
 #include <cmath>
 #include <linux/netlink.h>
@@ -73,15 +78,59 @@ void Backlight::refresh() {
             value = number(dir.filePath(name + "/brightness"), &ok);
         if (ok && maxOk && max > 0) {
             level = std::clamp(int(std::lround(100.0 * value / max)), 0, 100);
+            name_ = name;
+            max_ = max;
             break;
         }
     }
     present_ = level >= 0;
+    if (!present_) {
+        name_.clear();
+        max_ = 0;
+    }
     if (level == percent_)
         return;
     const bool first = !known_;
     percent_ = level;
     known_ = true;
+    Q_EMIT levelChanged();
     if (!first && present_)
         Q_EMIT changed(percent_);
+}
+void Backlight::setPercent(int percent) {
+    if (!present_)
+        return;
+    percent = std::clamp(percent, 0, 100);
+    const auto value = uint(std::lround(percent / 100.0 * max_));
+    // Shown at once, so that a slider being dragged does not jump back before the kernel reports
+    // the level; the report then matches it and brings no on-screen display.
+    if (percent != percent_) {
+        percent_ = percent;
+        Q_EMIT levelChanged();
+    }
+    const auto bus = qEnvironmentVariable("SHAODESK_LOGIN1_BUS");
+    if (bus.isEmpty() && root_ != "/sys") {
+        QFile file(root_ + "/class/backlight/" + name_ + "/brightness");
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate) ||
+            file.write(QByteArray::number(value) + '\n') < 0)
+            Q_EMIT failed("Could not set the brightness: " + file.errorString());
+        return;
+    }
+#if SHAODESK_DBUS
+    // The session's own object, which logind lets its user set the backlight through.
+    const auto connection = bus.isEmpty() ? QDBusConnection::systemBus()
+                                          : QDBusConnection::connectToBus(bus, QStringLiteral("shaodesk-login1"));
+    auto message = QDBusMessage::createMethodCall(
+        QStringLiteral("org.freedesktop.login1"), QStringLiteral("/org/freedesktop/login1/session/auto"),
+        QStringLiteral("org.freedesktop.login1.Session"), QStringLiteral("SetBrightness"));
+    message << QStringLiteral("backlight") << name_ << value;
+    auto *call = new QDBusPendingCallWatcher(connection.asyncCall(message), this);
+    connect(call, &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *done) {
+        if (done->isError())
+            Q_EMIT failed("Could not set the brightness: " + done->error().message());
+        done->deleteLater();
+    });
+#else
+    Q_EMIT failed(QStringLiteral("Could not set the brightness: shaodesk was built without Qt's D-Bus module"));
+#endif
 }

@@ -12,8 +12,9 @@ is focused already, as on Windows, from any monitor's bar) and a right-click [wi
 (its application's actions, minimize, maximize, fullscreen, another workspace or monitor, sticky,
 floating, pin to taskbar, close), middle-click to close a window, a right-click menu on empty bar space (tiling,
 applications, show desktop, and the appearance profiles in a submenu), a
-[start menu](#start-menu), a tiling on/off button for its monitor, a workspace indicator, battery and network status,
-the default output's volume, a clock, a [system tray](#system-tray), and a show-desktop button. Buttons show a tooltip
+[start menu](#start-menu), a workspace indicator, a wallpaper picker, a [system tray](#system-tray), Quick
+Settings (the network, the volume, the battery, tiling for its monitor, the appearance profiles,
+night light and do-not-disturb), a clock, and a show-desktop button. Buttons show a tooltip
 on hover. Installed applications are read
 from desktop entries through GIO. Lua configures the panel's height, top or
 bottom placement (`panel_position`), margins that make it float (`panel_margin`, one
@@ -38,13 +39,35 @@ as on Windows 11: the [notifications](#notifications-and-on-screen-display) on o
 it a calendar with the time and today's date over the month, today marked and the weeks starting
 on the locale's first day. The arrows or the mouse wheel page through the months, each sliding
 in; the title zooms out to the year's months and then to a decade's years, where a pick zooms back
-in; Today returns to this month. Each widget is
-switched off from Lua: `shell = { widgets = { battery = false, calendar = false } }`, with
-`workspaces`, `battery`, `network`, `volume`, `clock`, `calendar` (the clock stays, the
-calendar goes), `tiling`, `profiles` (the appearance profile picker), `keyboard_layout`,
-`power` (the [power button](#power) in the application menu) and `tray` (the [system tray](#system-tray)) all on by
-default; `notifications = true` adds a bell for the [notifications](#notifications-and-on-screen-display),
-which the clock otherwise stands for. All of them take the panel's `accent`,
+in; Today returns to this month.
+
+Left of the clock, as on Windows 11, the Quick Settings button shows the network, the volume and
+the battery in small icons; its wheel changes the volume and a middle click mutes. Clicking it
+opens Quick Settings at the bar's right end: tiles for do-not-disturb, night light (on or off
+against its schedule, through the compositor), tiling on this monitor, the appearance profile
+(listing the profiles under it), the wallpaper (opening the same picker as the bar's button) and
+the network (its state only: Wi-Fi, wired or down, and the interface; shaodesk does not manage
+connections); a brightness slider where the screen has a backlight (set through logind's
+`SetBrightness`, so no privileges are needed); the volume with its mute, the outputs to play
+through and each application's volume a click away; and the battery's charge along the foot.
+
+Each widget is switched off from Lua: `shell = { widgets = { battery = false, calendar = false } }`,
+with `workspaces`, `battery`, `network`, `volume`, `clock`, `calendar` (the clock stays, the
+calendar goes), `tiling`, `profiles` (the appearance profile picker), `wallpapers`,
+`notifications` (do-not-disturb), `keyboard_layout`, `power` (the [power button](#power) in the
+application menu) and `tray` (the [system tray](#system-tray)) all on by default. Those that can
+move sit on the bar with `"bar"` or in Quick Settings with `"quick"`, and `true` leaves them in
+their default place: `network`, `battery`, `volume`, `tiling`, `profiles` and `notifications`
+are in Quick Settings and `wallpapers` on the bar. Placed on the bar, each has its button there
+as before (`notifications = "bar"` is a bell with the unread count, which the clock otherwise
+stands for), and the Quick Settings button goes once nothing is placed in it:
+
+```lua
+shell = { widgets = { volume = "bar", network = "bar", battery = "bar", tiling = "bar",
+                      profiles = "bar", notifications = "bar", wallpapers = "quick" } },
+```
+
+All of them take the panel's `accent`,
 `panel_color`, `text_color`, `font` and `font_size`: hovering, pressing and what is open or on
 are shown by laying the text color over the panel at a low opacity, which shows on a light
 panel as on a dark one. Popups (the application menu, menus, the mixer, the calendar and the
@@ -707,7 +730,9 @@ warm in the evening and neutral again in the morning, easing over `transition` m
 sunset and sunrise. Give the times (`sunrise = "06:30"`, `sunset = "21:00"`) or a `latitude` and
 `longitude` and shaodesk works them out for each day. The actions `night_light_toggle`,
 `night_light_on`, `night_light_off` and `night_light_auto` (back to the schedule) override it,
-also as `shaodesk msg night_light_toggle`; `shaodesk msg get night_light` prints the temperature in
+also as `shaodesk msg night_light_toggle` and the tile in the shell's Quick Settings, which shows
+whether it is on (subscribers to the control socket hear `night-light on|off auto|on|off`);
+`shaodesk msg get night_light` prints the temperature in
 kelvin, the override (0 schedule, 1 neutral, 2 warm) and whether the schedule is enabled. The
 colours go through the output's gamma table, the way `wlsunset` does it, and a client using
 `wlr-gamma-control` still works alongside.
@@ -924,9 +949,10 @@ corner); further cards stack under it and slide in and out.
   clock counts those not yet seen; opening the flyout marks them seen. Clicking an entry runs its
   default action, the × that shows while the pointer is over it removes it, and Clear all empties
   the list. The flyout opens on the monitor under the pointer with `notification_history` too
-  (Super + N), and from a bell on the bar with `shell.widgets.notifications = true`.
+  (Super + N), and from a bell on the bar with `shell.widgets.notifications = "bar"`.
 - Do-not-disturb (`dnd_toggle`, `dnd_on`, `dnd_off`, `shaodesk msg dnd [on|off|toggle]`, a
-  right-click on the clock or the bell, or the switch in the flyout, or `notifications.dnd = true` to start that
+  right-click on the clock or the bell, the switch in the flyout, the tile in Quick Settings, or
+  `notifications.dnd = true` to start that
   way) keeps cards away and lets everything reach the history; critical notifications still show.
   A reload of the configuration does not undo what was toggled.
 

@@ -38,6 +38,17 @@ POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switch
            "overview", "palette-empty"]
 # The start menu's other views and its menus.
 POPUPS += ["launcher-all", "launcher-search", "launcher-menu"]
+POPUPS += ["quick-settings", "quick-settings-mixer", "bar-all"]
+
+# Pictures taken with settings of their own, put in the shell table: name -> (popup, settings).
+# The volume's and the profiles' popups belong to buttons Quick Settings holds by default.
+VARIANTS = {
+    "mixer": ("mixer", 'widgets = { volume = "bar" },'),
+    "outputs": ("outputs", 'widgets = { volume = "bar" },'),
+    "profiles": ("profiles", 'widgets = { profiles = "bar" },'),
+    "bar-all": ("bar", 'widgets = { network = "bar", battery = "bar", volume = "bar", '
+                       'tiling = "bar", profiles = "bar", notifications = "bar" },'),
+}
 
 # Translucent bars, as appearance profiles often have them.
 THEMES = {
@@ -235,7 +246,14 @@ def prepare(root, theme_name):
 
 def render(shell, env, root, popup, out, wait, icons):
     """Renders one popup to `out`; returns a list of what went wrong."""
-    result = subprocess.run([shell, "--config", str(root / "init.lua"), "--preview-popup", popup,
+    config = root / "init.lua"
+    if popup in VARIANTS:
+        # A configuration of the picture's own, beside the theme's, for this run alone.
+        popup, settings = VARIANTS[popup]
+        config = root / f"init-{out.stem}.lua"
+        config.write_text((root / "init.lua").read_text().replace(
+            "    shell = {\n", "    shell = {\n        " + settings + "\n", 1))
+    result = subprocess.run([shell, "--config", str(config), "--preview-popup", popup,
                              "--icon-theme", icons, "--quit-after", str(wait),
                              "--screenshot", str(out)],
                             env=env, capture_output=True, text=True, timeout=60)

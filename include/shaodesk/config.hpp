@@ -68,21 +68,28 @@ struct WindowRule {
     bool matches(const std::string &app_id, const std::string &title) const;
 };
 
-// Which widgets the panel shows; each is switched off with `shell.widgets = { name = false }`.
+// Where a panel widget that can move sits: on the bar, in the Quick Settings flyout, or nowhere.
+enum class WidgetPlace { Hidden, Bar, Quick };
+
+// Which widgets the panel shows, and where. Each is switched off with
+// `shell.widgets = { name = false }`; one that can move goes on the bar with "bar" or into Quick
+// Settings with "quick", and `true` puts it in its default place.
 struct ShellWidgets {
     bool workspaces = true; // this monitor's workspace numbers
-    bool battery = true;    // charge and state, only where a battery exists
-    bool network = true;    // connection state, only where a network interface exists
-    bool volume = true;     // the default output's volume, only with a sound server
+    WidgetPlace battery = WidgetPlace::Quick; // charge and state, only where a battery exists
+    WidgetPlace network = WidgetPlace::Quick; // connection state, only where an interface exists
+    WidgetPlace volume = WidgetPlace::Quick;  // the default output's volume, only with a sound server
     bool clock = true;
-    bool calendar = true; // clicking the clock opens a month calendar
-    bool tiling = true;   // the tiling on/off button
-    bool profiles = true; // the appearance profile picker, only with two or more profiles
-    bool wallpapers = true; // the wallpaper picker
+    bool calendar = true; // the month calendar in the clock's flyout
+    WidgetPlace tiling = WidgetPlace::Quick;   // tiling on or off for the monitor
+    WidgetPlace profiles = WidgetPlace::Quick; // the appearance profiles, only with two or more
+    WidgetPlace wallpapers = WidgetPlace::Bar; // the wallpaper picker
     bool keyboard_layout = true; // the active keyboard layout, only with two or more
     bool power = true;      // the launcher's power button, only with something in its menu
     bool tray = true;       // the system tray, only while applications show icons in it
-    bool notifications = false; // a bell for the notifications; the clock shows them either way
+    // Do-not-disturb, as a tile, or a bell on the bar with the unread count; the clock shows both
+    // either way.
+    WidgetPlace notifications = WidgetPlace::Quick;
 };
 
 struct ShellConfig {

@@ -529,25 +529,35 @@ const Option options[] = {
      "The wallpaper picker's folder, searched with its subfolders: absolute, or starting with "
      "`~/`; unset uses `$XDG_PICTURES_DIR/wallpapers`, else `$XDG_PICTURES_DIR`."},
     {"shell.widgets", "table", "", "", none, none,
-     "Panel widgets; each is switched off with `false`."},
+     "Panel widgets; each is switched off with `false`. One that can move takes `\"bar\"` to "
+     "sit on the bar or `\"quick\"` to sit in the Quick Settings flyout instead, and `true` "
+     "puts it in its default place."},
     {"shell.widgets.workspaces", "boolean", "true", "true", none, none,
      "This monitor's workspace numbers."},
-    {"shell.widgets.battery", "boolean", "true", "true", none, none,
-     "Charge and state, only where a battery exists."},
-    {"shell.widgets.network", "boolean", "true", "true", none, none,
-     "Connection state, only where a network interface exists."},
-    {"shell.widgets.volume", "boolean", "true", "true", none, none,
-     "The default output's volume, only with a sound server."},
+    {"shell.widgets.battery", "boolean or string", "true", "\"quick\"", none, none,
+     "Charge and state, only where a battery exists: `\"bar\"` or `\"quick\"` (along Quick "
+     "Settings' foot). By default in Quick Settings."},
+    {"shell.widgets.network", "boolean or string", "true", "\"quick\"", none, none,
+     "Connection state, only where a network interface exists: `\"bar\"` or `\"quick\"` (a "
+     "tile). By default in Quick Settings."},
+    {"shell.widgets.volume", "boolean or string", "true", "\"quick\"", none, none,
+     "The default output's volume, only with a sound server: `\"bar\"` or `\"quick\"` (a "
+     "slider, with the outputs and the applications' volumes). By default in Quick Settings."},
     {"shell.widgets.clock", "boolean", "true", "true", none, none, "The clock."},
     {"shell.widgets.calendar", "boolean", "true", "true", none, none,
      "The month calendar in the clock's flyout."},
-    {"shell.widgets.tiling", "boolean", "true", "true", none, none, "The tiling on/off button."},
-    {"shell.widgets.profiles", "boolean", "true", "true", none, none,
-     "The appearance profile picker: a button that lists `profiles` to switch between; shown "
-     "only when there are two or more."},
-    {"shell.widgets.wallpapers", "boolean", "true", "true", none, none,
+    {"shell.widgets.tiling", "boolean or string", "true", "\"quick\"", none, none,
+     "Tiling on or off for the monitor: `\"bar\"` (a button) or `\"quick\"` (a tile). By "
+     "default in Quick Settings."},
+    {"shell.widgets.profiles", "boolean or string", "true", "\"quick\"", none, none,
+     "The appearance profile picker, which lists `profiles` to switch between; shown only when "
+     "there are two or more: `\"bar\"` (a button) or `\"quick\"` (a tile). By default in "
+     "Quick Settings."},
+    {"shell.widgets.wallpapers", "boolean or string", "true", "\"bar\"", none, none,
      "The wallpaper picker: thumbnails of the images in `shell.wallpapers`; the one picked "
-     "replaces `shell.wallpaper` for the profile in use until the configured one changes."},
+     "replaces `shell.wallpaper` for the profile in use until the configured one changes. "
+     "`\"bar\"` (a button) or `\"quick\"` (a tile that opens the same picker). By default on "
+     "the bar."},
     {"shell.widgets.keyboard_layout", "boolean", "true", "true", none, none,
      "The active keyboard layout's short name, such as `us`; clicking it switches to the next. "
      "Shown only when the keymap has two or more layouts."},
@@ -558,9 +568,10 @@ const Option options[] = {
     {"shell.widgets.tray", "boolean", "true", "true", none, none,
      "The system tray: applications' status icons (StatusNotifierItem), shown while there are "
      "any. `false` also leaves the tray's D-Bus names to another program."},
-    {"shell.widgets.notifications", "boolean", "false", "true", none, none,
-     "A bell on the bar that opens the notifications, with their unread count; a right-click "
-     "toggles do-not-disturb. The clock does both either way."},
+    {"shell.widgets.notifications", "boolean or string", "true", "\"bar\"", none, none,
+     "Do-not-disturb and the unread notifications: `\"bar\"` (a bell that opens them, with "
+     "their count; a right-click toggles do-not-disturb) or `\"quick\"` (a do-not-disturb "
+     "tile). The clock does both either way. By default in Quick Settings."},
     {"shell.launchers", "list of tables", "unset", "", none, none,
      "Pinned commands for programs without a desktop file, at most 64."},
     {"shell.launchers[].name", "string", "", "", none, none, "Label, 1 to 128 bytes. Required."},

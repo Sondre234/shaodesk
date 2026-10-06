@@ -189,6 +189,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     configure_animations(&server);
     configure_layouts(&server);
     server.night_kelvin = SH_KELVIN_NEUTRAL;
+    server.night_announced = -1;
     sh_fade_init(&server.zoom_fade, 1);
     server.zoom_target = 1;
     server.night_clock = -1;

@@ -428,6 +428,7 @@ struct sh_server {
     struct wl_event_source *corner_timer;
     int night_mode; // enum sh_night_mode
     int night_kelvin;
+    int night_announced; // whether it was warm and who decided, as subscribers last heard; -1 first
     double night_clock; // minutes after midnight when fixed for testing, else -1
     struct wlr_color_transform *night_transform;
     struct wlr_buffer *black;   // stretched over windows to dim them; made on first use

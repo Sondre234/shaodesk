@@ -63,6 +63,7 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
         if (config_.osd.brightness)
             osd_.show(overlayOutput(), "Brightness", percent, "brightness");
     });
+    connect(&backlight_, &Backlight::failed, this, &ShellController::report);
 }
 ShellController::~ShellController() {
     delete engine_; // Before the objects its context refers to go away.
@@ -337,12 +338,18 @@ QVariantList ShellController::apps() const {
 }
 QVariantMap ShellController::widgets() const {
     const auto &w = config_.shell.widgets;
-    return {{"workspaces", w.workspaces}, {"battery", w.battery}, {"network", w.network},
-            {"volume", w.volume},         {"clock", w.clock},     {"calendar", w.calendar},
-            {"tiling", w.tiling},         {"profiles", w.profiles},
-            {"wallpapers", w.wallpapers}, {"keyboard_layout", w.keyboard_layout},
-            {"power", w.power},           {"tray", w.tray},
-            {"notifications", w.notifications}};
+    auto place = [](shaodesk::WidgetPlace where) {
+        return where == shaodesk::WidgetPlace::Bar     ? QStringLiteral("bar")
+               : where == shaodesk::WidgetPlace::Quick ? QStringLiteral("quick")
+                                                       : QString();
+    };
+    return {{"workspaces", w.workspaces},       {"battery", place(w.battery)},
+            {"network", place(w.network)},      {"volume", place(w.volume)},
+            {"clock", w.clock},                 {"calendar", w.calendar},
+            {"tiling", place(w.tiling)},        {"profiles", place(w.profiles)},
+            {"wallpapers", place(w.wallpapers)}, {"keyboard_layout", w.keyboard_layout},
+            {"power", w.power},                 {"tray", w.tray},
+            {"notifications", place(w.notifications)}};
 }
 QStringList ShellController::profiles() const {
     QStringList names;
@@ -615,6 +622,12 @@ void ShellController::subscribe() {
                     Q_EMIT keyboardLayoutChanged();
                 }
                 continue;
+            } else if (line.startsWith("night-light ")) {
+                // night-light ACTIVE MODE
+                const auto words = line.split(' ');
+                if (words.size() == 3)
+                    setNightLight(words[1] == "on", words[2]);
+                continue;
             } else if (line.startsWith("dnd ")) {
                 handleDnd(line.sliced(4));
                 continue;
@@ -763,6 +776,7 @@ void ShellController::subscribe() {
             Q_EMIT keyboardLayoutChanged();
         }
         power_.setAvailable("-");
+        setNightLight(false, {});
         if (urgentCount_ != 0 || !urgentWindows_.isEmpty()) {
             urgentCount_ = 0;
             urgentWindows_.clear();
@@ -778,6 +792,13 @@ void ShellController::subscribe() {
         clearOverview();
     });
     state_->connectToServer(path);
+}
+void ShellController::setNightLight(bool on, const QString &mode) {
+    if (on == nightLight_ && mode == nightLightMode_)
+        return;
+    nightLight_ = on;
+    nightLightMode_ = mode;
+    Q_EMIT nightLightChanged();
 }
 QString ShellController::overlayOutput() const {
     const auto screens = QGuiApplication::screens();

@@ -385,7 +385,8 @@ static void drop_partial_utf8(char *text) {
 /* The state subscribers get: "tiling on|off", "workspace N" and "focused NAME" for the focused
  * output, and "output NAME N USED TILING" for each output, with its current workspace, those
  * holding windows ("1,3", or "-"), and whether it tiles ("on" or "off"); then the urgent
- * windows, the keyboard layout, as described below, and the power actions that may run. */
+ * windows, the keyboard layout and night light, as described below, and the power actions
+ * that may run. */
 static void describe_state(struct sh_server *server, char *state, size_t size) {
     struct wlr_output *focused = focused_output(server);
     size_t length = snprintf(state, size, "tiling %s\nworkspace %d\nfocused %s\n",
@@ -467,6 +468,14 @@ static void describe_state(struct sh_server *server, char *state, size_t size) {
                            server->keyboard_layout + 1, xkb_keymap_num_layouts(server->keymap), code,
                            name);
     }
+    // "night-light ACTIVE MODE": whether the screen is warmed now ("on" or "off"), and whether
+    // the schedule decides ("auto") or an override holds it "on" or "off".
+    if (length < size)
+        length += snprintf(state + length, size - length, "night-light %s %s\n",
+                           server->night_kelvin < SH_KELVIN_NEUTRAL ? "on" : "off",
+                           server->night_mode == SH_NIGHT_ON    ? "on"
+                           : server->night_mode == SH_NIGHT_OFF ? "off"
+                                                                : "auto");
     // "power ACTIONS": the power actions that may run, as "lock,suspend,poweroff", or "-".
     if (length < size) {
         char actions[128];

@@ -64,12 +64,17 @@ class ShellController : public QObject {
     Q_PROPERTY(bool groupWindows READ groupWindows NOTIFY configChanged)
     // features.sticky: whether a window can be shown on every workspace of its monitor.
     Q_PROPERTY(bool stickyWindows READ stickyWindows NOTIFY configChanged)
-    // Which panel widgets Lua enables: {workspaces, battery, network, volume, clock, calendar,
-    // tiling, profiles, wallpapers, keyboard_layout, power, tray, notifications}.
+    // Which panel widgets Lua enables, and where: {workspaces, clock, calendar, keyboard_layout,
+    // power, tray} as booleans, and {battery, network, volume, tiling, profiles, wallpapers,
+    // notifications}, which can move, as "bar", "quick" (Quick Settings) or "" (hidden).
     Q_PROPERTY(QVariantMap widgets READ widgets NOTIFY configChanged)
     // The compositor's active keyboard layout: {number (from 1), count, short ("us"), name}, or
     // empty without a compositor.
     Q_PROPERTY(QVariantMap keyboardLayout READ keyboardLayout NOTIFY keyboardLayoutChanged)
+    // The compositor's night light: whether it warms the screen now, and who decides: "auto"
+    // (the schedule), "on" or "off" (an override), or "" without a compositor.
+    Q_PROPERTY(bool nightLight READ nightLight NOTIFY nightLightChanged)
+    Q_PROPERTY(QString nightLightMode READ nightLightMode NOTIFY nightLightChanged)
     Q_PROPERTY(QVariantList pinned READ pinned NOTIFY appsChanged)
     // Configured launchers and installed applications, as {appId, name, icon, pinned (to the
     // taskbar), configured, genericName, keywords, description}.
@@ -81,6 +86,8 @@ class ShellController : public QObject {
     Q_PROPERTY(TaskModel *tasks READ tasks CONSTANT)
     Q_PROPERTY(Audio *audio READ audio CONSTANT)
     Q_PROPERTY(SystemStatus *status READ status CONSTANT)
+    // The screen backlight, which Quick Settings sets.
+    Q_PROPERTY(Backlight *backlight READ backlight CONSTANT)
     // The notification daemon (cards, history, do-not-disturb) and the on-screen display.
     Q_PROPERTY(NotificationCenter *notifications READ notifications CONSTANT)
     Q_PROPERTY(Osd *osd READ osd CONSTANT)
@@ -170,6 +177,10 @@ class ShellController : public QObject {
     Q_INVOKABLE void pickProfile(const QString &name) { send("profile " + name); }
     QVariantMap widgets() const;
     QVariantMap keyboardLayout() const { return keyboardLayout_; }
+    bool nightLight() const { return nightLight_; }
+    QString nightLightMode() const { return nightLightMode_; }
+    // What the compositor says of night light; the preview's stand-in says it too.
+    void setNightLight(bool on, const QString &mode);
     QVariantList pinned() const;
     QVariantList apps() const;
     QString error() const { return error_; }
@@ -187,6 +198,7 @@ class ShellController : public QObject {
     // imports load once instead of once per output.
     QQmlEngine *engine();
     SystemStatus *status() { return &status_; }
+    Backlight *backlight() { return &backlight_; }
     NotificationCenter *notifications() { return &notifications_; }
     Osd *osd() { return &osd_; }
     QString focusedOutput() const { return focusedOutput_; }
@@ -275,6 +287,7 @@ class ShellController : public QObject {
     void focusedOutputChanged();
     void cardsOutputChanged();
     void keyboardLayoutChanged();
+    void nightLightChanged();
     // The compositor asked for the notification history on `output`.
     void notificationsRequested(const QString &output);
     // The compositor asked for the power menu on `output`.
@@ -309,6 +322,8 @@ class ShellController : public QObject {
                          qEnvironmentVariableIsSet("SHAODESK_SYSFS") ? 100 : 0};
     QString focusedOutput_, cardsOutput_;
     QVariantMap keyboardLayout_;
+    bool nightLight_ = false;
+    QString nightLightMode_;
     QObject *notificationService_ = nullptr;
     TrayModel tray_;
     QObject *trayHost_ = nullptr;

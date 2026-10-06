@@ -539,23 +539,50 @@ int main(int argc, char **argv) {
         rejects("return {shell={panel_margin={middle=1}}}");
         rejects("return {shell={font_size=2}}");
         rejects("return {shell={group_windows=1}}");
+        using shaodesk::WidgetPlace;
         auto widgets = shaodesk::parse_config(
             "return {shell={widgets={battery=false,calendar=false,workspaces=false}}}");
-        require(!widgets.shell.widgets.battery && !widgets.shell.widgets.calendar &&
-                    !widgets.shell.widgets.workspaces && widgets.shell.widgets.network &&
-                    widgets.shell.widgets.volume && widgets.shell.widgets.clock &&
-                    widgets.shell.widgets.tiling && widgets.shell.widgets.profiles &&
-                    widgets.shell.widgets.tray &&
-                    !shaodesk::parse_config("return {shell={widgets={profiles=false}}}")
-                         .shell.widgets.profiles &&
+        require(widgets.shell.widgets.battery == WidgetPlace::Hidden && !widgets.shell.widgets.calendar &&
+                    !widgets.shell.widgets.workspaces && widgets.shell.widgets.network != WidgetPlace::Hidden &&
+                    widgets.shell.widgets.volume != WidgetPlace::Hidden && widgets.shell.widgets.clock &&
+                    widgets.shell.widgets.tiling != WidgetPlace::Hidden &&
+                    widgets.shell.widgets.profiles != WidgetPlace::Hidden && widgets.shell.widgets.tray &&
+                    shaodesk::parse_config("return {shell={widgets={profiles=false}}}")
+                            .shell.widgets.profiles == WidgetPlace::Hidden &&
                     !shaodesk::parse_config("return {shell={widgets={tray=false}}}").shell.widgets.tray,
                 "shell widgets not parsed");
-        require(shaodesk::parse_config("return {shell={}}").shell.widgets.battery,
+        require(shaodesk::parse_config("return {shell={}}").shell.widgets.battery != WidgetPlace::Hidden,
                 "widgets not on by default");
-        require(!shaodesk::parse_config("return {shell={}}").shell.widgets.notifications &&
-                    shaodesk::parse_config("return {shell={widgets={notifications=true}}}")
-                        .shell.widgets.notifications,
-                "the notification bell is not off by default, or not switched on");
+        // By default the status widgets, tiling, the profiles and do-not-disturb are in Quick
+        // Settings and the wallpapers on the bar; `true` puts each there.
+        const auto placed_by_default = shaodesk::parse_config("return {shell={}}").shell.widgets;
+        require(placed_by_default.network == WidgetPlace::Quick &&
+                    placed_by_default.battery == WidgetPlace::Quick &&
+                    placed_by_default.volume == WidgetPlace::Quick &&
+                    placed_by_default.tiling == WidgetPlace::Quick &&
+                    placed_by_default.profiles == WidgetPlace::Quick &&
+                    placed_by_default.notifications == WidgetPlace::Quick &&
+                    placed_by_default.wallpapers == WidgetPlace::Bar,
+                "the widgets are not in their default places");
+        const auto all = shaodesk::parse_config(
+                             "return {shell={widgets={network=true,battery=true,volume=true,tiling=true,"
+                             "profiles=true,notifications=true,wallpapers=true}}}")
+                             .shell.widgets;
+        require(all.network == WidgetPlace::Quick && all.notifications == WidgetPlace::Quick &&
+                    all.wallpapers == WidgetPlace::Bar,
+                "true does not put a widget in its default place");
+        // A widget that can move goes where "bar" or "quick" says; nothing else is a place.
+        auto placed = shaodesk::parse_config(
+            "return {shell={widgets={network='quick',volume='bar',wallpapers='quick',tiling=true}}}");
+        require(placed.shell.widgets.network == WidgetPlace::Quick &&
+                    placed.shell.widgets.volume == WidgetPlace::Bar &&
+                    placed.shell.widgets.wallpapers == WidgetPlace::Quick &&
+                    placed.shell.widgets.tiling == shaodesk::ShellWidgets{}.tiling,
+                "widget places not parsed");
+        rejects("return {shell={widgets={network='taskbar'}}}");
+        rejects("return {shell={widgets={volume=1}}}");
+        rejects("return {shell={widgets={clock='bar'}}}");
+        rejects("return {shell={widgets={keyboard_layout='quick'}}}");
         rejects("return {shell={widgets={bluetooth=false}}}");
         rejects("return {shell={widgets=true}}");
         rejects("return {shell={accent='#12345'}}");

@@ -176,7 +176,9 @@ return {
         --                          false gives every window its own button
         -- widgets = { workspaces = true, battery = true, network = true, volume = true,
         --             clock = true, calendar = true, tiling = true, wallpapers = true,
-        --             keyboard_layout = true }, -- false hides one
+        --             keyboard_layout = true }, -- false hides one; battery, network, volume,
+        --             -- tiling, profiles, wallpapers and notifications also take "bar" or
+        --             -- "quick" (Quick Settings), and true is their default place
         -- accent = "#7da8ff",
         -- panel_color = "#151e2c", -- #RRGGBBAA makes it translucent
         -- text_color = "#edf2fa",

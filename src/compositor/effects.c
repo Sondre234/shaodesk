@@ -135,6 +135,13 @@ void night_light_update(struct sh_server *server) {
             server->night_mode == SH_NIGHT_AUTO && fx->night_light && server->night_clock < 0
                 ? NIGHT_LIGHT_TICK_MS
                 : 0);
+    // The shell's Quick Settings show whether it is on and who decides; they hear when either
+    // changes, not every step of a sunset.
+    int announced = (server->night_kelvin < SH_KELVIN_NEUTRAL ? 4 : 0) + server->night_mode;
+    if (announced != server->night_announced) {
+        server->night_announced = announced;
+        notify_subscribers(server);
+    }
 }
 
 int night_light_tick(void *data) {

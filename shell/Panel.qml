@@ -34,6 +34,8 @@ Item {
     property var audioSource: shell.audio
     // Battery and network state; tests swap in one that reads a fake sysfs.
     property var statusSource: shell.status
+    // The screen backlight, swapped the same way.
+    property var backlightSource: shell.backlight
     property string audioPopup: ""
     property real audioPopupX: 0
     // A tray item's menu: the item it belongs to ("" while closed), and where its icon is.
@@ -59,6 +61,8 @@ Item {
     // The surface the popups are drawn in, and the bar's edges in its coordinates: the bar's
     // surface lies along its top or bottom edge, across its width.
     readonly property Item popupLayer: popupLayer
+    // What Quick Settings opens the wallpaper picker by.
+    readonly property Item quickSettingsButton: quickButton
     readonly property real barTop: (onTop ? 0 : popover.height - height) + bar.y
     readonly property real barBottom: barTop + bar.height
     // A popup of the bar opens away from the screen edge the bar is on (PopupCard's side), beside
@@ -243,6 +247,13 @@ Item {
         case "wallpapers":
             toggleAudioPopup("wallpapers", wallpapersButton)
             return wallpapersButton.visible
+        case "quick-settings":
+        case "quick-settings-mixer":
+            // Quick Settings; with the applications' volumes open.
+            toggleAudioPopup("quick", quickButton)
+            if (name === "quick-settings-mixer")
+                Qt.callLater(function() { quickSettingsLoader.item.expanded = "mixer" })
+            return quickButton.visible
         case "notifications":
             // The flyout with the mail application's notifications expanded.
             toggleAudioPopup("clock", clockButton)
@@ -528,6 +539,17 @@ Item {
                 onLoaded: used = true
                 sourceComponent: Component { GroupList { panel: root; barItem: bar } }
             }
+
+            // The Quick Settings button: tiles, the volume and brightness, the battery.
+            Loader {
+                id: quickSettingsLoader
+                asynchronous: !(root.audioPopup === "quick")
+                active: root.audioPopup === "quick" || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { QuickSettings { panel: root; barItem: bar } }
+            }
         }
     }
 
@@ -595,7 +617,7 @@ Item {
             FlatButton {
                 id: wallpapersButton
                 objectName: "wallpapersButton"
-                visible: shell.widgets.wallpapers
+                visible: shell.widgets.wallpapers === "bar"
                 Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
                 active: root.audioPopup === "wallpapers"
                 onClicked: root.toggleAudioPopup("wallpapers", wallpapersButton)
@@ -609,7 +631,7 @@ Item {
             FlatButton {
                 id: profilesButton
                 objectName: "profilesButton"
-                visible: shell.widgets.profiles && shell.profiles.length > 1
+                visible: shell.widgets.profiles === "bar" && shell.profiles.length > 1
                 Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
                 active: root.audioPopup === "profiles"
                 onClicked: root.toggleAudioPopup("profiles", profilesButton)
@@ -637,7 +659,7 @@ Item {
             FlatButton {
                 id: tilingToggle
                 objectName: "tilingToggle"
-                visible: shell.widgets.tiling
+                visible: shell.widgets.tiling === "bar"
                 Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
                 enabled: shell.tilingAvailable
                 opacity: enabled ? 1 : 0.4
@@ -671,6 +693,7 @@ Item {
             BatteryWidget { panel: root; barHeight: bar.height }
             VolumeButton { id: audioWidget; panel: root; barHeight: bar.height }
             KeyboardLayout { panel: root; barHeight: bar.height }
+            QuickSettingsButton { id: quickButton; panel: root; barHeight: bar.height }
             ClockButton { id: clockButton; panel: root; barHeight: bar.height }
             Button {
                 id: showDesktopButton

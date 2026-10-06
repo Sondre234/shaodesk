@@ -121,11 +121,13 @@ int main(int argc, char **argv) {
     QFile file(config);
     if (!file.open(QIODevice::WriteOnly))
         return fail("could not write the configuration");
-    // Long Lua strings preserve paths without shell interpolation.
+    // Long Lua strings preserve paths without shell interpolation. The widgets Quick Settings
+    // holds by default are on the bar, where most of this test uses them.
+    const QString barWidgets = "widgets={network='bar',battery='bar',volume='bar',tiling='bar',profiles='bar'},";
     const auto lua = QString("return {layout={workspace_names={'web','','','mail'}},"
                              "power={countdown=2},"
                              "profile='dark',profiles={dark={},light={shell={accent='#336699'}}},"
-                             "shell={wallpaper='walls/a/one.png',wallpapers=[[%3]],"
+                             "shell={wallpaper='walls/a/one.png'," + barWidgets + "wallpapers=[[%3]],"
                              "launchers={{name='Test app',command={[[%1]],'-E','touch',[[%2]]}}}}}")
                          .arg(QString::fromLocal8Bit(argv[1]), marker, walls);
     file.write(lua.toUtf8());
@@ -150,6 +152,7 @@ int main(int argc, char **argv) {
     int currentWorkspace = 2;
     QStringList switches, requests;
     int layoutSwitches = 0; // "switch_layout next" requests, answered with the second layout
+    bool nightLight = false; // what "night_light_toggle" turns, and the state it then announces
     bool holdSessions = false;
     QString powerRefusal; // what the compositor answers a power action with; "" for ok
     QLocalSocket *pendingSessions = nullptr;
@@ -174,6 +177,12 @@ int main(int argc, char **argv) {
                 client->write("ok\n");
                 client->disconnectFromServer();
                 pickProfile(QString::fromUtf8(request).trimmed().section(' ', 1));
+            } else if (request == "night_light_toggle\n") {
+                requests.push_back("night_light_toggle");
+                nightLight = !nightLight;
+                client->write("ok\n");
+                client->disconnectFromServer();
+                subscriber->write(nightLight ? "night-light on on\n" : "night-light off off\n");
             } else if (request == "switch_layout next\n") {
                 ++layoutSwitches;
                 client->write("ok\n");
@@ -217,6 +226,9 @@ int main(int argc, char **argv) {
         shaodesk::save_profile(name.toStdString());
         controller.reload();
     };
+    // A stand-in sound server for the volume control, made before the panel so that it outlives
+    // it: what reads it never finds it gone.
+    FakeAudio audio;
     ShellView view(controller, app.primaryScreen(), false, true);
     if (view.status() != QQuickView::Ready) {
         for (const auto &error : view.errors())
@@ -600,7 +612,7 @@ int main(int argc, char **argv) {
             return 1;
         }
         if (!controller.widgets()["keyboard_layout"].toBool() ||
-            !rewrite(QString(lua).replace("shell={", "shell={widgets={keyboard_layout=false},")))
+            !rewrite(QString(lua).replace("widgets={", "widgets={keyboard_layout=false,")))
             return fail("the keyboard layout widget was off, or the configuration could not be rewritten");
         controller.reload();
         if (!QTest::qWaitFor([&] { return !layout->isVisible(); })) {
@@ -615,6 +627,15 @@ int main(int argc, char **argv) {
             return 1;
         }
     }
+    // The compositor says whether night light is on and who decides.
+    if (controller.nightLight() || !controller.nightLightMode().isEmpty())
+        return fail("night light is known before the compositor says");
+    subscriber->write("night-light on auto\n");
+    if (!QTest::qWaitFor([&] { return controller.nightLight() && controller.nightLightMode() == "auto"; }))
+        return fail("the night light the compositor reports was not read");
+    subscriber->write("night-light off off\n");
+    if (!QTest::qWaitFor([&] { return !controller.nightLight() && controller.nightLightMode() == "off"; }))
+        return fail("a change of night light was not read");
     // Battery and network widgets show what a (fake) sysfs reports, and only where it exists.
     {
         QDir sys(screens.filePath("sys"));
@@ -1698,7 +1719,6 @@ ListModel {
     }
     // The volume control, fed by a stand-in sound server. Its popups open above it, inside
     // the panel's own surface.
-    FakeAudio audio;
     audio.update({"speakers",
                   {{"speakers", "Speakers", 50, false}, {"headset", "Headset", 30, false}},
                   {{41, "Music", "audio-x-generic", 80, false},
@@ -2558,8 +2578,8 @@ ListModel {
         daemon->setServing(true);
         // The bell is off unless shell.widgets.notifications asks for it: the clock does its work.
         QTest::qWait(50);
-        if (bell->isVisible() || controller.widgets()["notifications"].toBool() ||
-            !rewrite(QString(lua).replace("shell={", "shell={widgets={notifications=true},")))
+        if (bell->isVisible() || controller.widgets()["notifications"].toString() != "quick" ||
+            !rewrite(QString(lua).replace("widgets={", "widgets={notifications='bar',")))
             return fail("the bell showed by default, or the configuration could not be rewritten");
         controller.reload();
         if (!QTest::qWaitFor([&] { return bell->isVisible() && bell->x() > 0; })) {
@@ -2821,6 +2841,199 @@ ListModel {
             std::cerr << "the bell stayed once the setting was gone\n";
             return 1;
         }
+    }
+    // Quick Settings: with the widgets placed in it, a button left of the clock shows their state,
+    // and its flyout holds a tile for each beside night light; the bar keeps none of their own.
+    {
+        // By default, but for the wallpapers.
+        const QString quickLua = QString(lua).replace(barWidgets, "widgets={wallpapers='quick'},");
+        if (!rewrite(quickLua))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        // A battery and a link that is down, as the battery test left the fake sysfs.
+        SystemStatus fake(screens.filePath("sys"));
+        QQmlEngine::setObjectOwnership(&fake, QQmlEngine::CppOwnership);
+        view.rootObject()->setProperty("statusSource", QVariant::fromValue(&fake));
+        auto *button = find(view.rootObject(), "quickSettingsButton");
+        if (!button || !QTest::qWaitFor([&] { return button->isVisible() && button->x() > 0; }))
+            return fail("the Quick Settings button did not appear with widgets placed in it");
+        for (const char *name : {"networkWidget", "batteryWidget", "audioWidget", "tilingToggle",
+                                 "profilesButton", "wallpapersButton", "notificationBell"})
+            if (find(view.rootObject(), name)->isVisible()) {
+                std::cerr << name << " stayed on the bar while placed in Quick Settings\n";
+                return 1;
+            }
+        click(button);
+        auto *quick = find(view.rootObject(), "quickSettings");
+        if (!quick || !QTest::qWaitFor([&] { return inPopover(quick); }))
+            return fail("clicking the Quick Settings button did not open its flyout");
+        auto tile = [&](const QString &name) { return find(quick, "quickTile:" + name); };
+        for (const char *name : {"dnd", "nightLight", "tiling", "profiles", "wallpapers", "network"})
+            if (!tile(name) || !tile(name)->isVisible()) {
+                std::cerr << "Quick Settings has no " << name << " tile\n";
+                return 1;
+            }
+        if (tile("network")->property("label").toString() != "Disconnected" ||
+            tile("network")->property("detail").toString() != "wlan0" ||
+            !find(quick, "quickBattery")->isVisible())
+            return fail("Quick Settings does not show the network and the battery as they are");
+        // Do not disturb, night light (through the compositor) and this monitor's tiling.
+        auto *daemon = controller.notifications();
+        click(tile("dnd"));
+        if (!QTest::qWaitFor([&] { return daemon->dnd() && tile("dnd")->property("checked").toBool(); }))
+            return fail("the do-not-disturb tile did not turn it on");
+        click(tile("dnd"));
+        if (!QTest::qWaitFor([&] { return !daemon->dnd(); }))
+            return fail("the do-not-disturb tile did not turn it off");
+        requests.clear();
+        click(tile("nightLight"));
+        if (!QTest::qWaitFor([&] { return tile("nightLight")->property("checked").toBool(); }) ||
+            requests != QStringList{"night_light_toggle"})
+            return fail("the night light tile did not ask the compositor to toggle it");
+        click(tile("nightLight"));
+        if (!QTest::qWaitFor([&] { return !tile("nightLight")->property("checked").toBool(); }))
+            return fail("the night light tile did not toggle it back");
+        const bool tiled = panelTiling();
+        click(tile("tiling"));
+        if (!QTest::qWaitFor([&] { return panelTiling() != tiled && tile("tiling")->property("checked").toBool() != tiled; }))
+            return fail("the tiling tile did not toggle this monitor's tiling");
+        click(tile("tiling"));
+        if (!QTest::qWaitFor([&] { return panelTiling() == tiled; }))
+            return fail("the tiling tile did not toggle tiling back");
+        // The appearance tile lists the profiles under it; picking one switches to it.
+        click(tile("profiles"));
+        auto *profiles = find(quick, "quickProfiles");
+        if (!profiles || !QTest::qWaitFor([&] { return profiles->isVisible() && profiles->height() > 0; }))
+            return fail("the appearance tile did not list the profiles");
+        requests.clear();
+        QQuickItem *light = nullptr;
+        for (auto *row : profiles->childItems())
+            if (row->property("text").toString() == "light")
+                light = row;
+        if (!light)
+            return fail("the light profile is not listed in Quick Settings");
+        click(light);
+        if (!QTest::qWaitFor([&] { return controller.profile() == "light"; }) ||
+            requests != QStringList{"profile light"})
+            return fail("picking a profile in Quick Settings did not switch to it");
+        controller.pickProfile("dark");
+        if (!QTest::qWaitFor([&] { return controller.profile() == "dark"; }))
+            return fail("the dark profile did not come back");
+        // The volume: its slider and mute, the outputs to pick from, and the applications'.
+        auto *sound = find(quick, "quickSound");
+        auto *volumeSlider = find(quick, "quickVolumeSlider");
+        if (!sound || !sound->isVisible() || !volumeSlider)
+            return fail("Quick Settings has no volume");
+        audio.requests.clear();
+        const auto volumeTrack =
+            volumeSlider->mapRectToScene(QRectF(0, 0, volumeSlider->width(), volumeSlider->height()));
+        QTest::mouseClick(popover, Qt::LeftButton, Qt::NoModifier,
+                          QPointF(volumeTrack.left() + volumeTrack.width() * 0.25, volumeTrack.center().y()).toPoint());
+        if (audio.requests.size() != 1 || !audio.requests[0].startsWith("volume headset ") ||
+            std::abs(audio.requests[0].section(' ', 2).toInt() - 25) > 6) {
+            std::cerr << "the Quick Settings volume slider did not set the volume: "
+                      << audio.requests.join(", ").toStdString() << '\n';
+            return 1;
+        }
+        click(find(quick, "quickMute"));
+        if (!QTest::qWaitFor([&] { return audio.muted(); }))
+            return fail("the Quick Settings mute button did not mute");
+        click(find(quick, "quickMute"));
+        auto *outputsList = find(quick, "quickOutputs");
+        click(find(quick, "quickOutputsToggle"));
+        if (!outputsList || !QTest::qWaitFor([&] { return outputsList->isVisible() && outputsList->height() > 0; }))
+            return fail("the outputs did not open under the volume");
+        audio.requests.clear();
+        click(findNamed(outputsList, "quickOutputItem", "Speakers"));
+        if (!QTest::qWaitFor([&] { return audio.output() == "speakers"; }) ||
+            audio.requests != QStringList{"output speakers 2"}) {
+            std::cerr << "picking an output in Quick Settings did not switch to it: "
+                      << audio.requests.join(", ").toStdString() << '\n';
+            return 1;
+        }
+        auto *streamsList = find(quick, "quickStreams");
+        click(find(quick, "quickMixerToggle"));
+        if (!streamsList || !QTest::qWaitFor([&] { return streamsList->isVisible() && !outputsList->isVisible(); }))
+            return fail("the applications' volumes did not open in place of the outputs");
+        QQuickItem *quickStream = nullptr;
+        if (!QTest::qWaitFor([&] { return (quickStream = findNamed(streamsList, "quickStreamSlider", {})); }))
+            return fail("no application's slider in Quick Settings");
+        QTest::qWait(50); // laid out
+        audio.requests.clear();
+        const auto streamTrack =
+            quickStream->mapRectToScene(QRectF(0, 0, quickStream->width(), quickStream->height()));
+        QTest::mouseClick(popover, Qt::LeftButton, Qt::NoModifier,
+                          QPointF(streamTrack.left() + streamTrack.width() * 0.5, streamTrack.center().y()).toPoint());
+        if (audio.requests.size() != 1 || !audio.requests[0].startsWith("stream 41 ")) {
+            std::cerr << "the Quick Settings application slider did not set its volume: "
+                      << audio.requests.join(", ").toStdString() << '\n';
+            return 1;
+        }
+        // The screen's brightness, only where there is a backlight; the slider sets it (in a
+        // fake sysfs tree, by writing the level).
+        auto *brightness = find(quick, "quickBrightness");
+        if (!brightness || brightness->isVisible())
+            return fail("Quick Settings shows a brightness without a backlight");
+        QDir lightSys(screens.filePath("light"));
+        lightSys.mkpath("class/backlight/fake");
+        for (const auto &[name, text] : {std::pair{"max_brightness", "200\n"}, {"brightness", "100\n"}}) {
+            QFile level(lightSys.filePath(QString("class/backlight/fake/") + name));
+            if (!level.open(QIODevice::WriteOnly) || level.write(text) < 0)
+                return fail("could not write the fake backlight");
+        }
+        Backlight fakeLight(lightSys.path());
+        QQmlEngine::setObjectOwnership(&fakeLight, QQmlEngine::CppOwnership);
+        view.rootObject()->setProperty("backlightSource", QVariant::fromValue(&fakeLight));
+        auto *brightnessSlider = find(quick, "quickBrightnessSlider");
+        if (!QTest::qWaitFor([&] { return brightness->isVisible() && brightnessSlider->property("value").toInt() == 50; }))
+            return fail("Quick Settings does not show the backlight's level");
+        QTest::qWait(50); // laid out
+        const auto lightTrack =
+            brightnessSlider->mapRectToScene(QRectF(0, 0, brightnessSlider->width(), brightnessSlider->height()));
+        QTest::mouseClick(popover, Qt::LeftButton, Qt::NoModifier,
+                          QPointF(lightTrack.left() + lightTrack.width() * 0.8, lightTrack.center().y()).toPoint());
+        QFile written(lightSys.filePath("class/backlight/fake/brightness"));
+        if (!written.open(QIODevice::ReadOnly) || std::abs(written.readAll().trimmed().toInt() - 160) > 12 ||
+            std::abs(fakeLight.percent() - 80) > 6) {
+            std::cerr << "the brightness slider did not set the backlight: " << fakeLight.percent() << "%\n";
+            return 1;
+        }
+        view.rootObject()->setProperty("backlightSource", QVariant::fromValue(controller.backlight()));
+        // The button's wheel changes the volume and a middle click mutes, as on the bar's.
+        audio.requests.clear();
+        const int before = audio.volume();
+        QWheelEvent notch(centre(button), view.mapToGlobal(centre(button)), {}, {0, 120},
+                          Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+        QGuiApplication::sendEvent(&view, &notch);
+        if (audio.volume() != before + 5)
+            return fail("the wheel on the Quick Settings button did not raise the volume");
+        click(button, Qt::MiddleButton);
+        if (!QTest::qWaitFor([&] { return audio.muted(); }))
+            return fail("a middle click on the Quick Settings button did not mute");
+        audio.toggleMute();
+        // The wallpaper tile opens the bar's own picker in its place.
+        if (!quick->isVisible())
+            click(button);
+        if (!QTest::qWaitFor([&] { return inPopover(quick); }))
+            return fail("Quick Settings did not open again");
+        click(tile("wallpapers"));
+        auto *picker = find(view.rootObject(), "wallpaperPicker");
+        if (!QTest::qWaitFor([&] { return picker && inPopover(picker) && !quick->isVisible(); }))
+            return fail("the wallpaper tile did not open the wallpaper picker");
+        QTest::keyClick(picker->window(), Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the wallpaper picker did not close");
+        view.rootObject()->setProperty("statusSource", QVariant::fromValue(controller.status()));
+        // With nothing placed in it (do-not-disturb, which this test's configuration leaves in
+        // it, switched off), the button goes.
+        if (!rewrite(QString(lua).replace("widgets={", "widgets={notifications=false,")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return !button->isVisible(); }))
+            return fail("the Quick Settings button stayed with nothing placed in it");
+        if (!rewrite(lua))
+            return fail("could not restore the configuration");
+        controller.reload();
     }
     // The system tray: hidden while empty, a button for each item shown in the order they came,
     // and clicks and the wheel passed on to the item's application. The items are put in the

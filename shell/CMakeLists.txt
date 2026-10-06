@@ -68,7 +68,11 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     GroupList.qml
 
     PowerDialog.qml
-    ClockFlyout.qml)
+    ClockFlyout.qml
+    BatteryIcon.qml
+    QuickSettingsButton.qml
+    QuickSettings.qml
+    QuickTile.qml)
 add_executable(shaodesk-shell main.cpp ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp task_model.cpp task_model.hpp
     task_filter.cpp task_filter.hpp icons.cpp icons.hpp wallpapers.cpp wallpapers.hpp view.cpp view.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
     preview.cpp preview.hpp
@@ -200,6 +204,18 @@ if(BUILD_TESTING)
         add_test(NAME shell_notifications_dbus COMMAND notifications_dbus_test)
         set_tests_properties(shell_notifications_dbus PROPERTIES TIMEOUT 60
             ENVIRONMENT "QT_QPA_PLATFORM=offscreen;DBUS_SESSION_BUS_ADDRESS=disabled:")
+        # Setting the backlight through a stand-in for logind on a private bus too, with the
+        # system bus made unusable as well.
+        add_executable(backlight_dbus_test ${PROJECT_SOURCE_DIR}/tests/backlight_dbus_test.cpp
+            backlight.cpp backlight.hpp)
+        set_target_properties(backlight_dbus_test PROPERTIES AUTOMOC ON)
+        target_include_directories(backlight_dbus_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+        target_compile_definitions(backlight_dbus_test PRIVATE QT_NO_KEYWORDS SHAODESK_DBUS=1)
+        target_compile_options(backlight_dbus_test PRIVATE -Wall -Wextra -Wpedantic)
+        target_link_libraries(backlight_dbus_test PRIVATE Qt6::Core Qt6::DBus Qt6::Test)
+        add_test(NAME shell_backlight_dbus COMMAND backlight_dbus_test)
+        set_tests_properties(shell_backlight_dbus PROPERTIES TIMEOUT 60
+            ENVIRONMENT "DBUS_SESSION_BUS_ADDRESS=disabled:;DBUS_SYSTEM_BUS_ADDRESS=disabled:")
     endif()
     if(SHAODESK_TRAY_DBUS)
         # A tray item for the end-to-end tests; tests/tray_fake_item.hpp is its item and menu.

@@ -176,6 +176,28 @@ void boolean(lua_State *L, const char *key, const char *label, bool &target) {
     }
     lua_pop(L, 1);
 }
+// A widget that can move: `true` for `place`, its default place, `false` for nowhere, or
+// "bar" or "quick" (Quick Settings).
+void placement(lua_State *L, const char *key, const char *label, WidgetPlace place,
+               WidgetPlace &target) {
+    lua_getfield(L, -1, key);
+    if (lua_isboolean(L, -1)) {
+        target = lua_toboolean(L, -1) ? place : WidgetPlace::Hidden;
+    } else if (lua_type(L, -1) == LUA_TSTRING) {
+        const std::string where = lua_tostring(L, -1);
+        if (where == "bar")
+            target = WidgetPlace::Bar;
+        else if (where == "quick")
+            target = WidgetPlace::Quick;
+        else
+            fail(std::string(label) + " must be true, false, \"bar\" or \"quick\", not \"" + where +
+                     "\"",
+                 key);
+    } else if (!lua_isnil(L, -1)) {
+        wrong_type(L, label, "true, false, \"bar\" or \"quick\"");
+    }
+    lua_pop(L, 1);
+}
 // A boolean that may be left unset (-1) to keep a device default.
 void tristate(lua_State *L, const char *key, const char *label, int &target) {
     bool value = false;
@@ -313,19 +335,26 @@ void read_shell(lua_State *L, ShellConfig &shell) {
     shell.workspaces_shown = integer(L, "workspaces_shown", 0, 0, 10);
     if (section(L, "widgets", "shell.widgets")) {
         for (auto [key, target] : {std::pair{"workspaces", &shell.widgets.workspaces},
-                                   {"battery", &shell.widgets.battery},
-                                   {"network", &shell.widgets.network},
-                                   {"volume", &shell.widgets.volume},
                                    {"clock", &shell.widgets.clock},
                                    {"calendar", &shell.widgets.calendar},
-                                   {"tiling", &shell.widgets.tiling},
-                                   {"profiles", &shell.widgets.profiles},
-                                   {"wallpapers", &shell.widgets.wallpapers},
                                    {"keyboard_layout", &shell.widgets.keyboard_layout},
                                    {"power", &shell.widgets.power},
-                                   {"tray", &shell.widgets.tray},
-                                   {"notifications", &shell.widgets.notifications}})
+                                   {"tray", &shell.widgets.tray}})
             boolean(L, key, (std::string("shell.widgets.") + key).c_str(), *target);
+        // Those that can move, and where `true` puts them.
+        struct Movable {
+            const char *key;
+            WidgetPlace *target;
+            WidgetPlace place;
+        };
+        for (auto [key, target, place] : {Movable{"battery", &shell.widgets.battery, WidgetPlace::Quick},
+                                          {"network", &shell.widgets.network, WidgetPlace::Quick},
+                                          {"volume", &shell.widgets.volume, WidgetPlace::Quick},
+                                          {"tiling", &shell.widgets.tiling, WidgetPlace::Quick},
+                                          {"profiles", &shell.widgets.profiles, WidgetPlace::Quick},
+                                          {"wallpapers", &shell.widgets.wallpapers, WidgetPlace::Bar},
+                                          {"notifications", &shell.widgets.notifications, WidgetPlace::Quick}})
+            placement(L, key, (std::string("shell.widgets.") + key).c_str(), place, *target);
     }
     lua_pop(L, 1);
     for (auto [key, target] : {std::pair{"accent", &shell.accent},
