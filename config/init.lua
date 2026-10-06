@@ -34,9 +34,49 @@ return {
     -- of the configuration while it is in use. Pick one from the panel's right-click menu
     -- ("Appearance"), the command palette, or `shaodesk msg profile NAME|next|prev`; the choice
     -- is kept across restarts. `profile` is the one to start with.
-    profile = "default",
+    --
+    -- shaodesk starts in the macOS style: a menu bar along the top, a dock at the bottom,
+    -- Launchpad, Spotlight, traffic-light window controls and soft window shadows. `default` and
+    -- `light` are the taskbar style (a bar with a start menu), and `default` is also the one that
+    -- shows a theme.lua from `shaodesk import` as it is, since a profile wins over it. The
+    -- macOS profiles name the Inter font, which looks closest to macOS's; without it installed
+    -- the default sans-serif stands in.
+    profile = "macos-light",
     profiles = {
-        default = {}, -- this file and its theme as they are
+        ["macos-light"] = {
+            appearance = { background = "#9dbbe6" }, -- the drawn wallpaper's sky
+            windows = {
+                controls = "traffic_lights", round = "always", shadow = { enabled = true },
+                -- Close, minimize and maximize on the left of GTK's own title bars too (read
+                -- as shaodesk starts)
+                buttons = "close,minimize,maximize:",
+            },
+            shell = {
+                style = "macos", accent = "#007aff", panel_color = "#f6f6f8bf",
+                text_color = "#1d1d1f", font = "Inter", font_size = 13,
+                -- The dock: 48-pixel icons, floating 6 pixels above the bottom edge
+                panel_height = 64, panel_margin = { bottom = 6 }, panel_radius = 20,
+                widgets = { workspaces = false, network = "bar", battery = "bar",
+                            volume = "quick", tiling = "quick", wallpapers = "quick",
+                            profiles = "quick", notifications = "quick" },
+            },
+        },
+        ["macos-dark"] = {
+            appearance = { background = "#1b2440" },
+            windows = {
+                controls = "traffic_lights", round = "always", shadow = { enabled = true },
+                buttons = "close,minimize,maximize:",
+            },
+            shell = {
+                style = "macos", accent = "#0a84ff", panel_color = "#232326bf",
+                text_color = "#f5f5f7", font = "Inter", font_size = 13,
+                panel_height = 64, panel_margin = { bottom = 6 }, panel_radius = 20,
+                widgets = { workspaces = false, network = "bar", battery = "bar",
+                            volume = "quick", tiling = "quick", wallpapers = "quick",
+                            profiles = "quick", notifications = "quick" },
+            },
+        },
+        default = {}, -- the taskbar: this file and its theme as they are
         light = {
             appearance = { background = "#dfe4ec" },
             windows = { border_color = "#3d6fd9", border_inactive_color = "#c3cad6" },
