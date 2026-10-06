@@ -2,6 +2,7 @@
 #pragma once
 #include "ext-image-capture-source-v1-client-protocol.h" // before the next, which names its interface
 #include "shaodesk-window-control-v1-client-protocol.h"
+#include "window_pictures.hpp"
 #include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
 #include <QAbstractListModel>
 #include <QSocketNotifier>
@@ -12,7 +13,8 @@
 // The windows the compositor lists for taskbars (wlr-foreign-toplevel), with where each is from
 // shaodesk-window-control-v1 when the compositor offers it: `output` (connector name), `workspace`
 // (of that output, from 1; 0 until it is known), whether it is `sticky` or `floating`, and whether
-// its workspace is `tiling`.
+// its workspace is `tiling`. From its version 2, a window watched with watchPicture also has a
+// `picture` (WindowPictures), "" until one has arrived.
 class TaskModel : public QAbstractListModel {
     Q_OBJECT
   public:
@@ -29,7 +31,8 @@ class TaskModel : public QAbstractListModel {
         Workspace,
         Sticky,
         Floating,
-        Tiling
+        Tiling,
+        Picture
     };
     explicit TaskModel(QObject *parent = nullptr);
     ~TaskModel() override;
@@ -50,6 +53,12 @@ class TaskModel : public QAbstractListModel {
     Q_INVOKABLE void setFloating(int id, bool floating);
     Q_INVOKABLE void close(int id);
     Q_INVOKABLE void showDesktop();
+    // Counted per window: while watched, the window is pictured, once or as it redraws when
+    // `live`, at `pixelWidth` device pixels wide. Its last picture stays until it closes.
+    Q_INVOKABLE void watchPicture(int taskId, int pixelWidth, bool live);
+    Q_INVOKABLE void unwatchPicture(int taskId);
+    // The window's last picture, for the image provider on any thread; null while it has none.
+    QImage picture(int taskId) const;
     // The windows the compositor says are asking for attention, as {appId, title} pairs: the
     // foreign-toplevel protocol has no such state, so a task is urgent when a pair matches its
     // app id and title (each pair marks one task, the first not marked already).
@@ -82,9 +91,12 @@ class TaskModel : public QAbstractListModel {
     wl_seat *seat_ = nullptr;
     zwlr_foreign_toplevel_manager_v1 *manager_ = nullptr;
     shaodesk_window_control_v1 *control_ = nullptr;
+    wl_shm *shm_ = nullptr;
+    ext_image_copy_capture_manager_v1 *captureManager_ = nullptr;
     std::unique_ptr<QSocketNotifier> read_, write_;
     QList<QPair<QString, QString>> urgent_;
     int nextId_ = 1;
+    WindowPictures pictures_{[this] { flush(); }};
     Task *find(int id);
     void flush();
     // Works out which tasks are urgent; those but `except` that change announce it.

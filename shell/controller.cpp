@@ -4,6 +4,7 @@
 #include "notification_images.hpp"
 #include "tray_images.hpp"
 #include "wallpapers.hpp"
+#include "window_images.hpp"
 #include <QQmlContext>
 #include <QQmlEngine>
 #include <QDir>
@@ -79,6 +80,7 @@ QQmlEngine *ShellController::engine() {
         engine_->addImageProvider("notify", new NotificationImages(notifications_));
         engine_->addImageProvider("tray", new TrayImages(tray_));
         engine_->addImageProvider("thumbs", new Thumbnails);
+        engine_->addImageProvider("windows", new WindowImages(tasks_));
         engine_->rootContext()->setContextProperty("shell", this);
     }
     return engine_;
