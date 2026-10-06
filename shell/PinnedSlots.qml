@@ -103,6 +103,7 @@ Repeater {
             topPadding: Theme.spacingXS; bottomPadding: Theme.spacingS + Theme.spacingXS
             onClicked: { if (shell.launch(pinnedSlot.modelData.appId)) pinnedSlots.panel.closeMenus() }
             Accessible.name: pinnedSlot.modelData.name
+            BarTip { panel: pinnedSlots.panel; owner: pinnedButton; text: pinnedSlot.modelData.name }
             contentItem: Item {
                 BarAppIcon {
                     anchors.centerIn: parent

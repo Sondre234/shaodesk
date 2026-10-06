@@ -602,6 +602,7 @@ Item {
                 active: root.launcherOpen
                 onClicked: root.launcherOpen = !root.launcherOpen
                 Accessible.name: "Applications"
+                BarTip { panel: root; owner: start; text: "Start" }
                 // Four squares in the accent colour, which shrink a little while pressed as an
                 // application's icon does.
                 contentItem: Item {

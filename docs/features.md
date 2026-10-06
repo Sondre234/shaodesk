@@ -20,8 +20,9 @@ from desktop entries through GIO, and again as soon as one is installed or remov
 
 Along the bar, from the left: the start button, the pinned applications and a button for each
 open window, the workspace indicator, the widgets placed on the bar, the tray, the Quick Settings
-button, the clock, and a sliver at the end that shows the desktop. Every button shows a tooltip
-when the pointer rests on it. Lua configures the panel's height, top or bottom placement
+button, the clock, and a sliver at the end that shows the desktop. A button shows a tooltip when
+the pointer rests on it, but for a stacked one, which lists its windows instead, and a window's
+whose title it shows already. Lua configures the panel's height, top or bottom placement
 (`panel_position`), margins that make it float (`panel_margin`, one number or
 `{ top, right, bottom, left }`), corner radius, font and text size, colors (`#RRGGBB`, or
 `#RRGGBBAA` for a translucent panel), wallpaper, and pinned commands, which run from your home
