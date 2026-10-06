@@ -152,16 +152,28 @@ Item {
                             font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily
                             textFormat: Text.PlainText; elide: Text.ElideRight
                         }
-                        Text {
+                        // Dismisses the card; it shows while the pointer is on the card.
+                        AbstractButton {
+                            id: close
                             objectName: "notificationClose"
-                            text: "×"
-                            color: closeArea.containsMouse ? Theme.text : Theme.textMuted
-                            font.pixelSize: 18
-                            MouseArea {
-                                id: closeArea
-                                anchors.fill: parent; anchors.margins: -6
-                                hoverEnabled: true
-                                onClicked: cards.center.dismiss(entry.notificationId)
+                            Layout.preferredWidth: Theme.iconSize + Theme.spacingS
+                            Layout.preferredHeight: Theme.iconSize + Theme.spacingS
+                            opacity: hover.hovered ? 1 : 0
+                            Behavior on opacity { NumberAnimation { duration: Theme.durationFast } }
+                            hoverEnabled: true
+                            focusPolicy: Qt.NoFocus
+                            Accessible.name: "Dismiss"
+                            onClicked: cards.center.dismiss(entry.notificationId)
+                            background: Rectangle {
+                                radius: height / 2
+                                color: close.pressed ? Theme.pressed : close.hovered ? Theme.hover : "transparent"
+                            }
+                            contentItem: Item {
+                                Icon {
+                                    anchors.centerIn: parent
+                                    name: "x"; size: Theme.iconSizeSmall
+                                    color: close.hovered ? Theme.text : Theme.textMuted
+                                }
                             }
                         }
                     }
