@@ -309,7 +309,6 @@ Item {
         return state && state.tiling !== undefined ? state.tiling : shell.tiling
     }
     readonly property bool onTop: shell.panelTop
-    readonly property string uiFont: shell.fontFamily.length > 0 ? shell.fontFamily : Qt.application.font.family
     readonly property bool floating: shell.panelRadius > 0 || shell.panelMarginLeft > 0 ||
                                      shell.panelMarginRight > 0 || shell.panelMarginTop > 0 ||
                                      shell.panelMarginBottom > 0
