@@ -1993,9 +1993,54 @@ int main(int argc, char **argv) {
             return 1;
         }
     }
+    // The design tokens follow the configuration: the animation settings set every duration,
+    // popups are opaque over a translucent bar, and a light panel is known for one.
+    {
+        QQmlComponent probe(view.engine());
+        // In the module's folder, where Theme is found as the panel finds it.
+        probe.setData("import QtQuick\nQtObject { property QtObject theme: Theme }",
+                      QUrl("qrc:/shell/ShaodeskShell/ThemeProbe.qml"));
+        std::unique_ptr<QObject> holder(probe.create());
+        auto *theme = holder ? holder->property("theme").value<QObject *>() : nullptr;
+        if (!theme) {
+            std::cerr << "Theme did not load: " << probe.errorString().toStdString() << '\n';
+            return 1;
+        }
+        auto rewrite = [&config](const QString &source) {
+            QFile again(config);
+            return again.open(QIODevice::WriteOnly | QIODevice::Truncate) &&
+                   again.write(source.toUtf8()) >= 0;
+        };
+        auto token = [&](const char *name) { return theme->property(name); };
+        if (token("durationFast").toInt() != 120 || token("light").toBool() ||
+            token("surface").value<QColor>() != controller.panelColor())
+            return fail("Theme does not follow the default configuration");
+        if (!rewrite(QString(lua).replace("shell={wallpaper", "animations={speed=2},shell={wallpaper")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return token("durationFast").toInt() == 60; }))
+            return fail("Theme's durations do not follow animations.speed");
+        if (!rewrite(QString(lua).replace(
+                "shell={wallpaper", "animations={enabled=false},shell={panel_color='#f3f2fbcc',"
+                                    "text_color='#141a48',accent='#4a64dc',wallpaper")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return token("light").toBool(); }) ||
+            token("durationFast").toInt() != 0 || token("durationSlow").toInt() != 0 ||
+            token("bar").value<QColor>().alpha() != 0xcc ||
+            token("surface").value<QColor>().alpha() != 255 ||
+            token("hover").value<QColor>().alpha() == 0 ||
+            token("textOnAccent").value<QColor>() != token("surface").value<QColor>()) {
+            std::cerr << "Theme does not follow a light, translucent profile without animations\n";
+            return 1;
+        }
+        if (!rewrite(lua))
+            return fail("could not restore the configuration");
+        controller.reload();
+    }
     std::cout << "Hover/click, launcher keyboard focus, search, command launch, tiling toggle, and "
                  "workspace indicator, task and bar context menus, pinning into a window's slot, "
                  "reordering pins, "
                  "task reordering, grouped windows, the volume control, the command palette, and the "
-                 "notification bell, cards and history, and the tray passed\n";
+                 "notification bell, cards and history, the tray, and the design tokens passed\n";
 }
