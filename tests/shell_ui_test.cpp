@@ -1897,6 +1897,18 @@ ListModel {
             std::cerr << "a window's picture does not show in its tile, fitted into it\n";
             return 1;
         }
+        // A new picture takes the old one's place, and without one the icon is back.
+        editTasks(QString("model.setProperty(%1, 'picture', 'image://test-windows/100x200')").arg(rowOf(10)));
+        if (!QTest::qWaitFor([&] {
+                return shows(10) && find(tileFor(10), "windowThumbnailPicture")->size() == QSizeF(75, 150);
+            }))
+            return fail("a window's new picture did not take the place of the old one");
+        editTasks(QString("model.setProperty(%1, 'picture', '')").arg(rowOf(10)));
+        if (!QTest::qWaitFor([&] { return !shows(10) && find(tileFor(10), "windowThumbnailStandIn")->isVisible(); }))
+            return fail("a window whose picture went shows no icon in its place");
+        editTasks(QString("model.setProperty(%1, 'picture', 'image://test-windows/320x100')").arg(rowOf(10)));
+        if (!QTest::qWaitFor([&] { return shows(10); }))
+            return fail("a window's picture did not come back");
         // The pointer can cross from the button to the card without it closing, and a click on
         // a tile focuses its window and closes the card.
         const QPoint into = centre(tileFor(10));

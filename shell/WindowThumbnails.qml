@@ -142,7 +142,7 @@ PopupCard {
                         Rectangle {
                             objectName: "windowThumbnailStandIn"
                             anchors.fill: parent
-                            visible: picture.status !== Image.Ready
+                            visible: !picture.visible
                             radius: Theme.radiusSmall
                             color: Theme.alpha(Theme.text, 0.06)
                             Image {
@@ -161,10 +161,19 @@ PopupCard {
                             width: Math.min(box.width, box.height * aspect)
                             height: Math.min(box.height, box.width / aspect)
                             source: tile.model.picture || ""
-                            // A new picture has a new name; the old one is not wanted again.
+                            // A new picture has a new name; the old one is not wanted again, but
+                            // stays until the new one has loaded.
                             cache: false
+                            retainWhileLoading: true
                             smooth: true; mipmap: true
-                            visible: status === Image.Ready
+                            // Whether it has a picture to show: once one has loaded, until there
+                            // is none.
+                            property bool shown: false
+                            onStatusChanged: {
+                                if (status === Image.Ready) shown = true
+                                else if (status !== Image.Loading) shown = false
+                            }
+                            visible: shown || status === Image.Ready
                             layer.enabled: Theme.effects
                             layer.effect: MultiEffect {
                                 maskEnabled: true
