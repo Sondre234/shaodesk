@@ -85,11 +85,14 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     MenuBarMenu.qml
     QuickSettings.qml
     QuickTile.qml)
-# The protocols task_model.cpp speaks, generated in the top-level build directory.
+# The protocols task_model.cpp and window_pictures.cpp speak, generated in the top-level build
+# directory.
 set(SHAODESK_TASK_PROTOCOL_SOURCES
     ${PROJECT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c ${PROJECT_BINARY_DIR}/shaodesk-window-control-v1-client-protocol.h
     ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
     ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h
+    ${PROJECT_BINARY_DIR}/ext-image-copy-capture-v1-protocol.c
+    ${PROJECT_BINARY_DIR}/ext-image-copy-capture-v1-client-protocol.h
     ${CAPTURE_SOURCE_PROTOCOL_SOURCES})
 add_executable(shaodesk-shell main.cpp ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp task_model.cpp task_model.hpp
     task_filter.cpp task_filter.hpp icons.cpp icons.hpp wallpapers.cpp wallpapers.hpp view.cpp view.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
@@ -188,6 +191,15 @@ if(BUILD_TESTING)
         $<TARGET_FILE:wayland_probe> ${EXAMPLE_CONFIG}
         $<TARGET_FILE:task_model_test>)
     set_tests_properties(shell_tasks PROPERTIES TIMEOUT 60)
+    # The window pictures' formats and sizes, without a compositor.
+    add_executable(window_pictures_test ${PROJECT_SOURCE_DIR}/tests/window_pictures_test.cpp
+        window_pictures.cpp window_pictures.hpp ${SHAODESK_TASK_PROTOCOL_SOURCES})
+    set_target_properties(window_pictures_test PROPERTIES AUTOMOC ON)
+    target_include_directories(window_pictures_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
+    target_compile_definitions(window_pictures_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(window_pictures_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(window_pictures_test PRIVATE Qt6::Gui Qt6::Test PkgConfig::SHELL_WAYLAND)
+    add_test(NAME shell_window_pictures COMMAND window_pictures_test)
     add_executable(notifications_test ${PROJECT_SOURCE_DIR}/tests/notifications_test.cpp
         notifications.cpp notifications.hpp)
     set_target_properties(notifications_test PROPERTIES AUTOMOC ON)
