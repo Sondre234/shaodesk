@@ -11,6 +11,7 @@
 #include <QJSValue>
 #include <QLocalServer>
 #include <QLocalSocket>
+#include <QPointer>
 #include <QQmlComponent>
 #include <QQmlEngine>
 #include <QQuickItem>
@@ -895,6 +896,41 @@ ListModel {
             return 1;
         }
         editTasks("model.remove(1)");
+    }
+    // A window's button fades and grows in as its window opens, its line drawn out, and shrinks
+    // away as it closes, taking no more clicks. Slowed down, so that it is seen on its way.
+    {
+        if (!rewrite(QString(lua).replace("return {", "return {animations={speed=0.25},")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return controller.animationSpeed() == 0.25; }))
+            return fail("the animations were not slowed down");
+        editTasks("model.append({taskId: 98, title: 'Arriving', appId: 'arriving', active: false, "
+                  "minimized: false, urgent: false})");
+        // Not the button of the window closed just before, which may still be on its way out.
+        QPointer<QQuickItem> arriving;
+        if (!QTest::qWaitFor([&] {
+                arriving = listedTask(1);
+                return arriving && arriving->property("taskId").toInt() == 98;
+            }) ||
+            arriving->opacity() == 1 || arriving->scale() == 1 || arriving->property("reveal").toReal() == 1)
+            return fail("a window's button did not fade and grow in");
+        if (!QTest::qWaitFor([&] {
+                return arriving && arriving->opacity() == 1 && arriving->scale() == 1 &&
+                       arriving->property("reveal").toReal() == 1;
+            }))
+            return fail("a window's button did not come all the way in");
+        editTasks("model.remove(1)");
+        if (!QTest::qWaitFor([&] { return arriving && arriving->opacity() < 1; }) ||
+            arriving->isEnabled())
+            return fail("a closing window's button did not fade out, or still takes clicks");
+        if (!QTest::qWaitFor([&] { return !arriving || !arriving->isVisible(); }))
+            return fail("a closed window's button stayed on the bar");
+        if (!rewrite(lua))
+            return fail("could not restore the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return controller.animationSpeed() == 1; }))
+            return fail("the animations did not get their speed back");
     }
     auto *menu = find(view.rootObject(), "contextMenu");
     // Repeater delegates are visual children only, so walk the item tree. Rows of the task
