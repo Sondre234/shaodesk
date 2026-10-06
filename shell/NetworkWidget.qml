@@ -12,7 +12,7 @@ FlatButton {
     objectName: "networkWidget"
     readonly property var status: network.panel.statusSource
     readonly property bool linkDown: status.networkState === "disconnected"
-    readonly property color tint: down ? Theme.textMuted : Theme.text
+    readonly property color tint: linkDown ? Theme.textMuted : Theme.text
     visible: shell.widgets.network && status.networkState !== "none"
     Layout.preferredWidth: 34; Layout.preferredHeight: network.barHeight - 10
     Accessible.name: status.networkText
