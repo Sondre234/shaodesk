@@ -50,13 +50,13 @@ Button {
     property int bouncesLeft: 0
     function bounce(times) {
         bouncesLeft = times
-        if (!bouncing.running)
-            bouncing.start()
+        if (!bounceAnimation.running)
+            bounceAnimation.start()
     }
     // The bounce on its way ends, and no other follows.
     function settle() { bouncesLeft = Math.min(bouncesLeft, 1) }
     SequentialAnimation {
-        id: bouncing
+        id: bounceAnimation
         NumberAnimation {
             target: dockIcon; property: "lift"; from: 0; to: 1
             duration: Theme.dockBounceDuration / 2; easing.type: Easing.OutQuad
@@ -68,10 +68,10 @@ Button {
         onFinished: {
             dockIcon.bouncesLeft = Math.max(0, dockIcon.bouncesLeft - 1)
             if (dockIcon.bouncesLeft > 0)
-                Qt.callLater(bouncing.start)
+                Qt.callLater(bounceAnimation.start)
         }
     }
-    readonly property bool bouncing: bouncing.running || bouncesLeft > 0
+    readonly property bool bouncing: bounceAnimation.running || bouncesLeft > 0
     onRunningChanged: if (running) settle()
     // A window asking for attention as the dock is made has been asking a while; one that starts
     // asking later is bounced for.
