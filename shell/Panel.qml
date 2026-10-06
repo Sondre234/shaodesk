@@ -526,7 +526,7 @@ Item {
         var pinned = shell.pinned.some(function(app) { return app.appId === appId })
         var toggle = function() { Qt.callLater(function() { if (pinned) shell.unpin(appId); else shell.pin(appId) }) }
         if (macos)
-            return { text: "Keep in Dock", toggle: "check", checked: pinned, objectName: "contextMenuKeep", run: toggle }
+            return { text: pinned ? "Remove from Dock" : "Keep in Dock", objectName: "contextMenuKeep", run: toggle }
         return pinned ? { text: "Unpin from taskbar", icon: "pin-off", run: toggle }
                       : { text: "Pin to taskbar", icon: "pin", run: toggle }
     }
