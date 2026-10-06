@@ -18,5 +18,5 @@ ToolTip {
         color: Theme.text; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
     }
     background: Rectangle { color: Theme.surface; border.color: Theme.border; radius: Theme.radiusSmall }
-    Component.onCompleted: if ("popupType" in barTip) barTip.popupType = Popup.Window
+    popupType: Popup.Window
 }
