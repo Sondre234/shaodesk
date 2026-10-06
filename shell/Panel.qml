@@ -222,7 +222,11 @@ Item {
             toggleAudioPopup("wallpapers", wallpapersButton)
             return wallpapersButton.visible
         case "quick-settings":
+        case "quick-settings-mixer":
+            // Quick Settings; with the applications' volumes open.
             toggleAudioPopup("quick", quickButton)
+            if (name === "quick-settings-mixer")
+                Qt.callLater(function() { quickSettingsLoader.item.expanded = "mixer" })
             return quickButton.visible
         case "notifications":
             // The flyout with the mail application's notifications expanded.

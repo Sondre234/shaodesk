@@ -76,19 +76,20 @@ enum class WidgetPlace { Hidden, Bar, Quick };
 // Settings with "quick", and `true` puts it in its default place.
 struct ShellWidgets {
     bool workspaces = true; // this monitor's workspace numbers
-    WidgetPlace battery = WidgetPlace::Bar; // charge and state, only where a battery exists
-    WidgetPlace network = WidgetPlace::Bar; // connection state, only where an interface exists
-    WidgetPlace volume = WidgetPlace::Bar;  // the default output's volume, only with a sound server
+    WidgetPlace battery = WidgetPlace::Quick; // charge and state, only where a battery exists
+    WidgetPlace network = WidgetPlace::Quick; // connection state, only where an interface exists
+    WidgetPlace volume = WidgetPlace::Quick;  // the default output's volume, only with a sound server
     bool clock = true;
     bool calendar = true; // the month calendar in the clock's flyout
-    WidgetPlace tiling = WidgetPlace::Bar;   // tiling on or off for the monitor
-    WidgetPlace profiles = WidgetPlace::Bar; // the appearance profiles, only with two or more
+    WidgetPlace tiling = WidgetPlace::Quick;   // tiling on or off for the monitor
+    WidgetPlace profiles = WidgetPlace::Quick; // the appearance profiles, only with two or more
     WidgetPlace wallpapers = WidgetPlace::Bar; // the wallpaper picker
     bool keyboard_layout = true; // the active keyboard layout, only with two or more
     bool power = true;      // the launcher's power button, only with something in its menu
     bool tray = true;       // the system tray, only while applications show icons in it
-    // Do-not-disturb and the unread count: a bell on the bar; the clock shows them either way.
-    WidgetPlace notifications = WidgetPlace::Hidden;
+    // Do-not-disturb, as a tile, or a bell on the bar with the unread count; the clock shows both
+    // either way.
+    WidgetPlace notifications = WidgetPlace::Quick;
 };
 
 struct ShellConfig {

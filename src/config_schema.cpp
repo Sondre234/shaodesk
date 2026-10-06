@@ -534,26 +534,26 @@ const Option options[] = {
      "puts it in its default place."},
     {"shell.widgets.workspaces", "boolean", "true", "true", none, none,
      "This monitor's workspace numbers."},
-    {"shell.widgets.battery", "boolean or string", "true", "\"bar\"", none, none,
+    {"shell.widgets.battery", "boolean or string", "true", "\"quick\"", none, none,
      "Charge and state, only where a battery exists: `\"bar\"` or `\"quick\"` (along Quick "
-     "Settings' foot). By default on the bar."},
-    {"shell.widgets.network", "boolean or string", "true", "\"bar\"", none, none,
+     "Settings' foot). By default in Quick Settings."},
+    {"shell.widgets.network", "boolean or string", "true", "\"quick\"", none, none,
      "Connection state, only where a network interface exists: `\"bar\"` or `\"quick\"` (a "
-     "tile). By default on the bar."},
-    {"shell.widgets.volume", "boolean or string", "true", "\"bar\"", none, none,
+     "tile). By default in Quick Settings."},
+    {"shell.widgets.volume", "boolean or string", "true", "\"quick\"", none, none,
      "The default output's volume, only with a sound server: `\"bar\"` or `\"quick\"` (a "
-     "slider, with the outputs and the applications' volumes). By default on the bar."},
+     "slider, with the outputs and the applications' volumes). By default in Quick Settings."},
     {"shell.widgets.clock", "boolean", "true", "true", none, none, "The clock."},
     {"shell.widgets.calendar", "boolean", "true", "true", none, none,
      "The month calendar in the clock's flyout."},
-    {"shell.widgets.tiling", "boolean or string", "true", "\"bar\"", none, none,
+    {"shell.widgets.tiling", "boolean or string", "true", "\"quick\"", none, none,
      "Tiling on or off for the monitor: `\"bar\"` (a button) or `\"quick\"` (a tile). By "
-     "default on the bar."},
-    {"shell.widgets.profiles", "boolean or string", "true", "\"bar\"", none, none,
+     "default in Quick Settings."},
+    {"shell.widgets.profiles", "boolean or string", "true", "\"quick\"", none, none,
      "The appearance profile picker, which lists `profiles` to switch between; shown only when "
-     "there are two or more: `\"bar\"` (a button) or `\"quick\"` (a tile). By default on the "
-     "bar."},
-    {"shell.widgets.wallpapers", "boolean or string", "true", "\"quick\"", none, none,
+     "there are two or more: `\"bar\"` (a button) or `\"quick\"` (a tile). By default in "
+     "Quick Settings."},
+    {"shell.widgets.wallpapers", "boolean or string", "true", "\"bar\"", none, none,
      "The wallpaper picker: thumbnails of the images in `shell.wallpapers`; the one picked "
      "replaces `shell.wallpaper` for the profile in use until the configured one changes. "
      "`\"bar\"` (a button) or `\"quick\"` (a tile that opens the same picker). By default on "
@@ -568,10 +568,10 @@ const Option options[] = {
     {"shell.widgets.tray", "boolean", "true", "true", none, none,
      "The system tray: applications' status icons (StatusNotifierItem), shown while there are "
      "any. `false` also leaves the tray's D-Bus names to another program."},
-    {"shell.widgets.notifications", "boolean or string", "false", "\"bar\"", none, none,
+    {"shell.widgets.notifications", "boolean or string", "true", "\"bar\"", none, none,
      "Do-not-disturb and the unread notifications: `\"bar\"` (a bell that opens them, with "
      "their count; a right-click toggles do-not-disturb) or `\"quick\"` (a do-not-disturb "
-     "tile). The clock does both either way. `true` puts the bell on the bar."},
+     "tile). The clock does both either way. By default in Quick Settings."},
     {"shell.launchers", "list of tables", "unset", "", none, none,
      "Pinned commands for programs without a desktop file, at most 64."},
     {"shell.launchers[].name", "string", "", "", none, none, "Label, 1 to 128 bytes. Required."},

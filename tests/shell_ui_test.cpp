@@ -118,11 +118,13 @@ int main(int argc, char **argv) {
     QFile file(config);
     if (!file.open(QIODevice::WriteOnly))
         return fail("could not write the configuration");
-    // Long Lua strings preserve paths without shell interpolation.
+    // Long Lua strings preserve paths without shell interpolation. The widgets Quick Settings
+    // holds by default are on the bar, where most of this test uses them.
+    const QString barWidgets = "widgets={network='bar',battery='bar',volume='bar',tiling='bar',profiles='bar'},";
     const auto lua = QString("return {layout={workspace_names={'web','','','mail'}},"
                              "power={countdown=2},"
                              "profile='dark',profiles={dark={},light={shell={accent='#336699'}}},"
-                             "shell={wallpaper='walls/a/one.png',wallpapers=[[%3]],"
+                             "shell={" + barWidgets + "wallpaper='walls/a/one.png',wallpapers=[[%3]],"
                              "launchers={{name='Test app',command={[[%1]],'-E','touch',[[%2]]}}}}}")
                          .arg(QString::fromLocal8Bit(argv[1]), marker, walls);
     file.write(lua.toUtf8());
@@ -568,7 +570,7 @@ int main(int argc, char **argv) {
             return 1;
         }
         if (!controller.widgets()["keyboard_layout"].toBool() ||
-            !rewrite(QString(lua).replace("shell={", "shell={widgets={keyboard_layout=false},")))
+            !rewrite(QString(lua).replace("widgets={", "widgets={keyboard_layout=false,")))
             return fail("the keyboard layout widget was off, or the configuration could not be rewritten");
         controller.reload();
         if (!QTest::qWaitFor([&] { return !layout->isVisible(); })) {
@@ -1931,8 +1933,8 @@ int main(int argc, char **argv) {
         daemon->setServing(true);
         // The bell is off unless shell.widgets.notifications asks for it: the clock does its work.
         QTest::qWait(50);
-        if (bell->isVisible() || !controller.widgets()["notifications"].toString().isEmpty() ||
-            !rewrite(QString(lua).replace("shell={", "shell={widgets={notifications=true},")))
+        if (bell->isVisible() || controller.widgets()["notifications"].toString() != "quick" ||
+            !rewrite(QString(lua).replace("widgets={", "widgets={notifications='bar',")))
             return fail("the bell showed by default, or the configuration could not be rewritten");
         controller.reload();
         if (!QTest::qWaitFor([&] { return bell->isVisible() && bell->x() > 0; })) {
@@ -2162,9 +2164,8 @@ int main(int argc, char **argv) {
     // Quick Settings: with the widgets placed in it, a button left of the clock shows their state,
     // and its flyout holds a tile for each beside night light; the bar keeps none of their own.
     {
-        const QString quickLua = QString(lua).replace(
-            "shell={", "shell={widgets={network='quick',battery='quick',volume='quick',tiling='quick',"
-                       "profiles='quick',notifications='quick',wallpapers='quick'},");
+        // By default, but for the wallpapers.
+        const QString quickLua = QString(lua).replace(barWidgets, "widgets={wallpapers='quick'},");
         if (!rewrite(quickLua))
             return fail("could not rewrite the configuration");
         controller.reload();

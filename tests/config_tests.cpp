@@ -553,10 +553,24 @@ int main(int argc, char **argv) {
                 "shell widgets not parsed");
         require(shaodesk::parse_config("return {shell={}}").shell.widgets.battery != WidgetPlace::Hidden,
                 "widgets not on by default");
-        require(shaodesk::parse_config("return {shell={}}").shell.widgets.notifications == WidgetPlace::Hidden &&
-                    shaodesk::parse_config("return {shell={widgets={notifications=true}}}")
-                            .shell.widgets.notifications == WidgetPlace::Bar,
-                "the notification bell is not off by default, or not switched on");
+        // By default the status widgets, tiling, the profiles and do-not-disturb are in Quick
+        // Settings and the wallpapers on the bar; `true` puts each there.
+        const auto placed_by_default = shaodesk::parse_config("return {shell={}}").shell.widgets;
+        require(placed_by_default.network == WidgetPlace::Quick &&
+                    placed_by_default.battery == WidgetPlace::Quick &&
+                    placed_by_default.volume == WidgetPlace::Quick &&
+                    placed_by_default.tiling == WidgetPlace::Quick &&
+                    placed_by_default.profiles == WidgetPlace::Quick &&
+                    placed_by_default.notifications == WidgetPlace::Quick &&
+                    placed_by_default.wallpapers == WidgetPlace::Bar,
+                "the widgets are not in their default places");
+        const auto all = shaodesk::parse_config(
+                             "return {shell={widgets={network=true,battery=true,volume=true,tiling=true,"
+                             "profiles=true,notifications=true,wallpapers=true}}}")
+                             .shell.widgets;
+        require(all.network == WidgetPlace::Quick && all.notifications == WidgetPlace::Quick &&
+                    all.wallpapers == WidgetPlace::Bar,
+                "true does not put a widget in its default place");
         // A widget that can move goes where "bar" or "quick" says; nothing else is a place.
         auto placed = shaodesk::parse_config(
             "return {shell={widgets={network='quick',volume='bar',wallpapers='quick',tiling=true}}}");

@@ -347,13 +347,13 @@ void read_shell(lua_State *L, ShellConfig &shell) {
             WidgetPlace *target;
             WidgetPlace place;
         };
-        for (auto [key, target, place] : {Movable{"battery", &shell.widgets.battery, WidgetPlace::Bar},
-                                          {"network", &shell.widgets.network, WidgetPlace::Bar},
-                                          {"volume", &shell.widgets.volume, WidgetPlace::Bar},
-                                          {"tiling", &shell.widgets.tiling, WidgetPlace::Bar},
-                                          {"profiles", &shell.widgets.profiles, WidgetPlace::Bar},
+        for (auto [key, target, place] : {Movable{"battery", &shell.widgets.battery, WidgetPlace::Quick},
+                                          {"network", &shell.widgets.network, WidgetPlace::Quick},
+                                          {"volume", &shell.widgets.volume, WidgetPlace::Quick},
+                                          {"tiling", &shell.widgets.tiling, WidgetPlace::Quick},
+                                          {"profiles", &shell.widgets.profiles, WidgetPlace::Quick},
                                           {"wallpapers", &shell.widgets.wallpapers, WidgetPlace::Bar},
-                                          {"notifications", &shell.widgets.notifications, WidgetPlace::Bar}})
+                                          {"notifications", &shell.widgets.notifications, WidgetPlace::Quick}})
             placement(L, key, (std::string("shell.widgets.") + key).c_str(), place, *target);
     }
     lua_pop(L, 1);
