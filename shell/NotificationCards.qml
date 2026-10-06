@@ -5,7 +5,8 @@ import QtQuick.Effects
 import QtQuick.Layouts
 
 // The notification cards: a stack of them from a corner of the focused monitor, each sliding in
-// and out. Clicking a card runs its default action or dismisses it; hovering one holds its timer.
+// and out. Clicking a card runs its default action or dismisses it; hovering one holds its timer,
+// whose time left runs down as a line along the card's bottom edge, and shows its close button.
 Item {
     id: cards
     required property string outputName
