@@ -1,0 +1,48 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+import QtQuick
+import QtQuick.Layouts
+
+// The profile button's popup: the appearance profiles, the one in use marked.
+Rectangle {
+    id: profileList
+    required property var panel
+    required property Item barItem
+    parent: panel
+    objectName: "profileList"
+    visible: panel.audioPopup === "profiles"
+    width: 240; height: 12 + 30 + shell.profiles.length * 42
+    x: Math.max(8, Math.min(panel.audioPopupX - width / 2, panel.width - width - 8))
+    y: panel.onTop ? barItem.y + barItem.height + 8 : barItem.y - height - 8
+    color: Theme.surface; radius: Theme.radiusMedium
+    border.color: Theme.border
+    MouseArea { anchors.fill: parent }
+    Column {
+        anchors.fill: parent; anchors.margins: 6; spacing: 0
+        Text {
+            width: parent.width; height: 30; leftPadding: 10; verticalAlignment: Text.AlignVCenter
+            text: "Appearance"; color: Theme.textMuted; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+        }
+        Repeater {
+            model: shell.profiles
+            delegate: FlatButton {
+                id: profileItem
+                required property string modelData
+                readonly property bool current: modelData === shell.profile
+                objectName: "profileItem"
+                width: parent.width; height: 42
+                text: modelData
+                Accessible.name: modelData + (current ? ", in use" : "")
+                onClicked: {
+                    panel.audioPopup = ""
+                    if (!current)
+                        shell.pickProfile(modelData)
+                }
+                contentItem: RowLayout {
+                    spacing: 10
+                    Rectangle { Layout.preferredWidth: 8; Layout.preferredHeight: 8; Layout.leftMargin: 4; radius: 4; color: profileItem.current ? Theme.accent : "transparent"; border.color: profileItem.current ? Theme.accent : Theme.textMuted }
+                    Text { Layout.fillWidth: true; text: profileItem.modelData; elide: Text.ElideRight; color: profileItem.current ? Theme.accent : Theme.text; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
+                }
+            }
+        }
+    }
+}

@@ -93,7 +93,7 @@ struct ShellConfig {
     std::string font;   // family; empty: the Qt default
     int font_size = 12; // taskbar text, in pixels
     bool icons_only = true; // taskbar buttons show the window's icon, its title as a tooltip
-    bool software_renderer = true; // renderer = "software": Qt Quick without the GPU, faster to start
+    bool software_renderer = false; // renderer = "software": Qt Quick without the GPU, faster to start
     bool group_windows = true; // one taskbar button per application, its windows listed on hover
     std::string accent = "#7da8ff";
     std::string panel_color = "#151e2c";

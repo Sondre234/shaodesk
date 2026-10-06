@@ -63,6 +63,59 @@ A function used by one file is `static`; one used by several is declared in `ser
 the file that defines it. The build warns (`-Wmissing-prototypes`) about one that is neither.
 Code that only exists with XWayland is inside `#if WLR_HAS_XWAYLAND`.
 
+## The shell (`shell/`)
+
+`ShellController` (`controller.cpp`) loads the configuration, keeps the compositor's state from
+its control socket and holds the models; QML reaches it as the context property `shell`.
+`view.cpp` makes one Qt Quick window per surface and output (a layer surface each), all in one
+QML engine. The QML is compiled into the binary (`qt_add_qml_module` in `shell/CMakeLists.txt`,
+which lists every file).
+
+| File | Covers |
+| --- | --- |
+| `Theme.qml` | The design tokens (colours, type, radii, spacing, icon sizes, motion, whether effects can be drawn), derived from the appearance profile. A singleton: every file reads `Theme.surface`, `Theme.hover`, ... instead of colours and sizes of its own. |
+| `Panel.qml` | The taskbar: which popup is open and where, the bar and its smaller buttons, and a loader for each popup. The popups are drawn in the bar's own surface, which `view.cpp` grows while one is open. Every part below takes the panel as `panel` (and the bar's height, or the bar as `barItem`) and reaches its state and functions through it. |
+| `PinnedSlots.qml`, `TaskList.qml`, `TaskButton.qml`, `TrayButton.qml`, `WorkspaceIndicator.qml`, `VolumeButton.qml`, `ClockButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `BarTip.qml` | Parts of the bar: widgets, and the tooltip for things on it. |
+| `NotificationHistory.qml`, `AudioMixer.qml`, `CalendarPopup.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
+| `Icon.qml`, `SpeakerIcon.qml` | Line icons (Lucide), drawn as vectors in any colour, and the loudspeaker for a volume. |
+| `FlatButton.qml` | The frameless button of the bar and of menus, showing the hover, pressed and active states. |
+| `AudioSlider.qml`, `MuteButton.qml` | Controls the mixer uses. |
+| `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |
+| `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |
+
+The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `task_filter.cpp`
+(the taskbar's slots and groups), `audio.cpp` with `pulse_audio.cpp`, `system_status.cpp`
+(battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
+`power.cpp`, `palette.cpp`. `preview.cpp` has stand-ins for all of them for
+`--preview-popup`.
+
+### Drawing something in the shell
+
+Take every colour, size and duration from `Theme`: `bar`, `surface`, `surfaceRaised` and
+`surfaceRaisedHover` for backgrounds; `hover`, `pressed` and `selected` laid over them for
+states; `border` and `divider`; `text`, `textMuted` and `textDisabled`; `accent`,
+`accentHover`, `accentSubtle` and `textOnAccent`; `danger`, `dangerFill`, `textOnDanger` and
+`dangerSurface`; `urgent` and `urgentSubtle`; `scrim`. Type is `fontFamily` with `fontSize`,
+`fontSizeCaption`, `fontSizeSmall`, `fontSizeLarge`, `fontSizeTitle` and `fontSizeDisplay`;
+shapes `radiusSmall`, `radiusMedium` and `radiusLarge`; spacing `spacingXS` to `spacingXXL`
+(2, 4, 8, 12, 16, 20); icons `iconSizeSmall`, `iconSize`, `appIconSize` and
+`appIconSizeLarge`. Animations use `durationFast`, `durationNormal`, `durationSlow` or
+`duration(ms)` with `easing` or `easingExit`, all 0 while `animations.enabled` is off.
+`effects` says whether shader effects (shadows) can be drawn: only through the GPU, so draw
+them only when it is true. `alpha()` and `mix()` derive a colour from these. A button without a
+frame of its own is a `FlatButton`, and a tooltip for something on the bar is a `BarTip`.
+
+### Seeing a change
+
+`shaodesk-shell --config FILE --preview-popup NAME --screenshot OUT.png --quit-after 400`
+renders the taskbar offscreen with one popup open, on stand-in windows, sound, tray items and
+notifications, over the configured wallpaper (`--preview-popup` lists the names).
+`tools/shell_gallery.py BUILD_DIR OUT_DIR` does that for every popup in a light and a dark
+theme, both with the software renderer (`light-launcher.png`) and through the GPU
+(`light-launcher-gpu.png`: Qt's OpenGL on Mesa's software implementation, in a private headless
+compositor), in about ten seconds; `--renderer`, `--theme` and `--popup` narrow it down. Nothing
+touches the session it runs in. The `shell_gallery` test runs it and fails on any QML warning.
+
 ## Recipes
 
 ### A new binding action

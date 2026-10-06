@@ -37,7 +37,13 @@ switched off from Lua: `shell = { widgets = { battery = false, calendar = false 
 calendar goes), `tiling`, `profiles` (the appearance profile picker), `keyboard_layout`,
 `power` (the [power button](#power) in the application menu) and `tray` (the [system tray](#system-tray)) all on by
 default. All of them take the panel's `accent`,
-`panel_color`, `text_color`, `font` and `font_size`. In a nested
+`panel_color`, `text_color`, `font` and `font_size`: hovering, pressing and what is open or on
+are shown by laying the text color over the panel at a low opacity, which shows on a light
+panel as on a dark one. Popups (the application menu, menus, the mixer, the calendar and the
+rest) are drawn in the panel color made opaque, even when the bar is translucent: nothing is
+blurred behind them, and a window showing through would make them hard to read. The shell
+draws through the GPU; `renderer = "software"` draws on the CPU instead, for a weak machine: it
+starts faster and uses less memory, but cannot draw effects such as shadows. In a nested
 session, applications that reuse an existing process or D-Bus service can open
 in the host session instead.
 
@@ -591,6 +597,8 @@ sets the slide as a share of the monitor's width (default 0.08, 0 only fades). S
 stay put.
 When focus moves, a window's opacity and border color fade to their new values (the `focus`
 kind) instead of switching.
+The shell's own animations (taskbar buttons sliding aside, notification cards, the on-screen
+display) follow `enabled` and `speed` too.
 
 ## Effects
 

@@ -6,7 +6,6 @@ Item {
     id: osd
     required property string outputName
     readonly property var model: shell.osd
-    readonly property string uiFont: shell.fontFamily.length > 0 ? shell.fontFamily : Qt.application.font.family
     readonly property bool mine: model.active && model.output === outputName
     // True while it is visible, including the fade out; the view hides the surface after that.
     readonly property bool visibleNow: mine || pill.opacity > 0
@@ -19,10 +18,10 @@ Item {
         objectName: "osdPill"
         anchors.centerIn: parent
         width: 300; height: 56; radius: 28
-        color: shell.panelColor
-        border.color: Qt.lighter(shell.panelColor, 1.6)
+        color: Theme.surface
+        border.color: Theme.border
         opacity: osd.mine ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: osd.mine ? 90 : 320; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: Theme.duration(osd.mine ? 90 : 320); easing.type: Theme.easing } }
         Canvas {
             id: glyph
             x: 20; anchors.verticalCenter: parent.verticalCenter
@@ -35,7 +34,7 @@ Item {
             onPaint: {
                 var ctx = getContext("2d")
                 ctx.reset()
-                ctx.fillStyle = shell.textColor; ctx.strokeStyle = shell.textColor
+                ctx.fillStyle = Theme.text; ctx.strokeStyle = Theme.text
                 ctx.lineWidth = 2; ctx.lineCap = "round"
                 if (kind === "volume" || kind === "muted") {
                     ctx.beginPath()
@@ -69,8 +68,8 @@ Item {
             x: 60
             width: osd.hasLevel ? 92 : parent.width - 80
             text: osd.model.text
-            color: shell.textColor
-            font.pixelSize: shell.fontSize + 2; font.family: osd.uiFont
+            color: Theme.text
+            font.pixelSize: Theme.fontSizeLarge; font.family: Theme.fontFamily
             textFormat: Text.PlainText; elide: Text.ElideRight
         }
         Rectangle {
@@ -79,11 +78,11 @@ Item {
             visible: osd.hasLevel
             x: 160; anchors.verticalCenter: parent.verticalCenter
             width: parent.width - 160 - 56; height: 6; radius: 3
-            color: Qt.lighter(shell.panelColor, 1.8)
+            color: Theme.selected
             Rectangle {
                 width: parent.width * Math.max(0, osd.model.percent) / 100; height: parent.height; radius: 3
-                color: osd.model.kind === "muted" ? "#8a96a8" : shell.accent
-                Behavior on width { NumberAnimation { duration: 80 } }
+                color: osd.model.kind === "muted" ? Theme.textMuted : Theme.accent
+                Behavior on width { NumberAnimation { duration: Theme.duration(80) } }
             }
         }
         Text {
@@ -91,8 +90,8 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             anchors.right: parent.right; anchors.rightMargin: 18
             text: osd.model.percent
-            color: shell.textColor; opacity: 0.8
-            font.pixelSize: shell.fontSize; font.family: osd.uiFont
+            color: Theme.text; opacity: 0.8
+            font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
         }
     }
 }

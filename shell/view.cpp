@@ -2,6 +2,7 @@
 #include "view.hpp"
 #include "task_filter.hpp"
 #include <QQuickItem>
+#include <QSGRendererInterface>
 #include <QScreen>
 #include <iostream>
 #if SHAODESK_LAYER_SHELL
@@ -17,6 +18,10 @@ ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop,
     setFlags(Qt::FramelessWindowHint);
     static const int registered = qmlRegisterType<TaskFilter>("Shaodesk", 1, 0, "TaskFilter");
     Q_UNUSED(registered);
+    // Known as soon as the window exists, so before any QML asks: every view of the shell draws
+    // the same way.
+    controller.setEffects(QSGRendererInterface::isApiRhiBased(rendererInterface()->graphicsApi()) &&
+                          rendererInterface()->graphicsApi() != QSGRendererInterface::Null);
     // The engine is shared by every view; what differs per view goes in as initial properties.
     // outputName matches the compositor's output name, which the workspace state is keyed by.
     if (!desktop)

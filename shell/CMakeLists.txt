@@ -37,15 +37,29 @@ set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_ima
 # The QML is compiled ahead of time into the binary (qmlcachegen), so starting the shell parses
 # and compiles none of it. It lives at qrc:/shell/ShaodeskShell/*.qml.
 qt_add_library(shaodesk_shell_qml STATIC)
+# Theme is the design tokens every QML file reads, one instance per engine.
+set_source_files_properties(Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREFIX /shell
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/ShaodeskShell
     NO_PLUGIN NO_GENERATE_QMLTYPES
-    QML_FILES Panel.qml Icon.qml Desktop.qml Switcher.qml Palette.qml Overview.qml NotificationCards.qml Osd.qml ConfigError.qml NotificationBell.qml NotificationHistory.qml
-    KeyboardLayout.qml
+    QML_FILES Theme.qml FlatButton.qml Panel.qml Icon.qml Desktop.qml Switcher.qml Palette.qml Overview.qml NotificationCards.qml Osd.qml ConfigError.qml NotificationBell.qml NotificationHistory.qml
+    KeyboardLayout.qml BarTip.qml TaskButton.qml TaskList.qml PinnedSlots.qml TrayButton.qml
+    WorkspaceIndicator.qml VolumeButton.qml ClockButton.qml BatteryWidget.qml NetworkWidget.qml SpeakerIcon.qml AudioSlider.qml MuteButton.qml
+    AudioMixer.qml
+    CalendarPopup.qml
+    AudioOutputs.qml
+    ProfileList.qml
+    WallpaperPicker.qml
+    Launcher.qml
+    PowerMenu.qml
+    TaskbarMenu.qml
+    TrayMenu.qml
+    GroupList.qml
 
     PowerDialog.qml)
 add_executable(shaodesk-shell main.cpp ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp task_model.cpp task_model.hpp
     task_filter.cpp task_filter.hpp icons.cpp icons.hpp wallpapers.cpp wallpapers.hpp view.cpp view.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
+    preview.cpp preview.hpp
     ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
     ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h)
 add_dependencies(shaodesk-shell shaodesk_wlr_client_protocols shaodesk_version)
@@ -208,6 +222,11 @@ if(BUILD_TESTING)
         ${PROJECT_SOURCE_DIR}/tests/shell_preview.py $<TARGET_FILE:shaodesk-shell>
         ${EXAMPLE_CONFIG})
     set_tests_properties(shell_preview PROPERTIES TIMEOUT 90)
+    # Every popup of tools/shell_gallery.py renders without a QML warning.
+    add_test(NAME shell_gallery COMMAND ${Python3_EXECUTABLE}
+        ${PROJECT_SOURCE_DIR}/tests/shell_gallery.py ${PROJECT_SOURCE_DIR}/tools/shell_gallery.py
+        ${PROJECT_BINARY_DIR} software)
+    set_tests_properties(shell_gallery PROPERTIES TIMEOUT 120)
     add_test(NAME shell_version COMMAND shaodesk-shell --version)
     set_tests_properties(shell_version PROPERTIES PASS_REGULAR_EXPRESSION "^shaodesk-shell ${PROJECT_VERSION}( \\(git [^)]+\\))?\n$")
     if(NOT SHAODESK_SHELL_PREVIEW_ONLY)
@@ -220,6 +239,16 @@ if(BUILD_TESTING)
             ${PROJECT_SOURCE_DIR}/tests/overview_shell_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(overview_shell_smoke PROPERTIES TIMEOUT 60)
+        # A few of the gallery's popups through the GPU (Mesa's software OpenGL, in a private
+        # compositor), where effects are drawn. Not under the sanitizers: now and then Qt's
+        # Wayland platform leaks a surface of a preview that quits soon after showing.
+        if(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize")
+            add_test(NAME shell_gallery_gpu COMMAND ${Python3_EXECUTABLE}
+                ${PROJECT_SOURCE_DIR}/tests/shell_gallery.py
+                ${PROJECT_SOURCE_DIR}/tools/shell_gallery.py ${PROJECT_BINARY_DIR} gpu
+                bar launcher tray-menu notifications)
+            set_tests_properties(shell_gallery_gpu PROPERTIES TIMEOUT 120)
+        endif()
         find_program(GRIM grim)
         # A missing grim is an empty argument, which the tests take as leaving out their
         # pixel checks (GRIM itself would be GRIM-NOTFOUND).

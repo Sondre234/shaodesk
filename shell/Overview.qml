@@ -11,7 +11,6 @@ Item {
     readonly property var windows: shell.overviewWindows
     readonly property var strip: shell.overviewStrip
     readonly property string filter: shell.overviewFilter
-    readonly property string uiFont: shell.fontFamily.length > 0 ? shell.fontFamily : Qt.application.font.family
     width: screenSize.width
     height: screenSize.height
 
@@ -22,17 +21,16 @@ Item {
         y: shell.overviewArea.y + 8
         width: Math.min(420, overview.width - 32); height: 32
         radius: 16
-        color: shell.panelColor
-        border.color: overview.filter.length > 0 ? shell.accent : Qt.lighter(shell.panelColor, 1.6)
+        color: Theme.surface
+        border.color: overview.filter.length > 0 ? Theme.accent : Theme.border
         border.width: 1
         Text {
             anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 14
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideLeft
             text: overview.filter.length > 0 ? overview.filter : qsTr("Type to search windows")
-            color: shell.textColor
-            opacity: overview.filter.length > 0 ? 1 : 0.55
-            font.family: overview.uiFont; font.pixelSize: 14
+            color: overview.filter.length > 0 ? Theme.text : Theme.textMuted
+            font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeLarge
         }
     }
 
@@ -50,14 +48,14 @@ Item {
                 anchors.left: parent.left; anchors.bottom: parent.bottom
                 anchors.margins: 4
                 width: label.implicitWidth + 12; height: 18; radius: 9
-                color: modelData.workspace === shell.overviewViewed ? shell.accent : Qt.rgba(0, 0, 0, 0.55)
-                border.width: cell.urgent ? 2 : 0; border.color: shell.urgentColor
+                color: modelData.workspace === shell.overviewViewed ? Theme.accent : Theme.alpha(Theme.surface, 0.85)
+                border.width: cell.urgent ? 2 : 0; border.color: Theme.urgent
                 Text {
                     id: label
                     anchors.centerIn: parent
                     text: cell.name.length > 0 ? modelData.workspace + " " + cell.name : modelData.workspace
-                    color: shell.textColor
-                    font.family: overview.uiFont; font.pixelSize: 11; font.bold: true
+                    color: modelData.workspace === shell.overviewViewed ? Theme.textOnAccent : Theme.text
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall; font.bold: true
                 }
             }
         }
@@ -79,12 +77,12 @@ Item {
                 objectName: "overviewUrgent"
                 anchors.fill: parent
                 visible: entry.modelData.urgent === true
-                color: "transparent"; border.width: 3; border.color: shell.urgentColor
+                color: "transparent"; border.width: 3; border.color: Theme.urgent
             }
             Rectangle {
                 anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
                 height: 24
-                color: Qt.rgba(0, 0, 0, entry.selected ? 0.78 : 0.62)
+                color: Theme.alpha(Theme.surface, entry.selected ? 0.92 : 0.8)
                 Image {
                     id: icon
                     x: 4; anchors.verticalCenter: parent.verticalCenter
@@ -97,8 +95,8 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                     text: entry.title; textFormat: Text.PlainText
                     elide: Text.ElideRight
-                    color: shell.textColor
-                    font.family: overview.uiFont; font.pixelSize: 12; font.bold: entry.selected
+                    color: Theme.text
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize; font.bold: entry.selected
                 }
             }
         }
@@ -108,15 +106,15 @@ Item {
         anchors.centerIn: parent
         visible: overview.windows.length === 0
         text: overview.filter.length > 0 ? qsTr("No window matches") : qsTr("No windows here")
-        color: shell.textColor; opacity: 0.7
-        font.family: overview.uiFont; font.pixelSize: 18
+        color: Theme.textMuted
+        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeTitle
     }
 
     Text {
         anchors.horizontalCenter: parent.horizontalCenter
         y: shell.overviewArea.y + shell.overviewArea.height - height - 4
         text: qsTr("Enter picks · Esc closes · middle click closes a window · drag a window onto a workspace to move it")
-        color: shell.textColor; opacity: 0.5
-        font.family: overview.uiFont; font.pixelSize: 11
+        color: Theme.textMuted
+        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall
     }
 }

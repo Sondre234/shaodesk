@@ -170,7 +170,7 @@ return {
         -- panel_radius = 0,
         -- font = "", -- family name; empty keeps the default
         -- font_size = 12,
-        -- renderer = "software", -- or "gpu"; read at shell start
+        -- renderer = "gpu", -- or "software" for a weak machine (no effects); read at shell start
         -- icons_only = true, -- taskbar buttons as small icons; false adds each window's title
         -- group_windows = true, -- one button per application, its windows listed on hover;
         --                          false gives every window its own button

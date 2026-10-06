@@ -54,6 +54,12 @@ class ShellController : public QObject {
     Q_PROPERTY(QString fontFamily READ fontFamily NOTIFY configChanged)
     Q_PROPERTY(int fontSize READ fontSize NOTIFY configChanged)
     Q_PROPERTY(bool iconsOnly READ iconsOnly NOTIFY configChanged)
+    // animations.enabled and animations.speed, which the shell's animations follow too.
+    Q_PROPERTY(bool animations READ animations NOTIFY configChanged)
+    Q_PROPERTY(qreal animationSpeed READ animationSpeed NOTIFY configChanged)
+    // Whether Qt Quick draws through the GPU, which shader effects such as shadows need; its
+    // software renderer cannot draw them. Set from what the views actually use.
+    Q_PROPERTY(bool effects READ effects NOTIFY effectsChanged)
     Q_PROPERTY(bool groupWindows READ groupWindows NOTIFY configChanged)
     // Which panel widgets Lua enables: {workspaces, battery, network, volume, clock, calendar,
     // tiling, profiles, wallpapers, keyboard_layout, power, tray}.
@@ -142,6 +148,10 @@ class ShellController : public QObject {
     int fontSize() const { return config_.shell.font_size; }
     bool softwareRenderer() const { return config_.shell.software_renderer; }
     bool iconsOnly() const { return config_.shell.icons_only; }
+    bool animations() const { return config_.settings.animations; }
+    qreal animationSpeed() const { return config_.settings.animation_speed; }
+    bool effects() const { return effects_; }
+    void setEffects(bool effects);
     bool groupWindows() const { return config_.shell.group_windows; }
     bool enabled() const { return config_.shell.enabled; }
     QStringList profiles() const;
@@ -228,6 +238,7 @@ class ShellController : public QObject {
     Q_INVOKABLE void showWorkspace(const QString &output, int number);
   Q_SIGNALS:
     void configChanged();
+    void effectsChanged();
     void wallpaperChanged();
     void wallpapersChanged();
     void appsChanged();
@@ -292,6 +303,7 @@ class ShellController : public QObject {
     QString error_;
     QString configError_;
     QQmlEngine *engine_ = nullptr;
+    bool effects_ = false;
     // Compositor state from its control socket ($SHAODESK_SOCKET), kept open by "subscribe".
     QLocalSocket *state_ = nullptr;
     bool subscribed_ = false, tiling_ = false;

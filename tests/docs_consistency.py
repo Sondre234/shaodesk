@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The documentation matches the code: every binding action the configuration accepts is
 described in the README or docs/features.md, and every action the example configuration binds
-exists. docs/architecture.md lists every source file of the compositor."""
+exists. docs/architecture.md lists every source file of the compositor and every QML file of the
+shell."""
 from pathlib import Path
 import re
 import sys
@@ -29,5 +30,8 @@ architecture = (root / "docs/architecture.md").read_text()
 sources = sorted(p.name for p in (root / "src/compositor").glob("*.[ch]"))
 unlisted = [name for name in sources if f"`{name}`" not in architecture]
 assert not unlisted, f"docs/architecture.md does not list these compositor files: {unlisted}"
+qml = sorted(p.name for p in (root / "shell").glob("*.qml"))
+unlisted = [name for name in qml if f"`{name}`" not in architecture]
+assert not unlisted, f"docs/architecture.md does not list these QML files of the shell: {unlisted}"
 
 print(f"{len(actions)} actions documented; {len(bound)} bound by default")

@@ -11,13 +11,12 @@ Rectangle {
     readonly property int padding: 12
     readonly property int rowHeight: 48
     readonly property int visibleRows: Math.max(1, Math.min(8, Math.floor((screenSize.height * 0.6 - 3 * padding - input.height) / rowHeight)))
-    readonly property string uiFont: shell.fontFamily.length > 0 ? shell.fontFamily : Qt.application.font.family
     readonly property var kindLabels: ({ window: "Window", app: "App", workspace: "Workspace", action: "Action", session: "Session" })
     width: Math.min(680, screenSize.width - 32)
     height: input.height + (list.count > 0 ? list.height + padding : 0) + 2 * padding
-    radius: 14
-    color: shell.panelColor
-    border.color: Qt.lighter(shell.panelColor, 1.6)
+    radius: Theme.radiusLarge
+    color: Theme.surface
+    border.color: Theme.border
 
     function reset() {
         input.text = shell.palette.query
@@ -34,14 +33,14 @@ Rectangle {
         x: root.padding; y: root.padding
         width: root.width - 2 * root.padding
         height: 40
-        color: shell.textColor
+        color: Theme.text
         placeholderText: "Search windows, apps, workspaces, actions, sessions"
-        placeholderTextColor: Qt.rgba(shell.textColor.r, shell.textColor.g, shell.textColor.b, 0.5)
-        font.family: root.uiFont; font.pixelSize: 16
+        placeholderTextColor: Theme.textMuted
+        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeTitle
         selectByMouse: true
         background: Rectangle {
-            radius: 8; color: Qt.rgba(1, 1, 1, 0.07)
-            border.color: input.activeFocus ? shell.accent : "transparent"
+            radius: Theme.radiusSmall; color: Theme.surfaceRaised
+            border.color: input.activeFocus ? Theme.accent : "transparent"
         }
         onTextChanged: shell.palette.query = text
         Keys.onPressed: function(event) {
@@ -74,9 +73,9 @@ Rectangle {
         currentIndex: shell.palette.selected
         highlightMoveDuration: 0
         highlight: Rectangle {
-            radius: 8
-            color: Qt.rgba(shell.accent.r, shell.accent.g, shell.accent.b, 0.28)
-            border.color: shell.accent
+            radius: Theme.radiusSmall
+            color: Theme.accentSubtle
+            border.color: Theme.accent
         }
         onCurrentIndexChanged: positionViewAtIndex(currentIndex, ListView.Contain)
         delegate: Item {
@@ -97,13 +96,13 @@ Rectangle {
                 Text {
                     width: parent.width
                     text: row.modelData.title; textFormat: Text.PlainText
-                    color: row.modelData.urgent === true ? shell.urgentColor : shell.textColor; font.family: root.uiFont; font.pixelSize: 14
+                    color: row.modelData.urgent === true ? Theme.urgent : Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeLarge
                     elide: Text.ElideRight
                 }
                 Text {
                     width: parent.width
                     text: row.modelData.subtitle; textFormat: Text.PlainText
-                    color: shell.textColor; opacity: 0.6; font.family: root.uiFont; font.pixelSize: 11
+                    color: Theme.textMuted; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall
                     elide: Text.ElideRight
                 }
             }
@@ -112,7 +111,7 @@ Rectangle {
                 anchors.right: parent.right; anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
                 text: root.kindLabels[row.modelData.kind] || ""
-                color: shell.textColor; opacity: 0.5; font.family: root.uiFont; font.pixelSize: 11
+                color: Theme.textMuted; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall
             }
             MouseArea {
                 anchors.fill: parent

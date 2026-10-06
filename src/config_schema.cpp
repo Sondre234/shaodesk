@@ -325,12 +325,14 @@ const Option options[] = {
      "Holding this modifier turns the scroll wheel into zoom steps (up zooms in); \"\" leaves the "
      "wheel alone. One of Alt, Super, Ctrl, Shift."},
 
-    {"animations", "table", "", "", none, none, "Window animations."},
+    {"animations", "table", "", "", none, none, "Window and shell animations."},
     {"animations.enabled", "boolean", "true", "true", none, none,
-     "Windows fade in and out and tiles glide into place."},
+     "Windows fade in and out and tiles glide into place; `false` also stills the shell's "
+     "animations."},
     {"animations.duration", "integer", "120", "120", 10, 1000, "Animation length in milliseconds."},
     {"animations.speed", "number", "1.0", "1.0", 0.1, 10,
-     "Speed multiplier for every animation: 2 makes them twice as fast, 0.5 half as fast."},
+     "Speed multiplier for every animation, the shell's too: 2 makes them twice as fast, 0.5 "
+     "half as fast."},
     {"animations.curve", "enum", "per kind", "\"ease-out\"", none, none,
      "Easing for every animation that does not set its own: `\"linear\"`, `\"ease-in\"`, "
      "`\"ease-out\"`, `\"ease-in-out\"`, `\"ease-out-quint\"`, `\"overshoot\"`, `\"spring\"`, or "
@@ -502,10 +504,11 @@ const Option options[] = {
     {"shell.font", "string", "\"\"", "\"\"", none, none,
      "Font family; empty keeps the Qt default."},
     {"shell.font_size", "integer", "12", "12", 6, 48, "Taskbar text size in pixels."},
-    {"shell.renderer", "enum", "\"software\"", "\"software\"", none, none,
-     "How the shell draws: `\"software\"` (the CPU, which starts about three times faster and "
-     "uses about half the memory) or `\"gpu\"`. Read at shell start, so a change needs a "
-     "restart."},
+    {"shell.renderer", "enum", "\"gpu\"", "\"gpu\"", none, none,
+     "How the shell draws: `\"gpu\"` (Qt Quick's OpenGL or Vulkan renderer, which effects such "
+     "as shadows need) or `\"software\"` (the CPU, without effects, but it starts about three "
+     "times faster and uses about half the memory, for a weak machine). Read at shell start, so "
+     "a change needs a restart."},
     {"shell.icons_only", "boolean", "true", "true", none, none,
      "Taskbar buttons show only the window icon, the title as a tooltip."},
     {"shell.group_windows", "boolean", "true", "true", none, none,
