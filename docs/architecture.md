@@ -111,6 +111,16 @@ keyboard where it is. Losing the keyboard while it holds it (`dismissed`)
 closes the popups. Without layer shell (`--preview-popup`, `shell_ui_test`) it is an ordinary
 window as large as `ShellView::previewSize()`, and a preview's screenshot draws it over the bar.
 
+The window switcher, the command palette, the power dialog and the overview's text are
+`OverlayView`s (`view.cpp`), a layer surface each on every output's overlay layer. `present()`
+shows one and sets its QML root's `shown`; `dismiss()` clears it, and the root animates its own
+`progress` back to 0 as its transition from the "shown" state says, the view hiding once it is
+there (at once with animations off). While it goes it is transparent for input and gives up the
+keyboard, so the windows under it have both at once, and shown again it comes back from where it
+was. What the compositor forgets as one closes (the switcher's windows, the power dialog's
+question, the overview's search) its root holds with a `Binding` while `shown`, so the fade shows
+what was there.
+
 | File | Covers |
 | --- | --- |
 | `Theme.qml` | The design tokens (colours, type, radii, spacing, icon sizes, motion, whether effects can be drawn), derived from the appearance profile. A singleton: every file reads `Theme.surface`, `Theme.hover`, ... instead of colours and sizes of its own. |
