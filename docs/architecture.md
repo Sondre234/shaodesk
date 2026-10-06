@@ -105,9 +105,9 @@ keeps its size. It is an overlay layer surface covering the output (exclusive zo
 coordinates are the output's), above fullscreen windows too, and hidden while nothing is open.
 While a menu or popup is open it holds the keyboard and takes every press but those on the bar's
 strip, where `inputRects` leaves a hole: a press on another bar button still switches popups in
-one press, and a press beside the popups closes them. The windows of a stacked button, shown on
-hover, take only the pointer over their list and down to the bar (`hoverArea`), and leave the
-keyboard where it is. Losing the keyboard while it holds it (`dismissed`)
+one press, and a press beside the popups closes them. The windows of a button shown on hover (the
+card of their pictures, or a stack's list) take only the pointer over the card and down to the bar
+(`hoverArea`), and leave the keyboard where it is. Losing the keyboard while it holds it (`dismissed`)
 closes the popups. Without layer shell (`--preview-popup`, `shell_ui_test`) it is an ordinary
 window as large as `ShellView::previewSize()`, and a preview's screenshot draws it over the bar.
 
@@ -167,6 +167,20 @@ The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `t
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
 `power.cpp`, `palette.cpp`. `preview.cpp` has stand-ins for all of them for
 `--preview-popup`.
+
+The pictures of the windows on the taskbar's card (`WindowThumbnails.qml`, with
+`shell.thumbnails`) are `TaskModel`'s: its `picture` role is `image://windows/<taskId>/<serial>`
+once a window has one, `""` until then, the serial new with every picture so that an `Image`
+with `cache: false` loads it again, and the `windows` image provider serves them by task id. The
+model takes pictures of a window only while something watches it: `watchPicture(taskId,
+pixelWidth, live)`, counted, which a tile calls as it appears and `unwatchPicture(taskId)` as it
+goes. It asks the window control for the window's capture source (`get_capture_source`, version
+2), captures it with ext-image-copy-capture into shared memory, scales the picture down off the
+GUI thread to fit `pixelWidth` by 5/8 of it, and, when `live`, takes the next as the window
+redraws, every 100 ms at most. The last picture stays until the window closes, so the card opens
+with it. A stand-in model (the preview's, the tests') has no `watchPicture`, which the card then
+does not call, and names pictures of its own (`image://preview-windows/ID`, painted by
+`preview.cpp`).
 
 The start menu (`Launcher.qml` and its `Start*.qml` parts) reads `shell.startMenu`, a `StartMenu`
 (`start_menu.cpp`): its own pins, seeded from the taskbar's; the applications launched lately
