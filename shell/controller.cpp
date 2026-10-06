@@ -321,12 +321,18 @@ QVariantList ShellController::apps() const {
 }
 QVariantMap ShellController::widgets() const {
     const auto &w = config_.shell.widgets;
-    return {{"workspaces", w.workspaces}, {"battery", w.battery}, {"network", w.network},
-            {"volume", w.volume},         {"clock", w.clock},     {"calendar", w.calendar},
-            {"tiling", w.tiling},         {"profiles", w.profiles},
-            {"wallpapers", w.wallpapers}, {"keyboard_layout", w.keyboard_layout},
-            {"power", w.power},           {"tray", w.tray},
-            {"notifications", w.notifications}};
+    auto place = [](shaodesk::WidgetPlace where) {
+        return where == shaodesk::WidgetPlace::Bar     ? QStringLiteral("bar")
+               : where == shaodesk::WidgetPlace::Quick ? QStringLiteral("quick")
+                                                       : QString();
+    };
+    return {{"workspaces", w.workspaces},       {"battery", place(w.battery)},
+            {"network", place(w.network)},      {"volume", place(w.volume)},
+            {"clock", w.clock},                 {"calendar", w.calendar},
+            {"tiling", place(w.tiling)},        {"profiles", place(w.profiles)},
+            {"wallpapers", place(w.wallpapers)}, {"keyboard_layout", w.keyboard_layout},
+            {"power", w.power},                 {"tray", w.tray},
+            {"notifications", place(w.notifications)}};
 }
 QStringList ShellController::profiles() const {
     QStringList names;

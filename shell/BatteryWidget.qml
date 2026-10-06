@@ -12,7 +12,7 @@ FlatButton {
     readonly property var status: battery.panel.statusSource
     readonly property bool low: status.batteryPercent <= 15 && status.batteryState !== "charging"
     readonly property color tint: low ? Theme.danger : (status.batteryState === "charging" ? Theme.accent : Theme.text)
-    visible: shell.widgets.battery && status.batteryPresent
+    visible: shell.widgets.battery === "bar" && status.batteryPresent
     Layout.preferredWidth: 62; Layout.preferredHeight: battery.barHeight - 10
     hoverEnabled: true
     Accessible.name: status.batteryText

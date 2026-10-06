@@ -121,6 +121,10 @@ void ranges() {
     expect("return {windows={opacity=2}}", "windows.opacity must be between 0.05 and 1, not 2");
     expect("return {keyboard={repeat_rate=101}}", "between 0 and 100");
     expect("return {outputs={monitors={X={transform=9}}}}", "between 0 and 7");
+    expect("return {shell={widgets={network='taskbar'}}}",
+           "shell.widgets.network must be true, false, \"bar\" or \"quick\", not \"taskbar\"");
+    expect("return {shell={widgets={volume=2}}}",
+           "shell.widgets.volume must be true, false, \"bar\" or \"quick\", not an integer");
 }
 void schema_matches_parser() {
     auto options = shaodesk::config_options();

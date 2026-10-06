@@ -569,7 +569,7 @@ Item {
             FlatButton {
                 id: wallpapersButton
                 objectName: "wallpapersButton"
-                visible: shell.widgets.wallpapers
+                visible: shell.widgets.wallpapers === "bar"
                 Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
                 active: root.audioPopup === "wallpapers"
                 onClicked: root.toggleAudioPopup("wallpapers", wallpapersButton)
@@ -583,7 +583,7 @@ Item {
             FlatButton {
                 id: profilesButton
                 objectName: "profilesButton"
-                visible: shell.widgets.profiles && shell.profiles.length > 1
+                visible: shell.widgets.profiles === "bar" && shell.profiles.length > 1
                 Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
                 active: root.audioPopup === "profiles"
                 onClicked: root.toggleAudioPopup("profiles", profilesButton)
@@ -611,7 +611,7 @@ Item {
             FlatButton {
                 id: tilingToggle
                 objectName: "tilingToggle"
-                visible: shell.widgets.tiling
+                visible: shell.widgets.tiling === "bar"
                 Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
                 enabled: shell.tilingAvailable
                 opacity: enabled ? 1 : 0.4

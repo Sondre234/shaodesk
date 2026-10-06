@@ -1924,7 +1924,7 @@ int main(int argc, char **argv) {
         daemon->setServing(true);
         // The bell is off unless shell.widgets.notifications asks for it: the clock does its work.
         QTest::qWait(50);
-        if (bell->isVisible() || controller.widgets()["notifications"].toBool() ||
+        if (bell->isVisible() || !controller.widgets()["notifications"].toString().isEmpty() ||
             !rewrite(QString(lua).replace("shell={", "shell={widgets={notifications=true},")))
             return fail("the bell showed by default, or the configuration could not be rewritten");
         controller.reload();

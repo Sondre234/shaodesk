@@ -9,7 +9,7 @@ FlatButton {
     required property var panel
     required property real barHeight
     objectName: "audioWidget"
-    visible: audioWidget.panel.audioSource.available && shell.widgets.volume
+    visible: audioWidget.panel.audioSource.available && shell.widgets.volume === "bar"
     Layout.preferredWidth: 60; Layout.preferredHeight: audioWidget.barHeight - 10
     onClicked: audioWidget.panel.toggleAudioPopup("mixer", audioWidget)
     Accessible.name: "Volume " + audioWidget.panel.audioSource.volume + "%" + (audioWidget.panel.audioSource.muted ? ", muted" : "")
