@@ -45,8 +45,8 @@ COMMON_DEPEND="
 	X? ( x11-libs/libxcb:= )
 	shell? (
 		dev-libs/glib:2
-		>=dev-qt/qtbase-6.5:6[gui,network,wayland]
-		>=dev-qt/qtdeclarative-6.5:6
+		>=dev-qt/qtbase-6.9:6[gui,network,wayland]
+		>=dev-qt/qtdeclarative-6.9:6
 		>=kde-plasma/layer-shell-qt-6.6:6
 		notifications? ( dev-qt/qtbase:6[dbus] )
 		pulseaudio? ( media-libs/libpulse )

@@ -60,9 +60,10 @@ between release series. Relevant Gentoo packages are:
 - `dev-lang/lua:5.4`
 - `dev-libs/wayland` and `dev-libs/wayland-protocols`
 - `dev-util/wayland-scanner` and `x11-libs/libxkbcommon`
-- `dev-qt/qtbase:6` with the `wayland` USE flag (Qt 6.11, the version in the tree, carries
-  the Wayland platform plugin there; older releases had it in `dev-qt/qtwayland:6`), its
-  default `network` flag, and `dbus` for the notification daemon; `dev-qt/qtdeclarative:6`;
+- `dev-qt/qtbase:6`, 6.9 or newer, with the `wayland` USE flag (Qt 6.11, the version in the
+  tree, carries the Wayland platform plugin there; older releases had it in
+  `dev-qt/qtwayland:6`), its default `network` flag, and `dbus` for the notification daemon;
+  `dev-qt/qtdeclarative:6` of the same version, whose Quick Effects draw the popups' shadows;
   and `dev-qt/qtsvg:6`, which the icons of most icon themes need
 - `kde-plasma/layer-shell-qt:6` (6.6+) and `dev-libs/glib:2` for the desktop shell
 - Optional: `media-libs/libpulse` for the panel's volume control (PipeWire's

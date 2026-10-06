@@ -6,6 +6,8 @@ release; the dated sections below it record the work that led up to it, and all 
 
 ## Unreleased
 
+- The shell needs Qt 6.9 or newer: its popups' shadows are Qt Quick Effects'
+  `RectangularShadow`, new in 6.9.
 - The shell draws through the GPU by default; `shell.renderer = "software"` keeps the CPU
   renderer for a weak machine. See [docs/performance.md](docs/performance.md).
 - The shell's colours, type, corners and timings come from one set of design tokens derived from
