@@ -14,8 +14,8 @@ import Shaodesk
 // tile is marked as the bar marks it: selected, with a line in the accent colour (the urgent one
 // for a window asking for attention) under it. Clicking a tile focuses its window (or minimizes
 // it when focused already), the cross or a middle click closes it, and a right click opens its
-// menu. Shown on hover, it leaves the keyboard where it is. How wide the pictures are, and
-// whether there is room for them at all rather than the list, is the panel's (thumbnailWidth).
+// menu. How wide the pictures are, and whether there is room for them at all rather than the
+// list, is the panel's (thumbnailWidth).
 PopupCard {
     id: thumbnails
     required property var panel
