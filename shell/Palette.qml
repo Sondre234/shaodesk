@@ -72,31 +72,14 @@ Item {
             border.color: Theme.border
         }
 
-        TextField {
+        // The start menu's field, larger.
+        SearchInput {
             id: input
             objectName: "paletteInput"
             x: root.padding; y: root.padding
             width: card.width - 2 * root.padding
-            height: Theme.rowHeight + Theme.spacingS + Theme.spacingXS
-            // A field as the launcher's, with a magnifier before the text.
-            leftPadding: Theme.spacingL + Theme.iconSize + Theme.spacingM
-            rightPadding: Theme.spacingL
-            color: Theme.text
+            large: true
             placeholderText: "Search windows, apps, workspaces, actions, sessions"
-            placeholderTextColor: Theme.textMuted
-            selectionColor: Theme.accent
-            selectedTextColor: Theme.textOnAccent
-            font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeTitle
-            selectByMouse: true
-            background: Rectangle {
-                radius: Theme.radiusSmall; color: Theme.surfaceRaised
-                border.color: input.activeFocus ? Theme.accent : Theme.border
-                Icon {
-                    x: Theme.spacingL; anchors.verticalCenter: parent.verticalCenter
-                    name: "search"; size: Theme.iconSize
-                    color: input.activeFocus ? Theme.text : Theme.textMuted
-                }
-            }
             onTextChanged: shell.palette.query = text
             Keys.onPressed: function(event) {
                 const ctrl = (event.modifiers & Qt.ControlModifier) !== 0

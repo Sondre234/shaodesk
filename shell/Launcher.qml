@@ -186,29 +186,13 @@ PopupCard {
         }
     }
 
-    TextField {
+    SearchInput {
         id: search
         objectName: "applicationSearch"
         x: launcher.padding; y: launcher.padding
         width: launcher.width - 2 * launcher.padding
-        height: Theme.rowHeight + Theme.spacingS
-        leftPadding: Theme.spacingL + Theme.iconSizeSmall + Theme.spacingM
         rightPadding: clear.visible ? clear.width + Theme.spacingS : Theme.spacingL
         placeholderText: "Search apps, windows and actions"
-        placeholderTextColor: Theme.textMuted
-        color: Theme.text
-        selectByMouse: true
-        verticalAlignment: TextInput.AlignVCenter
-        font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
-        background: Rectangle {
-            radius: height / 2
-            color: Theme.surfaceRaised
-            border.color: search.activeFocus ? Theme.accent : Theme.border
-            Icon {
-                x: Theme.spacingL; anchors.verticalCenter: parent.verticalCenter
-                name: "search"; size: Theme.iconSizeSmall; color: Theme.textMuted
-            }
-        }
         Keys.onPressed: (event) => launcher.key(event)
         // Clears the search, the keyboard staying in the field.
         CloseButton {

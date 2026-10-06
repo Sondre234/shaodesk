@@ -48,14 +48,15 @@ Item {
         }
     ]
 
-    // The search box, a field as the palette's: what was typed, or what typing does. It keeps to
-    // the room the compositor leaves above the strip.
+    // The search box, drawn as the palette's and the start menu's fields are (it takes no input):
+    // what was typed, or what typing does. It keeps to the room the compositor leaves above the
+    // strip.
     Rectangle {
         id: search
         anchors.horizontalCenter: parent.horizontalCenter
         y: overview.shownArea.y + Theme.spacingS
         width: Math.min(460, overview.width - 2 * Theme.spacingXL); height: Theme.rowHeight
-        radius: Theme.radiusSmall
+        radius: height / 2
         color: Theme.surface
         border.color: overview.shownFilter.length > 0 ? Theme.accent : Theme.border
         Icon {
