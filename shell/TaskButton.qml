@@ -30,11 +30,12 @@ Button {
     readonly property bool shownMinimized: group && group.count > 0 ? group.minimized : minimized
     // Asking for attention: any window of a stack will do.
     readonly property bool shownUrgent: group && group.count > 0 ? group.urgent : urgent
-    height: shell.panelHeight - 10
+    height: Theme.barButtonHeight
     // Hovering a stacked button lists its windows, whatever the platform thinks of hover.
     hoverEnabled: true
     // The icon sits above the activity line, fitting however short the bar is.
-    topPadding: 2; bottomPadding: 6; leftPadding: 6; rightPadding: 6
+    topPadding: Theme.spacingXS; bottomPadding: Theme.spacingS + Theme.spacingXS
+    leftPadding: Theme.spacingS + Theme.spacingXS; rightPadding: leftPadding
     onClicked: {
         task.panel.closeMenus()
         shell.tasks.activate(stacked ? group.nextTask() : taskId)
@@ -128,7 +129,7 @@ Button {
         }
     }
     contentItem: RowLayout {
-        spacing: 6
+        spacing: Theme.spacingS + Theme.spacingXS
         Item { Layout.fillWidth: shell.iconsOnly }
         BarAppIcon {
             name: task.iconName

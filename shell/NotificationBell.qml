@@ -8,13 +8,12 @@ import QtQuick.Layouts
 FlatButton {
     id: bell
     required property var panel
-    required property real barHeight
     objectName: "notificationBell"
     readonly property var center: shell.notifications
     readonly property string description: (center.dnd ? "Do not disturb, " : "") +
         (center.unread > 0 ? center.unread + " unread notifications" : "No new notifications")
     visible: shell.widgets.notifications === "bar" && center.serving
-    Layout.preferredWidth: 40; Layout.preferredHeight: barHeight - 10
+    Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
     hoverEnabled: true
     onClicked: panel.toggleAudioPopup("clock", bell)
     Accessible.name: description

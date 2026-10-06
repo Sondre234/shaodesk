@@ -9,7 +9,6 @@ import QtQuick.Layouts
 Item {
     id: workspaceIndicator
     required property var panel
-    required property real barHeight
     objectName: "workspaceIndicator"
     readonly property var workspaceState: shell.workspaces[workspaceIndicator.panel.outputName] || ({ current: 1, occupied: [] })
     // The workspaces shown, first to first + shown - 1: the current one in the middle, except
@@ -41,7 +40,7 @@ Item {
     }
     Row {
         id: buttons
-        spacing: 2
+        spacing: Theme.spacingXS
         Repeater {
             id: repeater
             model: workspaceIndicator.shown
@@ -55,8 +54,10 @@ Item {
                 readonly property bool urgent: (workspaceIndicator.workspaceState.urgent || []).indexOf(number) >= 0
                 readonly property string label: shell.workspaceNames[number - 1] || ""
                 objectName: "workspace" + number
-                width: label ? Math.max(26, workspaceText.implicitWidth + 14) : 26
-                height: workspaceIndicator.barHeight - 14
+                // A number with room around it, or a name with a little more.
+                readonly property real narrowest: Theme.iconSize + Theme.spacingM
+                width: label ? Math.max(narrowest, workspaceText.implicitWidth + 2 * Theme.spacingM) : narrowest
+                height: Theme.barButtonHeight - Theme.spacingS
                 onClicked: { workspaceIndicator.panel.closeMenus(); workspaceIndicator.show(number) }
                 Accessible.name: "Workspace " + number + (label ? " " + label : "") + (urgent ? " (needs attention)" : "")
                 BarTip { panel: workspaceIndicator.panel; owner: workspaceButton; text: "Workspace " + number + (label ? ": " + label : "") + (occupied ? "" : " (empty)") + (urgent ? ", needs attention" : "") }

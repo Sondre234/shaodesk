@@ -6,12 +6,11 @@ import Shaodesk
 ListView {
     id: taskList
     required property var panel
-    required property real barHeight
     objectName: "taskList"
     // As tall as a button, so its tasks line up with the pinned ones: a horizontal
     // list places each delegate at its top, whatever the delegate's own y.
-    Layout.fillWidth: true; Layout.preferredHeight: shell.panelHeight - 10
-    orientation: ListView.Horizontal; spacing: 4; clip: true
+    Layout.fillWidth: true; Layout.preferredHeight: Theme.barButtonHeight
+    orientation: ListView.Horizontal; spacing: Theme.spacingS; clip: true
     // Dragging moves a single task, not the list; the wheel scrolls an overflowing one.
     interactive: false
     // The task being dragged, the task whose place it takes, and how far the tasks
@@ -54,7 +53,7 @@ ListView {
         // Windows without an app id have nothing to group by.
         property TaskFilter appWindows: TaskFilter { controller: shell; sourceModel: taskList.panel.taskSource; windowApp: taskButton.appId }
         group: shell.groupWindows && appId !== "" ? appWindows : null
-        width: shell.iconsOnly ? 40 : Math.min(185, Math.max(92, taskList.width / Math.max(1, taskList.count) - 4))
+        width: shell.iconsOnly ? Theme.barButtonWidth : Math.min(185, Math.max(92, taskList.width / Math.max(1, taskList.count) - 4))
         z: reorder.active ? 1 : 0
         readonly property real shift: {
             var from = taskList.dragFrom, to = taskList.dragTo

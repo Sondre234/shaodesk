@@ -7,13 +7,13 @@ import QtQuick.Layouts
 FlatButton {
     id: indicator
     required property var panel
-    required property real barHeight
     objectName: "keyboardLayout"
     readonly property var layout: shell.keyboardLayout
     readonly property string label: layout.short || ""
     readonly property string description: "Keyboard layout: " + (layout.name || label)
     visible: shell.widgets.keyboard_layout && (layout.count || 0) > 1
-    Layout.preferredWidth: Math.max(40, text.implicitWidth + 16); Layout.preferredHeight: barHeight - 10
+    Layout.preferredWidth: Math.max(Theme.barButtonWidth, text.implicitWidth + 2 * Theme.spacingM)
+    Layout.preferredHeight: Theme.barButtonHeight
     hoverEnabled: true
     onClicked: { panel.closeMenus(); shell.send("switch_layout next") }
     Accessible.name: description

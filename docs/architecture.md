@@ -114,7 +114,7 @@ window as large as `ShellView::previewSize()`, and a preview's screenshot draws 
 | File | Covers |
 | --- | --- |
 | `Theme.qml` | The design tokens (colours, type, radii, spacing, icon sizes, motion, whether effects can be drawn), derived from the appearance profile. A singleton: every file reads `Theme.surface`, `Theme.hover`, ... instead of colours and sizes of its own. |
-| `Panel.qml` | The taskbar: which popup is open and where, the bar and its smaller buttons, and the popover with a loader for each popup. Every part below takes the panel as `panel` (and the bar's height, or the bar as `barItem`) and reaches its state and functions through it; a popup is placed in `panel.popupLayer`, by the bar's edges there (`panel.barTop`, `panel.barBottom`). |
+| `Panel.qml` | The taskbar: which popup is open and where, the bar and its smaller buttons, and the popover with a loader for each popup. Every part below takes the panel as `panel` (and a popup the bar as `barItem`) and reaches its state and functions through it; a popup is placed in `panel.popupLayer`, by the bar's edges there (`panel.barTop`, `panel.barBottom`). |
 | `PinnedSlots.qml`, `TaskList.qml`, `TaskButton.qml`, `TrayButton.qml`, `WorkspaceIndicator.qml`, `VolumeButton.qml`, `ClockButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `QuickSettingsButton.qml`, `BarAppIcon.qml`, `Badge.qml`, `BarTip.qml` | Parts of the bar: widgets, an application's icon on it, a count on a pill, and the tooltip for things on it. |
 | `ClockFlyout.qml`, `QuickSettings.qml`, `AudioMixer.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
 | `CalendarPopup.qml`, `NotificationHistory.qml` | The clock flyout's cards: the month calendar, and the notifications grouped by application. |
@@ -219,9 +219,13 @@ states; `border` and `divider`; `text`, `textMuted` and `textDisabled`; `accent`
 `fontSizeCaption`, `fontSizeSmall`, `fontSizeLarge`, `fontSizeTitle` and `fontSizeDisplay`;
 shapes `radiusSmall`, `radiusMedium` and `radiusLarge`; spacing `spacingXS` to `spacingXXL`
 (2, 4, 8, 12, 16, 20); icons `iconSizeSmall`, `iconSize`, `appIconSize` and
-`appIconSizeLarge`; rows of menus and lists `rowHeight`, their headings `headingHeight`.
-Animations use `durationFast`, `durationNormal`, `durationSlow` or `duration(ms)` with `easing`
-or `easingExit`, all 0 while `animations.enabled` is off. `effects` says whether shader effects
+`appIconSizeLarge`; rows of menus and lists `rowHeight`, their headings `headingHeight`; buttons
+on the bar `barButtonHeight` and, an icon's, `barButtonWidth`. Animations use `durationFast`,
+`durationNormal`, `durationSlow` or `duration(ms)` with `easing` or `easingExit`, all 0 while
+`animations.enabled` is off; something small growing in starts at `growFrom` of its size, and an
+icon on the bar shrinks to `pressScale` while pressed. Nothing animates while nothing changes,
+so that an idle shell wakes for nothing: motion is a `Behavior` or a transition on a change, and
+an animation that runs by itself ends, as the urgent pulse does after a few beats. `effects` says whether shader effects
 (shadows) can be drawn: only through the GPU, so draw them only when it is true, as a popup's
 `shadow` colour, `shadowBlur` and `shadowOffset` are. `alpha()` and `mix()` derive a colour from
 these. A button without a frame of its own is a `FlatButton`, one with a frame and text a

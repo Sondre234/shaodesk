@@ -12,7 +12,6 @@ import Shaodesk
 Repeater {
     id: pinnedSlots
     required property var panel
-    required property real barHeight
     model: shell.pinned
     // The applications whose slots are on the bar. Every change to the pins makes the slots
     // anew, so a slot comes in only when its application was not among them.
@@ -99,9 +98,9 @@ Repeater {
             id: pinnedButton
             objectName: "pinned:" + pinnedSlot.modelData.appId
             visible: pinnedTasks.count === 0
-            Layout.preferredWidth: 40; Layout.preferredHeight: pinnedSlots.barHeight - 10
+            Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
             // Padded like a window's button, so the icon stays put when one opens.
-            topPadding: 2; bottomPadding: 6
+            topPadding: Theme.spacingXS; bottomPadding: Theme.spacingS + Theme.spacingXS
             onClicked: { if (shell.launch(pinnedSlot.modelData.appId)) pinnedSlots.panel.closeMenus() }
             Accessible.name: pinnedSlot.modelData.name
             contentItem: Item {
@@ -141,7 +140,7 @@ Repeater {
                 group: shell.groupWindows ? pinnedWindows : null
                 groupSlot: pinnedSlot.modelData.appId
                 groupWindowApp: ""
-                width: shell.iconsOnly ? 40 : 160
+                width: shell.iconsOnly ? Theme.barButtonWidth : 160
                 Layout.preferredWidth: width; Layout.preferredHeight: height
                 DragHandler {
                     target: null
