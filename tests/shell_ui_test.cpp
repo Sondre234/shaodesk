@@ -1953,7 +1953,8 @@ int main(int argc, char **argv) {
             QQuickItem *line = nullptr;
             if (!QTest::qWaitFor([&] {
                     line = find(cards.rootObject(), "notificationCountdown");
-                    return cards.isVisible() && card() && line && line->isVisible() && line->width() > 0;
+                    return cards.isVisible() && card() && line && line->isVisible() &&
+                           line->width() > 0;
                 }))
                 return fail("a card with a timeout has no countdown line");
             const qreal start = line->width();
@@ -1965,12 +1966,13 @@ int main(int argc, char **argv) {
             const qreal held = line->width();
             QTest::qWait(300);
             if (line->width() != held) {
-                std::cerr << "a card's countdown line ran on while the pointer held it: "
-                          << held << " then " << line->width() << '\n';
+                std::cerr << "a card's countdown line ran on while the pointer held it: " << held
+                          << " then " << line->width() << '\n';
                 return 1;
             }
             QTest::mouseMove(&cards, QPoint(1, 1));
-            if (!QTest::qWaitFor([&] { return daemon->timerRunning(id) && line->width() < held - 2; }))
+            if (!QTest::qWaitFor(
+                    [&] { return daemon->timerRunning(id) && line->width() < held - 2; }))
                 return fail("a card's countdown did not run on once the pointer left it");
             daemon->dismiss(id);
             if (!QTest::qWaitFor([&] { return !cards.isVisible(); }, 3000))
