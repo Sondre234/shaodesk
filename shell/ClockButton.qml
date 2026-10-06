@@ -71,21 +71,11 @@ FlatButton {
             }
             // The unread count, in the accent colour, or muted while do-not-disturb holds the
             // cards back.
-            Rectangle {
-                id: badge
+            Badge {
                 objectName: "clockBadge"
-                visible: clockButton.unread > 0
                 anchors.verticalCenter: parent.verticalCenter
-                width: Math.max(height, badgeText.implicitWidth + 2 * Theme.spacingS); height: badgeText.implicitHeight + Theme.spacingXS
-                radius: height / 2
-                color: clockButton.center.dnd ? Theme.selected : Theme.accent
-                Text {
-                    id: badgeText
-                    anchors.centerIn: parent
-                    text: clockButton.unread > 9 ? "9+" : clockButton.unread
-                    color: clockButton.center.dnd ? Theme.textMuted : Theme.textOnAccent
-                    font.pixelSize: Theme.fontSizeCaption; font.weight: Font.DemiBold; font.family: Theme.fontFamily
-                }
+                count: clockButton.unread
+                muted: clockButton.center.dnd
             }
         }
     }

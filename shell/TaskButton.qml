@@ -120,13 +120,11 @@ Button {
                 NumberAnimation { to: 1; duration: Theme.duration(450) }
             }
         }
-        Rectangle {
+        // How many windows a stack has, on its corner.
+        Badge {
             objectName: "taskCount"
-            visible: task.stacked
-            anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 1
-            width: Math.max(14, count.implicitWidth + 6); height: 14; radius: 7
-            color: Theme.accent
-            Text { id: count; anchors.centerIn: parent; text: task.windows; color: Theme.textOnAccent; font.pixelSize: 10; font.bold: true; font.family: Theme.fontFamily }
+            anchors.right: parent.right; anchors.top: parent.top
+            count: task.stacked ? task.windows : 0
         }
     }
     contentItem: RowLayout {

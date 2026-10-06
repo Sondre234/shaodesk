@@ -33,18 +33,12 @@ FlatButton {
             name: bell.center.dnd ? "bell-off" : "bell"
             color: bell.center.dnd ? Theme.textMuted : Theme.text
         }
-        Rectangle {
+        // The unread count on the bell's shoulder, as the clock's.
+        Badge {
             objectName: "notificationBadge"
-            visible: bell.center.unread > 0
-            x: parent.width / 2 + 2; y: parent.height / 2 - 16
-            width: Math.max(15, badgeText.implicitWidth + 8); height: 15; radius: 7.5
-            color: bell.center.dnd ? Theme.textMuted : Theme.dangerFill
-            Text {
-                id: badgeText
-                anchors.centerIn: parent
-                text: bell.center.unread > 9 ? "9+" : bell.center.unread
-                color: bell.center.dnd ? Theme.surface : Theme.textOnDanger; font.pixelSize: 10; font.bold: true
-            }
+            x: parent.width / 2 + Theme.spacingXS; y: parent.height / 2 - Theme.iconSize + Theme.spacingXS
+            count: bell.center.unread
+            muted: bell.center.dnd
         }
     }
 }
