@@ -7,6 +7,7 @@
 #include "palette.hpp"
 #include "power.hpp"
 #include "shaodesk/config.hpp"
+#include "start_menu.hpp"
 #include "system_status.hpp"
 #include "task_model.hpp"
 #include "tray.hpp"
@@ -107,6 +108,8 @@ class ShellController : public QObject {
     Q_PROPERTY(Palette *palette READ palette CONSTANT)
     // The power menu: what may run of lock, suspend, hibernate and the rest.
     Q_PROPERTY(Power *power READ power CONSTANT)
+    // The start menu's pins, launch history, applications by letter, search and user.
+    Q_PROPERTY(StartMenu *startMenu READ startMenu CONSTANT)
     // The compositor's overview: the output showing it, empty while closed; its thumbnails as
     // {x, y, w, h, appId, title, workspace, urgent} and workspace strip cells as {x, y, w, h,
     // workspace, windows}, in the output's coordinates; the selected thumbnail, the workspace
@@ -172,6 +175,7 @@ class ShellController : public QObject {
     Audio *audio() { return audio_.get(); }
     Palette *palette() { return &palette_; }
     Power *power() { return &power_; }
+    StartMenu *startMenu() { return &startMenu_; }
     // Sends the compositor a request (an action, or "session restore NAME"), as `shaodesk msg`
     // would; `done` gets its whole reply. Without a session, `done` is not called.
     void ask(const QByteArray &line, std::function<void(const QByteArray &)> done);
@@ -292,6 +296,7 @@ class ShellController : public QObject {
     TaskModel tasks_;
     Palette palette_{*this};
     Power power_{*this};
+    StartMenu startMenu_{{}, this};
     std::unique_ptr<Audio> audio_ = makeAudio();
     SystemStatus status_{"/sys", nullptr, true};
     NotificationCenter notifications_;

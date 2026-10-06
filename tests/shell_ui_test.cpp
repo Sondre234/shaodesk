@@ -251,6 +251,13 @@ int main(int argc, char **argv) {
             std::cerr << "a desktop action did not run: " << controller.error().toStdString() << '\n';
             return 1;
         }
+        // The launch is remembered in the state directory, for the start menu's recent list.
+        QFile launches(screens.filePath("state/shaodesk/launches"));
+        const auto recent = controller.startMenu()->recent();
+        if (!launches.open(QIODevice::ReadOnly) ||
+            !launches.readAll().startsWith("shaodesk-test-actions.desktop\t1\t") || recent.size() != 1 ||
+            recent[0].toMap()["appId"] != "shaodesk-test-actions.desktop")
+            return fail("running a desktop action was not recorded as a launch");
         if (controller.launchAction("shaodesk-test-actions.desktop", "missing") ||
             !controller.error().startsWith("Could not launch Action app: ")) {
             std::cerr << "a desktop action whose program is missing was not reported: "

@@ -31,6 +31,9 @@ if(NOT SHAODESK_SHELL_PREVIEW_ONLY)
     endif()
 endif()
 
+# The start menu's model (its pins, the launch history and its search), in everything that builds
+# the controller.
+set(SHAODESK_START_SOURCES start_menu.cpp start_menu.hpp launch_history.cpp launch_history.hpp)
 set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_images.cpp
     notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp tray.cpp tray.hpp
     tray_images.cpp tray_images.hpp)
@@ -64,6 +67,7 @@ add_executable(shaodesk-shell main.cpp ${SHAODESK_NOTIFY_SOURCES} controller.cpp
     ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h)
 add_dependencies(shaodesk-shell shaodesk_wlr_client_protocols shaodesk_version)
 set_target_properties(shaodesk-shell PROPERTIES AUTOMOC ON RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
+target_sources(shaodesk-shell PRIVATE ${SHAODESK_START_SOURCES})
 target_include_directories(shaodesk-shell PRIVATE ${PROJECT_BINARY_DIR})
 target_link_libraries(shaodesk-shell PRIVATE shaodesk_config Qt6::Core Qt6::Gui Qt6::Network Qt6::Qml Qt6::Quick
     PkgConfig::GIO PkgConfig::SHELL_WAYLAND)
@@ -101,6 +105,7 @@ if(BUILD_TESTING)
         ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
         ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h)
     set_target_properties(shell_ui_test PROPERTIES AUTOMOC ON)
+    target_sources(shell_ui_test PRIVATE ${SHAODESK_START_SOURCES})
     target_include_directories(shell_ui_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
     target_compile_definitions(shell_ui_test PRIVATE QT_NO_KEYWORDS SHAODESK_LAYER_SHELL=0)
     target_compile_options(shell_ui_test PRIVATE -Wall -Wextra -Wpedantic)
@@ -116,6 +121,7 @@ if(BUILD_TESTING)
         ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
         ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h)
     set_target_properties(task_filter_test PROPERTIES AUTOMOC ON)
+    target_sources(task_filter_test PRIVATE ${SHAODESK_START_SOURCES})
     target_include_directories(task_filter_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
     target_compile_definitions(task_filter_test PRIVATE QT_NO_KEYWORDS SHAODESK_LAYER_SHELL=0)
     target_compile_options(task_filter_test PRIVATE -Wall -Wextra -Wpedantic)
@@ -134,7 +140,7 @@ if(BUILD_TESTING)
     add_test(NAME palette COMMAND palette_test)
     # The start menu's model: its pins, the launch history and its search.
     add_executable(start_menu_test ${PROJECT_SOURCE_DIR}/tests/start_menu_test.cpp
-        start_menu.cpp start_menu.hpp launch_history.cpp launch_history.hpp fuzzy.cpp fuzzy.hpp)
+        ${SHAODESK_START_SOURCES} fuzzy.cpp fuzzy.hpp)
     set_target_properties(start_menu_test PROPERTIES AUTOMOC ON)
     target_include_directories(start_menu_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_definitions(start_menu_test PRIVATE QT_NO_KEYWORDS)
@@ -209,6 +215,7 @@ if(BUILD_TESTING)
         ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
         ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h)
     set_target_properties(osd_test PROPERTIES AUTOMOC ON)
+    target_sources(osd_test PRIVATE ${SHAODESK_START_SOURCES})
     target_include_directories(osd_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
     target_compile_definitions(osd_test PRIVATE QT_NO_KEYWORDS SHAODESK_LAYER_SHELL=0)
     target_compile_options(osd_test PRIVATE -Wall -Wextra -Wpedantic)

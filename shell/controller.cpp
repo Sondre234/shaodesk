@@ -44,6 +44,10 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
             if (fields.size() == 3 && !fields[2].isEmpty())
                 pickedWallpapers_[fields[0]] = {fields[1], fields[2]};
         }
+    // The start menu follows the applications and the taskbar's pins, which seed its own.
+    connect(this, &ShellController::appsChanged, &startMenu_,
+            [this] { startMenu_.setApps(apps(), userPins_); });
+    connect(&startMenu_, &StartMenu::failed, this, &ShellController::report);
     refreshApps();
     subscribe();
     notifications_.configure(config_.notifications);
@@ -370,8 +374,12 @@ bool ShellController::launch(const QString &id) {
         report("This application is no longer available.");
         return false;
     }
-    if (it->command.empty())
-        return start(it->info, it->name);
+    if (it->command.empty()) {
+        if (!start(it->info, it->name))
+            return false;
+        startMenu_.record(id);
+        return true;
+    }
     QProcess process;
     auto env = QProcessEnvironment::systemEnvironment();
     env.remove("QT_WAYLAND_SHELL_INTEGRATION");
@@ -468,6 +476,7 @@ bool ShellController::launchAction(const QString &id, const QString &action) {
         g_desktop_app_info_launch_action(info, name.constData(), context);
         g_object_unref(context);
         clearError();
+        startMenu_.record(id);
         return true;
     }
     // GIO would start any other action with nowhere to say that it failed. Started as an entry of
@@ -489,6 +498,8 @@ bool ShellController::launchAction(const QString &id, const QString &action) {
     }
     const bool started = start(G_APP_INFO(entry), it->name);
     g_object_unref(entry);
+    if (started)
+        startMenu_.record(id);
     return started;
 }
 void ShellController::reload() {
