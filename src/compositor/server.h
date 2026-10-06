@@ -802,6 +802,7 @@ void evacuate_output(struct sh_server *server, const char *name, struct wlr_box 
                      bool keep_workspaces);
 void schedule_evacuation(struct sh_server *server, struct sh_output *output);
 void return_home_windows(struct sh_server *server);
+void move_toplevel_to_output(struct sh_toplevel *toplevel, struct wlr_output *to);
 void move_workspace_to_output(struct sh_server *server, const char *target);
 void swap_output_workspaces(struct sh_server *server, const char *target);
 
