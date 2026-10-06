@@ -101,6 +101,18 @@ APPS += [("code", "Visual Studio Code", "code"), ("libreoffice-writer", "LibreOf
          ("signal-desktop", "Signal", "signal-desktop"), ("htop", "htop", "htop"),
          ("org.gnome.SystemMonitor", "System Monitor", "org.gnome.SystemMonitor")]
 
+# More still in the macOS themes, so that Launchpad has a second page to show.
+LAUNCHPAD_APPS = [("audacity", "Audacity", "audacity"), ("brave-browser", "Brave", "brave-browser"),
+                  ("calibre", "calibre", "calibre"), ("darktable", "darktable", "darktable"),
+                  ("evince", "Document Viewer", "evince"), ("gnome-calendar", "Calendar", "gnome-calendar"),
+                  ("org.gnome.Maps", "Maps", "org.gnome.Maps"),
+                  ("org.gnome.Weather", "Weather", "org.gnome.Weather"),
+                  ("org.gnome.clocks", "Clocks", "org.gnome.clocks"), ("kdenlive", "Kdenlive", "kdenlive"),
+                  ("rhythmbox", "Rhythmbox", "rhythmbox"), ("shotwell", "Shotwell", "shotwell"),
+                  ("telegram", "Telegram", "telegram"), ("transmission", "Transmission", "transmission"),
+                  ("virt-manager", "Virtual Machine Manager", "virt-manager"),
+                  ("wireshark", "Wireshark", "wireshark")]
+
 # What a search finds some of them by besides their names: desktop id, then the generic name,
 # comment and keywords.
 DETAILS = {
@@ -214,7 +226,8 @@ def prepare(root, theme_name):
             lambda x, y, c=rgb(color): tuple(min(255, v + x + y) for v in c))
     data = root / "data"
     (data / "applications").mkdir(parents=True)
-    for desktop_id, name, icon in APPS:
+    macos = 'style = "macos"' in theme.get("shell", "")
+    for desktop_id, name, icon in APPS + (LAUNCHPAD_APPS if macos else []):
         actions = ACTIONS.get(desktop_id, [])
         entry = f"[Desktop Entry]\nType=Application\nName={name}\nIcon={icon}\nExec=true\n"
         if desktop_id in DETAILS:

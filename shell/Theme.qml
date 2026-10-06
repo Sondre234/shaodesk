@@ -162,6 +162,19 @@ QtObject {
     // edges a dark popup on a dark window.
     readonly property color popupOutline: macos && !light ? Qt.rgba(0, 0, 0, 0.6) : border
     readonly property color popupInnerEdge: macos && !light ? Qt.rgba(1, 1, 1, 0.1) : "transparent"
+    // Launchpad: its grid, columns by rows a page, and an application's icon there at most; the
+    // scrim over the wallpaper behind it; its text, white in both appearances as on macOS; the
+    // application the keyboard is at; its search field; and a dot for each page.
+    readonly property int launchpadColumns: 7
+    readonly property int launchpadRows: 5
+    readonly property int launchpadIconSize: 96
+    readonly property color launchpadScrim: Qt.rgba(0, 0, 0, light ? 0.28 : 0.42)
+    readonly property color launchpadText: "#ffffff"
+    readonly property color launchpadHighlight: Qt.rgba(1, 1, 1, 0.2)
+    readonly property color launchpadField: Qt.rgba(1, 1, 1, 0.16)
+    readonly property int launchpadFieldWidth: 240
+    readonly property int launchpadFieldHeight: 28
+    readonly property int launchpadDot: 7
 
     // `milliseconds` at the animation speed, 0 with animations off.
     function duration(milliseconds) { return Math.round(milliseconds * motionScale) }

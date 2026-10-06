@@ -504,7 +504,10 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { Launcher { panel: root; barItem: bar } }
+                // The start menu, or Launchpad in the macOS style.
+                sourceComponent: Theme.macos ? launchpadComponent : startMenuComponent
+                Component { id: startMenuComponent; Launcher { panel: root; barItem: bar } }
+                Component { id: launchpadComponent; Launchpad { panel: root; barItem: bar } }
             }
 
             Loader {
