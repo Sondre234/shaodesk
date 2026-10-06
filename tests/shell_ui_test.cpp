@@ -1182,11 +1182,13 @@ int main(int argc, char **argv) {
                   << groupList->isVisible() << popover->isVisible() << "\n";
         return 1;
     }
-    // The popover takes the pointer over the list alone.
+    // The popover takes the pointer over the list alone, and between it and the bar.
     {
         // Once it has slid into place.
         auto box = [&] {
-            return groupList->mapRectToScene(QRectF(0, 0, groupList->width(), groupList->height()));
+            QRectF area = groupList->mapRectToScene(QRectF(0, 0, groupList->width(), groupList->height()));
+            area.setBottom(popover->height() - view.height());
+            return area;
         };
         if (!QTest::qWaitFor([&] { return popover->inputRegion() == QRegion(box().toAlignedRect()); })) {
             std::cerr << "the popover takes the pointer elsewhere than over the list: "

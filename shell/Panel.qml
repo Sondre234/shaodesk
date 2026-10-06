@@ -64,6 +64,14 @@ Item {
     function barAnchor(x, width) { return Qt.rect(x, barTop, width, bar.height) }
     // The output but the bar's strip, where popups stay (PopupCard's bounds).
     readonly property rect popupArea: Qt.rect(0, onTop ? height : 0, popover.width, popover.height - height)
+    // Where a list shown on hover takes the pointer: over it and down to the bar, so that the
+    // pointer crossing from its button never lands on a window between (which, with focus
+    // following the pointer, would take the keyboard).
+    function hoverArea(item) {
+        var top = onTop ? popupArea.y : item.y
+        var bottom = onTop ? item.y + item.height : popupArea.y + popupArea.height
+        return Qt.rect(item.x, top, item.width, bottom - top)
+    }
     onLauncherOpenChanged: {
         if (launcherOpen) { taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; trayMenuKey = "" }
         else powerOpen = false
@@ -357,18 +365,15 @@ Item {
 
     // The popups' surface, over the whole output (PopoverWindow in view.hpp). While a menu is
     // open it takes the keyboard and every press but those on the bar, and a press beside the
-    // popups closes them; the list shown on hover takes only the pointer over it. It stays up
-    // while what closed fades out.
+    // popups closes them; the list shown on hover takes only the pointer over it and up to the
+    // bar. It stays up while what closed fades out.
     PopoverWindow {
         id: popover
         panel: root.shellView
         keyboard: root.menuOpen
         inputRects: root.menuOpen
             ? [root.popupArea]
-            : root.groupOpen && groupListLoader.item
-            ? [Qt.rect(groupListLoader.item.x, groupListLoader.item.y, groupListLoader.item.width,
-                       groupListLoader.item.height)]
-            : []
+            : root.groupOpen && groupListLoader.item ? [root.hoverArea(groupListLoader.item)] : []
         onDismissed: root.closeMenus()
         Timer { id: closing; interval: Theme.durationNormal; onTriggered: if (!root.expanded) popover.open = false }
         Connections {
