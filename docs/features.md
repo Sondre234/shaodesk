@@ -244,8 +244,9 @@ An urgent window's border pulses for four seconds in `windows.urgent_color` (ora
 and then holds it, also on windows without a `border_width`, where a two pixel frame is drawn
 inside the window's edge without moving anything. Its taskbar button (or the stack it is in) gets
 a tinted background and a pulsing dot, the workspace indicator marks its workspace, the overview
-frames its thumbnail and colours its workspace, the window switcher puts a dot on its icon,
-and the command palette lists it first with "needs attention". `focus_urgent` (Super + U, `shaodesk msg focus_urgent`) focuses the window that
+frames its thumbnail and colours its workspace, the window switcher puts a dot on its icon and
+tints its cell, and the command palette lists it first with "needs attention" and a dot on its
+icon. `focus_urgent` (Super + U, `shaodesk msg focus_urgent`) focuses the window that
 has been urgent the longest, switching workspace and showing it if it was minimized or in the
 scratchpad; a window that gets focus any other way, or closes, is no longer urgent. The focused
 window is never urgent, and a client that clears its X11 hint or demand ends it too.
@@ -302,7 +303,9 @@ switcher and the shell draws it, only once it has been open for a moment, so a q
 Alt + Tab flips between two windows without it flashing up; without the shell it still
 switches, unseen. Bound to a key without modifiers, or sent as
 `shaodesk msg switcher`, it stays open until `switcher_confirm [N]` (the Nth window in the
-list), `switcher_cancel`, Return, or Escape. `cycle` is the older action that raises the
+list), `switcher_cancel`, Return, or Escape. A minimized window's icon is faded and marked with a
+dash, and the caption under the grid gives the selected window's full title, its workspace (by
+name too) and monitor, and whether it is minimized or asking for attention. `cycle` is the older action that raises the
 least recently focused window on the spot.
 
 ## Overview
@@ -352,7 +355,8 @@ word must match, in any order, as letters in sequence of the title or its small 
 runs of letters and word starts (`gc` finds Google Chrome, `lay mon` finds Layout: monocle).
 Up and Down, Tab and Shift + Tab, Ctrl + N and Ctrl + P, or the pointer select; Enter or a click
 runs the entry; Escape, or clicking elsewhere, closes it. A leading `>` searches only actions, `@`
-windows, `#` workspaces and `%` sessions. The palette needs the shell (`shaodesk-shell`), which
+windows, `#` workspaces and `%` sessions; when nothing matches, the palette says so and lists
+these. The palette needs the shell (`shaodesk-shell`), which
 draws it, and the compositor's control socket for actions and sessions. On a machine with 600
 entries a keystroke re-ranks them in under a millisecond (an optimized build; see
 `tests/palette_test.cpp`). Super + P used to toggle sticky windows; that moved to Super + Shift + P.
@@ -638,7 +642,8 @@ stay put.
 When focus moves, a window's opacity and border color fade to their new values (the `focus`
 kind) instead of switching.
 The shell's own animations (taskbar buttons sliding aside, notification cards, the on-screen
-display) follow `enabled` and `speed` too.
+display, the switcher, the palette and the power dialog coming in) follow `enabled` and `speed`
+too.
 
 ## Effects
 
@@ -856,18 +861,22 @@ The shell is a notification daemon. It owns `org.freedesktop.Notifications` on t
 right corner of the monitor that has the focus (`notifications.position` moves it to another
 corner); further cards stack under it and slide in and out.
 
-- The card shows the application, the summary, the body (the spec's markup: `<b>`, `<i>`, `<u>`,
-  `<a href>` for web and mail links, `<br>`; anything else is dropped), the icon (`app_icon`, or
-  the `image-path`, `image-data` and `desktop-entry` hints), a progress bar for the `value` hint,
-  and a button for each action. A click on the card runs the action named `default`, or dismisses
-  the card when there is none; the × dismisses it too.
+- The card is headed by the application's icon and name (from the `desktop-entry` hint or the
+  application's name, else `app_icon`) and how long ago it came. Under that come the summary, the
+  body (the spec's markup: `<b>`, `<i>`, `<u>`, `<a href>` for web and mail links, `<br>`; anything
+  else is dropped) and a progress bar for the `value` hint, beside the picture (the `image-path`
+  or `image-data` hint, else `app_icon` when the application's own icon heads the card), and a
+  button for each action. A click on the card runs the action named `default`, or dismisses the
+  card when there is none; the × that shows while the pointer is on the card dismisses it too.
+  A critical card is edged in red.
 - `replaces_id` updates a notification in place, and so does a repeated
   `x-canonical-private-synchronous` (or `synchronous`, `x-dunst-stack-tag`) hint from the same
   application, which volume and brightness scripts use. `resident` keeps a notification after
   one of its actions runs, and `transient` keeps it out of the history.
-- Cards leave after `notifications.timeout` (6 s), or the application's own timeout. Critical
-  notifications stay until dismissed. Hovering a card pauses its timer, which continues with
-  the time it had left. At most `notifications.max_visible` cards show; the oldest makes room.
+- Cards leave after `notifications.timeout` (6 s), or the application's own timeout, which a
+  line along the card's bottom edge runs down (with animations on). Critical notifications stay
+  until dismissed. The pointer anywhere on a card, its buttons too, pauses its timer and the
+  line, which continue with the time it had left. At most `notifications.max_visible` cards show; the oldest makes room.
 - The bell in the panel keeps the last `notifications.history` notifications. Its badge counts
   those not yet seen; opening the list marks them seen. Clicking an entry runs its default action,
   × removes it, Clear empties the list. It opens with `notification_history` too (Super + N).
@@ -1022,7 +1031,8 @@ out when nothing may. A click elsewhere in the application menu closes only the 
 compositor, which also reports across the panel an action that fails or is cancelled later.
 Restart, Power off and Log out ask first: a dialog in the middle of the monitor counts down
 `power.countdown` seconds (10; 0 waits for a click) and then goes ahead, as do its button and
-Enter, while Escape, Cancel or a click beside it gives up. The actions themselves, bound to keys
+Enter, while Escape, Cancel or a click beside it gives up. The keyboard starts on the action's
+button, ringed, and Tab moves it to Cancel, where Enter gives up. The actions themselves, bound to keys
 or sent with `shaodesk msg`, do not ask. The `power_menu` action opens the application menu
 with the power menu up on the monitor under the pointer, with the keyboard in it: Up and Down
 choose, Enter runs, Escape closes the power menu.

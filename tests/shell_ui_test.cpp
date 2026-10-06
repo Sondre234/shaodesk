@@ -1968,6 +1968,17 @@ ListModel {
             std::cerr << "Enter did not log out\n";
             return 1;
         }
+        // The keyboard starts on the action's button; Tab takes it to Cancel, where Enter gives
+        // up.
+        requests.clear();
+        if (!ask("reboot") || !dialogItem("powerConfirm")->hasActiveFocus())
+            return fail("the power dialog's keyboard is not on its action's button");
+        QTest::keyClick(&dialog, Qt::Key_Tab);
+        if (!QTest::qWaitFor([&] { return dialogItem("powerCancel")->hasActiveFocus(); }))
+            return fail("Tab did not take the power dialog's keyboard to Cancel");
+        QTest::keyClick(&dialog, Qt::Key_Return);
+        if (!gaveUp() || !requests.isEmpty())
+            return fail("Enter on Cancel did not give up the restart");
         requests.clear();
         if (!ask("poweroff"))
             return fail("the power off was not asked about");
@@ -2210,6 +2221,42 @@ ListModel {
         if (!QTest::qWaitFor([&] { return !cards.isVisible(); }, 3000)) {
             std::cerr << "the dismissed card stayed\n";
             return 1;
+        }
+        // A card's countdown line runs down with its timer, and both stop while the pointer is
+        // on the card.
+        {
+            Notification n;
+            n.app = "Test";
+            n.summary = "Counting down";
+            n.timeout = 5000;
+            const uint id = daemon->notify(n);
+            QQuickItem *line = nullptr;
+            if (!QTest::qWaitFor([&] {
+                    line = find(cards.rootObject(), "notificationCountdown");
+                    return cards.isVisible() && card() && line && line->isVisible() &&
+                           line->width() > 0;
+                }))
+                return fail("a card with a timeout has no countdown line");
+            const qreal start = line->width();
+            if (!QTest::qWaitFor([&] { return line->width() < start - 2; }))
+                return fail("a card's countdown line does not run down");
+            QTest::mouseMove(&cards, centre(card()));
+            if (!QTest::qWaitFor([&] { return !daemon->timerRunning(id); }))
+                return fail("the pointer on a card did not hold its timer");
+            const qreal held = line->width();
+            QTest::qWait(300);
+            if (line->width() != held) {
+                std::cerr << "a card's countdown line ran on while the pointer held it: " << held
+                          << " then " << line->width() << '\n';
+                return 1;
+            }
+            QTest::mouseMove(&cards, QPoint(1, 1));
+            if (!QTest::qWaitFor(
+                    [&] { return daemon->timerRunning(id) && line->width() < held - 2; }))
+                return fail("a card's countdown did not run on once the pointer left it");
+            daemon->dismiss(id);
+            if (!QTest::qWaitFor([&] { return !cards.isVisible(); }, 3000))
+                return fail("the counting card stayed");
         }
         // The history opens from the bell, marks what it shows as seen, and clears.
         auto *history = find(view.rootObject(), "notificationHistory");

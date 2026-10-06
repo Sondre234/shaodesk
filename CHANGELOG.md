@@ -41,6 +41,24 @@ release; the dated sections below it record the work that led up to it, and all 
 - For working on the shell: `shaodesk-shell --preview-popup NAME` shows one of the taskbar's
   popups on stand-in data, and `tools/shell_gallery.py` saves a picture of every one, in a light
   and a dark theme, drawn in software and through the GPU.
+- The on-screen display, the notification cards, the window switcher, the command palette and the
+  power dialog take the popups' look: opaque cards with a shadow through the GPU, the theme's type
+  and sizes, and each comes in on the theme's motion (at once with animations off). The overview's
+  search box, labels, title bars and hint follow, legible over its backdrop in a light theme too.
+- The on-screen display draws line icons (a sun for brightness, a crossed-out bell for
+  do-not-disturb), glides its level to each new value and keeps the number in figures of one
+  width.
+- A notification card is headed by its application's icon and name and how long ago it came, sets
+  its summary over its body beside its picture, shows its actions as buttons and its close button
+  while the pointer is on it, runs a line down along its bottom edge as its timer runs, and is
+  edged in red when critical. The pointer over a card's buttons now holds its timer too.
+- The window switcher shows larger icons over two lines of title, glides its selection, fades and
+  marks minimized windows, tints those asking for attention, and names the selected window's
+  workspace in its caption. The command palette's results look like a menu's rows with their kind
+  on a pill, and it says how to narrow a search that finds nothing. The power dialog's keyboard
+  starts on its action's button, ringed, and Tab moves it to Cancel.
+- `--preview-popup` and the gallery show the overlays too: `osd-volume`, `osd-text`, `cards`,
+  `power-dialog`, `palette`, `palette-empty`, `switcher` and `overview`.
 
 ## 0.1.1 (2026-10-05)
 

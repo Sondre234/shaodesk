@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Render every popup of the taskbar as a PNG, in a light and a dark theme.
+"""Render every popup of the taskbar and every overlay surface as a PNG, in a light and a dark
+theme.
 
 usage: tools/shell_gallery.py BUILD_DIR OUT_DIR [--renderer software|gpu|both]
                               [--theme light|dark] [--popup NAME] [--scale FACTOR]
                               [--icon-theme NAME] [--jobs N]
 
 Each picture is `shaodesk-shell --preview-popup NAME --screenshot`: the taskbar with that popup
-open, on stand-in windows, sound, tray items and notifications, over a wallpaper made for the
-purpose. They are written as OUT_DIR/THEME-NAME.png, and OUT_DIR/THEME-NAME-gpu.png for the GPU
+open, or with that overlay (the on-screen display, the cards, the switcher, ...) over it, on
+stand-in windows, sound, tray items and notifications, over a wallpaper made for the purpose. They are written as OUT_DIR/THEME-NAME.png, and OUT_DIR/THEME-NAME-gpu.png for the GPU
 renderer. The software renderer runs offscreen; the GPU one (Qt's OpenGL, on Mesa's software
 implementation here) needs a display, so it runs against a private headless compositor from
 BUILD_DIR. Nothing touches a real session: no display, session bus, configuration or state of
@@ -32,6 +33,9 @@ import zlib
 POPUPS = ["bar", "launcher", "power", "bar-menu", "bar-submenu", "task-menu", "stack-menu",
           "pin-menu", "group", "tray-menu", "tray-submenu", "calendar", "mixer", "outputs",
           "profiles", "wallpapers", "notifications"]
+# The overlay surfaces, each shown over the bar alone (PreviewData::surfaces in shell/preview.cpp).
+POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switcher",
+           "overview", "palette-empty"]
 
 # Translucent bars, as appearance profiles often have them.
 THEMES = {

@@ -1,97 +1,136 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
+import QtQuick.Effects
+import QtQuick.Layouts
 
-// The on-screen display: a pill with an icon, a label and a level, fading away when its time is up.
+// The on-screen display: a pill with an icon, a label and a level, rising into view from the edge
+// it is by and fading away when its time is up.
 Item {
     id: osd
     required property string outputName
     readonly property var model: shell.osd
     readonly property bool mine: model.active && model.output === outputName
+    // How far it is shown, from 0 to 1: its opacity, and what is left of its rise and growth. It
+    // comes quickly and goes slowly, both at once with animations off.
+    property real progress: 0
     // True while it is visible, including the fade out; the view hides the surface after that.
-    readonly property bool visibleNow: mine || pill.opacity > 0
+    readonly property bool visibleNow: mine || progress > 0
     readonly property bool hasLevel: model.percent >= 0
-    width: 320
-    height: 64 + 2 * 8
+    // The room around the pill, which its shadow takes when there is one.
+    readonly property int margin: Math.max(Theme.spacingL, Theme.shadowMargin)
+    width: pill.width + 2 * margin
+    height: pill.height + 2 * margin
+    states: State {
+        name: "shown"
+        when: osd.mine
+        PropertyChanges { osd.progress: 1 }
+    }
+    transitions: [
+        Transition {
+            to: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationNormal; easing.type: Theme.easing }
+        },
+        Transition {
+            from: "shown"
+            NumberAnimation { property: "progress"; duration: Theme.durationSlow; easing.type: Theme.easingExit }
+        }
+    ]
 
-    Rectangle {
+    Item {
         id: pill
         objectName: "osdPill"
         anchors.centerIn: parent
-        width: 300; height: 56; radius: 28
-        color: Theme.surface
-        border.color: Theme.border
-        opacity: osd.mine ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: Theme.duration(osd.mine ? 90 : 320); easing.type: Theme.easing } }
-        Canvas {
-            id: glyph
-            x: 20; anchors.verticalCenter: parent.verticalCenter
-            width: 26; height: 22
-            readonly property string kind: osd.model.kind
-            readonly property int level: osd.model.percent
-            onKindChanged: requestPaint()
-            onLevelChanged: requestPaint()
-            Component.onCompleted: requestPaint()
-            onPaint: {
-                var ctx = getContext("2d")
-                ctx.reset()
-                ctx.fillStyle = Theme.text; ctx.strokeStyle = Theme.text
-                ctx.lineWidth = 2; ctx.lineCap = "round"
-                if (kind === "volume" || kind === "muted") {
-                    ctx.beginPath()
-                    ctx.moveTo(2, 8); ctx.lineTo(6, 8); ctx.lineTo(11, 3); ctx.lineTo(11, 19); ctx.lineTo(6, 14); ctx.lineTo(2, 14)
-                    ctx.closePath(); ctx.fill()
-                    if (kind === "muted" || level === 0) {
-                        ctx.beginPath(); ctx.moveTo(16, 7); ctx.lineTo(23, 15); ctx.moveTo(23, 7); ctx.lineTo(16, 15); ctx.stroke()
-                    } else {
-                        var waves = level > 66 ? 3 : level > 33 ? 2 : 1
-                        for (var i = 0; i < waves; ++i) { ctx.beginPath(); ctx.arc(11, 11, 5 + i * 4.2, -0.75, 0.75); ctx.stroke() }
-                    }
-                } else if (kind === "brightness") {
-                    ctx.beginPath(); ctx.arc(13, 11, 4.5, 0, Math.PI * 2); ctx.fill()
-                    for (var r = 0; r < 8; ++r) {
-                        var a = r * Math.PI / 4
-                        ctx.beginPath(); ctx.moveTo(13 + Math.cos(a) * 7.5, 11 + Math.sin(a) * 7.5)
-                        ctx.lineTo(13 + Math.cos(a) * 10, 11 + Math.sin(a) * 10); ctx.stroke()
-                    }
-                } else if (kind === "dnd") {
-                    ctx.beginPath(); ctx.arc(13, 11, 9, 0, Math.PI * 2); ctx.stroke()
-                    ctx.beginPath(); ctx.moveTo(7, 11); ctx.lineTo(19, 11); ctx.stroke()
-                } else {
-                    ctx.beginPath(); ctx.arc(13, 11, 4, 0, Math.PI * 2); ctx.fill()
-                }
+        // With a level it keeps its width as the level changes; a message alone fits its text.
+        width: osd.hasLevel ? 300 : Math.min(300, row.implicitWidth + row.anchors.leftMargin + row.anchors.rightMargin)
+        height: Theme.rowHeight + 2 * Theme.spacingM
+        opacity: osd.progress
+        scale: 0.94 + 0.06 * osd.progress
+        transform: Translate { y: (1 - osd.progress) * Theme.spacingM * (osd.model.top ? -1 : 1) }
+        Loader {
+            anchors.fill: parent
+            active: Theme.effects
+            sourceComponent: RectangularShadow {
+                radius: pill.height / 2
+                blur: Theme.shadowBlur
+                offset: Qt.vector2d(0, Theme.shadowOffset)
+                color: Theme.shadow
             }
-        }
-        Text {
-            id: label
-            objectName: "osdText"
-            anchors.verticalCenter: parent.verticalCenter
-            x: 60
-            width: osd.hasLevel ? 92 : parent.width - 80
-            text: osd.model.text
-            color: Theme.text
-            font.pixelSize: Theme.fontSizeLarge; font.family: Theme.fontFamily
-            textFormat: Text.PlainText; elide: Text.ElideRight
         }
         Rectangle {
-            id: track
-            objectName: "osdLevel"
-            visible: osd.hasLevel
-            x: 160; anchors.verticalCenter: parent.verticalCenter
-            width: parent.width - 160 - 56; height: 6; radius: 3
-            color: Theme.selected
-            Rectangle {
-                width: parent.width * Math.max(0, osd.model.percent) / 100; height: parent.height; radius: 3
-                color: osd.model.kind === "muted" ? Theme.textMuted : Theme.accent
-                Behavior on width { NumberAnimation { duration: Theme.duration(80) } }
-            }
+            anchors.fill: parent
+            radius: height / 2
+            color: Theme.surface
+            border.color: Theme.border
         }
-        Text {
-            visible: osd.hasLevel
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.right: parent.right; anchors.rightMargin: 18
-            text: osd.model.percent
-            color: Theme.text; opacity: 0.8
-            font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+        RowLayout {
+            id: row
+            anchors.fill: parent
+            anchors.leftMargin: Theme.spacingXL
+            anchors.rightMargin: Theme.spacingXL + Theme.spacingXS
+            spacing: Theme.spacingL
+            // What it is about: the loudspeaker for the volume, as the bar draws it, a sun for
+            // the brightness, the bell for notifications, else a mark for a message.
+            Item {
+                id: glyph
+                readonly property string kind: osd.model.kind
+                readonly property bool speaker: kind === "volume" || kind === "muted"
+                Layout.preferredWidth: Theme.iconSizeLarge; Layout.preferredHeight: Theme.iconSizeLarge
+                SpeakerIcon {
+                    visible: glyph.speaker
+                    size: Theme.iconSizeLarge
+                    level: osd.model.percent
+                    muted: glyph.kind === "muted"
+                }
+                Icon {
+                    visible: !glyph.speaker
+                    size: Theme.iconSizeLarge
+                    name: glyph.kind === "brightness" ? "sun" : glyph.kind === "dnd" ? "bell-off"
+                          : glyph.kind === "notifications" ? "bell" : "info"
+                }
+            }
+            Text {
+                id: label
+                objectName: "osdText"
+                Layout.fillWidth: !osd.hasLevel
+                Layout.maximumWidth: osd.hasLevel ? 110 : -1
+                text: osd.model.text
+                color: Theme.text
+                font.pixelSize: Theme.fontSizeLarge; font.family: Theme.fontFamily; font.weight: Font.Medium
+                textFormat: Text.PlainText; elide: Text.ElideRight
+            }
+            Rectangle {
+                id: track
+                objectName: "osdLevel"
+                visible: osd.hasLevel
+                Layout.fillWidth: true
+                Layout.preferredHeight: Theme.spacingS + Theme.spacingXS
+                radius: height / 2
+                color: Theme.selected
+                // The level glides to a new value, and on from there when keys repeat.
+                Rectangle {
+                    width: parent.width * Math.max(0, osd.model.percent) / 100; height: parent.height
+                    radius: height / 2
+                    color: osd.model.kind === "muted" ? Theme.textMuted : Theme.accent
+                    Behavior on width { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
+                    Behavior on color { ColorAnimation { duration: Theme.durationFast } }
+                }
+            }
+            // The number in figures of one width, in room for 100, so that it does not shift as
+            // it changes.
+            Text {
+                visible: osd.hasLevel
+                Layout.preferredWidth: digits.width
+                horizontalAlignment: Text.AlignRight
+                text: osd.model.percent
+                color: Theme.textMuted
+                font: digits.font
+                TextMetrics {
+                    id: digits
+                    text: "100"
+                    font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+                    font.features: { "tnum": 1 }
+                }
+            }
         }
     }
 }
