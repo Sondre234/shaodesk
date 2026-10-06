@@ -9,7 +9,8 @@ usage: tools/shell_gallery.py BUILD_DIR OUT_DIR [--renderer software|gpu|both]
 
 Each picture is `shaodesk-shell --preview-popup NAME --screenshot`: the taskbar with that popup
 open, or with that overlay (the on-screen display, the cards, the switcher, ...) over it, on
-stand-in windows, sound, tray items and notifications, over a wallpaper made for the purpose. They are written as OUT_DIR/THEME-NAME.png, and OUT_DIR/THEME-NAME-gpu.png for the GPU
+stand-in windows, sound, tray items and notifications, over a wallpaper made for the purpose;
+"desktop" is the desktop alone (`--preview-desktop`), without that wallpaper. They are written as OUT_DIR/THEME-NAME.png, and OUT_DIR/THEME-NAME-gpu.png for the GPU
 renderer. The software renderer runs offscreen; the GPU one (Qt's OpenGL, on Mesa's software
 implementation here) needs a display, so it runs against a private headless compositor from
 BUILD_DIR. Nothing touches a real session: no display, session bus, configuration or state of
@@ -39,6 +40,8 @@ POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switch
 # The start menu's other views and its menus.
 POPUPS += ["launcher-all", "launcher-search", "launcher-empty", "launcher-menu"]
 POPUPS += ["quick-settings", "quick-settings-mixer", "bar-all"]
+# The desktop alone, without the wallpaper made for the gallery: the style's own background.
+POPUPS += ["desktop"]
 
 # Pictures taken with settings of their own, put in the shell table: name -> (popup, settings).
 # The volume's and the profiles' popups belong to buttons Quick Settings holds by default.
@@ -276,7 +279,13 @@ def render(shell, env, root, popup, out, wait, icons):
         config = root / f"init-{out.stem}.lua"
         config.write_text((root / "init.lua").read_text().replace(
             "    shell = {\n", "    shell = {\n        " + settings + "\n", 1))
-    result = subprocess.run([shell, "--config", str(config), "--preview-popup", popup,
+    shown = ["--preview-popup", popup]
+    if popup == "desktop":
+        config = root / f"init-{out.stem}.lua"
+        config.write_text("".join(line for line in (root / "init.lua").read_text().splitlines(True)
+                                  if not line.strip().startswith("wallpaper = ")))
+        shown = ["--preview", "--preview-desktop"]
+    result = subprocess.run([shell, "--config", str(config), *shown,
                              "--icon-theme", icons, "--quit-after", str(wait),
                              "--screenshot", str(out)],
                             env=env, capture_output=True, text=True, timeout=60)

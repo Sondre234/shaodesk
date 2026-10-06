@@ -254,12 +254,10 @@ Item {
         id: backdrop
         anchors.fill: parent
         opacity: launchpad.progress
-        Rectangle {
+        Loader {
             anchors.fill: parent
-            gradient: Gradient {
-                GradientStop { position: 0; color: Qt.lighter(shell.background, 1.45) }
-                GradientStop { position: 1; color: shell.background }
-            }
+            active: shell.wallpaper.toString().length === 0
+            sourceComponent: DrawnWallpaper {}
         }
         Image {
             anchors.fill: parent
