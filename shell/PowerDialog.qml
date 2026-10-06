@@ -110,30 +110,49 @@ Item {
             }
             RowLayout {
                 Layout.alignment: Qt.AlignRight
-                spacing: 8
-                Button {
+                spacing: Theme.spacingM
+                DialogButton {
                     id: cancel
                     objectName: "powerCancel"
                     text: "Cancel"
-                    palette.buttonText: Theme.text
                     onClicked: root.power.cancel()
-                    background: Rectangle {
-                        implicitWidth: 96; implicitHeight: 36; radius: Theme.radiusSmall
-                        color: cancel.pressed ? Theme.pressed : cancel.hovered ? Theme.selected : Theme.hover
-                    }
                 }
-                Button {
+                DialogButton {
                     id: confirm
                     objectName: "powerConfirm"
                     text: root.power.pendingTitle
-                    palette.buttonText: Theme.textOnDanger
+                    danger: true
                     onClicked: root.power.confirm()
-                    background: Rectangle {
-                        implicitWidth: 112; implicitHeight: 36; radius: Theme.radiusSmall
-                        color: confirm.hovered ? Qt.lighter(Theme.dangerFill, 1.15) : Theme.dangerFill
-                    }
                 }
             }
+        }
+    }
+
+    // A button of the dialog: framed on the raised surface, or for the action itself, which
+    // cannot be taken back, filled with the danger colour.
+    component DialogButton: Button {
+        id: button
+        property bool danger: false
+        implicitWidth: Math.max(contentItem.implicitWidth + leftPadding + rightPadding, 3 * Theme.rowHeight)
+        implicitHeight: Theme.rowHeight
+        leftPadding: Theme.spacingXL; rightPadding: Theme.spacingXL
+        hoverEnabled: true
+        background: Rectangle {
+            radius: Theme.radiusSmall
+            color: button.danger ? (button.hovered ? Theme.mix(Theme.dangerFill, Theme.textOnDanger, 0.12) : Theme.dangerFill)
+                   : button.hovered ? Theme.surfaceRaisedHover : Theme.surfaceRaised
+            border.color: button.danger ? "transparent" : Theme.border
+            Rectangle {
+                anchors.fill: parent
+                radius: parent.radius
+                color: button.pressed ? Theme.pressed : "transparent"
+            }
+        }
+        contentItem: Text {
+            text: button.text
+            color: button.danger ? Theme.textOnDanger : Theme.text
+            font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize; font.weight: Font.Medium
+            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
         }
     }
 }
