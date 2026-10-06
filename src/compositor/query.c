@@ -287,6 +287,29 @@ static void get_opacities(struct sh_server *server, int fd, const char *argument
     }
 }
 
+static void get_frames(struct sh_server *server, int fd, const char *arguments) {
+    // What the compositor draws for each window, in the order of `get windows`: app_id, title,
+    // focused, its controls ("flat", "traffic_lights", or "none" while the window draws its
+    // own frame) and whether they show.
+    control_reply(fd, "ok\n");
+    const char *style = deco_style(server) == SH_DECO_TRAFFIC_LIGHTS ? "traffic_lights" : "flat";
+    struct sh_toplevel *toplevel;
+    wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
+        char line[1024], app_id[256], title[512];
+        const char *raw_app_id = toplevel_app_id(toplevel), *raw_title = toplevel_title(toplevel);
+        snprintf(app_id, sizeof(app_id), "%s", raw_app_id ? raw_app_id : "");
+        snprintf(title, sizeof(title), "%s", raw_title ? raw_title : "");
+        for (char *c = app_id; *c; ++c)
+            *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
+        for (char *c = title; *c; ++c)
+            *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
+        bool revealed = toplevel->deco && toplevel->deco->node.enabled;
+        snprintf(line, sizeof(line), "%s\t%s\t%d\t%s\t%d\n", app_id, title,
+                 server->focused_toplevel == toplevel, toplevel->deco ? style : "none", revealed);
+        control_reply(fd, line);
+    }
+}
+
 static void get_zoom(struct sh_server *server, int fd, const char *arguments) {
     // The magnification now and its target (thousandths), and the number of outputs that
     // drew the last frame magnified.
@@ -431,6 +454,7 @@ static const struct {
     {"dim", get_dim, false},
     {"peek", get_peek, false},
     {"opacities", get_opacities, false},
+    {"frames", get_frames, false},
     {"zoom", get_zoom, false},
     {"night_light", get_night_light, false},
     {"overview", get_overview, false},
