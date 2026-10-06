@@ -4,8 +4,10 @@ import Shaodesk
 
 // The context menu of a window's button (its pinned application's too), of a pinned
 // application's button, or of the bar itself, whose appearance entry opens the profiles beside
-// it. It opens where the bar was pressed. A window's and a pinned application's begin with the
-// application's icon and name.
+// it. It opens where the bar was pressed. A window's begins with its application's icon and name
+// over its title, then offers what the application starts, what can be done to the window (by its
+// state, and where it is), pinning and closing it; a stacked button's acts on all its windows. A
+// pinned application's offers what it starts, and unpinning it.
 PopupMenu {
     id: contextMenu
     required property var panel
@@ -44,11 +46,12 @@ PopupMenu {
         return null
     }
     // The menu's title: the application's icon and name (the window's app id when it has no
-    // entry), with `line` under it.
+    // entry), with `line` under it; without either, `line` alone.
     function titleEntry(record, windowAppId, line) {
+        var named = record !== null || windowAppId !== ""
         return { title: record ? record.name : (windowAppId || line),
                  icon: record ? record.icon : shell.iconFor(windowAppId),
-                 secondary: line, objectName: "contextMenuTitle" }
+                 secondary: named ? line : "", objectName: "contextMenuTitle" }
     }
     // What the application offers to start besides itself (its desktop actions, with their
     // icons), then `open` starting it, unless an action of its own is a new window already.
