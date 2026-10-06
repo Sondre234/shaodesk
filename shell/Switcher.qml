@@ -40,7 +40,7 @@ Item {
         opacity: switcher.progress
         scale: 0.94 + 0.06 * switcher.progress
         width: switcher.columns * switcher.cell + 2 * switcher.padding
-        height: switcher.rows * switcher.cell + 2 * switcher.padding + caption.height + 8
+        height: switcher.rows * switcher.cell + 2 * switcher.padding + caption.height + caption.anchors.topMargin
         Loader {
             anchors.fill: parent
             active: Theme.effects
@@ -84,11 +84,12 @@ Item {
                 width: switcher.cell; height: switcher.cell
                 readonly property bool minimized: modelData.minimized === true
                 readonly property bool urgent: modelData.urgent === true
-                // A window asking for attention is tinted in the urgent colour.
+                // A window asking for attention is tinted in the urgent colour, but for the
+                // selection's own.
                 Rectangle {
                     anchors.fill: parent; anchors.margins: Theme.spacingXS
                     radius: Theme.radiusMedium
-                    color: entry.urgent ? Theme.urgentSubtle : "transparent"
+                    color: entry.urgent && !entry.GridView.isCurrentItem ? Theme.urgentSubtle : "transparent"
                     Rectangle {
                         anchors.fill: parent
                         radius: parent.radius
@@ -144,22 +145,57 @@ Item {
                 }
             }
         }
+        // A label on a small pill, for what the caption says of a window's state.
+        component Tag: Rectangle {
+            property alias text: label.text
+            implicitWidth: label.implicitWidth + 2 * Theme.spacingM
+            implicitHeight: label.implicitHeight + Theme.spacingXS
+            radius: height / 2
+            color: Theme.selected
+            Text {
+                id: label
+                anchors.centerIn: parent
+                color: Theme.text
+                font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeCaption; font.weight: Font.Medium
+            }
+        }
+        // The selected window's full title, and where it is: its workspace, by name too when it
+        // has one, and its output; then whether it is minimized or asking for attention.
         Column {
             id: caption
-            anchors.top: grid.bottom; anchors.topMargin: 8
+            anchors.top: grid.bottom; anchors.topMargin: Theme.spacingM
             x: switcher.padding; width: card.width - 2 * switcher.padding
+            spacing: Theme.spacingS
             Text {
                 width: parent.width
                 text: switcher.current.title || switcher.current.appId || ""
                 textFormat: Text.PlainText
-                color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeLarge; font.bold: true
+                color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeLarge; font.weight: Font.DemiBold
                 horizontalAlignment: Text.AlignHCenter; elide: Text.ElideMiddle
             }
-            Text {
-                width: parent.width
-                text: switcher.current.output ? "Workspace " + switcher.current.workspace + " on " + switcher.current.output + (switcher.current.minimized ? " · minimized" : "") + (switcher.current.urgent ? " · needs attention" : "") : ""
-                color: Theme.textMuted; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize
-                horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: !!switcher.current.output
+                spacing: Theme.spacingS
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+                    readonly property string name: shell.workspaceNames[switcher.current.workspace - 1] || ""
+                    text: "Workspace " + switcher.current.workspace + (name.length > 0 ? " · " + name : "")
+                          + " · " + switcher.current.output
+                    textFormat: Text.PlainText
+                    color: Theme.textMuted; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize
+                }
+                Tag {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: switcher.current.minimized === true
+                    text: "Minimized"
+                }
+                Tag {
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: switcher.current.urgent === true
+                    text: "Needs attention"
+                    color: Theme.urgentSubtle
+                }
             }
         }
     }
