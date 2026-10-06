@@ -321,18 +321,18 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.wallpapers` | string | unset | - | The wallpaper picker's folder, searched with its subfolders: absolute, or starting with `~/`; unset uses `$XDG_PICTURES_DIR/wallpapers`, else `$XDG_PICTURES_DIR`. |
 | `shell.widgets` | table | - | - | Panel widgets; each is switched off with `false`. One that can move takes `"bar"` to sit on the bar or `"quick"` to sit in the Quick Settings flyout instead, and `true` puts it in its default place. |
 | `shell.widgets.workspaces` | boolean | true | - | This monitor's workspace numbers. |
-| `shell.widgets.battery` | boolean or string | true | - | Charge and state, only where a battery exists: `"bar"` or `"quick"` (along Quick Settings' foot). By default on the bar. |
-| `shell.widgets.network` | boolean or string | true | - | Connection state, only where a network interface exists: `"bar"` or `"quick"` (a tile). By default on the bar. |
-| `shell.widgets.volume` | boolean or string | true | - | The default output's volume, only with a sound server: `"bar"` or `"quick"` (a slider, with the outputs and the applications' volumes). By default on the bar. |
+| `shell.widgets.battery` | boolean or string | true | - | Charge and state, only where a battery exists: `"bar"` or `"quick"` (along Quick Settings' foot). By default in Quick Settings. |
+| `shell.widgets.network` | boolean or string | true | - | Connection state, only where a network interface exists: `"bar"` or `"quick"` (a tile). By default in Quick Settings. |
+| `shell.widgets.volume` | boolean or string | true | - | The default output's volume, only with a sound server: `"bar"` or `"quick"` (a slider, with the outputs and the applications' volumes). By default in Quick Settings. |
 | `shell.widgets.clock` | boolean | true | - | The clock. |
 | `shell.widgets.calendar` | boolean | true | - | The month calendar in the clock's flyout. |
-| `shell.widgets.tiling` | boolean or string | true | - | Tiling on or off for the monitor: `"bar"` (a button) or `"quick"` (a tile). By default on the bar. |
-| `shell.widgets.profiles` | boolean or string | true | - | The appearance profile picker, which lists `profiles` to switch between; shown only when there are two or more: `"bar"` (a button) or `"quick"` (a tile). By default on the bar. |
+| `shell.widgets.tiling` | boolean or string | true | - | Tiling on or off for the monitor: `"bar"` (a button) or `"quick"` (a tile). By default in Quick Settings. |
+| `shell.widgets.profiles` | boolean or string | true | - | The appearance profile picker, which lists `profiles` to switch between; shown only when there are two or more: `"bar"` (a button) or `"quick"` (a tile). By default in Quick Settings. |
 | `shell.widgets.wallpapers` | boolean or string | true | - | The wallpaper picker: thumbnails of the images in `shell.wallpapers`; the one picked replaces `shell.wallpaper` for the profile in use until the configured one changes. `"bar"` (a button) or `"quick"` (a tile that opens the same picker). By default on the bar. |
 | `shell.widgets.keyboard_layout` | boolean | true | - | The active keyboard layout's short name, such as `us`; clicking it switches to the next. Shown only when the keymap has two or more layouts. |
 | `shell.widgets.power` | boolean | true | - | The power button in the application menu's bottom-right corner: lock, suspend, hibernate, restart, power off and log out, as far as `power.lock_command` and logind allow them. |
 | `shell.widgets.tray` | boolean | true | - | The system tray: applications' status icons (StatusNotifierItem), shown while there are any. `false` also leaves the tray's D-Bus names to another program. |
-| `shell.widgets.notifications` | boolean or string | false | - | Do-not-disturb and the unread notifications: `"bar"` (a bell that opens them, with their count; a right-click toggles do-not-disturb) or `"quick"` (a do-not-disturb tile). The clock does both either way. `true` puts the bell on the bar. |
+| `shell.widgets.notifications` | boolean or string | true | - | Do-not-disturb and the unread notifications: `"bar"` (a bell that opens them, with their count; a right-click toggles do-not-disturb) or `"quick"` (a do-not-disturb tile). The clock does both either way. By default in Quick Settings. |
 | `shell.launchers` | list of tables | unset | - | Pinned commands for programs without a desktop file, at most 64. |
 | `shell.launchers[].name` | string | - | - | Label, 1 to 128 bytes. Required. |
 | `shell.launchers[].icon` | string | "application-x-executable" | - | Icon theme name. |
