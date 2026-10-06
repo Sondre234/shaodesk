@@ -731,11 +731,13 @@ int main(int argc, char **argv) {
         editTasks("model.remove(1)");
     }
     auto *menu = find(view.rootObject(), "contextMenu");
-    // Repeater delegates are visual children only, so walk the item tree.
+    // Repeater delegates are visual children only, so walk the item tree. Rows of the task
+    // menus are named contextMenuItem, contextMenuTitle, contextMenuAction and the like.
     std::function<QQuickItem *(QQuickItem *, const QString &)> findMenuItem =
         [&](QQuickItem *parent, const QString &text) -> QQuickItem * {
         for (auto *item : parent->childItems()) {
-            if (item->objectName() == "contextMenuItem" && item->property("text") == text)
+            if (item->objectName().startsWith("contextMenu") && item->objectName() != "contextMenu" &&
+                item->property("text") == text)
                 return item;
             if (auto *found = findMenuItem(item, text))
                 return found;
@@ -830,7 +832,7 @@ int main(int argc, char **argv) {
     }
     click(pinned(), Qt::RightButton);
     if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Unpin from taskbar"); }) ||
-        !menuItem("Open Fake app")) {
+        !menuItem("Open")) {
         std::cerr << "a pinned application's menu did not offer to unpin it\n";
         return 1;
     }
@@ -848,6 +850,45 @@ int main(int argc, char **argv) {
               "minimized: false, urgent: false })");
     if (!(task = listedTask(0)))
         return fail("the re-added task is not listed");
+    // A window's menu is headed by its application's name and the window's title. One of an
+    // application with desktop actions offers them, with their icons, and to start it again.
+    {
+        auto title = [&] { return find(view.rootObject(), "contextMenuTitle"); };
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && title(); }) ||
+            title()->property("text") != "Fake app" ||
+            title()->property("modelData").toMap()["secondary"] != "Fake" || !menuItem("New window")) {
+            std::cerr << "a window's menu is not headed by its application and title\n";
+            return 1;
+        }
+        QTest::keyClick(popover, Qt::Key_Escape);
+        editTasks("model.append({ taskId: 8, title: 'Report', appId: 'shaodesk-test-actions', "
+                  "active: false, minimized: false, urgent: false })");
+        QQuickItem *withActions = listedTask(1);
+        if (!withActions)
+            return fail("the window with desktop actions is not listed");
+        click(withActions, Qt::RightButton);
+        if (!QTest::qWaitFor([&] {
+                return menuShown() && title() && title()->property("text") == "Action app" &&
+                       menuItem("Touch a file") && menuItem("Missing program") &&
+                       menuItem("New window");
+            }) ||
+            menuItem("Touch a file")->objectName() != "contextMenuAction" ||
+            menuItem("Touch a file")->property("modelData").toMap()["icon"] != "document-new") {
+            std::cerr << "a window's menu does not offer its application's desktop actions\n";
+            return 1;
+        }
+        QFile::remove(actionMarker);
+        click(menuItem("Touch a file"));
+        if (!QTest::qWaitFor([&] { return QFile::exists(actionMarker); }) ||
+            !QTest::qWaitFor([&] { return !view.rootObject()->property("menuOpen").toBool(); })) {
+            std::cerr << "a desktop action in a window's menu did not run\n";
+            return 1;
+        }
+        editTasks("model.remove(1)");
+        // The list drops the button when it next lays itself out.
+        QMetaObject::invokeMethod(tasks, "forceLayout");
+    }
     // Empty bar space, right of the only task, opens the bar menu.
     const QPoint empty =
         task->mapToScene(QPointF(task->width() + 40, task->height() / 2)).toPoint();

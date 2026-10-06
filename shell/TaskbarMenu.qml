@@ -46,22 +46,53 @@ PopupMenu {
                  icon: record ? record.icon : shell.iconFor(windowAppId),
                  secondary: line, objectName: "contextMenuTitle" }
     }
+    // What the application offers to start besides itself (its desktop actions, with their
+    // icons), then `open` starting it, unless an action of its own is a new window already.
+    function launchEntries(record, open) {
+        if (!record)
+            return []
+        var actions = shell.appActions(record.appId)
+        var entries = actions.map(function(action) {
+            return { text: action.name, icon: action.icon, objectName: "contextMenuAction",
+                     run: function() { shell.launchAction(record.appId, action.action) } }
+        })
+        var newWindow = actions.some(function(action) {
+            return action.action === "new-window" || action.name.toLowerCase() === "new window"
+        })
+        return open === "New window" && newWindow ? entries
+            : entries.concat([{ text: open, icon: open === "Open" ? "app-window" : "plus",
+                                run: function() { shell.launch(record.appId) } }])
+    }
+    // The groups of entries, with a line between those that have any.
+    function sections(groups) {
+        var entries = []
+        for (var i = 0; i < groups.length; ++i) {
+            if (groups[i].length === 0)
+                continue
+            if (entries.length > 0)
+                entries.push({ separator: true })
+            entries = entries.concat(groups[i])
+        }
+        return entries
+    }
 
     entries: {
         var task = panel.taskMenuId
         if (task >= 0) {
             var window = menuWindows.windows[0] || { appId: "", title: "" }
-            return [titleEntry(appRecord(window.appId), window.appId, window.title), { separator: true },
-                    { text: "Maximize / restore", run: function() { shell.tasks.maximize(task) } },
-                    { text: "Minimize", run: function() { shell.tasks.minimize(task) } }]
-                .concat(panel.taskMenuApp ? [panel.pinAction(panel.taskMenuApp)] : [])
-                .concat([{ text: "Close window", run: function() { shell.tasks.close(task) } }])
+            var record = appRecord(window.appId)
+            return sections([[titleEntry(record, window.appId, window.title)],
+                             launchEntries(record, "New window"),
+                             [{ text: "Maximize / restore", run: function() { shell.tasks.maximize(task) } },
+                              { text: "Minimize", run: function() { shell.tasks.minimize(task) } }]
+                                 .concat(panel.taskMenuApp ? [panel.pinAction(panel.taskMenuApp)] : [])
+                                 .concat([{ text: "Close window", run: function() { shell.tasks.close(task) } }])])
         }
+        // A pinned application without windows.
         var app = panel.pinMenuApp
         if (app !== null)
-            return [titleEntry(app, app.appId, ""), { separator: true },
-                    { text: "Open " + app.name, run: function() { shell.launch(app.appId) } }]
-                .concat(app.configured ? [] : [panel.pinAction(app.appId)])
+            return sections([[titleEntry(app, app.appId, "")], launchEntries(app, "Open"),
+                             app.configured ? [] : [panel.pinAction(app.appId)]])
         // Icons of what each entry leads to: floating windows or tiles, as the tiling button shows.
         return [{ text: panel.tiling ? "Turn tiling off" : "Turn tiling on",
                   icon: panel.tiling ? "copy" : "layout-panel-left", enabled: shell.tilingAvailable,
