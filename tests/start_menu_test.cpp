@@ -351,5 +351,5 @@ class StartMenuTest : public QObject {
   private:
     QTemporaryDir home;
 };
-QTEST_APPLESS_MAIN(StartMenuTest)
+QTEST_GUILESS_MAIN(StartMenuTest)
 #include "start_menu_test.moc"
