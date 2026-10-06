@@ -204,7 +204,7 @@ int main(int argc, char **argv) {
                 client->disconnectFromServer();
             } else if (request.startsWith("output ") || request.startsWith("session ") ||
                        request == "toggle_tiling\n" || request == "layout_monocle\n" ||
-                       request == "terminal\n") {
+                       request == "terminal\n" || request == "snap_left\n" || request == "snap_right\n") {
                 if (!request.startsWith("output ")) {
                     requests.push_back(QString::fromUtf8(request).trimmed());
                     client->write("ok\n");
@@ -3591,9 +3591,288 @@ ListModel {
         if (!QTest::qWaitFor([&] { return !card->isVisible(); }))
             return fail("a press beside the desktop's menu did not close it");
     }
+    // The macOS style, from a profile: the menu bar along the top in a surface of its own and the
+    // dock at the bottom of the panel's surface, in place of the taskbar, laid out anew as the
+    // profile changes and back again.
+    {
+        if (!rewrite(QString(lua).replace("profiles={", "profiles={mac={shell={style='macos',panel_height=64,"
+                                                         "panel_margin={bottom=6},panel_radius=20}},")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        controller.pickProfile("mac");
+        auto *root = view.rootObject();
+        MenuBarWindow *menuBar = view.menuBar();
+        auto inBar = [&](const QString &name) { return menuBar ? find(menuBar->contentItem(), name) : nullptr; };
+        if (!menuBar || !QTest::qWaitFor([&] {
+                return menuBar->isVisible() && inBar("menuBar") && find(root, "dock") &&
+                       !find(root, "taskList") && !find(root, "bar");
+            }))
+            return fail("the macOS style did not put a menu bar and a dock in place of the taskbar");
+        // The menu bar spans the output; the dock sits in the middle of the panel's surface, lifted
+        // off the bottom, which takes the pointer only over it and has room above it to bounce.
+        auto *dock = find(root, "dock");
+        auto sceneRect = [](QQuickItem *item) {
+            return item->mapRectToScene(QRectF(0, 0, item->width(), item->height()));
+        };
+        const int barHeight = root->property("menuBarHeight").toInt();
+        // Once the panel has taken its new size.
+        QTest::qWaitFor([&] { return root->height() == view.height(); });
+        const QRectF dockRect = sceneRect(dock);
+        if (barHeight < 20 || menuBar->height() != barHeight ||
+            menuBar->width() != ShellView::previewSize().width() ||
+            view.height() != controller.panelExtent() + controller.panelHeadroom() ||
+            dockRect.bottom() != view.height() - controller.panelMarginBottom() ||
+            dockRect.height() != controller.panelHeight() ||
+            std::abs(dockRect.center().x() - view.width() / 2.0) > 1 ||
+            view.inputRegion() != QRegion(dockRect.toAlignedRect()))
+            return fail("the menu bar and the dock are not laid out as the macOS style has them");
+
+        // Windows of three: two of the fake application's and one of the application with actions.
+        for (const auto &app : controller.pinned())
+            controller.unpin(app.toMap()["appId"].toString());
+        controller.power()->setAvailable("lock,suspend,reboot,poweroff,logout");
+        const QString roles = ", minimized: false, urgent: false, maximized: false, fullscreen: false, "
+                              "output: '" + output + "', workspace: 2, sticky: false, floating: false, tiling: true})";
+        editTasks("model.clear(); "
+                  "model.append({taskId: 31, title: 'Fake window', appId: 'fake', active: true" + roles + "; "
+                  "model.append({taskId: 32, title: 'Action window', appId: 'shaodesk-test-actions', active: false" + roles + "; "
+                  "model.append({taskId: 33, title: 'Second fake', appId: 'fake', active: false" + roles);
+        taskRequests();
+        // The focused window's application is named in bold, "Desktop" while none is focused.
+        auto *appTitle = inBar("appMenuTitle");
+        auto named = [&](const QString &name) {
+            return QTest::qWaitFor([&] { return appTitle && appTitle->property("text").toString() == name; });
+        };
+        if (!named("Fake app"))
+            return fail("the menu bar does not name the focused window's application");
+        editTasks("model.setProperty(0, 'active', false); model.setProperty(1, 'active', true)");
+        if (!named("Action app"))
+            return fail("the menu bar's application did not follow the focus");
+        editTasks("model.setProperty(1, 'active', false)");
+        if (!named("Desktop"))
+            return fail("the menu bar does not say Desktop while no window is focused");
+        editTasks("model.setProperty(0, 'active', true)");
+        if (!named("Fake app"))
+            return fail("the menu bar did not name the application focused again");
+
+        // Each menu opens on a press, below its title with their left edges in line, in the
+        // popover, which takes the keyboard and every press but those on the bars.
+        auto *barMenu = find(root, "menuBarMenu");
+        // A row of the open menu, by its name or its text.
+        auto entryOf = [&](const QString &name) -> QQuickItem * {
+            std::function<QQuickItem *(QQuickItem *)> walk = [&](QQuickItem *item) -> QQuickItem * {
+                for (auto *child : item->childItems()) {
+                    if (child->isVisible() && (child->objectName() == name || child->property("text") == name))
+                        return child;
+                    if (auto *found = walk(child))
+                        return found;
+                }
+                return nullptr;
+            };
+            return barMenu ? walk(barMenu) : nullptr;
+        };
+        auto openMenu = [&](const QString &kind) {
+            auto *title = inBar(kind + "MenuTitle");
+            if (!title)
+                return false;
+            QTest::mousePress(menuBar, Qt::LeftButton, Qt::NoModifier, centre(title));
+            QTest::mouseRelease(menuBar, Qt::LeftButton, Qt::NoModifier, centre(title));
+            barMenu = find(root, "menuBarMenu");
+            return QTest::qWaitFor([&] {
+                auto *card = barMenu ? barMenu->property("card").value<QQuickItem *>() : nullptr;
+                if (!card || card->property("progress").toReal() != 1 || root->property("menuBarMenu") != kind)
+                    return false;
+                const QRectF at = sceneRect(card);
+                return std::abs(at.left() - title->mapToScene(QPointF(0, 0)).x()) < 1 && at.top() >= barHeight &&
+                       at.top() <= barHeight + 8 && popover->isVisible();
+            });
+        };
+        auto chosen = [&](const QString &entry) {
+            QQuickItem *row = nullptr;
+            if (!QTest::qWaitFor([&] { return (row = entryOf(entry)) != nullptr; }))
+                return false;
+            click(row);
+            return QTest::qWaitFor([&] { return root->property("menuBarMenu").toString().isEmpty(); });
+        };
+        if (!openMenu("app") || !QTest::qWaitFor([&] {
+                return entryOf("appMenuNewWindow") && entryOf("appMenuHideOthers") && entryOf("appMenuHide") &&
+                       entryOf("appMenuQuit") && entryOf("appMenuHide")->property("text") == "Hide Fake app" &&
+                       entryOf("appMenuQuit")->property("text") == "Quit Fake app";
+            }))
+            return fail("the application's menu did not open below its name with its entries");
+        // The popover leaves holes for the menu bar's strip and the dock.
+        const QRegion holes = popover->inputRegion();
+        const QPointF dockInPopover = dockRect.center() + QPointF(0, popover->height() - view.height());
+        if (holes.contains(QPoint(500, barHeight / 2)) || holes.contains(dockInPopover.toPoint()) ||
+            !holes.contains(QPoint(10, popover->height() - 10)) || !holes.contains(QPoint(500, 300)))
+            return fail("the popover takes presses on the menu bar or the dock");
+        if (!chosen("appMenuQuit") || taskRequests() != "close 31|close 33")
+            return fail("quitting the application did not close its windows");
+        if (!openMenu("app") || !chosen("appMenuHide") || taskRequests() != "minimize 31|minimize 33")
+            return fail("hiding the application did not minimize its windows");
+        // Moving onto another title while a menu is open opens that one; Left and Right step
+        // through them.
+        if (!openMenu("app"))
+            return fail("the application's menu did not open again");
+        QTest::mouseMove(menuBar, centre(inBar("windowMenuTitle")));
+        if (!QTest::qWaitFor([&] { return root->property("menuBarMenu") == "window" && entryOf("windowMenu:minimize"); }))
+            return fail("moving onto the Window menu's title did not open it in place of the other");
+        QTest::keyClick(popover, Qt::Key_Right);
+        if (!QTest::qWaitFor([&] { return root->property("menuBarMenu") == "system" && entryOf("systemMenu:lock"); }))
+            return fail("Right did not go on to the system menu");
+        QTest::keyClick(popover, Qt::Key_Left);
+        if (!QTest::qWaitFor([&] { return root->property("menuBarMenu") == "window"; }))
+            return fail("Left did not go back to the Window menu");
+        if (!chosen("windowMenu:minimize") || taskRequests() != "minimize 31")
+            return fail("the Window menu did not minimize the focused window");
+        requests.clear();
+        if (!openMenu("window") || !chosen("windowMenu:left") || taskRequests() != "activate 31" ||
+            !QTest::qWaitFor([&] { return requests.contains("snap_left"); }))
+            return fail("the Window menu did not tile the focused window to the left");
+        if (!openMenu("window") || !chosen("windowMenu:fullscreen") || taskRequests() != "fullscreen 31 true")
+            return fail("the Window menu did not make the window fullscreen");
+        // The system menu: the appearance profiles beside it, and the power actions.
+        if (!openMenu("system") ||
+            !QTest::qWaitFor([&] { return entryOf("systemMenuAppearance") && entryOf("Restart…") && entryOf("Shut Down…"); }) ||
+            !chosen("systemMenu:lock") ||
+            !QTest::qWaitFor([&] { return requests.contains("lock"); }))
+            return fail("the system menu did not lock the screen");
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the popover stayed after the menu bar's menus closed");
+
+        // The clock and Quick Settings open their popups at the output's right edge below the
+        // menu bar; search opens the command palette there, and closes it again.
+        auto rightUnderBar = [&](const char *name) {
+            auto *popup = find(root, name);
+            if (!popup)
+                return false;
+            const QRectF at = sceneRect(popup);
+            const QVariant progress = popup->property("progress");
+            return popup->isVisible() && progress.toReal() == 1 && at.top() >= barHeight &&
+                   at.bottom() <= popover->height() - controller.panelExtent() &&
+                   at.right() >= popover->width() - 16 && at.right() <= popover->width();
+        };
+        click(inBar("clockButton"));
+        if (!QTest::qWaitFor([&] { return rightUnderBar("calendar"); }))
+            return fail("the clock did not open its flyout at the right below the menu bar");
+        click(inBar("quickSettingsButton"));
+        if (!QTest::qWaitFor([&] { return rightUnderBar("quickSettings") && !find(root, "calendar")->isVisible(); }))
+            return fail("the Quick Settings button did not open them at the right below the menu bar");
+        click(inBar("quickSettingsButton"));
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("Quick Settings did not close on a second click");
+        click(inBar("searchButton"));
+        if (!QTest::qWaitFor([&] { return controller.palette()->output() == output; }))
+            return fail("the search button did not open the command palette");
+        click(inBar("searchButton"));
+        if (!QTest::qWaitFor([&] { return controller.palette()->output().isEmpty(); }))
+            return fail("the search button did not close the command palette");
+
+        // The dock: the applications button, the pinned applications (the configured launcher),
+        // each running application once with a dot under it, a line, and the Trash.
+        editTasks("model.setProperty(0, 'minimized', false); model.setProperty(2, 'minimized', false)");
+        auto icon = [&](const QString &name) { return find(root, name); };
+        auto dotted = [&](QQuickItem *app) {
+            auto *dot = app ? find(app, "dockDot") : nullptr;
+            return dot && dot->isVisible();
+        };
+        auto leftOf = [&](const QString &left, const QString &right) {
+            return icon(left) && icon(right) && centre(icon(left)).x() < centre(icon(right)).x();
+        };
+        if (!QTest::qWaitFor([&] {
+                return leftOf("dockLauncher", "dockApp:pinned:0") && leftOf("dockApp:pinned:0", "dockApp:fake") &&
+                       leftOf("dockApp:fake", "dockApp:shaodesk-test-actions") &&
+                       leftOf("dockApp:shaodesk-test-actions", "dockSeparator") && leftOf("dockSeparator", "dockTrash");
+            }) ||
+            !dotted(icon("dockApp:fake")) || !dotted(icon("dockApp:shaodesk-test-actions")) ||
+            dotted(icon("dockApp:pinned:0")) || !icon("dockApp:fake")->property("stacked").toBool())
+            return fail("the dock does not list the pinned applications, then the running ones, then the Trash");
+        // A click on a running application brings up its next window.
+        click(icon("dockApp:fake"));
+        if (!QTest::qWaitFor([&] { return taskRequests() == "activate 33"; }))
+            return fail("clicking a running application on the dock did not bring up its next window");
+        // Resting on one with several windows lists them above it.
+        QTest::mouseMove(&view, centre(icon("dockApp:fake")));
+        auto *groupList = find(root, "groupList");
+        if (!QTest::qWaitFor([&] { return groupList && groupList->isVisible() && groupList->property("progress").toReal() == 1; }) ||
+            sceneRect(groupList).bottom() > popover->height() - view.height() + dockRect.top())
+            return fail("resting on an application with two windows did not list them above the dock");
+        QTest::mouseMove(&view, QPoint(10, 10));
+        if (!QTest::qWaitFor([&] { return !root->property("groupOpen").toBool(); }))
+            return fail("the windows listed on the dock did not go with the pointer");
+        // Its menu opens above it: its windows, then keeping it in the dock, hiding and quitting.
+        auto *contextMenu = find(root, "contextMenu");
+        auto contextEntry = [&](const QString &name) -> QQuickItem * {
+            std::function<QQuickItem *(QQuickItem *)> walk = [&](QQuickItem *item) -> QQuickItem * {
+                for (auto *child : item->childItems()) {
+                    if (child->isVisible() && (child->objectName() == name || child->property("text") == name) &&
+                        child->objectName().startsWith("contextMenu"))
+                        return child;
+                    if (auto *found = walk(child))
+                        return found;
+                }
+                return nullptr;
+            };
+            return contextMenu ? walk(contextMenu) : nullptr;
+        };
+        click(icon("dockApp:fake"), Qt::RightButton);
+        if (!QTest::qWaitFor([&] {
+                auto *card = contextMenu->property("card").value<QQuickItem *>();
+                return card && card->property("progress").toReal() == 1 && contextEntry("Fake window") &&
+                       contextEntry("Second fake") && contextEntry("contextMenuKeep") &&
+                       sceneRect(card).bottom() <= popover->height() - view.height() + dockRect.top() &&
+                       std::abs(sceneRect(card).center().x() - centre(icon("dockApp:fake")).x()) < 2;
+            }))
+            return fail("an application's menu on the dock did not open above it with its windows");
+        click(contextEntry("contextMenuKeep"));
+        if (!QTest::qWaitFor([&] { return icon("dockApp:shaodesk-test-app.desktop") && !icon("dockApp:fake"); }) ||
+            !controller.isPinned("shaodesk-test-app.desktop") || !dotted(icon("dockApp:shaodesk-test-app.desktop")))
+            return fail("keeping an application in the dock did not pin it");
+        // A pinned application without windows starts on a click and bounces, three times at most,
+        // or until a window of it opens.
+        auto bouncing = [&](const QString &name) { return icon(name) && icon(name)->property("bouncing").toBool(); };
+        click(icon("dockApp:pinned:0"));
+        if (!QTest::qWaitFor([&] { return bouncing("dockApp:pinned:0"); }) ||
+            !QTest::qWaitFor([&] { return !bouncing("dockApp:pinned:0") && icon("dockApp:pinned:0")->property("lift").toReal() == 0; }, 5000))
+            return fail("a pinned application's icon did not bounce as it started, or did not stop");
+        controller.pin("shaodesk-test-other.desktop");
+        if (!QTest::qWaitFor([&] {
+                return icon("dockApp:shaodesk-test-other.desktop") &&
+                       icon("dockApp:shaodesk-test-other.desktop")->property("grow").toReal() == 1;
+            }))
+            return fail("a pinned application did not come onto the dock");
+        click(icon("dockApp:shaodesk-test-other.desktop"));
+        if (!QTest::qWaitFor([&] { return bouncing("dockApp:shaodesk-test-other.desktop"); }))
+            return fail("starting an application from the dock did not bounce its icon");
+        editTasks("model.append({taskId: 34, title: 'Other window', appId: 'shaodesk-test-other', active: false" + roles);
+        if (!QTest::qWaitFor([&] { return icon("dockApp:shaodesk-test-other.desktop")->property("bouncesLeft").toInt() <= 1; }) ||
+            !QTest::qWaitFor([&] { return !bouncing("dockApp:shaodesk-test-other.desktop"); }))
+            return fail("an icon went on bouncing after its application's window opened");
+        // The Trash shows whether it holds anything.
+        QDir(screens.path()).mkpath("data/Trash/files");
+        QFile trashed(screens.filePath("data/Trash/files/old.txt"));
+        if (!trashed.open(QIODevice::WriteOnly) || trashed.write("x") < 0)
+            return fail("could not put a file in the trash");
+        trashed.close();
+        if (!QTest::qWaitFor([&] { return icon("dockTrash")->property("iconName") == "user-trash-full"; }, 10000))
+            return fail("the dock's Trash did not fill as a file went into the trash");
+        trashed.remove();
+        if (!QTest::qWaitFor([&] { return icon("dockTrash")->property("iconName") == "user-trash"; }, 10000))
+            return fail("the dock's Trash did not empty as the trash did");
+
+        // Back to a taskbar profile: the menu bar goes, and the taskbar is as it was.
+        controller.pickProfile("dark");
+        if (!QTest::qWaitFor([&] { return !menuBar->isVisible() && find(root, "bar") && !find(root, "dock"); }) ||
+            view.height() != controller.panelExtent() || !view.inputRegion().isEmpty())
+            return fail("the taskbar did not come back in place of the macOS style's bars");
+        if (!rewrite(lua))
+            return fail("could not restore the configuration");
+        controller.reload();
+    }
     std::cout << "Hover/click, launcher keyboard focus, search, command launch, tiling toggle, and "
                  "workspace indicator, task and bar context menus, pinning into a window's slot, "
                  "reordering pins, "
                  "task reordering, grouped windows, the volume control, the command palette, and the "
-                 "notification bell, cards and history, the tray, and the design tokens passed\n";
+                 "notification bell, cards and history, the tray, the design tokens, and the macOS style's "
+                 "menu bar and dock passed\n";
 }
