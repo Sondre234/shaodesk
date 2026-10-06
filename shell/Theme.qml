@@ -111,6 +111,8 @@ QtObject {
     // How small a small thing (a taskbar button, a badge) starts as it grows in, and ends as it
     // shrinks away.
     readonly property real growFrom: 0.5
+    // How small an icon on the bar gets while its button is pressed.
+    readonly property real pressScale: 0.88
 
     // Whether shader effects (shadows) can be drawn: only through the GPU.
     readonly property bool effects: shell.effects

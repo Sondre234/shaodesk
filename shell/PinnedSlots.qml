@@ -105,10 +105,11 @@ Repeater {
             onClicked: { if (shell.launch(pinnedSlot.modelData.appId)) pinnedSlots.panel.closeMenus() }
             Accessible.name: pinnedSlot.modelData.name
             contentItem: Item {
-                Image {
-                    readonly property int size: Math.min(Theme.appIconSize, parent.height)
-                    anchors.centerIn: parent; width: size; height: size
-                    source: "image://icons/" + pinnedSlot.modelData.icon; sourceSize: Qt.size(size, size)
+                BarAppIcon {
+                    anchors.centerIn: parent
+                    name: pinnedSlot.modelData.icon
+                    pressed: pinnedButton.pressed
+                    size: Math.min(Theme.appIconSize, parent.height)
                 }
             }
             MouseArea {

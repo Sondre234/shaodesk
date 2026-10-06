@@ -132,9 +132,10 @@ Button {
     contentItem: RowLayout {
         spacing: 6
         Item { Layout.fillWidth: shell.iconsOnly }
-        Image {
-            readonly property int size: Math.min(Theme.appIconSize, task.availableHeight)
-            source: "image://icons/" + task.iconName; sourceSize: Qt.size(size, size)
+        BarAppIcon {
+            name: task.iconName
+            pressed: task.pressed
+            size: Math.min(Theme.appIconSize, task.availableHeight)
             Layout.preferredWidth: size; Layout.preferredHeight: size
         }
         Text { visible: !shell.iconsOnly; text: task.title; textFormat: Text.PlainText; color: Theme.text; elide: Text.ElideRight; Layout.fillWidth: true; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
