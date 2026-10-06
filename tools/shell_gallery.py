@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Render every popup of the taskbar and every overlay surface as a PNG, in a light and a dark
-theme.
+theme of each style (the taskbar and macOS).
 
 usage: tools/shell_gallery.py BUILD_DIR OUT_DIR [--renderer software|gpu|both]
-                              [--theme light|dark] [--popup NAME] [--scale FACTOR]
+                              [--theme light|dark|macos-light|macos-dark] [--popup NAME] [--scale FACTOR]
                               [--icon-theme NAME] [--jobs N]
 
 Each picture is `shaodesk-shell --preview-popup NAME --screenshot`: the taskbar with that popup
@@ -50,12 +50,22 @@ VARIANTS = {
                        'tiling = "bar", profiles = "bar", notifications = "bar" },'),
 }
 
-# Translucent bars, as appearance profiles often have them.
+# Translucent bars, as appearance profiles often have them; `shell` is more of the profile's
+# shell table, as Lua.
 THEMES = {
     "light": {"panel_color": "#f3f2fbf2", "text_color": "#141a48", "accent": "#4a64dc",
               "background": "#c3cde4"},
     "dark": {"panel_color": "#0c1131c7", "text_color": "#f2f4ff", "accent": "#7f9bff",
              "background": "#1b2238"},
+    # The macOS style, as config/init.lua's macos-light and macos-dark profiles have it.
+    "macos-light": {"panel_color": "#f6f6f8bf", "text_color": "#1d1d1f", "accent": "#007aff",
+                    "background": "#8fb3e6",
+                    "shell": 'style = "macos", font_size = 13, panel_height = 64, '
+                             'panel_margin = { bottom = 6 }, panel_radius = 20'},
+    "macos-dark": {"panel_color": "#232326bf", "text_color": "#f5f5f7", "accent": "#0a84ff",
+                   "background": "#1b2a4a",
+                   "shell": 'style = "macos", font_size = 13, panel_height = 64, '
+                            'panel_margin = { bottom = 6 }, panel_radius = 20'},
 }
 
 # Installed applications for the launcher: desktop id, name, icon.
@@ -156,9 +166,9 @@ def wallpaper(path, theme):
 def config(root, theme_name):
     """The shell's configuration: both themes as profiles, this one in use."""
     profiles = ",\n".join(
-        f'        {name} = {{ appearance = {{ background = "{t["background"]}" }}, '
+        f'        ["{name}"] = {{ appearance = {{ background = "{t["background"]}" }}, '
         f'shell = {{ panel_color = "{t["panel_color"]}", text_color = "{t["text_color"]}", '
-        f'accent = "{t["accent"]}" }} }}' for name, t in THEMES.items())
+        f'accent = "{t["accent"]}", {t.get("shell", "")} }} }}' for name, t in THEMES.items())
     return f"""return {{
     profile = "{theme_name}",
     profiles = {{
