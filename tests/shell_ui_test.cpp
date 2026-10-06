@@ -1873,6 +1873,11 @@ int main(int argc, char **argv) {
             std::cerr << "the bell has no badge for an unread notification\n";
             return 1;
         }
+        if (auto *badge = find(view.rootObject(), "clockBadge");
+            !badge || !QTest::qWaitFor([&] { return badge->isVisible(); })) {
+            std::cerr << "the clock has no badge for an unread notification\n";
+            return 1;
+        }
         // (Hovering a card holds its timer; offscreen Qt sends no hover to these items, so
         // notifications_smoke checks that with a real pointer.)
         // An action's button runs it and dismisses the card; the surface goes once it has left.
@@ -1972,6 +1977,18 @@ int main(int argc, char **argv) {
             return 1;
         }
         daemon->setDnd(false);
+        // So does right-clicking the clock, which shows a crossed-out bell while it is on.
+        auto *clockDnd = find(view.rootObject(), "clockDnd");
+        click(find(view.rootObject(), "clockButton"), Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return daemon->dnd() && clockDnd && clockDnd->isVisible(); })) {
+            std::cerr << "right-clicking the clock did not turn do-not-disturb on\n";
+            return 1;
+        }
+        click(find(view.rootObject(), "clockButton"), Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return !daemon->dnd() && !clockDnd->isVisible(); })) {
+            std::cerr << "right-clicking the clock again did not turn do-not-disturb off\n";
+            return 1;
+        }
     }
     // The system tray: hidden while empty, a button for each item shown in the order they came,
     // and clicks and the wheel passed on to the item's application. The items are put in the
