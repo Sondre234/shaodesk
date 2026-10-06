@@ -108,6 +108,9 @@ QtObject {
     // Something arriving or moving, and something leaving.
     readonly property int easing: Easing.OutCubic
     readonly property int easingExit: Easing.InCubic
+    // How small a small thing (a taskbar button, a badge) starts as it grows in, and ends as it
+    // shrinks away.
+    readonly property real growFrom: 0.5
 
     // Whether shader effects (shadows) can be drawn: only through the GPU.
     readonly property bool effects: shell.effects

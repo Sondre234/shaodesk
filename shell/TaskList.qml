@@ -20,20 +20,18 @@ ListView {
     property int dragTo: -1
     property real dragStep: 0
     model: TaskFilter { controller: shell; sourceModel: taskList.panel.taskSource; grouped: shell.groupWindows }
-    // A window's button fades and grows in from `growFrom` of its size as the window opens,
-    // drawing its activity line out, and shrinks away as it closes, taking no more clicks; the
-    // buttons beside it slide over to make room or close the gap. Dragged ones slide aside
-    // quicker, keeping up with the pointer.
-    readonly property real growFrom: 0.5
+    // A window's button fades and grows in as the window opens, drawing its activity line out,
+    // and shrinks away as it closes, taking no more clicks; the buttons beside it slide over to
+    // make room or close the gap. Dragged ones slide aside quicker, keeping up with the pointer.
     add: Transition {
         NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durationNormal; easing.type: Theme.easing }
-        NumberAnimation { property: "scale"; from: taskList.growFrom; to: 1; duration: Theme.durationNormal; easing.type: Theme.easing }
+        NumberAnimation { property: "scale"; from: Theme.growFrom; to: 1; duration: Theme.durationNormal; easing.type: Theme.easing }
         NumberAnimation { property: "reveal"; from: 0; to: 1; duration: Theme.durationNormal; easing.type: Theme.easing }
     }
     remove: Transition {
         PropertyAction { property: "enabled"; value: false }
         NumberAnimation { property: "opacity"; to: 0; duration: Theme.durationFast; easing.type: Theme.easingExit }
-        NumberAnimation { property: "scale"; to: taskList.growFrom; duration: Theme.durationFast; easing.type: Theme.easingExit }
+        NumberAnimation { property: "scale"; to: Theme.growFrom; duration: Theme.durationFast; easing.type: Theme.easingExit }
     }
     // A button displaced while it was still coming in ends whole.
     displaced: Transition {

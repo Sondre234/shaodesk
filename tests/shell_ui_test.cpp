@@ -502,6 +502,14 @@ int main(int argc, char **argv) {
         return again.open(QIODevice::WriteOnly | QIODevice::Truncate) &&
                again.write(source.toUtf8()) >= 0;
     };
+    // Slows the shell's animations down to a quarter of their speed, or brings them back, so that
+    // a test sees what moves on its way.
+    auto slowMotion = [&](bool slow) {
+        if (!rewrite(slow ? QString(lua).replace("return {", "return {animations={speed=0.25},") : lua))
+            return false;
+        controller.reload();
+        return QTest::qWaitFor([&] { return controller.animationSpeed() == (slow ? 0.25 : 1); });
+    };
     // shell.workspaces_shown = 3 shows the current workspace with its neighbours, the last
     // three on the last one, and the names follow their workspaces.
     if (!rewrite(QString(lua).replace("shell={", "shell={workspaces_shown=3,")))
@@ -900,10 +908,7 @@ ListModel {
     // A window's button fades and grows in as its window opens, its line drawn out, and shrinks
     // away as it closes, taking no more clicks. Slowed down, so that it is seen on its way.
     {
-        if (!rewrite(QString(lua).replace("return {", "return {animations={speed=0.25},")))
-            return fail("could not rewrite the configuration");
-        controller.reload();
-        if (!QTest::qWaitFor([&] { return controller.animationSpeed() == 0.25; }))
+        if (!slowMotion(true))
             return fail("the animations were not slowed down");
         editTasks("model.append({taskId: 98, title: 'Arriving', appId: 'arriving', active: false, "
                   "minimized: false, urgent: false})");
@@ -926,10 +931,7 @@ ListModel {
             return fail("a closing window's button did not fade out, or still takes clicks");
         if (!QTest::qWaitFor([&] { return !arriving || !arriving->isVisible(); }))
             return fail("a closed window's button stayed on the bar");
-        if (!rewrite(lua))
-            return fail("could not restore the configuration");
-        controller.reload();
-        if (!QTest::qWaitFor([&] { return controller.animationSpeed() == 1; }))
+        if (!slowMotion(false))
             return fail("the animations did not get their speed back");
     }
     auto *menu = find(view.rootObject(), "contextMenu");
@@ -1209,6 +1211,36 @@ ListModel {
     if (!QTest::qWaitFor([&] { return !pinnedTask() && pinned()->isVisible(); })) {
         std::cerr << "a pinned slot did not show its launcher again once its window closed\n";
         return 1;
+    }
+    // Slowed down: a window opening in a pinned slot draws its line out under the launcher's
+    // icon, which stays, and an application just pinned fades and grows into a slot opening
+    // for it.
+    {
+        if (!slowMotion(true))
+            return fail("the animations were not slowed down");
+        editTasks("model.append({taskId: 12, title: 'Fake again', appId: 'fake', active: false, "
+                  "minimized: false, urgent: false})");
+        QPointer<QQuickItem> arrived;
+        if (!QTest::qWaitFor([&] { return (arrived = pinnedTask()) != nullptr; }) ||
+            arrived->property("reveal").toReal() == 1 || arrived->opacity() != 1 || arrived->scale() != 1)
+            return fail("a window opening in a pinned slot did not only draw its line out");
+        if (!QTest::qWaitFor([&] { return arrived && arrived->property("reveal").toReal() == 1; }))
+            return fail("the line of a window opening in a pinned slot was not drawn all the way");
+        editTasks("model.remove(0)");
+        controller.pin("shaodesk-test-other.desktop");
+        QPointer<QQuickItem> slot;
+        if (!QTest::qWaitFor([&] { return other() && (slot = other()->parentItem()); }) ||
+            slot->property("grow").toReal() == 1 || slot->opacity() == 1)
+            return fail("an application just pinned did not grow into its slot");
+        if (!QTest::qWaitFor([&] { return slot && slot->property("grow").toReal() == 1; }))
+            return fail("an application just pinned did not come all the way in");
+        if (pinned()->parentItem()->property("grow").toReal() != 1)
+            return fail("a slot that was there already came in again with another");
+        controller.unpin("shaodesk-test-other.desktop");
+        if (!slowMotion(false))
+            return fail("the animations did not get their speed back");
+        if (!QTest::qWaitFor([&] { return !other() && !pinnedTask() && pinned()->isVisible(); }))
+            return fail("the pinned slots did not go back as they were");
     }
     click(pinned(), Qt::RightButton);
     if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Unpin from taskbar"); }) ||

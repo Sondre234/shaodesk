@@ -49,15 +49,24 @@ Button {
         visible: shell.iconsOnly && !task.stacked && task.hovered && !task.panel.expanded && !task.pressed
         text: task.title
     }
-    // How far the activity line has come in, from 0 to 1, for a button that arrives (its
-    // window opening) to draw it out from its middle.
+    // How far the activity line has come in, from 0 to 1, drawn out from its middle as the
+    // button arrives.
     property real reveal: 1
-    NumberAnimation on reveal {
+    // A button arriving where there was none (its window opening) fades and grows in, drawing its
+    // line out; one taking a pinned launcher's place, whose icon was there already, only draws
+    // its line out (appear()). The task list does the former with its own transition.
+    ParallelAnimation {
+        id: entering
+        NumberAnimation { target: task; property: "opacity"; from: 0; to: 1; duration: Theme.durationNormal; easing.type: Theme.easing }
+        NumberAnimation { target: task; property: "scale"; from: Theme.growFrom; to: 1; duration: Theme.durationNormal; easing.type: Theme.easing }
+    }
+    NumberAnimation {
         id: revealing
-        running: false
+        target: task; property: "reveal"
         from: 0; to: 1
         duration: Theme.durationNormal; easing.type: Theme.easing
     }
+    function enter() { entering.restart(); revealing.restart() }
     function appear() { revealing.restart() }
     background: ButtonFill {
         hovered: task.hovered
