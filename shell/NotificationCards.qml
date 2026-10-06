@@ -120,13 +120,15 @@ Item {
                     border.color: entry.critical ? Theme.danger : Theme.border
                     border.width: entry.critical ? 2 : 1
                 }
-                MouseArea {
+                // The pointer anywhere on the card, its buttons too, holds its timer.
+                HoverHandler {
                     id: hover
+                    onHoveredChanged: cards.center.hold(entry.notificationId, hovered)
+                }
+                Component.onDestruction: cards.center.hold(entry.notificationId, false)
+                MouseArea {
                     anchors.fill: parent
-                    hoverEnabled: true
-                    onContainsMouseChanged: cards.center.hold(entry.notificationId, containsMouse)
                     onClicked: cards.center.activate(entry.notificationId)
-                    Component.onDestruction: cards.center.hold(entry.notificationId, false)
                 }
                 ColumnLayout {
                     id: content
