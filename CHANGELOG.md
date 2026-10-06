@@ -41,6 +41,17 @@ release; the dated sections below it record the work that led up to it, and all 
   `notification_history` (Super + N) opens the flyout. The clock shows the unread count, muted
   with do-not-disturb, which a right-click on it toggles; the bell is off unless
   `shell.widgets.notifications = true`.
+- Quick Settings, as on Windows 11: a button left of the clock with the network, volume and
+  battery icons (its wheel changes the volume, a middle click mutes) opens tiles for
+  do-not-disturb, night light, tiling on the monitor, the appearance profiles, the wallpaper
+  picker and the network's state, a brightness slider where there is a backlight (through
+  logind), the volume with its outputs and the applications' volumes, and the battery. The
+  network, battery, volume, tiling, profiles and do-not-disturb are in it by default and the
+  wallpaper picker on the bar; `shell.widgets.NAME = "bar"` or `"quick"` places each, `true`
+  leaving it where it goes by default, so configurations with `true` and `false` keep working.
+  `shell.widgets.notifications = "bar"` is the bell.
+- The compositor tells the shell whether night light is on and whether the schedule decides
+  (`night-light ACTIVE MODE` on the control socket's state stream).
 
 ## 0.1.1 (2026-10-05)
 
