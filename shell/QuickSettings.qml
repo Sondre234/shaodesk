@@ -4,8 +4,9 @@ import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
 // The Quick Settings flyout, as on Windows 11, at the bar's right end: tiles for what
-// shell.widgets puts in it ("quick") and for night light, and the battery along its foot. What
-// sits on the bar instead keeps its own button there.
+// shell.widgets puts in it ("quick") and for night light, the volume with the outputs and the
+// applications' volumes a click away, and the battery along its foot. What sits on the bar
+// instead keeps its own button there.
 PopupCard {
     id: quick
     required property var panel
@@ -15,8 +16,9 @@ PopupCard {
     open: panel.audioPopup === "quick"
     readonly property var widgets: shell.widgets
     readonly property var status: panel.statusSource
+    readonly property var audio: panel.audioSource
     readonly property var center: shell.notifications
-    // Which list is open under its tile: "profiles", or "" for none.
+    // Which list is open under its tile or row: "profiles", "outputs", "mixer", or "" for none.
     property string expanded: ""
     function toggle(list) { expanded = expanded === list ? "" : list }
     onOpened: expanded = ""
@@ -29,6 +31,28 @@ PopupCard {
     alignment: Qt.AlignRight
     bounds: panel.popupArea
     radius: Theme.radiusLarge
+    readonly property string outputName: {
+        var outputs = audio.outputs
+        for (var i = 0; i < outputs.length; ++i)
+            if (outputs[i].name === audio.output) return outputs[i].description
+        return "No output"
+    }
+
+    // A row's chevron that opens or closes a list under it.
+    component Expander: FlatButton {
+        id: expander
+        property bool expanded: false
+        Layout.preferredWidth: Theme.rowHeight; Layout.preferredHeight: Theme.rowHeight
+        active: expanded
+        contentItem: Item {
+            Icon {
+                anchors.centerIn: parent
+                name: "chevron-right"; size: Theme.iconSizeSmall; color: Theme.textMuted
+                rotation: expander.expanded ? 90 : 0
+                Behavior on rotation { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
+            }
+        }
+    }
 
     // What does not fit scrolls, above the foot.
     Flickable {
@@ -126,6 +150,138 @@ PopupCard {
                         width: parent.width
                         iconColumn: true
                         onClicked: if (modelData.text !== shell.profile) shell.pickProfile(modelData.text)
+                    }
+                }
+            }
+            // The default output's volume, the outputs to play through and each application's
+            // volume.
+            ColumnLayout {
+                objectName: "quickSound"
+                visible: quick.widgets.volume === "quick" && quick.audio.available
+                Layout.fillWidth: true
+                spacing: Theme.spacingXS
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingS
+                    MuteButton {
+                        objectName: "quickMute"
+                        level: quick.audio.volume; muted: quick.audio.muted
+                        Accessible.name: muted ? "Unmute" : "Mute"
+                        onClicked: quick.audio.toggleMute()
+                    }
+                    AudioSlider {
+                        objectName: "quickVolumeSlider"
+                        Layout.fillWidth: true
+                        value: quick.audio.volume; muted: quick.audio.muted
+                        Accessible.name: "Volume"
+                        onMoved: quick.audio.setVolume(Math.round(value))
+                    }
+                    Text {
+                        Layout.preferredWidth: Theme.rowHeight
+                        text: quick.audio.volume + "%"; horizontalAlignment: Text.AlignRight
+                        color: Theme.text; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+                    }
+                    Expander {
+                        objectName: "quickOutputsToggle"
+                        expanded: quick.expanded === "outputs"
+                        Accessible.name: "Output: " + quick.outputName
+                        onClicked: quick.toggle("outputs")
+                    }
+                }
+                // The outputs, the one in use marked.
+                Column {
+                    objectName: "quickOutputs"
+                    visible: quick.expanded === "outputs"
+                    Layout.fillWidth: true
+                    Repeater {
+                        model: [{ header: "Output" }].concat(quick.audio.outputs.map(function(output) {
+                            return { text: output.description, name: output.name, toggle: "radio",
+                                     checked: output.name === quick.audio.output }
+                        }))
+                        MenuRow {
+                            objectName: modelData.header ? "quickOutputsHeading" : "quickOutputItem"
+                            width: parent.width
+                            iconColumn: true
+                            onClicked: quick.audio.setOutput(modelData.name)
+                        }
+                    }
+                }
+                // The applications playing sound, and their volumes under it.
+                FlatButton {
+                    id: mixerToggle
+                    objectName: "quickMixerToggle"
+                    Layout.fillWidth: true; Layout.preferredHeight: Theme.rowHeight
+                    leftPadding: Theme.spacingS; rightPadding: Theme.spacingS
+                    active: quick.expanded === "mixer"
+                    onClicked: quick.toggle("mixer")
+                    Accessible.name: "Applications"
+                    contentItem: RowLayout {
+                        spacing: Theme.spacingS
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Applications"; elide: Text.ElideRight
+                            color: Theme.text; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+                        }
+                        Text {
+                            text: quick.audio.streams.count > 0 ? quick.audio.streams.count : "None playing"
+                            color: Theme.textMuted; font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily
+                        }
+                        Icon {
+                            name: "chevron-right"; size: Theme.iconSizeSmall; color: Theme.textMuted
+                            rotation: mixerToggle.active ? 90 : 0
+                            Behavior on rotation { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
+                        }
+                    }
+                }
+                Column {
+                    objectName: "quickStreams"
+                    visible: quick.expanded === "mixer"
+                    Layout.fillWidth: true
+                    Text {
+                        visible: quick.audio.streams.count === 0
+                        width: parent.width; height: Theme.rowHeight
+                        text: "No applications are playing sound"
+                        horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                        color: Theme.textMuted; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+                    }
+                    Repeater {
+                        model: quick.audio.streams
+                        RowLayout {
+                            id: streamRow
+                            required property int streamId
+                            required property string name
+                            required property string icon
+                            required property int volume
+                            required property bool muted
+                            width: parent.width; height: Theme.rowHeight + Theme.spacingM
+                            spacing: Theme.spacingS
+                            Image {
+                                source: "image://icons/" + streamRow.icon
+                                sourceSize: Qt.size(2 * Theme.appIconSize, 2 * Theme.appIconSize)
+                                Layout.preferredWidth: Theme.appIconSize; Layout.preferredHeight: Theme.appIconSize
+                                Layout.leftMargin: Theme.spacingXS; Layout.rightMargin: Theme.spacingXS
+                            }
+                            ColumnLayout {
+                                Layout.fillWidth: true; spacing: 0
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: streamRow.name; textFormat: Text.PlainText; elide: Text.ElideRight
+                                    color: Theme.text; font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily
+                                }
+                                AudioSlider {
+                                    objectName: "quickStreamSlider"
+                                    Layout.fillWidth: true; Layout.preferredHeight: Theme.iconSize + Theme.spacingS
+                                    value: streamRow.volume; muted: streamRow.muted
+                                    Accessible.name: streamRow.name
+                                    onMoved: quick.audio.setStreamVolume(streamRow.streamId, Math.round(value))
+                                }
+                            }
+                            MuteButton {
+                                level: streamRow.volume; muted: streamRow.muted
+                                Accessible.name: (muted ? "Unmute " : "Mute ") + streamRow.name
+                                onClicked: quick.audio.toggleStreamMute(streamRow.streamId)
+                            }
+                        }
                     }
                 }
             }
