@@ -62,7 +62,7 @@ Rectangle {
         visible: source.toString() !== ""
         NumberAnimation {
             id: fade
-            target: previous; property: "opacity"; to: 0; duration: 450; easing.type: Easing.InOutQuad
+            target: previous; property: "opacity"; to: 0; duration: Theme.duration(450); easing.type: Easing.InOutQuad
             onFinished: previous.source = ""
         }
     }
@@ -93,11 +93,11 @@ Rectangle {
                 width: 88; height: 84
                 onDoubleClicked: shell.launch(modelData.appId)
                 Accessible.name: "Double-click to open " + modelData.name
-                background: Rectangle { radius: 8; color: parent.hovered ? "#284b638a" : "transparent"; border.color: parent.hovered ? "#557da8ff" : "transparent" }
+                background: Rectangle { radius: Theme.radiusSmall; color: parent.hovered ? Theme.accentSubtle : "transparent"; border.color: parent.hovered ? Theme.alpha(Theme.accent, 0.33) : "transparent" }
                 contentItem: Column {
                     spacing: 6
                     Image { anchors.horizontalCenter: parent.horizontalCenter; width: 40; height: 40; sourceSize: Qt.size(40, 40); source: "image://icons/" + modelData.icon }
-                    Text { width: parent.width; text: modelData.name; textFormat: Text.PlainText; color: shell.textColor; font.pixelSize: 12; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight }
+                    Text { width: parent.width; text: modelData.name; textFormat: Text.PlainText; color: Theme.text; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight }
                 }
             }
         }
@@ -105,12 +105,12 @@ Rectangle {
     Rectangle {
         id: menu
         visible: false
-        width: 210; height: 112; radius: 8
-        color: shell.panelColor; border.color: Qt.lighter(shell.panelColor, 1.6)
+        width: 210; height: 112; radius: Theme.radiusMedium
+        color: Theme.surface; border.color: Theme.border
         Column {
             anchors.fill: parent; anchors.margins: 6
-            Button { width: parent.width; height: 48; text: "Refresh applications"; onClicked: { shell.refreshApps(); menu.visible = false } palette.buttonText: shell.textColor; background: Rectangle { color: parent.hovered ? Qt.lighter(shell.panelColor, 1.5) : "transparent"; radius: 6 } }
-            Button { width: parent.width; height: 48; text: "Show desktop"; onClicked: { shell.tasks.showDesktop(); menu.visible = false } palette.buttonText: shell.textColor; background: Rectangle { color: parent.hovered ? Qt.lighter(shell.panelColor, 1.5) : "transparent"; radius: 6 } }
+            FlatButton { width: parent.width; height: 48; text: "Refresh applications"; onClicked: { shell.refreshApps(); menu.visible = false } palette.buttonText: Theme.text; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
+            FlatButton { width: parent.width; height: 48; text: "Show desktop"; onClicked: { shell.tasks.showDesktop(); menu.visible = false } palette.buttonText: Theme.text; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
         }
     }
 }
