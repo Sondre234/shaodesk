@@ -74,17 +74,17 @@ Rectangle {
             GradientStop { position: 1; color: shell.background }
         }
     }
+    // A right press opens the desktop's menu where it was; any other press closes it.
     MouseArea {
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        onClicked: function(mouse) {
-            menu.visible = mouse.button === Qt.RightButton
-            menu.x = Math.max(0, Math.min(mouse.x, desktop.width - menu.width - 8))
-            menu.y = Math.max(shell.panelTop ? shell.panelExtent : 0, Math.min(mouse.y, desktop.height - (shell.panelTop ? 0 : shell.panelExtent) - menu.height - 8))
+        onPressed: function(mouse) {
+            menu.anchorRect = Qt.rect(mouse.x, mouse.y, 0, 0)
+            menu.open = mouse.button === Qt.RightButton
         }
     }
     Column {
-        x: 16; y: 24; spacing: 12
+        x: Theme.spacingXL; y: Theme.spacingXXL + Theme.spacingS; spacing: Theme.spacingL
         Repeater {
             // Configured launchers only; applications pinned from the taskbar stay there.
             model: shell.pinned.filter(function(app) { return app.configured })
@@ -95,22 +95,31 @@ Rectangle {
                 Accessible.name: "Double-click to open " + modelData.name
                 background: Rectangle { radius: Theme.radiusSmall; color: parent.hovered ? Theme.accentSubtle : "transparent"; border.color: parent.hovered ? Theme.alpha(Theme.accent, 0.33) : "transparent" }
                 contentItem: Column {
-                    spacing: 6
+                    spacing: Theme.spacingS + Theme.spacingXS
                     Image { anchors.horizontalCenter: parent.horizontalCenter; width: 40; height: 40; sourceSize: Qt.size(40, 40); source: "image://icons/" + modelData.icon }
                     Text { width: parent.width; text: modelData.name; textFormat: Text.PlainText; color: Theme.text; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight }
                 }
             }
         }
     }
-    Rectangle {
+    // Showing the desktop, and the appearance profiles beside their entry, as the bar's menu
+    // offers them; in the room the panel leaves.
+    PopupMenu {
         id: menu
-        visible: false
-        width: 210; height: 112; radius: Theme.radiusMedium
-        color: Theme.surface; border.color: Theme.border
-        Column {
-            anchors.fill: parent; anchors.margins: 6
-            FlatButton { width: parent.width; height: 48; text: "Refresh applications"; onClicked: { shell.refreshApps(); menu.visible = false } palette.buttonText: Theme.text; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
-            FlatButton { width: parent.width; height: 48; text: "Show desktop"; onClicked: { shell.tasks.showDesktop(); menu.visible = false } palette.buttonText: Theme.text; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
-        }
+        objectName: "desktopMenu"
+        entryName: "desktopMenuItem"
+        side: Qt.BottomEdge
+        alignment: Qt.AlignLeft
+        gap: 0
+        bounds: Qt.rect(0, shell.panelTop ? shell.panelExtent : 0, desktop.width, desktop.height - shell.panelExtent)
+        onDismissed: open = false
+        entries: [{ text: "Show desktop", icon: "minimize-2", run: function() { shell.tasks.showDesktop() } }]
+            .concat(shell.profiles.length > 0
+                ? [{ text: "Appearance", icon: "palette", secondary: shell.profile,
+                     submenu: shell.profiles.map(function(name) {
+                         return { text: name, toggle: "radio", checked: name === shell.profile,
+                                  run: function() { if (name !== shell.profile) shell.pickProfile(name) } }
+                     }) }]
+                : [])
     }
 }

@@ -248,7 +248,8 @@ class ShellController : public QObject {
     // Runs one of an application's actions as launch() starts the application, a failure shown
     // across the panel the same way; returns whether it started.
     Q_INVOKABLE bool launchAction(const QString &id, const QString &action);
-    Q_INVOKABLE void refreshApps();
+    // Reads the installed applications again, as GIO's monitor says they changed.
+    void refreshApps();
     // Pins an installed application to the taskbar, remembered across sessions. Configured
     // launchers stay pinned; unpinning them means editing the configuration.
     Q_INVOKABLE void pin(const QString &id);

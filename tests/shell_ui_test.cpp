@@ -3508,6 +3508,38 @@ ListModel {
             return fail("could not restore the configuration");
         controller.reload();
     }
+    // The desktop's menu: a right press opens it where it was, with Show desktop and the
+    // appearance profiles beside their entry; a press elsewhere closes it.
+    {
+        ShellView desktop(controller, app.primaryScreen(), true, true);
+        desktop.show();
+        if (!QTest::qWaitForWindowExposed(&desktop) || !desktop.rootObject())
+            return fail("the desktop never showed");
+        auto *desktopMenu = find(desktop.rootObject(), "desktopMenu");
+        auto entry = [&](const QString &text) {
+            std::function<QQuickItem *(QQuickItem *)> walk = [&](QQuickItem *item) -> QQuickItem * {
+                for (auto *child : item->childItems()) {
+                    if (child->objectName() == "desktopMenuItem" && child->property("text") == text)
+                        return child;
+                    if (auto *found = walk(child))
+                        return found;
+                }
+                return nullptr;
+            };
+            return desktopMenu ? walk(desktopMenu) : nullptr;
+        };
+        const QPoint at(200, 150);
+        QTest::mousePress(&desktop, Qt::RightButton, Qt::NoModifier, at);
+        QTest::mouseRelease(&desktop, Qt::RightButton, Qt::NoModifier, at);
+        auto *card = desktopMenu ? desktopMenu->property("card").value<QQuickItem *>() : nullptr;
+        if (!card || !QTest::qWaitFor([&] { return card->isVisible() && card->property("progress").toReal() == 1; }) ||
+            !entry("Show desktop") || !entry("Appearance") ||
+            card->mapToScene(QPointF(0, 0)).toPoint() != at)
+            return fail("a right press on the desktop did not open its menu there");
+        QTest::mouseClick(&desktop, Qt::LeftButton, Qt::NoModifier, QPoint(600, 500));
+        if (!QTest::qWaitFor([&] { return !card->isVisible(); }))
+            return fail("a press beside the desktop's menu did not close it");
+    }
     std::cout << "Hover/click, launcher keyboard focus, search, command launch, tiling toggle, and "
                  "workspace indicator, task and bar context menus, pinning into a window's slot, "
                  "reordering pins, "
