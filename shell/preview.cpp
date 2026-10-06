@@ -61,7 +61,7 @@ QRect usableArea(const ShellController &controller) {
 
 // The overview's stand-ins, as the compositor would lay them out in `area`: four windows of the
 // first workspace (the first selected, the third asking for attention), and the strip of four
-// workspaces above them.
+// workspaces above them, below the room it leaves for the search box (OVERVIEW_TOP).
 QVariantList overviewWindows(const QRect &area) {
     auto window = [&area](int x, int y, int w, int h, const QString &appId, const QString &title,
                           bool urgent = false) {
@@ -77,7 +77,7 @@ QVariantList overviewWindows(const QRect &area) {
 QVariantList overviewStrip(const QRect &area) {
     QVariantList cells;
     for (int i = 0; i < 4; ++i)
-        cells.push_back(QVariantMap{{"x", area.x() + 292 + i * 132}, {"y", area.y() + 56},
+        cells.push_back(QVariantMap{{"x", area.x() + 292 + i * 132}, {"y", area.y() + 48},
                                     {"w", 120}, {"h", 68}, {"workspace", i + 1},
                                     {"windows", i == 0 ? 4 : i == 1 ? 2 : 0}});
     return cells;
