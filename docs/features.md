@@ -41,7 +41,9 @@ default. All of them take the panel's `accent`,
 are shown by laying the text color over the panel at a low opacity, which shows on a light
 panel as on a dark one. Popups (the application menu, menus, the mixer, the calendar and the
 rest) are drawn in the panel color made opaque, even when the bar is translucent: nothing is
-blurred behind them, and a window showing through would make them hard to read. In a nested
+blurred behind them, and a window showing through would make them hard to read. The shell
+draws through the GPU; `renderer = "software"` draws on the CPU instead, for a weak machine: it
+starts faster and uses less memory, but cannot draw effects such as shadows. In a nested
 session, applications that reuse an existing process or D-Bus service can open
 in the host session instead.
 
