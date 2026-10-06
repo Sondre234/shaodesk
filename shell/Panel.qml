@@ -445,11 +445,11 @@ Item {
         radius: shell.panelRadius
         // A floating bar gets an outline; a docked one a line along its inner edge.
         border.width: root.floating ? 1 : 0
-        border.color: Qt.lighter(shell.panelColor, 1.65)
+        border.color: Theme.border
         Rectangle {
             visible: !root.floating
             y: root.onTop ? parent.height - 1 : 0
-            width: parent.width; height: 1; color: Qt.lighter(shell.panelColor, 1.65)
+            width: parent.width; height: 1; color: Theme.border
         }
         // Right-clicking the bar anywhere but on a task opens the bar's own menu.
         MouseArea {
@@ -475,53 +475,47 @@ Item {
         RowLayout {
             anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
             spacing: 6
-            Button {
+            FlatButton {
                 id: start
                 Layout.preferredWidth: 44; Layout.preferredHeight: bar.height - 10
+                active: root.launcherOpen
                 onClicked: root.launcherOpen = !root.launcherOpen
                 Accessible.name: "Applications"
-                background: Rectangle { radius: 7; color: start.hovered || root.launcherOpen ? Qt.lighter(shell.panelColor, 1.8) : "transparent" }
                 contentItem: Item {
                     Grid {
                         anchors.centerIn: parent; columns: 2; spacing: 3
-                        Repeater { model: 4; Rectangle { width: 9; height: 9; radius: 2; color: shell.accent } }
+                        Repeater { model: 4; Rectangle { width: 9; height: 9; radius: 2; color: Theme.accent } }
                     }
                 }
             }
             PinnedSlots { id: pinnedSlots; panel: root; barHeight: bar.height }
-            Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 24; color: Qt.lighter(shell.panelColor, 1.8) }
+            Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: 24; color: Theme.divider }
             TaskList { id: taskList; panel: root; barHeight: bar.height }
             WorkspaceIndicator { id: workspaceIndicator; panel: root; barHeight: bar.height }
             // The wallpaper picker.
-            Button {
+            FlatButton {
                 id: wallpapersButton
                 objectName: "wallpapersButton"
                 visible: shell.widgets.wallpapers
                 Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
+                active: root.audioPopup === "wallpapers"
                 onClicked: root.toggleAudioPopup("wallpapers", wallpapersButton)
                 Accessible.name: "Wallpapers"
                 BarTip { panel: root; owner: wallpapersButton; text: "Wallpapers" }
-                background: Rectangle {
-                    radius: 7
-                    color: root.audioPopup === "wallpapers" ? Qt.lighter(shell.panelColor, 1.8) : (wallpapersButton.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
-                }
                 contentItem: Item {
-                    Icon { anchors.centerIn: parent; name: "image"; color: root.audioPopup === "wallpapers" ? shell.accent : shell.textColor }
+                    Icon { anchors.centerIn: parent; name: "image"; color: wallpapersButton.active ? Theme.accent : Theme.text }
                 }
             }
             // The appearance profile in use; clicking lists the profiles to switch to.
-            Button {
+            FlatButton {
                 id: profilesButton
                 objectName: "profilesButton"
                 visible: shell.widgets.profiles && shell.profiles.length > 1
                 Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
+                active: root.audioPopup === "profiles"
                 onClicked: root.toggleAudioPopup("profiles", profilesButton)
                 Accessible.name: "Appearance: " + (shell.profile || "none")
                 BarTip { panel: root; owner: profilesButton; text: "Appearance: " + (shell.profile || "none") }
-                background: Rectangle {
-                    radius: 7
-                    color: root.audioPopup === "profiles" ? Qt.lighter(shell.panelColor, 1.8) : (profilesButton.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
-                }
                 // Three swatches of the profile in use: accent, desktop background, text.
                 contentItem: Item {
                     Row {
@@ -535,32 +529,29 @@ Item {
                                 width: 10; height: 10; radius: 5
                                 color: modelData
                                 border.width: 1
-                                border.color: Qt.rgba(shell.textColor.r, shell.textColor.g, shell.textColor.b, 0.5)
+                                border.color: Theme.alpha(Theme.text, 0.5)
                             }
                         }
                     }
                 }
             }
-            Button {
+            FlatButton {
                 id: tilingToggle
                 objectName: "tilingToggle"
                 visible: shell.widgets.tiling
                 Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
                 enabled: shell.tilingAvailable
                 opacity: enabled ? 1 : 0.4
+                active: root.tiling
                 onClicked: { root.closeMenus(); shell.toggleTiling(outputName) }
                 Accessible.name: root.tiling ? "Tiling on" : "Tiling off"
                 BarTip { panel: root; owner: tilingToggle; text: root.tiling ? "Tiling on: click for floating" : "Floating: click to tile" }
-                background: Rectangle {
-                    radius: 7
-                    color: root.tiling ? Qt.lighter(shell.panelColor, 1.8) : (tilingToggle.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
-                }
                 // On: a split layout in the accent colour. Off: two overlapping windows.
                 contentItem: Item {
                     Icon {
                         anchors.centerIn: parent
                         name: root.tiling ? "layout-panel-left" : "copy"
-                        color: root.tiling ? shell.accent : shell.textColor
+                        color: root.tiling ? Theme.accent : Theme.text
                     }
                 }
             }
@@ -588,15 +579,21 @@ Item {
                 onClicked: { root.closeMenus(); shell.tasks.showDesktop() }
                 Accessible.name: "Show desktop"
                 BarTip { panel: root; owner: showDesktopButton; text: "Show desktop" }
-                background: Rectangle { color: parent.hovered ? shell.accent : Qt.lighter(shell.panelColor, 1.6); width: 3; anchors.right: parent.right }
+                background: Rectangle { color: parent.hovered ? Theme.accent : Theme.border; width: 3; anchors.right: parent.right }
             }
         }
         Rectangle {
             visible: shell.error.length > 0
             anchors.fill: parent; anchors.margins: 4
-            color: "#542b32"; radius: 6
-            Text { anchors.left: parent.left; anchors.right: dismiss.left; anchors.verticalCenter: parent.verticalCenter; anchors.margins: 10; text: shell.error; color: "#fff0f1"; elide: Text.ElideRight; font.pixelSize: 12 }
-            Button { id: dismiss; anchors.right: parent.right; height: parent.height; width: 40; text: "×"; onClicked: shell.clearError() }
+            color: Theme.dangerSurface; radius: Theme.radiusSmall
+            Text { anchors.left: parent.left; anchors.right: dismiss.left; anchors.verticalCenter: parent.verticalCenter; anchors.margins: 10; text: shell.error; color: Theme.text; elide: Text.ElideRight; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
+            FlatButton {
+                id: dismiss
+                anchors.right: parent.right; height: parent.height; width: 40
+                Accessible.name: "Dismiss"
+                onClicked: shell.clearError()
+                contentItem: Text { text: "×"; color: Theme.text; font.pixelSize: Theme.fontSizeTitle; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
+            }
         }
     }
 }
