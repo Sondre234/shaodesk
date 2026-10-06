@@ -90,7 +90,7 @@ Rectangle {
         }
     }
     Column {
-        x: Theme.spacingXL; y: Theme.spacingXXL + Theme.spacingS; spacing: Theme.spacingL
+        x: Theme.spacingXL; y: Theme.spacingXXL + Theme.spacingS + (Theme.macos ? Theme.menuBarHeight : 0); spacing: Theme.spacingL
         Repeater {
             // Configured launchers only; applications pinned from the taskbar stay there.
             model: shell.pinned.filter(function(app) { return app.configured })
@@ -117,7 +117,8 @@ Rectangle {
         side: Qt.BottomEdge
         alignment: Qt.AlignLeft
         gap: 0
-        bounds: Qt.rect(0, shell.panelTop ? shell.panelExtent : 0, desktop.width, desktop.height - shell.panelExtent)
+        bounds: Theme.macos ? Qt.rect(0, Theme.menuBarHeight, desktop.width, desktop.height - Theme.menuBarHeight - shell.panelExtent)
+                            : Qt.rect(0, shell.panelTop ? shell.panelExtent : 0, desktop.width, desktop.height - shell.panelExtent)
         onDismissed: open = false
         entries: [{ text: "Show desktop", icon: "minimize-2", run: function() { shell.tasks.showDesktop() } }]
             .concat(shell.profiles.length > 0
