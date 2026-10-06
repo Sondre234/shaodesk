@@ -10,8 +10,8 @@ The shell has pinned desktop shortcuts (double-click to launch), a taskbar with
 window activation/minimization (clicking a window's button focuses it, or minimizes it when it
 is focused already, as on Windows, from any monitor's bar) and a right-click window menu (maximize/restore,
 minimize, pin to taskbar, close), middle-click to close a window, a right-click menu on empty bar space (tiling,
-applications, show desktop, and the appearance profiles in a submenu), an application
-search menu, a tiling on/off button for its monitor, a workspace indicator, battery and network status,
+applications, show desktop, and the appearance profiles in a submenu), a
+[start menu](#start-menu), a tiling on/off button for its monitor, a workspace indicator, battery and network status,
 the default output's volume, a clock, a [system tray](#system-tray), and a show-desktop button. Buttons show a tooltip
 on hover. Installed applications are read
 from desktop entries through GIO. Lua configures the panel's height, top or
@@ -56,6 +56,40 @@ draws through the GPU; `renderer = "software"` draws on the CPU instead, for a w
 starts faster and uses less memory, but cannot draw effects such as shadows. In a nested
 session, applications that reuse an existing process or D-Bus service can open
 in the host session instead.
+
+### Start menu
+
+The bar's first button (or Super + R) opens the start menu, after Windows 11's, above the button.
+Its search field is on top and has the keyboard, so typing searches at once; along the bottom are
+the user's name and picture and the [power button](#power). Under the search field are the
+applications pinned to the start menu, six to a row on pages of up to three rows (the wheel or the
+dots beside them turn the pages; dragging a tile moves it), and under them Recent: the
+applications launched lately, with how long ago ("5 min ago", "Yesterday"). All apps › lists every
+application from A to Z under its letter, and clicking a letter shows them all to jump to one.
+
+The search finds applications by name, generic name ("Web Browser"), keywords, desktop id and
+comment, and open windows, workspaces and actions as the [command palette](#command-palette) does
+(its `>`, `@` and `#` too), grouped under Best match, Apps, Open windows and Actions. The best
+match is on a card of its own, with an application's desktop actions ("New Private Window") as
+buttons beside Open. Among equal matches, what is launched more often comes first; what matches
+far worse than the best match is left out.
+
+The arrows, Tab and Page Up and Page Down move through the tiles, the lists and the results, and
+Enter opens what the keyboard is at (the best match, as the search starts); Escape clears the
+search, then closes the menu. Right-clicking an application, or the menu key, gives its menu:
+Open, its desktop actions, Pin to Start or Unpin from Start, a tile's Move to front, and Pin to
+taskbar or Unpin from taskbar.
+
+The start menu's pins are its own, as on Windows, kept in `$XDG_STATE_HOME/shaodesk/start-pinned`,
+a desktop id per line. Until they are first changed they are the taskbar's pins, then common
+applications up to six: the default web browser, file manager, a terminal, text editor, mail
+client, image viewer and media player. Every launch of an installed application from the shell
+(the start menu, the taskbar, the palette, desktop actions) is counted in
+`$XDG_STATE_HOME/shaodesk/launches`: its desktop id, how many times and when last, the 200 most
+recent kept. Applications installed or removed show at once, without a refresh. The picture is
+`~/.face` or `~/.face.icon`, else AccountsService's when the shell is built with D-Bus, else the
+name's first letter on the accent colour; the name is the full name from the password database,
+else the login name.
 
 ## Windows
 
