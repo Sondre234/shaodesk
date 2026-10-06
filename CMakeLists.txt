@@ -614,6 +614,12 @@ if(SHAODESK_BUILD_COMPOSITOR)
         target_link_libraries(animation_tests PRIVATE shaodesk_config PkgConfig::WLROOTS
             PkgConfig::WAYLAND m)
         add_test(NAME animation COMMAND animation_tests)
+        add_executable(decoration_tests tests/decoration_tests.c src/decoration.c)
+        target_compile_definitions(decoration_tests PRIVATE WLR_USE_UNSTABLE)
+        target_compile_options(decoration_tests PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        target_include_directories(decoration_tests PRIVATE include)
+        target_link_libraries(decoration_tests PRIVATE PkgConfig::WLROOTS m)
+        add_test(NAME decoration COMMAND decoration_tests)
         add_test(NAME animation_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/animation_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)

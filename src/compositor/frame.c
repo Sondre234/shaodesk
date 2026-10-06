@@ -36,7 +36,8 @@ static struct wlr_buffer *deco_buffer(struct sh_server *server, enum sh_deco_par
             if (output->wlr_output->scale > scale)
                 scale = output->wlr_output->scale;
         }
-        server->deco_buffers[hovered] = sh_decoration_render((int)ceilf(scale), hovered);
+        struct sh_deco_look look = {SH_DECO_FLAT, true, hovered, SH_DECO_NONE};
+        server->deco_buffers[hovered] = sh_decoration_render((int)ceilf(scale), &look);
     }
     return server->deco_buffers[hovered];
 }

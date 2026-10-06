@@ -195,7 +195,7 @@ static struct sh_toplevel *deco_at(struct sh_server *server, double x, double y,
     struct sh_toplevel *toplevel = owner->owner;
     if (!toplevel->deco || &toplevel->deco->node != node)
         return NULL;
-    *part = sh_decoration_part_at(sx, sy);
+    *part = sh_decoration_part_at(SH_DECO_FLAT, sx, sy);
     return *part == SH_DECO_NONE ? NULL : toplevel;
 }
 
