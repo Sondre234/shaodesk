@@ -2857,6 +2857,17 @@ ListModel {
             std::cerr << "expanding an application did not list all its notifications\n";
             return 1;
         }
+        // Too many for the room the calendar leaves on this short output: the calendar gives up
+        // its time and date to them, and where the list still goes on past the card's edge, that
+        // edge fades out.
+        auto *flyoutCalendar = find(view.rootObject(), "calendar");
+        auto *calendarTime = find(view.rootObject(), "calendarTime");
+        auto *fadeBottom = find(view.rootObject(), "notificationFadeBottom");
+        if (!QTest::qWaitFor([&] {
+                return flyoutCalendar->property("compact").toBool() && !calendarTime->isVisible() &&
+                       fadeBottom->isVisible() == !list->property("atYEnd").toBool();
+            }))
+            return fail("the calendar did not make room for the notifications, or the list's edge does not fade where it is cut off");
         // An action's button runs it, from the history as from a card.
         invoked.clear();
         auto *historyAction = find(list, "notificationHistoryAction");
@@ -2895,6 +2906,8 @@ ListModel {
             std::cerr << "Clear all did not empty the history and say so\n";
             return 1;
         }
+        if (!QTest::qWaitFor([&] { return !flyoutCalendar->property("compact").toBool() && calendarTime->isVisible(); }))
+            return fail("the calendar did not show its time and date again once the notifications were gone");
         click(bell); // close the popup
         // The compositor's notification_history action (Super + N) opens the flyout on the output
         // it names, and closes it again.
