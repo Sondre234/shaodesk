@@ -51,6 +51,12 @@ int main(int argc, char **argv) {
         wait([&] { return value(TaskModel::Maximized).toBool(); }, "maximize failed");
         model.maximize(id);
         wait([&] { return !value(TaskModel::Maximized).toBool(); }, "unmaximize failed");
+        model.setFullscreen(id, true);
+        wait([&] { return value(TaskModel::Fullscreen).toBool(); }, "fullscreen failed");
+        model.setFullscreen(id, false);
+        wait([&] { return !value(TaskModel::Fullscreen).toBool(); }, "leaving fullscreen failed");
+        if (model.roleNames().value(TaskModel::Fullscreen) != "fullscreen")
+            throw std::runtime_error("the fullscreen role is not named for QML");
         model.showDesktop();
         wait([&] { return value(TaskModel::Minimized).toBool(); }, "show desktop failed");
         model.activate(id);
@@ -89,7 +95,8 @@ int main(int argc, char **argv) {
         model.activate(id);
         model.close(id);
         std::cout
-            << "Task model metadata, minimize, restore, maximize, show desktop, close passed\n";
+            << "Task model metadata, minimize, restore, maximize, fullscreen, show desktop, close "
+               "passed\n";
         return 0;
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n' << client.readAllStandardError().toStdString();

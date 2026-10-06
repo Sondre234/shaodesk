@@ -77,14 +77,16 @@ QVariant TaskModel::data(const QModelIndex &index, int role) const {
         return state.maximized;
     case Urgent:
         return state.urgent;
+    case Fullscreen:
+        return state.fullscreen;
     default:
         return {};
     }
 }
 QHash<int, QByteArray> TaskModel::roleNames() const {
-    return {{TaskId, "taskId"}, {Title, "title"},         {AppId, "appId"},
-            {Active, "active"}, {Minimized, "minimized"}, {Maximized, "maximized"},
-            {Urgent, "urgent"}};
+    return {{TaskId, "taskId"},        {Title, "title"},         {AppId, "appId"},
+            {Active, "active"},        {Minimized, "minimized"}, {Maximized, "maximized"},
+            {Urgent, "urgent"},        {Fullscreen, "fullscreen"}};
 }
 TaskModel::Task *TaskModel::find(int id) {
     for (auto &task : tasks_)
@@ -115,6 +117,16 @@ void TaskModel::maximize(int id) {
             zwlr_foreign_toplevel_handle_v1_unset_maximized(task->handle);
         else
             zwlr_foreign_toplevel_handle_v1_set_maximized(task->handle);
+    }
+    flush();
+}
+void TaskModel::setFullscreen(int id, bool fullscreen) {
+    if (auto *task = find(id)) {
+        // On the output it is on.
+        if (fullscreen)
+            zwlr_foreign_toplevel_handle_v1_set_fullscreen(task->handle, nullptr);
+        else
+            zwlr_foreign_toplevel_handle_v1_unset_fullscreen(task->handle);
     }
     flush();
 }
@@ -188,6 +200,7 @@ void TaskModel::changed(Task *task) {
             compare(&State::active, Active);
             compare(&State::minimized, Minimized);
             compare(&State::maximized, Maximized);
+            compare(&State::fullscreen, Fullscreen);
             compare(&State::urgent, Urgent);
             if (roles.isEmpty())
                 return;
@@ -247,12 +260,13 @@ void TaskModel::appId(void *data, zwlr_foreign_toplevel_handle_v1 *, const char 
 void TaskModel::output(void *, zwlr_foreign_toplevel_handle_v1 *, wl_output *) {}
 void TaskModel::state(void *data, zwlr_foreign_toplevel_handle_v1 *, wl_array *states) {
     auto &state = static_cast<Task *>(data)->state;
-    state.active = state.minimized = state.maximized = false;
+    state.active = state.minimized = state.maximized = state.fullscreen = false;
     const auto *values = static_cast<const uint32_t *>(states->data);
     for (size_t i = 0; i < states->size / sizeof(uint32_t); ++i) {
         state.active |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_ACTIVATED;
         state.minimized |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MINIMIZED;
         state.maximized |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MAXIMIZED;
+        state.fullscreen |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_FULLSCREEN;
     }
 }
 void TaskModel::done(void *data, zwlr_foreign_toplevel_handle_v1 *) {

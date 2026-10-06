@@ -10,7 +10,7 @@
 class TaskModel : public QAbstractListModel {
     Q_OBJECT
   public:
-    enum Role { TaskId = Qt::UserRole + 1, Title, AppId, Active, Minimized, Maximized, Urgent };
+    enum Role { TaskId = Qt::UserRole + 1, Title, AppId, Active, Minimized, Maximized, Urgent, Fullscreen };
     explicit TaskModel(QObject *parent = nullptr);
     ~TaskModel() override;
     bool connectDisplay();
@@ -20,6 +20,7 @@ class TaskModel : public QAbstractListModel {
     Q_INVOKABLE void activate(int id);
     Q_INVOKABLE void minimize(int id);
     Q_INVOKABLE void maximize(int id);
+    Q_INVOKABLE void setFullscreen(int id, bool fullscreen);
     Q_INVOKABLE void close(int id);
     Q_INVOKABLE void showDesktop();
     // The windows the compositor says are asking for attention, as {appId, title} pairs: the
@@ -35,7 +36,7 @@ class TaskModel : public QAbstractListModel {
     // What a window is, as the compositor last said.
     struct State {
         QString title, appId;
-        bool active = false, minimized = false, maximized = false, urgent = false;
+        bool active = false, minimized = false, maximized = false, fullscreen = false, urgent = false;
     };
     struct Task {
         TaskModel *model;
