@@ -25,7 +25,7 @@ Item {
     }
     // The surface follows the cards' height up at once but down only after they have left, or a
     // card sliding out would be cut off.
-    Timer { id: shrink; interval: 320; onTriggered: cards.settled = cards.shown }
+    Timer { id: shrink; interval: Theme.durationSlow; onTriggered: cards.settled = cards.shown }
     // How long ago a card came, as the history says it, kept current while cards are up.
     property date now: new Date()
     Timer { interval: 30000; repeat: true; running: cards.active; onTriggered: cards.now = new Date() }
@@ -55,19 +55,22 @@ Item {
         // Newest nearest the screen edge the stack starts from.
         verticalLayoutDirection: center.bottom ? ListView.BottomToTop : ListView.TopToBottom
         model: cards.active ? center.cards : null
+        // A card slides in from the screen's edge, all the way past it, and back out to it when
+        // it goes; the others make room for it or close up after it.
+        readonly property real offscreen: (center.left ? -1 : 1) * (center.cardWidth + cards.margin)
         add: Transition {
             ParallelAnimation {
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.duration(160) }
-                NumberAnimation { property: "x"; from: center.left ? -center.cardWidth : center.cardWidth; duration: Theme.duration(220); easing.type: Theme.easing }
+                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durationNormal; easing.type: Theme.easing }
+                NumberAnimation { property: "x"; from: list.offscreen; duration: Theme.durationSlow; easing.type: Theme.easing }
             }
         }
         remove: Transition {
             ParallelAnimation {
-                NumberAnimation { property: "opacity"; to: 0; duration: Theme.duration(160) }
-                NumberAnimation { property: "x"; to: center.left ? -center.cardWidth : center.cardWidth; duration: Theme.duration(200); easing.type: Theme.easingExit }
+                NumberAnimation { property: "opacity"; to: 0; duration: Theme.durationNormal; easing.type: Theme.easingExit }
+                NumberAnimation { property: "x"; to: list.offscreen; duration: Theme.durationNormal; easing.type: Theme.easingExit }
             }
         }
-        displaced: Transition { NumberAnimation { properties: "y"; duration: Theme.duration(180); easing.type: Theme.easing } }
+        displaced: Transition { NumberAnimation { properties: "y"; duration: Theme.durationNormal; easing.type: Theme.easing } }
         delegate: Item {
             id: entry
             required property int index
