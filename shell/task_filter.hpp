@@ -8,19 +8,24 @@ class ShellController;
 // `app` is empty, every window no pinned application takes in. `controller` is the shell.
 // `windowApp`, when set, keeps only the windows with that app id. `grouped` keeps one window per
 // application, the first of them: in a pinned slot the whole slot is one application; elsewhere
-// windows with the same app id are, and those without one stand alone.
+// windows with the same app id are, and those without one stand alone. `taskId`, when 0 or more,
+// keeps only the window with that id, wherever it belongs.
 class TaskFilter : public QSortFilterProxyModel {
     Q_OBJECT
     Q_PROPERTY(QObject *controller READ controller WRITE setController NOTIFY controllerChanged)
     Q_PROPERTY(QString app READ app WRITE setApp NOTIFY appChanged)
     Q_PROPERTY(QString windowApp READ windowApp WRITE setWindowApp NOTIFY windowAppChanged)
     Q_PROPERTY(bool grouped READ grouped WRITE setGrouped NOTIFY groupedChanged)
+    Q_PROPERTY(int taskId READ taskId WRITE setTaskId NOTIFY taskIdChanged)
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     // The focused window among these, or -1, and whether every one of them is minimized.
     Q_PROPERTY(int activeTask READ activeTask NOTIFY summaryChanged)
     Q_PROPERTY(bool minimized READ minimized NOTIFY summaryChanged)
     // Whether any of them is asking for attention.
     Q_PROPERTY(bool urgent READ urgent NOTIFY summaryChanged)
+    // Every window, as a map of the source model's roles ({taskId, title, ...}), for QML that
+    // reads them as data: a binding reading it follows every change to these windows.
+    Q_PROPERTY(QVariantList windows READ windows NOTIFY summaryChanged)
   public:
     explicit TaskFilter(QObject *parent = nullptr);
     QObject *controller() const;
@@ -31,11 +36,14 @@ class TaskFilter : public QSortFilterProxyModel {
     void setWindowApp(const QString &windowApp);
     bool grouped() const { return grouped_; }
     void setGrouped(bool grouped);
+    int taskId() const { return taskId_; }
+    void setTaskId(int taskId);
     int count() const { return rowCount(); }
     void setSourceModel(QAbstractItemModel *source) override;
     int activeTask() const;
     bool minimized() const;
     bool urgent() const;
+    QVariantList windows() const;
     // The window after the focused one, wrapping around, or the first when none is focused.
     Q_INVOKABLE int nextTask() const;
     // Moves within the source model, so dragging reorders the whole task list. Grouped, a
@@ -46,6 +54,7 @@ class TaskFilter : public QSortFilterProxyModel {
     void appChanged();
     void windowAppChanged();
     void groupedChanged();
+    void taskIdChanged();
     void countChanged();
     void summaryChanged();
 
@@ -56,6 +65,7 @@ class TaskFilter : public QSortFilterProxyModel {
     QPointer<ShellController> shell_;
     QString app_, windowApp_;
     bool grouped_ = false;
+    int taskId_ = -1;
     QList<QMetaObject::Connection> sourceConnections_;
     // Which source rows the filter accepts, worked out for all of them at once the first time
     // the proxy asks after a change (a filter that looks at each row's predecessors is

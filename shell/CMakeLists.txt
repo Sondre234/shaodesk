@@ -71,6 +71,7 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
 add_executable(shaodesk-shell main.cpp ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp task_model.cpp task_model.hpp
     task_filter.cpp task_filter.hpp icons.cpp icons.hpp wallpapers.cpp wallpapers.hpp view.cpp view.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
     preview.cpp preview.hpp
+    ${PROJECT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c ${PROJECT_BINARY_DIR}/shaodesk-window-control-v1-client-protocol.h
     ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
     ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h)
 add_dependencies(shaodesk-shell shaodesk_wlr_client_protocols shaodesk_version)
@@ -110,6 +111,7 @@ if(BUILD_TESTING)
     add_executable(shell_ui_test ${PROJECT_SOURCE_DIR}/tests/shell_ui_test.cpp
         ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp view.cpp view.hpp task_model.cpp task_model.hpp
         task_filter.cpp task_filter.hpp icons.cpp icons.hpp wallpapers.cpp wallpapers.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
+        ${PROJECT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c ${PROJECT_BINARY_DIR}/shaodesk-window-control-v1-client-protocol.h
         ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
         ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h)
     set_target_properties(shell_ui_test PROPERTIES AUTOMOC ON)
@@ -126,6 +128,7 @@ if(BUILD_TESTING)
     add_executable(task_filter_test ${PROJECT_SOURCE_DIR}/tests/task_filter_test.cpp
         ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp view.cpp view.hpp task_model.cpp task_model.hpp
         task_filter.cpp task_filter.hpp icons.cpp icons.hpp wallpapers.cpp wallpapers.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
+        ${PROJECT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c ${PROJECT_BINARY_DIR}/shaodesk-window-control-v1-client-protocol.h
         ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
         ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h)
     set_target_properties(task_filter_test PROPERTIES AUTOMOC ON)
@@ -157,6 +160,7 @@ if(BUILD_TESTING)
     add_test(NAME start_menu COMMAND start_menu_test)
     add_executable(task_model_test ${PROJECT_SOURCE_DIR}/tests/task_model_test.cpp
         task_model.cpp task_model.hpp
+        ${PROJECT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c ${PROJECT_BINARY_DIR}/shaodesk-window-control-v1-client-protocol.h
         ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
         ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h)
     set_target_properties(task_model_test PROPERTIES AUTOMOC ON)
@@ -220,6 +224,7 @@ if(BUILD_TESTING)
     add_executable(osd_test ${PROJECT_SOURCE_DIR}/tests/osd_test.cpp
         ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp view.cpp view.hpp task_model.cpp task_model.hpp
         task_filter.cpp task_filter.hpp icons.cpp icons.hpp wallpapers.cpp wallpapers.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
+        ${PROJECT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c ${PROJECT_BINARY_DIR}/shaodesk-window-control-v1-client-protocol.h
         ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
         ${PROJECT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h)
     set_target_properties(osd_test PROPERTIES AUTOMOC ON)
@@ -263,14 +268,14 @@ if(BUILD_TESTING)
             ${PROJECT_SOURCE_DIR}/tests/overview_shell_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(overview_shell_smoke PROPERTIES TIMEOUT 60)
-        # A few of the gallery's popups through the GPU (Mesa's software OpenGL, in a private
-        # compositor), where effects are drawn. Not under the sanitizers: now and then Qt's
-        # Wayland platform leaks a surface of a preview that quits soon after showing.
+        # A few of the gallery's popups and overlays through the GPU (Mesa's software OpenGL, in a
+        # private compositor), where effects are drawn. Not under the sanitizers: now and then
+        # Qt's Wayland platform leaks a surface of a preview that quits soon after showing.
         if(NOT CMAKE_CXX_FLAGS MATCHES "-fsanitize")
             add_test(NAME shell_gallery_gpu COMMAND ${Python3_EXECUTABLE}
                 ${PROJECT_SOURCE_DIR}/tests/shell_gallery.py
                 ${PROJECT_SOURCE_DIR}/tools/shell_gallery.py ${PROJECT_BINARY_DIR} gpu
-                bar launcher tray-menu notifications)
+                bar launcher tray-menu notifications osd-volume cards switcher palette power-dialog)
             set_tests_properties(shell_gallery_gpu PROPERTIES TIMEOUT 120)
         endif()
         find_program(GRIM grim)

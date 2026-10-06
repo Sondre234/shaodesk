@@ -8,8 +8,13 @@ TaskModel::TaskModel(QObject *parent) : QAbstractListModel(parent) {}
 TaskModel::~TaskModel() {
     read_.reset();
     write_.reset();
-    for (auto &task : tasks_)
+    for (auto &task : tasks_) {
+        if (task->window)
+            shaodesk_window_v1_destroy(task->window);
         zwlr_foreign_toplevel_handle_v1_destroy(task->handle);
+    }
+    if (control_)
+        shaodesk_window_control_v1_destroy(control_);
     if (manager_)
         zwlr_foreign_toplevel_manager_v1_destroy(manager_);
     if (seat_)
@@ -61,29 +66,44 @@ QVariant TaskModel::data(const QModelIndex &index, int role) const {
     if (!index.isValid() || index.row() < 0 || index.row() >= rowCount())
         return {};
     const auto &task = *tasks_[index.row()];
+    const auto &state = task.state;
     switch (role) {
     case TaskId:
         return task.id;
     case Title:
-        return task.title.isEmpty() ? task.appId : task.title;
+        return state.title.isEmpty() ? state.appId : state.title;
     case AppId:
-        return task.appId;
+        return state.appId;
     case Active:
-        return task.active;
+        return state.active;
     case Minimized:
-        return task.minimized;
+        return state.minimized;
     case Maximized:
-        return task.maximized;
+        return state.maximized;
     case Urgent:
-        return task.urgent;
+        return state.urgent;
+    case Fullscreen:
+        return state.fullscreen;
+    case Output:
+        return state.output;
+    case Workspace:
+        return state.workspace;
+    case Sticky:
+        return state.sticky;
+    case Floating:
+        return state.floating;
+    case Tiling:
+        return state.tiling;
     default:
         return {};
     }
 }
 QHash<int, QByteArray> TaskModel::roleNames() const {
-    return {{TaskId, "taskId"}, {Title, "title"},         {AppId, "appId"},
-            {Active, "active"}, {Minimized, "minimized"}, {Maximized, "maximized"},
-            {Urgent, "urgent"}};
+    return {{TaskId, "taskId"},        {Title, "title"},         {AppId, "appId"},
+            {Active, "active"},        {Minimized, "minimized"}, {Maximized, "maximized"},
+            {Urgent, "urgent"},        {Fullscreen, "fullscreen"}, {Output, "output"},
+            {Workspace, "workspace"},  {Sticky, "sticky"},         {Floating, "floating"},
+            {Tiling, "tiling"}};
 }
 TaskModel::Task *TaskModel::find(int id) {
     for (auto &task : tasks_)
@@ -95,7 +115,7 @@ void TaskModel::activate(int id) {
     auto *task = find(id);
     if (!task || !seat_)
         return;
-    if (task->active && !task->minimized)
+    if (task->state.active && !task->state.minimized)
         zwlr_foreign_toplevel_handle_v1_set_minimized(task->handle);
     else {
         zwlr_foreign_toplevel_handle_v1_unset_minimized(task->handle);
@@ -110,10 +130,52 @@ void TaskModel::minimize(int id) {
 }
 void TaskModel::maximize(int id) {
     if (auto *task = find(id)) {
-        if (task->maximized)
+        if (task->state.maximized)
             zwlr_foreign_toplevel_handle_v1_unset_maximized(task->handle);
         else
             zwlr_foreign_toplevel_handle_v1_set_maximized(task->handle);
+    }
+    flush();
+}
+void TaskModel::setFullscreen(int id, bool fullscreen) {
+    if (auto *task = find(id)) {
+        // On the output it is on.
+        if (fullscreen)
+            zwlr_foreign_toplevel_handle_v1_set_fullscreen(task->handle, nullptr);
+        else
+            zwlr_foreign_toplevel_handle_v1_unset_fullscreen(task->handle);
+    }
+    flush();
+}
+void TaskModel::moveToWorkspace(int id, int number) {
+    auto *task = find(id);
+    if (task && task->window && number > 0)
+        shaodesk_window_v1_move_to_workspace(task->window, static_cast<uint32_t>(number));
+    flush();
+}
+void TaskModel::moveToOutput(int id, const QString &output) {
+    auto *task = find(id);
+    if (task && task->window && !output.isEmpty())
+        shaodesk_window_v1_move_to_output(task->window, output.toUtf8().constData());
+    flush();
+}
+void TaskModel::setSticky(int id, bool sticky) {
+    auto *task = find(id);
+    if (task && task->window) {
+        if (sticky)
+            shaodesk_window_v1_set_sticky(task->window);
+        else
+            shaodesk_window_v1_unset_sticky(task->window);
+    }
+    flush();
+}
+void TaskModel::setFloating(int id, bool floating) {
+    auto *task = find(id);
+    if (task && task->window) {
+        if (floating)
+            shaodesk_window_v1_set_floating(task->window);
+        else
+            shaodesk_window_v1_unset_floating(task->window);
     }
     flush();
 }
@@ -152,9 +214,10 @@ void TaskModel::matchUrgent(const Task *except) {
     for (const auto &[appId, title] : urgent_) {
         for (auto &task : tasks_) {
             // The compositor cuts a very long title short.
-            const bool sameTitle = task->title == title ||
-                                   (title.toUtf8().size() >= 250 && task->title.startsWith(title));
-            if (task->appId == appId && sameTitle && !claimed.contains(task.get())) {
+            const auto &state = task->state;
+            const bool sameTitle = state.title == title ||
+                                   (title.toUtf8().size() >= 250 && state.title.startsWith(title));
+            if (state.appId == appId && sameTitle && !claimed.contains(task.get())) {
                 claimed.push_back(task.get());
                 break;
             }
@@ -162,40 +225,40 @@ void TaskModel::matchUrgent(const Task *except) {
     }
     for (int i = 0; i < rowCount(); ++i) {
         auto &task = *tasks_[i];
-        task.urgent = claimed.contains(&task);
-        if (&task == except || task.urgent == task.shownUrgent)
+        task.state.urgent = claimed.contains(&task);
+        if (&task == except || task.state.urgent == task.shown.urgent)
             continue;
-        task.shownUrgent = task.urgent;
+        task.shown.urgent = task.state.urgent;
         Q_EMIT dataChanged(index(i), index(i), {Urgent});
     }
 }
 void TaskModel::changed(Task *task) {
     // A window is found by its app id and title, so either changing may mark or unmark it.
-    if (!urgent_.isEmpty() && (task->title != task->shownTitle || task->appId != task->shownAppId))
+    const auto &state = task->state, &shown = task->shown;
+    if (!urgent_.isEmpty() && (state.title != shown.title || state.appId != shown.appId))
         matchUrgent(task);
     for (int i = 0; i < rowCount(); ++i)
         if (tasks_[i].get() == task) {
             QList<int> roles;
-            if (task->title != task->shownTitle)
-                roles.push_back(Title);
-            if (task->appId != task->shownAppId)
-                roles.push_back(AppId);
-            if (task->active != task->shownActive)
-                roles.push_back(Active);
-            if (task->minimized != task->shownMinimized)
-                roles.push_back(Minimized);
-            if (task->maximized != task->shownMaximized)
-                roles.push_back(Maximized);
-            if (task->urgent != task->shownUrgent)
-                roles.push_back(Urgent);
+            auto compare = [&](auto field, Role role) {
+                if (state.*field != shown.*field)
+                    roles.push_back(role);
+            };
+            compare(&State::title, Title);
+            compare(&State::appId, AppId);
+            compare(&State::active, Active);
+            compare(&State::minimized, Minimized);
+            compare(&State::maximized, Maximized);
+            compare(&State::fullscreen, Fullscreen);
+            compare(&State::urgent, Urgent);
+            compare(&State::output, Output);
+            compare(&State::workspace, Workspace);
+            compare(&State::sticky, Sticky);
+            compare(&State::floating, Floating);
+            compare(&State::tiling, Tiling);
             if (roles.isEmpty())
                 return;
-            task->shownTitle = task->title;
-            task->shownAppId = task->appId;
-            task->shownActive = task->active;
-            task->shownMinimized = task->minimized;
-            task->shownMaximized = task->maximized;
-            task->shownUrgent = task->urgent;
+            task->shown = task->state;
             Q_EMIT dataChanged(index(i), index(i), roles);
             return;
         }
@@ -204,6 +267,8 @@ void TaskModel::removed(Task *task) {
     for (int i = 0; i < rowCount(); ++i)
         if (tasks_[i].get() == task) {
             beginRemoveRows({}, i, i);
+            if (task->window)
+                shaodesk_window_v1_destroy(task->window);
             zwlr_foreign_toplevel_handle_v1_destroy(task->handle);
             tasks_.erase(tasks_.begin() + i);
             endRemoveRows();
@@ -221,7 +286,20 @@ void TaskModel::global(void *data, wl_registry *registry, uint32_t name, const c
     } else if (!std::strcmp(interface, "wl_seat") && !self.seat_) {
         self.seat_ =
             static_cast<wl_seat *>(wl_registry_bind(registry, name, &wl_seat_interface, 1));
+    } else if (!std::strcmp(interface, shaodesk_window_control_v1_interface.name) && !self.control_) {
+        self.control_ = static_cast<shaodesk_window_control_v1 *>(
+            wl_registry_bind(registry, name, &shaodesk_window_control_v1_interface, 1));
+        for (auto &task : self.tasks_)
+            self.watch(task.get());
     }
+}
+void TaskModel::watch(Task *task) {
+    if (!control_ || task->window)
+        return;
+    task->window = shaodesk_window_control_v1_get_window(control_, task->handle);
+    static const shaodesk_window_v1_listener listener{windowOutput, windowWorkspace, windowState,
+                                                      windowDone};
+    shaodesk_window_v1_add_listener(task->window, &listener, task);
 }
 void TaskModel::globalRemoved(void *, wl_registry *, uint32_t) {}
 void TaskModel::newTask(void *data, zwlr_foreign_toplevel_manager_v1 *,
@@ -234,6 +312,7 @@ void TaskModel::newTask(void *data, zwlr_foreign_toplevel_manager_v1 *,
     static const zwlr_foreign_toplevel_handle_v1_listener listener{title, appId, output, output,
                                                                    state, done,  closed, nullptr};
     zwlr_foreign_toplevel_handle_v1_add_listener(handle, &listener, task.get());
+    self.watch(task.get());
     int row = self.rowCount();
     self.beginInsertRows({}, row, row);
     self.tasks_.push_back(std::move(task));
@@ -243,20 +322,21 @@ void TaskModel::finished(void *data, zwlr_foreign_toplevel_manager_v1 *) {
     Q_EMIT static_cast<TaskModel *>(data)->disconnected();
 }
 void TaskModel::title(void *data, zwlr_foreign_toplevel_handle_v1 *, const char *value) {
-    static_cast<Task *>(data)->title = QString::fromUtf8(value);
+    static_cast<Task *>(data)->state.title = QString::fromUtf8(value);
 }
 void TaskModel::appId(void *data, zwlr_foreign_toplevel_handle_v1 *, const char *value) {
-    static_cast<Task *>(data)->appId = QString::fromUtf8(value);
+    static_cast<Task *>(data)->state.appId = QString::fromUtf8(value);
 }
 void TaskModel::output(void *, zwlr_foreign_toplevel_handle_v1 *, wl_output *) {}
 void TaskModel::state(void *data, zwlr_foreign_toplevel_handle_v1 *, wl_array *states) {
-    auto &task = *static_cast<Task *>(data);
-    task.active = task.minimized = task.maximized = false;
+    auto &state = static_cast<Task *>(data)->state;
+    state.active = state.minimized = state.maximized = state.fullscreen = false;
     const auto *values = static_cast<const uint32_t *>(states->data);
     for (size_t i = 0; i < states->size / sizeof(uint32_t); ++i) {
-        task.active |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_ACTIVATED;
-        task.minimized |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MINIMIZED;
-        task.maximized |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MAXIMIZED;
+        state.active |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_ACTIVATED;
+        state.minimized |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MINIMIZED;
+        state.maximized |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_MAXIMIZED;
+        state.fullscreen |= values[i] == ZWLR_FOREIGN_TOPLEVEL_HANDLE_V1_STATE_FULLSCREEN;
     }
 }
 void TaskModel::done(void *data, zwlr_foreign_toplevel_handle_v1 *) {
@@ -266,4 +346,20 @@ void TaskModel::done(void *data, zwlr_foreign_toplevel_handle_v1 *) {
 void TaskModel::closed(void *data, zwlr_foreign_toplevel_handle_v1 *) {
     auto *task = static_cast<Task *>(data);
     task->model->removed(task);
+}
+void TaskModel::windowOutput(void *data, shaodesk_window_v1 *, const char *name) {
+    static_cast<Task *>(data)->state.output = QString::fromUtf8(name);
+}
+void TaskModel::windowWorkspace(void *data, shaodesk_window_v1 *, uint32_t number) {
+    static_cast<Task *>(data)->state.workspace = static_cast<int>(number);
+}
+void TaskModel::windowState(void *data, shaodesk_window_v1 *, uint32_t flags) {
+    auto &state = static_cast<Task *>(data)->state;
+    state.sticky = flags & SHAODESK_WINDOW_V1_STATE_STICKY;
+    state.floating = flags & SHAODESK_WINDOW_V1_STATE_FLOATING;
+    state.tiling = flags & SHAODESK_WINDOW_V1_STATE_TILING;
+}
+void TaskModel::windowDone(void *data, shaodesk_window_v1 *) {
+    auto *task = static_cast<Task *>(data);
+    task->model->changed(task);
 }

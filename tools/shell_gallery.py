@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Render every popup of the taskbar as a PNG, in a light and a dark theme.
+"""Render every popup of the taskbar and every overlay surface as a PNG, in a light and a dark
+theme.
 
 usage: tools/shell_gallery.py BUILD_DIR OUT_DIR [--renderer software|gpu|both]
                               [--theme light|dark] [--popup NAME] [--scale FACTOR]
                               [--icon-theme NAME] [--jobs N]
 
 Each picture is `shaodesk-shell --preview-popup NAME --screenshot`: the taskbar with that popup
-open, on stand-in windows, sound, tray items and notifications, over a wallpaper made for the
-purpose. They are written as OUT_DIR/THEME-NAME.png, and OUT_DIR/THEME-NAME-gpu.png for the GPU
+open, or with that overlay (the on-screen display, the cards, the switcher, ...) over it, on
+stand-in windows, sound, tray items and notifications, over a wallpaper made for the purpose. They are written as OUT_DIR/THEME-NAME.png, and OUT_DIR/THEME-NAME-gpu.png for the GPU
 renderer. The software renderer runs offscreen; the GPU one (Qt's OpenGL, on Mesa's software
 implementation here) needs a display, so it runs against a private headless compositor from
 BUILD_DIR. Nothing touches a real session: no display, session bus, configuration or state of
@@ -29,9 +30,12 @@ import tempfile
 import zlib
 
 # The names previewPopup in shell/Panel.qml knows.
-POPUPS = ["bar", "launcher", "power", "bar-menu", "bar-submenu", "task-menu", "pin-menu",
-          "group", "tray-menu", "tray-submenu", "calendar", "mixer", "outputs", "profiles",
-          "wallpapers", "notifications"]
+POPUPS = ["bar", "launcher", "power", "bar-menu", "bar-submenu", "task-menu", "stack-menu",
+          "pin-menu", "group", "tray-menu", "tray-submenu", "calendar", "mixer", "outputs",
+          "profiles", "wallpapers", "notifications"]
+# The overlay surfaces, each shown over the bar alone (PreviewData::surfaces in shell/preview.cpp).
+POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switcher",
+           "overview", "palette-empty"]
 # The start menu's other views and its menus.
 POPUPS += ["launcher-all", "launcher-search", "launcher-menu"]
 
@@ -200,6 +204,9 @@ def prepare(root, theme_name):
             entry += f"\n[Desktop Action {action}]\nName={title}\nExec=true\n"
             entry += f"Icon={action_icon}\n" if action_icon else ""
         (data / "applications" / f"{desktop_id}.desktop").write_text(entry)
+    # One of them pinned from the shell, without a window, so that pin-menu has actions to show.
+    (root / "state" / "shaodesk").mkdir(parents=True)
+    (root / "state" / "shaodesk" / "pinned").write_text("thunderbird.desktop\n")
     # The applications are the ones above, but the icons are the desktop's: the user's and the
     # system's icon folders are linked into the private data folders.
     home = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share")

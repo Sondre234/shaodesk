@@ -299,19 +299,8 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
             set_sticky(current, !current->sticky, true);
         break;
     case SH_TOGGLE_FLOATING:
-        if (current && current->sticky) {
-            current->sticky_floating = false; // it tiles once it is no longer sticky
-            set_sticky(current, false, true);
-        } else if (current && current->tiled) {
-            current->floating = true;
-            current->placed = false;
-            untile_toplevel(current, true);
-        } else if (current) {
-            current->floating = false;
-            current->scratchpad = false; // tiled, it leaves the scratchpad
-            if (wants_tiling(current, NULL))
-                tile_toplevel(current, NULL, NULL, true);
-        }
+        if (current)
+            set_floating(current, current->tiled, true);
         break;
     default:
         arrange_windows(server, action);

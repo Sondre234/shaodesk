@@ -23,3 +23,7 @@ Source SHA-256 checksums:
 The virtual pointer and virtual keyboard protocols are used only by the test client
 `tests/pointer_probe.c`. `virtual-keyboard-unstable-v1.xml` is the copy in the
 wayland-protocols-misc crate (from the same upstream), vendored on 2026-09-28.
+
+`shaodesk-window-control-v1.xml` is shaodesk's own: the shell's window menu moves a window it
+knows by its foreign-toplevel handle to another workspace or output, makes it sticky or floats
+it, and hears where it is (see [docs/architecture.md](../docs/architecture.md#naming-a-window-from-the-shell)).
