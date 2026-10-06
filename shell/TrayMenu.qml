@@ -14,9 +14,10 @@ PopupMenu {
     separatorName: "trayMenuSeparator"
     open: panel.trayMenuKey !== ""
     entries: panel.trayEntries(panel.trayMenuKey, 0, panel.trayMenuRevision)
-    anchorRect: panel.barAnchor(panel.trayMenuX, 0)
+    // Centred below its item, or from its left edge as macOS's menus open.
+    anchorRect: panel.barAnchor(panel.trayMenuX - panel.trayMenuWidth / 2, panel.trayMenuWidth)
     side: panel.popupSide
-    alignment: Qt.AlignHCenter
+    alignment: panel.macos ? Qt.AlignLeft : Qt.AlignHCenter
     bounds: panel.popupArea
     minimumWidth: 180
     onDismissed: panel.trayMenuKey = ""

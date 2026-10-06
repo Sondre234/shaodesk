@@ -37,10 +37,13 @@ Item {
     // The screen backlight, swapped the same way.
     property var backlightSource: shell.backlight
     property string audioPopup: ""
+    // The middle of the item it opens by, and the item's width.
     property real audioPopupX: 0
+    property real audioPopupWidth: 0
     // A tray item's menu: the item it belongs to ("" while closed), and where its icon is.
     property string trayMenuKey: ""
     property real trayMenuX: 0
+    property real trayMenuWidth: 0
     // Bumped when the open menu's item changes its entries, so they are read again.
     property int trayMenuRevision: 0
     // The menu bar's own menus in the macOS style: "system", "app" or "window" while one is open,
@@ -188,6 +191,7 @@ Item {
     function toggleAudioPopup(kind, item) {
         if (audioPopup === kind) { audioPopup = ""; return }
         audioPopupX = item.mapToItem(root, item.width / 2, 0).x
+        audioPopupWidth = item.width
         audioPopup = kind
         launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; trayMenuKey = ""; menuBarMenu = ""
     }
@@ -451,6 +455,7 @@ Item {
             return
         }
         trayMenuX = button.mapToItem(root, button.width / 2, 0).x
+        trayMenuWidth = button.width
         trayMenuKey = button.key
         launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false; menuBarMenu = ""
     }
