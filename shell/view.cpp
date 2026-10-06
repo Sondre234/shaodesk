@@ -117,8 +117,10 @@ void PopoverWindow::setPanel(QQuickWindow *panel) {
         // Super + R must show over a video.
         layer_->setLayer(W::LayerOverlay);
         layer_->setAnchors(W::Anchors(W::AnchorTop | W::AnchorBottom | W::AnchorLeft | W::AnchorRight));
-        // The whole output, the bar's strip included: a popup is placed by the bar.
+        // The whole output, the bar's strip included: a popup is placed by the bar. The
+        // compositor sizes it to the output.
         layer_->setExclusiveZone(-1);
+        layer_->setDesiredSize(QSize(0, 0));
         layer_->setKeyboardInteractivity(W::KeyboardInteractivityNone);
         layer_->setActivateOnShow(false);
     }
