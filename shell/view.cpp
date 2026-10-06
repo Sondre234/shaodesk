@@ -58,6 +58,11 @@ ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop,
             QMetaObject::invokeMethod(rootObject(), "togglePowerMenu");
     });
     connect(screen, &QScreen::geometryChanged, this, [this] { resizeForContent(); });
+    // A surface made anew as the view shows takes the region again.
+    connect(this, &QWindow::visibleChanged, this, [this](bool visible) {
+        if (visible)
+            applyInput();
+    });
 }
 PopoverWindow *ShellView::popover() const {
     return rootObject() ? rootObject()->findChild<PopoverWindow *>() : nullptr;
@@ -88,6 +93,25 @@ void ShellView::resizeForContent() {
     if (layer_)
         layer_->setDesiredSize(QSize(0, desktop_ ? 0 : height));
 #endif
+}
+
+void ShellView::setInputRects(const QVariantList &rects) {
+    if (rects == inputRects_)
+        return;
+    inputRects_ = rects;
+    Q_EMIT inputRectsChanged();
+    applyInput();
+}
+void ShellView::applyInput() {
+    inputRegion_ = QRegion();
+    for (const auto &rect : std::as_const(inputRects_))
+        inputRegion_ += rect.toRectF().toAlignedRect();
+    if (!layer_)
+        return;
+    // An empty mask is no mask: the whole surface.
+    setMask(inputRegion_);
+    // The region is the surface's state, sent with its next frame.
+    update();
 }
 
 PopoverWindow::PopoverWindow(QWindow *parent) : QQuickWindow(parent) {

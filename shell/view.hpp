@@ -10,6 +10,10 @@ class Window;
 class PopoverWindow;
 class ShellView : public QQuickView {
     Q_OBJECT
+    // Where the panel takes the pointer: rectangles in its coordinates, or the whole surface while
+    // there are none, as for the taskbar. The dock lists only its own rectangle, so that the
+    // desktop beside it and under its surface's headroom stays reachable.
+    Q_PROPERTY(QVariantList inputRects READ inputRects WRITE setInputRects NOTIFY inputRectsChanged)
   public:
     ShellView(ShellController &controller, QScreen *screen, bool desktop, bool preview);
     QScreen *outputScreen() const { return outputScreen_; }
@@ -19,14 +23,25 @@ class ShellView : public QQuickView {
     PopoverWindow *popover() const;
     // The size of the output a preview stands for.
     static QSize previewSize() { return {1100, 720}; }
+    QVariantList inputRects() const { return inputRects_; }
+    void setInputRects(const QVariantList &rects);
+    // inputRects as a region, empty for the whole surface. Applied to the surface with layer shell
+    // only, as a preview's platform may have no input regions.
+    QRegion inputRegion() const { return inputRegion_; }
+
+  Q_SIGNALS:
+    void inputRectsChanged();
 
   private:
     ShellController &controller_;
     bool desktop_, preview_;
     LayerShellQt::Window *layer_ = nullptr;
     QScreen *outputScreen_;
+    QVariantList inputRects_;
+    QRegion inputRegion_;
     void placeLayer();
     void resizeForContent();
+    void applyInput();
 };
 
 // The popups of one output's taskbar, in a surface of their own over the whole output: the bar's
