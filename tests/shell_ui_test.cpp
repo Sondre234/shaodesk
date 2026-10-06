@@ -3565,11 +3565,30 @@ ListModel {
     // clears the search and then closes it; a click on an application launches it, a right click
     // opens its menu, and a click beside the applications closes Launchpad.
     {
+        // The macOS style's tokens are the taskbar style's own in that style, which so keeps its
+        // look, and macOS's in the macOS style.
+        QQmlComponent probe(view.engine());
+        probe.setData("import QtQuick\nQtObject { property QtObject theme: Theme }",
+                      QUrl("qrc:/shell/ShaodeskShell/ThemeProbe.qml"));
+        std::unique_ptr<QObject> holder(probe.create());
+        auto *theme = holder ? holder->property("theme").value<QObject *>() : nullptr;
+        if (!theme)
+            return fail("Theme did not load");
+        auto token = [&](const char *name) { return theme->property(name); };
+        if (token("macos").toBool() || token("menuRowHeight") != token("rowHeight") ||
+            token("menuRadius") != token("radiusMedium") || token("menuHighlight") != token("hover") ||
+            token("popupSurface") != token("surface") || token("popupOutline") != token("border") ||
+            token("textOnAccentFill") != token("textOnAccent") || token("buttonFace") != token("surfaceRaised"))
+            return fail("the macOS style's tokens are not the taskbar style's own in that style");
         if (!rewrite(QString(lua).replace("shell={wallpaper", "shell={style='macos',wallpaper")))
             return fail("could not rewrite the configuration");
         controller.reload();
         if (!QTest::qWaitFor([&] { return controller.style() == "macos"; }))
             return fail("the configuration's macOS style was not read");
+        if (!token("macos").toBool() || token("menuRowHeight").toInt() != 24 ||
+            token("menuHighlight") != token("accent") ||
+            token("textOnAccentFill").value<QColor>() != QColor(Qt::white))
+            return fail("the macOS style's menus are not drawn as macOS draws them");
         QFile::remove(marker);
         auto *root = view.rootObject();
         QQuickItem *launchpad = nullptr;
