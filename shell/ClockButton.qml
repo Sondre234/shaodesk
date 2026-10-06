@@ -11,6 +11,7 @@ FlatButton {
     objectName: "clockButton"
     visible: shell.widgets.clock
     Layout.preferredWidth: clock.implicitWidth + 12; Layout.preferredHeight: clockButton.barHeight - 10
+    hoverEnabled: true
     enabled: shell.widgets.calendar
     onClicked: clockButton.panel.toggleAudioPopup("calendar", clockButton)
     Accessible.name: Qt.formatDateTime(clock.now, "dddd d MMMM yyyy, HH:mm")

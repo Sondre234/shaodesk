@@ -16,6 +16,7 @@ FlatButton {
         (center.unread > 0 ? center.unread + " unread notifications" : "No new notifications")
     visible: center.serving
     Layout.preferredWidth: 40; Layout.preferredHeight: barHeight - 10
+    hoverEnabled: true
     onClicked: panel.toggleAudioPopup("notifications", bell)
     Accessible.name: description
     BarTip { panel: bell.panel; owner: bell; text: bell.description + "\nRight-click: do not disturb" }

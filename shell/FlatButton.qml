@@ -9,7 +9,6 @@ Button {
     id: button
     property bool active: false
     property real radius: Theme.radiusSmall
-    hoverEnabled: true
     background: Rectangle {
         radius: button.radius
         color: button.pressed ? Theme.pressed

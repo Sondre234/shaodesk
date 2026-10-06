@@ -15,6 +15,7 @@ FlatButton {
     readonly property color tint: low ? Theme.danger : (status.batteryState === "charging" ? Theme.accent : Theme.text)
     visible: shell.widgets.battery && status.batteryPresent
     Layout.preferredWidth: 62; Layout.preferredHeight: battery.barHeight - 10
+    hoverEnabled: true
     Accessible.name: status.batteryText
     BarTip { panel: battery.panel; owner: battery; text: battery.status.batteryText }
     contentItem: Row {

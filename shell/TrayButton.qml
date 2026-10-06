@@ -20,6 +20,7 @@ FlatButton {
     objectName: "trayItem"
     visible: status !== "Passive"
     width: 32; height: shell.panelHeight - 10
+    hoverEnabled: true
     active: panel.trayMenuKey === key
     Accessible.name: title
     onClicked: panel.trayActivate(trayButton)

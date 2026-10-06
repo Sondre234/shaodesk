@@ -15,6 +15,7 @@ FlatButton {
     readonly property string description: "Keyboard layout: " + (layout.name || label)
     visible: shell.widgets.keyboard_layout && (layout.count || 0) > 1
     Layout.preferredWidth: Math.max(40, text.implicitWidth + 16); Layout.preferredHeight: barHeight - 10
+    hoverEnabled: true
     onClicked: { panel.closeMenus(); shell.send("switch_layout next") }
     Accessible.name: description
     BarTip { panel: indicator.panel; owner: indicator; text: indicator.description + "\nClick: next layout" }

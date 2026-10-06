@@ -15,6 +15,7 @@ FlatButton {
     readonly property color tint: linkDown ? Theme.textMuted : Theme.text
     visible: shell.widgets.network && status.networkState !== "none"
     Layout.preferredWidth: 34; Layout.preferredHeight: network.barHeight - 10
+    hoverEnabled: true
     Accessible.name: status.networkText
     BarTip { panel: network.panel; owner: network; text: network.status.networkText }
     contentItem: Item {
