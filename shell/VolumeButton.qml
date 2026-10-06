@@ -5,7 +5,7 @@ import QtQuick.Layouts
 
 // The default output's volume. Left-click: per-application volumes; right-click: the
 // output; wheel: louder or quieter; middle-click: mute.
-Button {
+FlatButton {
     id: audioWidget
     required property var panel
     required property real barHeight
@@ -15,19 +15,16 @@ Button {
     onClicked: audioWidget.panel.toggleAudioPopup("mixer", audioWidget)
     Accessible.name: "Volume " + audioWidget.panel.audioSource.volume + "%" + (audioWidget.panel.audioSource.muted ? ", muted" : "")
     BarTip { panel: audioWidget.panel; owner: audioWidget; text: audioWidget.Accessible.name }
-    background: Rectangle {
-        radius: 7
-        color: (audioWidget.panel.audioPopup === "mixer" || audioWidget.panel.audioPopup === "outputs") ? Qt.lighter(shell.panelColor, 1.8) : (audioWidget.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
-    }
+    active: audioWidget.panel.audioPopup === "mixer" || audioWidget.panel.audioPopup === "outputs"
     contentItem: Item {
         Row {
             anchors.centerIn: parent; spacing: 4
-            SpeakerIcon { anchors.verticalCenter: parent.verticalCenter; level: audioWidget.panel.audioSource.volume; muted: audioWidget.panel.audioSource.muted; color: audioWidget.panel.audioSource.muted ? "#8a96a8" : shell.textColor }
+            SpeakerIcon { anchors.verticalCenter: parent.verticalCenter; level: audioWidget.panel.audioSource.volume; muted: audioWidget.panel.audioSource.muted; color: audioWidget.panel.audioSource.muted ? Theme.textMuted : Theme.text }
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 text: audioWidget.panel.audioSource.volume + "%"
-                color: audioWidget.panel.audioSource.muted ? "#8a96a8" : shell.textColor
-                font.pixelSize: Math.max(6, shell.fontSize - 1); font.family: audioWidget.panel.uiFont
+                color: audioWidget.panel.audioSource.muted ? Theme.textMuted : Theme.text
+                font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
             }
         }
     }

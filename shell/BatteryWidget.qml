@@ -5,19 +5,17 @@ import QtQuick.Layouts
 
 // The battery: an outline filled to the charge, red when nearly empty and not charging,
 // in the accent colour while charging.
-Button {
+FlatButton {
     id: battery
     required property var panel
     required property real barHeight
     objectName: "batteryWidget"
     readonly property var status: battery.panel.statusSource
     readonly property bool low: status.batteryPercent <= 15 && status.batteryState !== "charging"
-    readonly property color tint: low ? "#ff6b6b" : (status.batteryState === "charging" ? shell.accent : shell.textColor)
+    readonly property color tint: low ? Theme.danger : (status.batteryState === "charging" ? Theme.accent : Theme.text)
     visible: shell.widgets.battery && status.batteryPresent
     Layout.preferredWidth: 62; Layout.preferredHeight: battery.barHeight - 10
-    hoverEnabled: true
     Accessible.name: status.batteryText
-    background: Rectangle { radius: 7; color: battery.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
     BarTip { panel: battery.panel; owner: battery; text: battery.status.batteryText }
     contentItem: Row {
         spacing: 5
@@ -40,7 +38,7 @@ Button {
             anchors.verticalCenter: parent.verticalCenter
             text: battery.status.batteryPercent + "%"
             color: battery.tint
-            font.pixelSize: Math.max(6, shell.fontSize - 1); font.family: battery.panel.uiFont
+            font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
         }
     }
 }

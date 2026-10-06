@@ -6,7 +6,7 @@ import QtQuick.Controls.Basic
 // it needs attention. Left-click activates the application (or opens the menu of an item that
 // is only a menu), middle-click is its secondary action, right-click opens its menu, and the
 // wheel scrolls it.
-Button {
+FlatButton {
     id: trayButton
     required property string key
     required property string title
@@ -20,7 +20,7 @@ Button {
     objectName: "trayItem"
     visible: status !== "Passive"
     width: 32; height: shell.panelHeight - 10
-    hoverEnabled: true
+    active: panel.trayMenuKey === key
     Accessible.name: title
     onClicked: panel.trayActivate(trayButton)
     ToolTip {
@@ -33,11 +33,6 @@ Button {
         contentItem: Text { text: trayTip.text; textFormat: Text.PlainText; font: trayTip.font; wrapMode: Text.Wrap; color: trayTip.palette.toolTipText }
         y: trayButton.panel.onTop ? trayButton.height + 6 : -implicitHeight - 6
         Component.onCompleted: if ("popupType" in trayTip) trayTip.popupType = Popup.Window
-    }
-    background: Rectangle {
-        radius: 7
-        color: trayButton.panel.trayMenuKey === trayButton.key ? Qt.lighter(shell.panelColor, 1.8)
-               : trayButton.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent"
     }
     contentItem: Item {
         Image {
