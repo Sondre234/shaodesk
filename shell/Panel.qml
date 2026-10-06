@@ -504,16 +504,6 @@ Item {
         }
     }
 
-    // A tooltip in a popup window of its own: the panel's surface is only as tall as the bar.
-    component BarTip: ToolTip {
-        id: barTip
-        required property Item owner
-        visible: owner.hovered && !owner.pressed && text.length > 0 && !root.menuOpen
-        delay: 500
-        y: root.onTop ? owner.height + 6 : -implicitHeight - 6
-        Component.onCompleted: if ("popupType" in barTip) barTip.popupType = Popup.Window
-    }
-
     // The battery: an outline filled to the charge, red when nearly empty and not charging,
     // in the accent colour while charging.
     component BatteryWidget: Button {
@@ -527,7 +517,7 @@ Item {
         hoverEnabled: true
         Accessible.name: status.batteryText
         background: Rectangle { radius: 7; color: battery.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
-        BarTip { owner: battery; text: battery.status.batteryText }
+        BarTip { panel: root; owner: battery; text: battery.status.batteryText }
         contentItem: Row {
             spacing: 5
             anchors.centerIn: parent
@@ -567,7 +557,7 @@ Item {
         hoverEnabled: true
         Accessible.name: status.networkText
         background: Rectangle { radius: 7; color: network.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
-        BarTip { owner: network; text: network.status.networkText }
+        BarTip { panel: root; owner: network; text: network.status.networkText }
         contentItem: Item {
             Icon {
                 anchors.centerIn: parent
@@ -1886,7 +1876,7 @@ Item {
                         height: bar.height - 14
                         onClicked: { root.closeMenus(); workspaceIndicator.show(number) }
                         Accessible.name: "Workspace " + number + (label ? " " + label : "") + (urgent ? " (needs attention)" : "")
-                BarTip { owner: workspaceButton; text: "Workspace " + number + (label ? ": " + label : "") + (occupied ? "" : " (empty)") + (urgent ? ", needs attention" : "") }
+                BarTip { panel: root; owner: workspaceButton; text: "Workspace " + number + (label ? ": " + label : "") + (occupied ? "" : " (empty)") + (urgent ? ", needs attention" : "") }
                         background: Rectangle {
                             radius: 6
                             color: workspaceButton.current ? Qt.lighter(shell.panelColor, 1.8) : (workspaceButton.hovered ? Qt.lighter(shell.panelColor, 1.4) : "transparent")
@@ -1931,7 +1921,7 @@ Item {
                 Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
                 onClicked: root.toggleAudioPopup("wallpapers", wallpapersButton)
                 Accessible.name: "Wallpapers"
-                BarTip { owner: wallpapersButton; text: "Wallpapers" }
+                BarTip { panel: root; owner: wallpapersButton; text: "Wallpapers" }
                 background: Rectangle {
                     radius: 7
                     color: root.audioPopup === "wallpapers" ? Qt.lighter(shell.panelColor, 1.8) : (wallpapersButton.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
@@ -1948,7 +1938,7 @@ Item {
                 Layout.preferredWidth: 40; Layout.preferredHeight: bar.height - 10
                 onClicked: root.toggleAudioPopup("profiles", profilesButton)
                 Accessible.name: "Appearance: " + (shell.profile || "none")
-                BarTip { owner: profilesButton; text: "Appearance: " + (shell.profile || "none") }
+                BarTip { panel: root; owner: profilesButton; text: "Appearance: " + (shell.profile || "none") }
                 background: Rectangle {
                     radius: 7
                     color: root.audioPopup === "profiles" ? Qt.lighter(shell.panelColor, 1.8) : (profilesButton.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
@@ -1981,7 +1971,7 @@ Item {
                 opacity: enabled ? 1 : 0.4
                 onClicked: { root.closeMenus(); shell.toggleTiling(outputName) }
                 Accessible.name: root.tiling ? "Tiling on" : "Tiling off"
-                BarTip { owner: tilingToggle; text: root.tiling ? "Tiling on: click for floating" : "Floating: click to tile" }
+                BarTip { panel: root; owner: tilingToggle; text: root.tiling ? "Tiling on: click for floating" : "Floating: click to tile" }
                 background: Rectangle {
                     radius: 7
                     color: root.tiling ? Qt.lighter(shell.panelColor, 1.8) : (tilingToggle.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
@@ -2019,7 +2009,7 @@ Item {
                 Layout.preferredWidth: 60; Layout.preferredHeight: bar.height - 10
                 onClicked: root.toggleAudioPopup("mixer", audioWidget)
                 Accessible.name: "Volume " + root.audioSource.volume + "%" + (root.audioSource.muted ? ", muted" : "")
-                BarTip { owner: audioWidget; text: audioWidget.Accessible.name }
+                BarTip { panel: root; owner: audioWidget; text: audioWidget.Accessible.name }
                 background: Rectangle {
                     radius: 7
                     color: (root.audioPopup === "mixer" || root.audioPopup === "outputs") ? Qt.lighter(shell.panelColor, 1.8) : (audioWidget.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
@@ -2074,7 +2064,7 @@ Item {
                     radius: 7
                     color: root.audioPopup === "calendar" ? Qt.lighter(shell.panelColor, 1.8) : (clockButton.hovered && clockButton.enabled ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
                 }
-                BarTip { owner: clockButton; text: Qt.formatDate(clock.now, "dddd d MMMM yyyy") }
+                BarTip { panel: root; owner: clockButton; text: Qt.formatDate(clock.now, "dddd d MMMM yyyy") }
                 contentItem: Text {
                     id: clock
                     objectName: "clock"
@@ -2097,7 +2087,7 @@ Item {
                 Layout.preferredWidth: 14; Layout.fillHeight: true
                 onClicked: { root.closeMenus(); shell.tasks.showDesktop() }
                 Accessible.name: "Show desktop"
-                BarTip { owner: showDesktopButton; text: "Show desktop" }
+                BarTip { panel: root; owner: showDesktopButton; text: "Show desktop" }
                 background: Rectangle { color: parent.hovered ? shell.accent : Qt.lighter(shell.panelColor, 1.6); width: 3; anchors.right: parent.right }
             }
         }
