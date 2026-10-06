@@ -36,10 +36,12 @@ static void overview_thumb_place(struct sh_thumb *thumb, struct wlr_scene_tree *
         if (!thumb->tree)
             return;
     }
-    uint64_t print = sh_thumb_fingerprint(toplevel->scene_tree);
+    // The cards behind the thumbnails stand in for the windows' shadows.
+    const struct wlr_scene_node *shadow = toplevel->shadow ? &toplevel->shadow->node : NULL;
+    uint64_t print = sh_thumb_fingerprint(toplevel->scene_tree, shadow);
     if (print != thumb->fingerprint || fabs(scale - thumb->scale) > 1e-4) {
         sh_thumb_clear(thumb->tree);
-        sh_thumb_clone(thumb->tree, toplevel->scene_tree, scale, 1.0f);
+        sh_thumb_clone(thumb->tree, toplevel->scene_tree, scale, 1.0f, shadow);
         thumb->fingerprint = print;
         thumb->scale = scale;
     }

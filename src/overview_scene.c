@@ -9,14 +9,16 @@ static uint64_t mix(uint64_t hash, uint64_t value) {
     return hash;
 }
 
-static uint64_t fingerprint(uint64_t hash, const struct wlr_scene_tree *tree) {
+static uint64_t fingerprint(uint64_t hash, const struct wlr_scene_tree *tree,
+                            const struct wlr_scene_node *skip) {
     const struct wlr_scene_node *node;
     wl_list_for_each(node, &tree->children, link) {
-        if (!node->enabled)
+        if (!node->enabled || node == skip)
             continue;
         hash = mix(hash, (uint64_t)(uint32_t)node->x << 32 | (uint32_t)node->y);
         if (node->type == WLR_SCENE_NODE_TREE) {
-            hash = fingerprint(hash, wlr_scene_tree_from_node((struct wlr_scene_node *)node));
+            hash = fingerprint(hash, wlr_scene_tree_from_node((struct wlr_scene_node *)node),
+                               skip);
         } else if (node->type == WLR_SCENE_NODE_RECT) {
             const struct wlr_scene_rect *rect =
                 wlr_scene_rect_from_node((struct wlr_scene_node *)node);
@@ -41,8 +43,9 @@ static uint64_t fingerprint(uint64_t hash, const struct wlr_scene_tree *tree) {
     return hash;
 }
 
-uint64_t sh_thumb_fingerprint(const struct wlr_scene_tree *tree) {
-    return fingerprint(1469598103934665603ULL, tree);
+uint64_t sh_thumb_fingerprint(const struct wlr_scene_tree *tree,
+                              const struct wlr_scene_node *skip) {
+    return fingerprint(1469598103934665603ULL, tree, skip);
 }
 
 /* A scaled span from `start` of `length` on the same grid as its neighbours, so adjoining
@@ -54,16 +57,16 @@ static void span(double scale, int start, int length, int *out_start, int *out_l
 }
 
 static int clone(struct wlr_scene_tree *target, const struct wlr_scene_tree *tree, int ox, int oy,
-                 double scale, float opacity) {
+                 double scale, float opacity, const struct wlr_scene_node *skip) {
     int made = 0;
     const struct wlr_scene_node *node;
     wl_list_for_each(node, &tree->children, link) {
-        if (!node->enabled)
+        if (!node->enabled || node == skip)
             continue;
         int x = ox + node->x, y = oy + node->y;
         if (node->type == WLR_SCENE_NODE_TREE) {
             made += clone(target, wlr_scene_tree_from_node((struct wlr_scene_node *)node), x, y,
-                          scale, opacity);
+                          scale, opacity, skip);
         } else if (node->type == WLR_SCENE_NODE_RECT) {
             const struct wlr_scene_rect *rect =
                 wlr_scene_rect_from_node((struct wlr_scene_node *)node);
@@ -108,8 +111,8 @@ static int clone(struct wlr_scene_tree *target, const struct wlr_scene_tree *tre
 }
 
 int sh_thumb_clone(struct wlr_scene_tree *target, const struct wlr_scene_tree *source,
-                   double scale, float opacity) {
-    return clone(target, source, 0, 0, scale, opacity);
+                   double scale, float opacity, const struct wlr_scene_node *skip) {
+    return clone(target, source, 0, 0, scale, opacity, skip);
 }
 
 void sh_thumb_clear(struct wlr_scene_tree *target) {
