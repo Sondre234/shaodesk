@@ -876,7 +876,7 @@ corner); further cards stack under it and slide in and out.
   clock counts those not yet seen; opening the flyout marks them seen. Clicking an entry runs its
   default action, the × that shows while the pointer is over it removes it, and Clear all empties
   the list. The flyout opens on the monitor under the pointer with `notification_history` too
-  (Super + N), and from a bell on the bar with `shell.widgets.notifications = true`.
+  (Super + N), and from a bell on the bar with `shell.widgets.notifications = "bar"`.
 - Do-not-disturb (`dnd_toggle`, `dnd_on`, `dnd_off`, `shaodesk msg dnd [on|off|toggle]`, a
   right-click on the clock or the bell, the switch in the flyout, the tile in Quick Settings, or
   `notifications.dnd = true` to start that

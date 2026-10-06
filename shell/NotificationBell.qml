@@ -2,7 +2,7 @@
 import QtQuick
 import QtQuick.Layouts
 
-// The bell in the panel (shell.widgets.notifications, off by default: the clock does the same):
+// The bell in the panel (shell.widgets.notifications = "bar"; the clock does the same anyway):
 // opens the clock flyout with the notifications, shows how many have not been seen, and turns into
 // a crossed-out bell while do-not-disturb is on. Right-click toggles do-not-disturb.
 FlatButton {

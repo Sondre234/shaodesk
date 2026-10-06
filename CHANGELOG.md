@@ -40,7 +40,7 @@ release; the dated sections below it record the work that led up to it, and all 
   month in), zooms out from its title to the months and the years, and has a Today button.
   `notification_history` (Super + N) opens the flyout. The clock shows the unread count, muted
   with do-not-disturb, which a right-click on it toggles; the bell is off unless
-  `shell.widgets.notifications = true`.
+  `shell.widgets.notifications = "bar"`.
 - Quick Settings, as on Windows 11: a button left of the clock with the network, volume and
   battery icons (its wheel changes the volume, a middle click mutes) opens tiles for
   do-not-disturb, night light, tiling on the monitor, the appearance profiles, the wallpaper
