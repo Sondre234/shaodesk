@@ -49,10 +49,21 @@ Button {
         visible: shell.iconsOnly && !task.stacked && task.hovered && !task.panel.expanded && !task.pressed
         text: task.title
     }
-    background: Rectangle {
-        radius: Theme.radiusSmall
-        color: task.shownUrgent ? Theme.urgentSubtle
-               : task.shownActive ? Theme.selected : (task.hovered ? Theme.hover : "transparent")
+    // How far the activity line has come in, from 0 to 1, for a button that arrives (its
+    // window opening) to draw it out from its middle.
+    property real reveal: 1
+    NumberAnimation on reveal {
+        id: revealing
+        running: false
+        from: 0; to: 1
+        duration: Theme.durationNormal; easing.type: Theme.easing
+    }
+    function appear() { revealing.restart() }
+    background: ButtonFill {
+        hovered: task.hovered
+        pressed: task.pressed
+        active: task.shownActive
+        color: task.shownUrgent ? Theme.urgentSubtle : stateColor
         border.width: task.shownUrgent ? 1 : 0; border.color: Theme.urgent
         // Several windows: a second button's edge peeks out behind this one.
         Rectangle {
@@ -61,15 +72,29 @@ Button {
             color: "transparent"; border.width: 1
             border.color: task.shownActive ? Theme.alpha(Theme.text, 0.3) : Theme.border
         }
-        Row {
+        // The activity line along the bottom: long under the focused window's button, short
+        // under the others, split in two for a stack; in the accent colour, the urgent one, or
+        // dimmed while minimized. Its length and colour ease to each new state.
+        Item {
+            id: line
+            objectName: "taskLine"
+            readonly property real segment: (task.shownActive ? (shell.iconsOnly ? 18 : 28) / (task.stacked ? 2 : 1)
+                                                              : (task.stacked ? 6 : 10)) * task.reveal
+            property real first: segment
+            property real second: task.stacked ? segment : 0
+            property real gap: task.stacked ? 3 : 0
+            property color tint: task.shownUrgent ? Theme.urgent : task.shownMinimized ? Theme.textDisabled : Theme.accent
+            Behavior on first { enabled: !revealing.running; NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
+            Behavior on second { enabled: !revealing.running; NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
+            Behavior on gap { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
+            Behavior on tint { ColorAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
             anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 3
-            Repeater {
-                model: task.stacked ? 2 : 1
-                Rectangle {
-                    width: task.shownActive ? (shell.iconsOnly ? 18 : 28) / (task.stacked ? 2 : 1) : (task.stacked ? 6 : 10)
-                    height: 3; radius: 1; color: task.shownUrgent ? Theme.urgent : task.shownMinimized ? Theme.textDisabled : Theme.accent
-                }
+            width: first + gap + second; height: 3
+            Rectangle { width: line.first; height: parent.height; radius: 1; color: line.tint }
+            Rectangle {
+                visible: width > 0
+                x: line.first + line.gap; width: line.second; height: parent.height; radius: 1
+                color: line.tint
             }
         }
         // A dot that pulses a few times when the window asks for attention, then holds.
