@@ -5,6 +5,7 @@ backend has no gamma hardware and its screen capture is taken before the colour 
 what the screen shows needs a real output and is not covered here."""
 from pathlib import Path
 import signal
+import socket
 import sys
 
 import harness
@@ -30,6 +31,27 @@ manual = ("enabled = true, night_temperature = 3400, sunrise = '07:00', sunset =
           "transition = 60")
 
 
+class Subscriber:
+    """The night light states the control socket's stream announced, as the shell reads them:
+    "ACTIVE MODE"."""
+
+    def __init__(self, desktop):
+        self.socket = socket.socket(socket.AF_UNIX)
+        self.socket.connect(desktop.env["SHAODESK_SOCKET"])
+        self.socket.sendall(b"subscribe\n")
+        self.socket.settimeout(0.05)
+        self.buffer = ""
+
+    def heard(self):
+        try:
+            while data := self.socket.recv(8192):
+                self.buffer += data.decode()
+        except socket.timeout:
+            pass
+        return [line[len("night-light "):] for line in self.buffer.splitlines()
+                if line.startswith("night-light ")]
+
+
 def run(clock, body, extra=manual):
     """Runs `body` on a compositor with the clock fixed at `clock`."""
     with harness.Compositor(compositor, settings(extra),
@@ -40,7 +62,11 @@ def run(clock, body, extra=manual):
 def noon(desktop):
     msg = desktop.msg
     assert state(msg) == (6500, 0, 1), state(msg)
-    # Forcing night, neutral, and back to the schedule.
+    subscriber = Subscriber(desktop)
+    desktop.wait_for(lambda: subscriber.heard() == ["off auto"], "the first state",
+                     detail=subscriber.heard)
+    # Forcing night, neutral, and back to the schedule; subscribers (the shell's Quick Settings)
+    # hear each.
     msg("night_light_on")
     assert state(msg) == (3400, 2, 1), state(msg)
     msg("night_light_toggle")
@@ -49,6 +75,9 @@ def noon(desktop):
     assert state(msg)[:2] == (3400, 2), state(msg)
     msg("night_light_auto")
     assert state(msg) == (6500, 0, 1), state(msg)
+    desktop.wait_for(lambda: subscriber.heard() == ["off auto", "on on", "off off", "on on",
+                                                     "off auto"],
+                     "subscribers told of each change", detail=subscriber.heard)
 
 
 def midnight(desktop):
@@ -83,4 +112,4 @@ run("22:00", expect(lambda k: k == 3400, "night after the transition"))
 located = "enabled = true, latitude = 0, longitude = 0, transition = 10"
 run("12:00", expect(lambda k: k == 6500, "day at noon"), located)
 run("00:00", expect(lambda k: k == 3400, "night at midnight"), located)
-print("Night light follows the schedule and overrides")
+print("Night light follows the schedule and overrides, and tells subscribers")
