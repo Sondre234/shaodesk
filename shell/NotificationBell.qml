@@ -35,7 +35,8 @@ FlatButton {
         // The unread count on the bell's shoulder, as the clock's.
         Badge {
             objectName: "notificationBadge"
-            x: parent.width / 2 + Theme.spacingXS; y: parent.height / 2 - Theme.iconSize + Theme.spacingXS
+            // Inside the button, however short the bar (the macOS style's menu bar).
+            x: parent.width / 2 + Theme.spacingXS; y: Math.max(-bell.topPadding, parent.height / 2 - Theme.iconSize + Theme.spacingXS)
             count: bell.center.unread
             muted: bell.center.dnd
         }
