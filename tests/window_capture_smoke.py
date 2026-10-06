@@ -49,9 +49,10 @@ with harness.Compositor(compositor, CONFIG) as desktop:
         return f"{width}x{height} {BAND} {BODY}"
 
     def captures(title, expected):
-        """Both ways to the window's capture source give one frame, as `expected`."""
+        """Capturing the window both ways prints `expected`."""
         for path in PATHS:
-            assert run(title, path) == expected, (path, run(title, path))
+            printed = run(title, path)
+            assert printed == expected, (path, printed)
 
     a = desktop.spawn([probe, "--window-only"],
                       env={"SHAODESK_PROBE_TITLE": "A", "SHAODESK_PROBE_APP_ID": "app-A"})
