@@ -221,6 +221,12 @@ QtObject {
     // A search field: its height and corners, and its fill.
     readonly property int fieldHeight: macos ? 28 : rowHeight + spacingS
     readonly property color fieldFill: macos ? alpha(text, light ? 0.06 : 0.1) : surfaceRaised
+    // The window switcher, in the macOS style as macOS's application switcher: large icons on a
+    // rounded, translucent card, the one chosen on a light square, its title only under them.
+    readonly property int switcherIconSize: macos ? 96 : appIconSizeDisplay
+    readonly property int switcherRadius: macos ? 24 : radiusLarge
+    readonly property color switcherSurface: macos ? alpha(popupSurface, 0.88) : surface
+    readonly property color switcherSelection: macos ? alpha(text, 0.16) : accentSubtle
 
     // `milliseconds` at the animation speed, 0 with animations off.
     function duration(milliseconds) { return Math.round(milliseconds * motionScale) }
