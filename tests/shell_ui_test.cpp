@@ -1748,6 +1748,26 @@ int main(int argc, char **argv) {
             return fail("a desktop action from the start menu did not run, or the menu stayed");
         if (!openStart())
             return fail("the start menu did not open after a desktop action");
+        // Dragging a tile onto another's place moves it there, the press launching nothing.
+        {
+            auto *dragged = item("startTile:shaodesk-test-other.desktop");
+            auto *first = item("startTile:shaodesk-test-app.desktop");
+            if (!dragged || !first || !QTest::qWaitFor([&] { return dragged->isVisible() && first->isVisible(); }))
+                return fail("the tiles to drag are not shown");
+            const QPoint from = centre(dragged), to = centre(first);
+            QTest::mousePress(popover, Qt::LeftButton, Qt::NoModifier, from);
+            for (int step = 1; step <= 10; ++step) {
+                QTest::mouseMove(popover, from + (to - from) * step / 10);
+                QTest::qWait(10);
+            }
+            QTest::mouseRelease(popover, Qt::LeftButton, Qt::NoModifier, to);
+            if (!QTest::qWaitFor([&] {
+                    return startPins() == "shaodesk-test-other.desktop\nshaodesk-test-app.desktop\n"
+                                          "shaodesk-test-actions.desktop\n";
+                }) ||
+                !launcherOpen() || start->recent()[0].toMap()["appId"] == "shaodesk-test-other.desktop")
+                return fail(("dragging a tile did not move it: " + startPins().toStdString()).c_str());
+        }
         // A search groups what it finds: the best match first, then applications, windows and
         // actions; the keyboard moves through them all and Enter runs the one it is at.
         editTasks("model.append({ taskId: 42, title: 'Quarterly report', appId: 'shaodesk-test-other', "

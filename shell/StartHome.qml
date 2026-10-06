@@ -37,6 +37,40 @@ Item {
         page = 0
         current = -1
     }
+    // Where pin `index` lies, its page's rows under the page before.
+    function cellX(index) { return index % perPage % columns * cellWidth }
+    function cellY(index) {
+        return (Math.floor(index / perPage) * rows + Math.floor(index % perPage / columns)) * cellHeight
+    }
+    // The tile being dragged, the pin whose place it takes, and how far it has been dragged.
+    property int dragFrom: -1
+    property int dragTo: -1
+    property point dragOffset: Qt.point(0, 0)
+    function drag(index, offset) {
+        dragFrom = index
+        dragOffset = offset
+        // The cell under its middle, on the page shown.
+        var column = Math.max(0, Math.min(columns - 1, Math.floor((cellX(index) + offset.x + cellWidth / 2) / cellWidth)))
+        var row = Math.max(0, Math.min(rows - 1, Math.floor((cellY(index) - page * rows * cellHeight +
+                                                             offset.y + cellHeight / 2) / cellHeight)))
+        dragTo = Math.min(pins.length - 1, page * perPage + row * columns + column)
+    }
+    function drop() {
+        var from = dragFrom, to = dragTo
+        if (from < 0)
+            return
+        if (to < 0 || to === from) {
+            dragFrom = dragTo = -1
+            return
+        }
+        // Moving the pin makes the tiles anew, the dragged one and its handler with them; till
+        // then they stay where the drag left them.
+        var app = pins[from].appId, target = pins[to].appId
+        Qt.callLater(function() {
+            shell.startMenu.movePin(app, target)
+            home.dragFrom = home.dragTo = -1
+        })
+    }
     // The tile or row the keyboard is at, or null.
     function currentItem() {
         return current < 0 ? null : current < pins.length ? tiles.itemAt(current)
@@ -128,14 +162,36 @@ Item {
                     id: tile
                     required property var modelData
                     required property int index
-                    readonly property int place: index % home.perPage
+                    readonly property bool dragging: home.dragFrom === index
+                    // Where it shows while another is dragged: its place, or the one before or
+                    // after it as it makes way.
+                    readonly property int shownAt: {
+                        var from = home.dragFrom, to = home.dragTo
+                        if (from < 0 || dragging)
+                            return index
+                        if (from < to && index > from && index <= to)
+                            return index - 1
+                        if (from > to && index >= to && index < from)
+                            return index + 1
+                        return index
+                    }
                     app: modelData
                     current: home.current === index
-                    x: place % home.columns * home.cellWidth
-                    y: (Math.floor(index / home.perPage) * home.rows + Math.floor(place / home.columns)) * home.cellHeight
+                    x: home.cellX(shownAt) + (dragging ? home.dragOffset.x : 0)
+                    y: home.cellY(shownAt) + (dragging ? home.dragOffset.y : 0)
+                    z: dragging ? 1 : 0
+                    Behavior on x { enabled: !tile.dragging; NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
+                    Behavior on y { enabled: !tile.dragging; NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
                     width: home.cellWidth; height: home.cellHeight
                     onClicked: home.launcher.launch(modelData.appId)
                     onMenuRequested: (x, y) => home.launcher.openAppMenu(modelData, tile, x, y, true)
+                    // Dragged, it follows the pointer through its page, the tiles it passes
+                    // making way, and moves there on release; the press never becomes a click.
+                    DragHandler {
+                        target: null
+                        onActiveTranslationChanged: if (active) home.drag(tile.index, activeTranslation)
+                        onActiveChanged: if (!active) home.drop()
+                    }
                 }
             }
         }
