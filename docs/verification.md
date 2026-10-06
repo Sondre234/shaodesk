@@ -474,3 +474,20 @@ log and session bus it then has; `shaodesk-session` from a text console on OpenR
 standalone session logs without a session bus; real terminals opened by `terminal` and swallowed
 (GNOME Terminal's `org.gnome.Terminal` app ID is taken from its documentation); and the panel's
 error on a real display.
+
+## Shell groundwork: popup gallery, design tokens, GPU renderer
+
+Added 2026-10-06. `tools/shell_gallery.py` renders every popup of the taskbar in a light and a
+dark translucent profile, with the software renderer offscreen and with Qt's OpenGL renderer
+against a private headless compositor (Mesa's llvmpipe), and the pictures were looked at after
+each step. Splitting `Panel.qml` into files was checked picture for picture against the gallery
+before it (identical but for the clock), besides the existing tests; `shell_gallery` and
+`shell_gallery_gpu` fail on any QML warning, and `shell_ui` checks that the tokens follow the
+animation settings and a light, translucent profile. `tools/shell_perf.py` measured both
+renderers headlessly (see [performance.md](performance.md)).
+
+Not checked: the shell on the GPU in a real session (a real driver, its memory and startup time,
+fractional scaling at 1.25, a 144 or 200 Hz output), hover and pressed states under a real
+pointer (offscreen Qt sends no hover, so the gallery shows none), the tooltips (popup windows of
+their own, which a grab of the panel leaves out), and the switcher, palette, overview, cards,
+display and power dialog after their move to the tokens, which only the tests ran.
