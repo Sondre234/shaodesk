@@ -47,6 +47,17 @@ class StartMenuTest : public QObject {
         qputenv("XDG_CONFIG_HOME", home.filePath("config").toLocal8Bit());
         qputenv("XDG_CONFIG_DIRS", home.filePath("none").toLocal8Bit());
         QLocale::setDefault(QLocale(QLocale::English, QLocale::UnitedStates));
+        // Of the applications there, a web browser by default and a terminal are common ones.
+        QVERIFY(write(home.filePath("data/applications/browser.desktop"),
+                      "[Desktop Entry]\nType=Application\nName=Browser\nExec=true\n"
+                      "MimeType=x-scheme-handler/https;\n"));
+        QVERIFY(write(home.filePath("data/applications/term.desktop"),
+                      "[Desktop Entry]\nType=Application\nName=Term\nExec=true\n"
+                      "Categories=System;TerminalEmulator;\n"));
+        QVERIFY(write(home.filePath("data/applications/game.desktop"),
+                      "[Desktop Entry]\nType=Application\nName=Game\nExec=true\nCategories=Game;\n"));
+        QVERIFY(write(home.filePath("config/mimeapps.list"),
+                      "[Default Applications]\nx-scheme-handler/https=browser.desktop\n"));
     }
     void recordsLaunches() {
         QTemporaryDir directory;
@@ -112,6 +123,18 @@ class StartMenuTest : public QObject {
         // Every taskbar pin, however many.
         QCOMPARE(StartMenu::seed(installed, {"z"}, installed), installed);
         QCOMPARE(StartMenu::seed({}, {}, installed), QStringList{});
+    }
+    void seedsCommonApps() {
+        QCOMPARE(StartMenu::commonApps(), (QStringList{"browser.desktop", "term.desktop"}));
+        // With no taskbar pins, the start menu begins with those.
+        QTemporaryDir state;
+        StartMenu menu(state.path());
+        menu.setApps({app("game.desktop", "Game"), app("term.desktop", "Term"), app("browser.desktop", "Browser")}, {});
+        QCOMPARE(ids(menu.pinned()), (QStringList{"browser.desktop", "term.desktop"}));
+        menu.setApps({app("game.desktop", "Game"), app("term.desktop", "Term"), app("browser.desktop", "Browser")},
+                     {"game.desktop"});
+        QCOMPARE(ids(menu.pinned()), (QStringList{"game.desktop", "browser.desktop", "term.desktop"}));
+        QVERIFY(!QFile::exists(state.filePath("start-pinned")));
     }
     void pinsAreItsOwnOnceChanged() {
         QTemporaryDir state;
