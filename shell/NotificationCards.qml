@@ -84,12 +84,6 @@ Item {
             required property string desktopEntry
             required property var time
             readonly property bool critical: urgency === 2
-            readonly property string iconSource: {
-                if (hasImage) return "image://notify/" + notificationId + "/" + Number(time)
-                if (icon.length > 0) return "image://icons/" + icon
-                var known = desktopEntry.length > 0 ? desktopEntry : app.toLowerCase()
-                return shell.appFor(known).length > 0 ? "image://icons/" + shell.iconFor(known) : ""
-            }
             // The installed application's icon, "" when it is not one.
             readonly property string appIcon: {
                 var known = desktopEntry.length > 0 ? desktopEntry : app.toLowerCase()
@@ -97,6 +91,10 @@ Item {
             }
             // The header's icon: the application's, else the notification's own.
             readonly property string headerIcon: appIcon.length > 0 ? appIcon : icon
+            // The picture beside the text: the notification's image (a contact's, an album's),
+            // else its own icon when the header shows the application's instead.
+            readonly property string picture: hasImage ? "image://notify/" + notificationId + "/" + Number(time)
+                : icon.length > 0 && appIcon.length > 0 && icon !== appIcon ? "image://icons/" + icon : ""
             width: list.width
             height: card.height
 
@@ -104,7 +102,7 @@ Item {
                 id: card
                 objectName: "notificationCard"
                 width: parent.width
-                height: content.implicitHeight + 24
+                height: content.implicitHeight + 2 * content.y
                 Loader {
                     anchors.fill: parent
                     active: Theme.effects
@@ -132,7 +130,7 @@ Item {
                 }
                 ColumnLayout {
                     id: content
-                    x: 12; y: 12; width: parent.width - 24
+                    x: Theme.spacingL + Theme.spacingXS; y: x; width: parent.width - 2 * x
                     spacing: Theme.spacingM
                     // Who it is from and when: the application's icon and name, and the time.
                     RowLayout {
@@ -165,27 +163,30 @@ Item {
                             }
                         }
                     }
+                    // What it says, the summary over the body, beside its picture.
                     RowLayout {
                         Layout.fillWidth: true
-                        spacing: 10
+                        spacing: Theme.spacingL
+                        // Twice an application's icon.
                         Image {
-                            visible: entry.iconSource.length > 0
+                            visible: entry.picture.length > 0
                             Layout.alignment: Qt.AlignTop
-                            Layout.preferredWidth: 40; Layout.preferredHeight: 40
-                            sourceSize: Qt.size(80, 80)
+                            Layout.preferredWidth: 2 * Theme.appIconSize; Layout.preferredHeight: 2 * Theme.appIconSize
+                            sourceSize: Qt.size(4 * Theme.appIconSize, 4 * Theme.appIconSize)
                             fillMode: Image.PreserveAspectFit
-                            source: entry.iconSource
+                            source: entry.picture
                             cache: false
                         }
                         ColumnLayout {
                             Layout.fillWidth: true
-                            spacing: 3
+                            Layout.alignment: Qt.AlignTop
+                            spacing: Theme.spacingXS
                             Text {
                                 Layout.fillWidth: true
                                 visible: text.length > 0
                                 text: entry.summary
                                 color: Theme.text
-                                font.pixelSize: Theme.fontSize + 1; font.bold: true; font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeLarge; font.weight: Font.DemiBold; font.family: Theme.fontFamily
                                 textFormat: Text.PlainText
                                 wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
                             }
@@ -193,18 +194,24 @@ Item {
                                 Layout.fillWidth: true
                                 visible: text.length > 0
                                 text: entry.body
-                                color: Theme.text; opacity: 0.85
+                                color: Theme.textMuted
                                 font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+                                lineHeight: 1.1
                                 textFormat: Text.StyledText
                                 linkColor: Theme.accent
                                 wrapMode: Text.Wrap; maximumLineCount: 5; elide: Text.ElideRight
                                 onLinkActivated: (link) => cards.center.openLink(link)
                             }
+                            // The application's own progress (a download, a copy).
                             Rectangle {
                                 visible: entry.progress >= 0
-                                Layout.fillWidth: true; Layout.preferredHeight: 6; Layout.topMargin: 3
-                                radius: 3; color: Theme.selected
-                                Rectangle { width: parent.width * Math.max(0, entry.progress) / 100; height: parent.height; radius: 3; color: Theme.accent }
+                                Layout.fillWidth: true; Layout.topMargin: Theme.spacingS
+                                Layout.preferredHeight: Theme.spacingS + Theme.spacingXS
+                                radius: height / 2; color: Theme.selected
+                                Rectangle {
+                                    width: parent.width * Math.max(0, entry.progress) / 100; height: parent.height
+                                    radius: height / 2; color: Theme.accent
+                                }
                             }
                             Flow {
                                 visible: entry.actions.length > 0
