@@ -5,18 +5,17 @@ import QtQuick.Layouts
 
 // The notification history popover above (or below) the panel's bell: every notification still
 // kept, newest first, with a do-not-disturb switch and a button that clears the list.
-Rectangle {
+PopupCard {
     id: history
     required property var panel
     required property Item barItem
     readonly property var center: shell.notifications
     objectName: "notificationHistory"
     parent: panel.popupLayer
-    visible: panel.audioPopup === "notifications"
+    open: panel.audioPopup === "notifications"
     // Looking at the list is reading it, also when it was made open.
-    onVisibleChanged: if (visible) center.markAllRead()
-    Component.onCompleted: if (visible) center.markAllRead()
-    Connections { target: history.center; function onUnreadChanged() { if (history.visible) history.center.markAllRead() } }
+    onOpened: center.markAllRead()
+    Connections { target: history.center; function onUnreadChanged() { if (history.open) history.center.markAllRead() } }
     function ago(time) {
         var seconds = (Date.now() - time.getTime()) / 1000
         if (seconds < 60) return "now"
@@ -24,13 +23,11 @@ Rectangle {
         if (new Date().toDateString() === time.toDateString()) return Qt.formatTime(time, "HH:mm")
         return Qt.formatDate(time, "d MMM") + " " + Qt.formatTime(time, "HH:mm")
     }
-    width: 380
-    height: Math.min(460, 56 + Math.max(90, list.contentHeight) + 8)
-    x: Math.max(8, Math.min(panel.audioPopupX - width / 2, panel.width - width - 8))
-    y: panel.onTop ? panel.barBottom + 8 : panel.barTop - height - 8
-    color: Theme.surface; radius: Theme.radiusLarge
-    border.color: Theme.border
-    MouseArea { anchors.fill: parent }
+    implicitWidth: 380
+    implicitHeight: Math.min(460, 56 + Math.max(90, list.contentHeight) + 8)
+    anchorRect: panel.barAnchor(panel.audioPopupX, 0)
+    side: panel.popupSide
+    radius: Theme.radiusLarge
     ColumnLayout {
         anchors.fill: parent; anchors.margins: 10; spacing: 6
         RowLayout {
