@@ -91,6 +91,17 @@ int main() {
         rejects("return {windows={placement='random'}}");
         rejects("return {windows={placement=1}}");
         rejects("return {windows={placement=true}}");
+        // windows.controls: the flat strip unless told otherwise, and a profile may switch it.
+        require(defaults.settings.window_controls == SH_CONTROLS_FLAT, "controls default");
+        require(shaodesk::parse_config("return {windows={controls='traffic_lights'}}")
+                        .settings.window_controls == SH_CONTROLS_TRAFFIC_LIGHTS,
+                "controls not read");
+        require(shaodesk::parse_config("return {profile='mac',profiles={mac={windows={"
+                                       "controls='traffic_lights'}}}}")
+                        .settings.window_controls == SH_CONTROLS_TRAFFIC_LIGHTS,
+                "a profile's controls not applied");
+        rejects("return {windows={controls='macos'}}");
+        rejects("return {windows={controls=true}}");
         std::cout << "Window feature configuration passed\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';

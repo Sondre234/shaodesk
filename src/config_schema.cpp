@@ -234,6 +234,12 @@ const Option options[] = {
      "Pixels along the top of a window without a title bar (kitty, X11 applications) that move "
      "it when dragged, as a title bar would; they no longer reach the application. 0 turns "
      "this off."},
+    {"windows.controls", "enum", "\"flat\"", "\"traffic_lights\"", none, none,
+     "How the controls of the windows shaodesk decorates look; they show while the pointer is "
+     "near their corner. `\"flat\"`: minimize, fullscreen and close buttons on a dark strip at "
+     "the top-right. `\"traffic_lights\"`: close, minimize and fullscreen as red, yellow and "
+     "green circles at the top-left, grey while the window has no focus, their symbols shown "
+     "while the pointer is on one."},
     {"windows.buttons", "string", "\"appmenu:minimize,maximize,close\"",
      "\"appmenu:minimize,maximize,close\"", none, none,
      "GTK button layout for windows that draw their own frame; lowercase letters, `_`, `,` "

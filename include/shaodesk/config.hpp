@@ -258,6 +258,7 @@ struct Config {
                          .magnet_guide_color = {0.49F * 0.7F, 0.66F * 0.7F, 0.7F, 0.7F},
                          .placement = SH_PLACE_CASCADE,
                          .drag_strip = 6,
+                         .window_controls = SH_CONTROLS_FLAT,
                          .lock_before_sleep = true,
                          .close_windows = true,
                          .close_timeout = 5000,

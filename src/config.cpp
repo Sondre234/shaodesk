@@ -831,6 +831,17 @@ void read_windows(lua_State *L, Config &config) {
     }
     lua_pop(L, 1);
     config.settings.drag_strip = integer(L, "drag_strip", config.settings.drag_strip, 0, 100);
+    lua_getfield(L, -1, "controls");
+    if (!lua_isnil(L, -1)) {
+        auto name = string(L, -1, "windows.controls");
+        if (name == "flat")
+            config.settings.window_controls = SH_CONTROLS_FLAT;
+        else if (name == "traffic_lights")
+            config.settings.window_controls = SH_CONTROLS_TRAFFIC_LIGHTS;
+        else
+            unknown("controls", name, {"flat", "traffic_lights"}, "=" + name);
+    }
+    lua_pop(L, 1);
     lua_getfield(L, -1, "rules");
     if (!lua_isnil(L, -1)) {
         auto size = array_size(L, -1, 256);

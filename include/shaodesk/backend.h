@@ -336,6 +336,9 @@ struct sh_settings {
     /* windows.drag_strip: how many pixels along the top of a window without a title bar move
      * it when dragged. */
     int drag_strip;
+    /* windows.controls: enum sh_window_controls, how the controls of the windows the compositor
+     * decorates look. */
+    int window_controls;
     /* power.lock_before_sleep: the screen locks with power.lock_command before the machine
      * sleeps. */
     bool lock_before_sleep;
@@ -497,6 +500,9 @@ enum sh_activation {
     SH_ACTIVATION_FOCUS,
     SH_ACTIVATION_IGNORE,
 };
+/* The window controls of the windows the compositor decorates: FLAT buttons on a dark strip
+ * at the top-right corner, or TRAFFIC_LIGHTS, three coloured circles at the top-left. */
+enum sh_window_controls { SH_CONTROLS_FLAT, SH_CONTROLS_TRAFFIC_LIGHTS };
 enum sh_scroll_follow {
     SH_SCROLL_FOLLOW_CENTER, /* the focused column is always centered */
     SH_SCROLL_FOLLOW_EDGE,   /* the view moves only as far as needed to show it */
