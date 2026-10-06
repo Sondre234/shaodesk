@@ -52,14 +52,6 @@ TrayMenuEntry menuEntry(QVariantMap properties, std::vector<int> children = {}) 
     return entry;
 }
 
-// What the panel leaves of the output a preview stands for, where a layer surface that keeps
-// clear of it (an exclusive zone of 0) goes.
-QRect usableArea(const ShellController &controller) {
-    const int panel = controller.panelExtent();
-    return QRect(QPoint(0, 0), ShellView::previewSize())
-        .adjusted(0, controller.panelTop() ? panel : 0, 0, controller.panelTop() ? 0 : -panel);
-}
-
 // The overview's stand-ins, as the compositor would lay them out in `area`: four windows of the
 // first workspace (the first selected, the third asking for attention), and the strip of four
 // workspaces above them, below the room it leaves for the search box (OVERVIEW_TOP).
@@ -218,7 +210,17 @@ ListModel {
 }
 PreviewData::~PreviewData() = default;
 
+// What the panel leaves of the output a preview stands for, where a layer surface that keeps clear
+// of it (an exclusive zone of 0) goes: the output but the bar's strip, and the menu bar's.
+QRect PreviewData::usableArea() const {
+    const int panel = controller_.panelExtent();
+    const int menuBar = panel_ ? panel_->property("menuBarHeight").toInt() : 0;
+    const bool top = controller_.panelSurfaceTop();
+    return QRect(QPoint(0, 0), ShellView::previewSize()).adjusted(0, top ? panel : menuBar, 0, top ? 0 : -panel);
+}
+
 void PreviewData::fill(QQuickItem *panel) {
+    panel_ = panel;
     QQmlEngine::setObjectOwnership(audio_.get(), QQmlEngine::CppOwnership);
     QQmlEngine::setObjectOwnership(status_.get(), QQmlEngine::CppOwnership);
     panel->setProperty("audioSource", QVariant::fromValue<QObject *>(audio_.get()));
@@ -326,7 +328,7 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
             {"shown", true}};
     } else if (name == "overview") {
         file = "Overview.qml";
-        const QRect area = usableArea(controller_);
+        const QRect area = usableArea();
         properties = {{"screenSize", ShellView::previewSize()},
                       {"windows", overviewWindows(area)},
                       {"strip", overviewStrip(area)},
@@ -373,17 +375,18 @@ QImage PreviewData::withSurface(QImage desktop) const {
     // panel leaves when it keeps clear of it (an exclusive zone of 0), over the whole output when
     // it does not (-1).
     const QRect output(QPoint(0, 0), ShellView::previewSize());
-    const QRect usable = usableArea(controller_);
+    const QRect usable = usableArea();
     const QSize size = root.toSize();
     QPoint at;
     if (surfaceName_.startsWith("osd-")) {
-        // OsdView: centred, 48 pixels from the bottom edge or from the top.
+        // OsdView: centred, 48 pixels from the top edge, or ShellController::osdBottom from the
+        // bottom.
         at = QPoint((output.width() - size.width()) / 2,
-                    controller_.osd()->top() ? 48 : output.height() - 48 - size.height());
+                    controller_.osd()->top() ? 48 : output.height() - controller_.osdBottom() - size.height());
     } else if (surfaceName_.startsWith("palette")) {
-        // PaletteView: centred, a sixth of the output's height down.
+        // PaletteView: centred, below the bars by ShellController::paletteDrop.
         at = QPoint(usable.left() + (usable.width() - size.width()) / 2,
-                    usable.top() + output.height() / 6);
+                    usable.top() + controller_.paletteDrop(output.height()));
     } else if (surfaceName_ == "switcher") {
         // SwitcherView: centred.
         at = usable.center() - QPoint(size.width() / 2, size.height() / 2);
@@ -435,10 +438,11 @@ QImage PreviewData::withSurface(QImage desktop) const {
     return desktop;
 }
 
-QImage previewOnDesktop(QImage panel, QImage popover, bool panelTop,
-                        const ShellController &controller) {
+QImage previewOnDesktop(QImage panel, QImage popover, QImage menuBar, bool panelTop,
+                        ShellController &controller) {
     panel.setDevicePixelRatio(1);
     popover.setDevicePixelRatio(1);
+    menuBar.setDevicePixelRatio(1);
     // As large as the output a preview stands for, in the bar's pixels.
     const QSize output = ShellView::previewSize() * (panel.width() / qreal(ShellView::previewSize().width()));
     QImage desktop(output, QImage::Format_ARGB32_Premultiplied);
@@ -453,6 +457,18 @@ QImage previewOnDesktop(QImage panel, QImage popover, bool panelTop,
                                        (desktop.height() - size.height()) / 2),
                                 size),
                           wallpaper);
+    } else if (controller.style() == "macos") {
+        // The wallpaper the macOS style draws while none is set, as Desktop.qml shows it, drawn
+        // offscreen for the picture.
+        QQuickView drawn(controller.engine(), nullptr);
+        drawn.setColor(Qt::transparent);
+        drawn.setResizeMode(QQuickView::SizeRootObjectToView);
+        drawn.resize(ShellView::previewSize());
+        drawn.setSource(QUrl("qrc:/shell/ShaodeskShell/DrawnWallpaper.qml"));
+        drawn.create();
+        QImage picture = drawn.grabWindow();
+        picture.setDevicePixelRatio(1);
+        painter.drawImage(desktop.rect(), picture);
     } else {
         QLinearGradient gradient(0, 0, 0, desktop.height());
         gradient.setColorAt(0, controller.background().lighter(145));
@@ -460,6 +476,8 @@ QImage previewOnDesktop(QImage panel, QImage popover, bool panelTop,
         painter.fillRect(desktop.rect(), gradient);
     }
     painter.drawImage(0, panelTop ? 0 : desktop.height() - panel.height(), panel);
+    if (!menuBar.isNull())
+        painter.drawImage(0, 0, menuBar);
     // Along the bar's edge, as the popups are placed by it, should a compositor have made the
     // window smaller.
     if (!popover.isNull())

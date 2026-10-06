@@ -10,9 +10,10 @@ PopupMenu {
     objectName: "audioOutputs"
     entryName: "audioOutputItem"
     open: panel.audioPopup === "outputs"
-    anchorRect: panel.barAnchor(panel.audioPopupX, 0)
+    // Centred below its item, or from its left edge as macOS's menus open.
+    anchorRect: panel.barAnchor(panel.audioPopupX - panel.audioPopupWidth / 2, panel.audioPopupWidth)
     side: panel.popupSide
-    alignment: Qt.AlignHCenter
+    alignment: panel.macos ? Qt.AlignLeft : Qt.AlignHCenter
     bounds: panel.popupArea
     minimumWidth: 240
     onDismissed: panel.audioPopup = ""

@@ -37,14 +37,21 @@ Item {
     // The screen backlight, swapped the same way.
     property var backlightSource: shell.backlight
     property string audioPopup: ""
+    // The middle of the item it opens by, and the item's width.
     property real audioPopupX: 0
+    property real audioPopupWidth: 0
     // A tray item's menu: the item it belongs to ("" while closed), and where its icon is.
     property string trayMenuKey: ""
     property real trayMenuX: 0
+    property real trayMenuWidth: 0
     // Bumped when the open menu's item changes its entries, so they are read again.
     property int trayMenuRevision: 0
+    // The menu bar's own menus in the macOS style: "system", "app" or "window" while one is open,
+    // below the item whose left edge is at menuBarMenuX.
+    property string menuBarMenu: ""
+    property real menuBarMenuX: 0
     property bool menuOpen: launcherOpen || taskMenuId >= 0 || pinMenuApp !== null || barMenuOpen || audioPopup !== "" ||
-                            trayMenuKey !== ""
+                            trayMenuKey !== "" || menuBarMenu !== ""
     // Hovering an application's stacked button lists its windows above it: those of the pinned
     // application groupSlot, or with the app id groupWindowApp outside the pinned slots.
     property bool groupOpen: false
@@ -58,31 +65,83 @@ Item {
     // opens under a window being typed in.
     readonly property bool expanded: menuOpen || groupOpen
     onMenuOpenChanged: if (menuOpen) groupOpen = false
+    // The bars the style has: the taskbar (Taskbar.qml), or in the macOS style the dock
+    // (Dock.qml) in the panel's surface and the menu bar (TopMenuBar.qml) in a surface of its own
+    // along the output's top edge.
+    readonly property bool macos: Theme.macos
+    readonly property Item taskbar: taskbarLoader.item
+    readonly property Item dock: dockLoader.item
+    readonly property Item menuBar: menuBarLoader.item
+    readonly property MenuBarWindow menuBarWindow: menuBarWindow
+    // The bar along the panel's edge, which its popups open by; the panel itself while it is
+    // being made.
+    readonly property Item bar: taskbar ? taskbar.barItem : dock ? dock.barItem : root
+    // The bar with the status widgets (the clock, Quick Settings, the tray, ...), whose popups
+    // open by it, and the part that holds them and names the buttons they open by.
+    readonly property Item statusBar: macos ? menuBar || root : bar
+    readonly property Item statusArea: macos ? menuBar : taskbar
     // The surface the popups are drawn in, and the bar's top edge in its coordinates: the bar's
-    // surface lies along its top or bottom edge, across its width.
+    // surface lies along its top or bottom edge, across its width, where it begins at surfaceTop.
     readonly property Item popupLayer: popupLayer
     // What Quick Settings opens the wallpaper picker by.
-    readonly property Item quickSettingsButton: quickButton
-    readonly property real barTop: (onTop ? 0 : popover.height - height) + bar.y
+    readonly property Item quickSettingsButton: statusArea ? statusArea.quickSettings : null
+    readonly property real surfaceTop: onTop ? 0 : popover.height - height
+    readonly property real barTop: surfaceTop + bar.y
+    // The menu bar's strip along the output's top edge, none without one.
+    readonly property real menuBarHeight: macos ? Theme.menuBarHeight : 0
     // A popup of the bar opens away from the screen edge the bar is on (PopupCard's side), beside
-    // the rectangle barAnchor gives: from `x`, `width` wide, and across the bar.
-    readonly property int popupSide: onTop ? Qt.BottomEdge : Qt.TopEdge
-    function barAnchor(x, width) { return Qt.rect(x, barTop, width, bar.height) }
-    // The output but the bar's strip, where popups stay (PopupCard's bounds).
-    readonly property rect popupArea: Qt.rect(0, onTop ? height : 0, popover.width, popover.height - height)
+    // the rectangle barAnchor gives: from `x`, `width` wide, and across the bar. In the macOS
+    // style the bar with the widgets is the menu bar, and the dock's popups (an application's
+    // menu, the windows of one) open above the dock by dockAnchor, which on the taskbar is the
+    // bar's.
+    readonly property int popupSide: onTop || macos ? Qt.BottomEdge : Qt.TopEdge
+    function barAnchor(x, width) { return macos ? Qt.rect(x, 0, width, menuBarHeight) : dockAnchor(x, width) }
+    readonly property int dockSide: macos ? Qt.TopEdge : popupSide
+    function dockAnchor(x, width) { return Qt.rect(x, barTop, width, bar.height) }
+    // The output but the bar's strip, where popups stay (PopupCard's bounds); between the menu
+    // bar and the dock's strip in the macOS style.
+    readonly property rect popupArea: macos
+        ? Qt.rect(0, menuBarHeight, popover.width, popover.height - menuBarHeight - shell.panelExtent)
+        : Qt.rect(0, onTop ? height : 0, popover.width, popover.height - height)
     // Where a list shown on hover takes the pointer: over it and down to the bar, so that the
     // pointer crossing from its button never lands on a window between (which, with focus
     // following the pointer, would take the keyboard).
     function hoverArea(item) {
         var top = onTop ? popupArea.y : item.y
-        var bottom = onTop ? item.y + item.height : popupArea.y + popupArea.height
+        var bottom = onTop ? item.y + item.height : macos ? barTop : popupArea.y + popupArea.height
         return Qt.rect(item.x, top, item.width, bottom - top)
     }
+    // Where the popover takes the pointer while a popup is open: all but the bars, so that a
+    // press on either switches popups in one press. In the macOS style that is the output but the
+    // menu bar's strip and the dock's rectangle, as the four rectangles around the dock; but
+    // Launchpad covers both bars, and takes every press.
+    readonly property var popoverInput: {
+        if (!macos)
+            return [popupArea]
+        var top = menuBarHeight, w = popover.width, h = popover.height
+        if (launcherOpen)
+            return [Qt.rect(0, 0, w, h)]
+        var left = bar.x, right = bar.x + bar.width, dockBottom = barTop + bar.height
+        return [Qt.rect(0, top, w, barTop - top), Qt.rect(0, dockBottom, w, h - dockBottom),
+                Qt.rect(0, barTop, left, bar.height), Qt.rect(right, barTop, w - right, bar.height)]
+    }
+    // An application's record in shell.apps for a window's app id: the application whose pinned
+    // slot it takes (a configured launcher too), else the installed one; null when there is none.
+    function appRecord(windowAppId) {
+        var id = shell.pinnedAppFor(windowAppId) || shell.appFor(windowAppId)
+        var apps = id !== "" ? shell.apps : []
+        for (var i = 0; i < apps.length; ++i)
+            if (apps[i].appId === id)
+                return apps[i]
+        return null
+    }
     onLauncherOpenChanged: {
-        if (launcherOpen) { taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; trayMenuKey = "" }
+        if (launcherOpen) { taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; trayMenuKey = ""; menuBarMenu = "" }
         else powerOpen = false
     }
-    function closeMenus() { launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false; trayMenuKey = "" }
+    function closeMenus() { launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false; trayMenuKey = ""; menuBarMenu = "" }
+    // A change of style lays the panel out anew: what was open belonged to bars that are gone.
+    onMacosChanged: closeMenus()
     // A stacked button hovered for a moment, or at once while another's list is open, shows its
     // windows; leaving both it and the list hides them again.
     function hoverGroup(button, hovered) {
@@ -126,18 +185,39 @@ Item {
         if (taskId >= 0) { taskMenuId = taskId; taskMenuApp = shell.appFor(app || ""); pinMenuApp = null; barMenuOpen = false }
         else if (app) { pinMenuApp = app; taskMenuId = -1; barMenuOpen = false }
         else { barMenuOpen = true; taskMenuId = -1; pinMenuApp = null }
-        launcherOpen = false; audioPopup = ""; trayMenuKey = ""
+        launcherOpen = false; audioPopup = ""; trayMenuKey = ""; menuBarMenu = ""
     }
     // Opens (or, when it is already open, closes) one of the volume control's popups.
     function toggleAudioPopup(kind, item) {
         if (audioPopup === kind) { audioPopup = ""; return }
         audioPopupX = item.mapToItem(root, item.width / 2, 0).x
+        audioPopupWidth = item.width
         audioPopup = kind
-        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; trayMenuKey = ""
+        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; trayMenuKey = ""; menuBarMenu = ""
+    }
+    // Opens (or, when it is already open, closes) one of the menu bar's own menus below `item`.
+    function toggleMenuBarMenu(kind, item) {
+        if (menuBarMenu === kind) { menuBarMenu = ""; return }
+        menuBarMenuX = item.mapToItem(root, 0, 0).x
+        menuBarMenu = kind
+        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; trayMenuKey = ""
+    }
+    // While one of them is open, the pointer moving onto another's title opens that one instead.
+    function hoverMenuBarMenu(kind, item) {
+        if (menuBarMenu !== "" && menuBarMenu !== kind)
+            toggleMenuBarMenu(kind, item)
     }
     // The power menu, from the power_menu action: the launcher opens with it, and closes with it
     // when asked again.
     function togglePowerMenu() {
+        // The macOS style's system menu has them.
+        if (macos) {
+            if (menuBarMenu === "system")
+                closeMenus()
+            else if (menuBar && shell.power.entries.length > 0)
+                toggleMenuBarMenu("system", menuBar.systemButton)
+            return
+        }
         if (powerOpen) {
             closeMenus()
         } else if (shell.power.entries.length > 0) {
@@ -149,7 +229,17 @@ Item {
     // the way its button would. "bar" opens none. Returns false for a name it does not know, or
     // when what the popup belongs to is not on the bar.
     function previewPopup(name) {
-        taskList.forceLayout()
+        if (macos) {
+            var shown = previewMacos(name)
+            if (shown !== undefined)
+                return shown
+        }
+        var taskList = taskbar ? taskbar.tasks : null, pinnedSlots = taskbar ? taskbar.pins : null
+        var tray = statusArea.trayRow, clockButton = statusArea.clock, audioWidget = statusArea.volume
+        var quickButton = statusArea.quickSettings
+        var profilesButton = statusArea.profiles, wallpapersButton = statusArea.wallpapers
+        if (taskList)
+            taskList.forceLayout()
         var i
         switch (name) {
         case "bar":
@@ -262,6 +352,55 @@ Item {
         }
         return false
     }
+    // The popups previewPopup opens otherwise in the macOS style: those of the dock's icons and
+    // the menu bar's menus (system-menu, app-menu, window-menu, window-submenu); undefined for
+    // the others, which open as on the taskbar.
+    function previewMacos(name) {
+        var icons = [], i
+        for (i = 0; i < dock.pins.count; ++i)
+            icons.push(dock.pins.itemAt(i))
+        for (i = 0; i < dock.running.count; ++i)
+            icons.push(dock.running.itemAt(i))
+        // The first icon with windows, with several, or without any.
+        function find(test) { return icons.filter(function(icon) { return icon && test(icon) })[0] || null }
+        var icon
+        switch (name) {
+        case "power":
+        case "system-menu":
+            toggleMenuBarMenu("system", menuBar.systemButton)
+            return true
+        case "app-menu":
+            toggleMenuBarMenu("app", menuBar.appButton)
+            return true
+        case "window-menu":
+        case "window-submenu":
+            toggleMenuBarMenu("window", menuBar.windowButton)
+            if (name === "window-submenu") {
+                previewSubmenu.menu = menuBarMenuLoader
+                previewSubmenu.start()
+            }
+            return true
+        case "task-menu":
+            icon = find(function(icon) { return icon.running })
+            if (icon)
+                dock.openMenu(icon, icon.modelData || null, "")
+            return icon !== null
+        case "pin-menu":
+            icon = find(function(icon) { return !icon.running && icon.modelData && !icon.modelData.configured })
+            if (icon)
+                dock.openMenu(icon, icon.modelData, icon.modelData.appId)
+            return icon !== null
+        case "stack-menu":
+        case "group":
+            icon = find(function(icon) { return icon.stacked })
+            if (icon && name === "group")
+                openGroup(icon)
+            else if (icon)
+                dock.openMenu(icon, icon.modelData || null, "")
+            return icon !== null
+        }
+        return undefined
+    }
     // For a preview: opens the first submenu of a menu just opened, once its rows are laid out.
     Timer {
         id: previewSubmenu
@@ -277,11 +416,12 @@ Item {
         }
     }
     // Where a tray item's icon is on the screen, which some applications place a window by: the
-    // panel spans its output's width, at its top or bottom edge.
+    // panel spans its output's width, at its top or bottom edge, and the menu bar along its top.
     function trayPoint(item) {
         var p = item.mapToItem(root, item.width / 2, item.height / 2)
+        var inMenuBar = item.Window.window === menuBarWindow
         return Qt.point(Math.round(Screen.virtualX + p.x),
-                        Math.round(Screen.virtualY + (onTop ? p.y : Screen.height - height + p.y)))
+                        Math.round(Screen.virtualY + (inMenuBar || onTop ? p.y : Screen.height - height + p.y)))
     }
     // An item that is only a menu opens it; one that cannot be activated opens it after all.
     property Item trayActivating: null
@@ -315,8 +455,9 @@ Item {
             return
         }
         trayMenuX = button.mapToItem(root, button.width / 2, 0).x
+        trayMenuWidth = button.width
         trayMenuKey = button.key
-        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false
+        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false; menuBarMenu = ""
     }
     // The entries of item `key`'s menu entry `parent` (0 for the top), as a PopupMenu lists them:
     // an entry with children opens them beside it, read as it opens; any other is the
@@ -388,8 +529,11 @@ Item {
         // Reading shell.pinned re-evaluates the menu when pins change. Pinning waits until
         // the click is handled: the change rebuilds the menu, destroying the clicked item.
         var pinned = shell.pinned.some(function(app) { return app.appId === appId })
-        return pinned ? { text: "Unpin from taskbar", icon: "pin-off", run: function() { Qt.callLater(function() { shell.unpin(appId) }) } }
-                      : { text: "Pin to taskbar", icon: "pin", run: function() { Qt.callLater(function() { shell.pin(appId) }) } }
+        var toggle = function() { Qt.callLater(function() { if (pinned) shell.unpin(appId); else shell.pin(appId) }) }
+        if (macos)
+            return { text: pinned ? "Remove from Dock" : "Keep in Dock", objectName: "contextMenuKeep", run: toggle }
+        return pinned ? { text: "Unpin from taskbar", icon: "pin-off", run: toggle }
+                      : { text: "Pin to taskbar", icon: "pin", run: toggle }
     }
     // Popups open away from the screen edge the bar sits on.
     // Tiling is per monitor: this panel shows and toggles its own.
@@ -397,10 +541,8 @@ Item {
         var state = shell.workspaces[outputName]
         return state && state.tiling !== undefined ? state.tiling : shell.tiling
     }
-    readonly property bool onTop: shell.panelTop
-    readonly property bool floating: shell.panelRadius > 0 || shell.panelMarginLeft > 0 ||
-                                     shell.panelMarginRight > 0 || shell.panelMarginTop > 0 ||
-                                     shell.panelMarginBottom > 0
+    // The dock is at the bottom whatever shell.panel_position says.
+    readonly property bool onTop: shell.panelTop && !macos
 
     // A click on the bar's empty space closes what is open.
     MouseArea {
@@ -418,7 +560,7 @@ Item {
         panel: root.shellView
         keyboard: root.menuOpen
         inputRects: root.menuOpen
-            ? [root.popupArea]
+            ? root.popoverInput
             : root.groupOpen && groupListLoader.item ? [root.hoverArea(groupListLoader.item)] : []
         onDismissed: root.closeMenus()
         Timer { id: closing; interval: Theme.durationNormal; onTriggered: if (!root.expanded) popover.open = false }
@@ -449,7 +591,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { AudioMixer { panel: root; barItem: bar } }
+                sourceComponent: Component { AudioMixer { panel: root; barItem: root.statusBar } }
             }
 
             // Clicking the clock: the notifications and a month calendar, at the bar's right end.
@@ -460,7 +602,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { ClockFlyout { panel: root; barItem: bar } }
+                sourceComponent: Component { ClockFlyout { panel: root; barItem: root.statusBar } }
             }
 
             // Right-clicking the volume control: the outputs to play through.
@@ -471,7 +613,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { AudioOutputs { panel: root; barItem: bar } }
+                sourceComponent: Component { AudioOutputs { panel: root; barItem: root.statusBar } }
             }
 
             // The profile button: the appearance profiles, the one in use marked.
@@ -482,7 +624,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { ProfileList { panel: root; barItem: bar } }
+                sourceComponent: Component { ProfileList { panel: root; barItem: root.statusBar } }
             }
 
             // The wallpaper button: thumbnails of the pictures in shell.wallpapers, by subfolder, with
@@ -494,7 +636,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { WallpaperPicker { panel: root; barItem: bar } }
+                sourceComponent: Component { WallpaperPicker { panel: root; barItem: root.statusBar } }
             }
 
             Loader {
@@ -506,8 +648,8 @@ Item {
                 onLoaded: used = true
                 // The start menu, or Launchpad in the macOS style.
                 sourceComponent: Theme.macos ? launchpadComponent : startMenuComponent
-                Component { id: startMenuComponent; Launcher { panel: root; barItem: bar } }
-                Component { id: launchpadComponent; Launchpad { panel: root; barItem: bar } }
+                Component { id: startMenuComponent; Launcher { panel: root; barItem: root.bar } }
+                Component { id: launchpadComponent; Launchpad { panel: root; barItem: root.bar } }
             }
 
             Loader {
@@ -517,7 +659,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { TaskbarMenu { panel: root; barItem: bar } }
+                sourceComponent: Component { TaskbarMenu { panel: root; barItem: root.bar } }
             }
 
             // A tray item's menu, in the style of the bar's own, its submenus beside it.
@@ -528,7 +670,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { TrayMenu { panel: root; barItem: bar } }
+                sourceComponent: Component { TrayMenu { panel: root; barItem: root.statusBar } }
             }
 
             // The windows of the hovered stacked button: clicking one focuses it (or minimizes it when
@@ -540,7 +682,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { GroupList { panel: root; barItem: bar } }
+                sourceComponent: Component { GroupList { panel: root; barItem: root.bar } }
             }
 
             // The Quick Settings button: tiles, the volume and brightness, the battery.
@@ -551,186 +693,56 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { QuickSettings { panel: root; barItem: bar } }
+                sourceComponent: Component { QuickSettings { panel: root; barItem: root.statusBar } }
+            }
+
+            // The menu bar's own menus in the macOS style: the system menu, the focused
+            // application's and the Window menu.
+            Loader {
+                id: menuBarMenuLoader
+                asynchronous: root.menuBarMenu === ""
+                active: root.macos && (root.menuBarMenu !== "" || root.warm || used)
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { MenuBarMenu { panel: root; barItem: root.statusBar } }
             }
         }
     }
 
-    Rectangle {
-        id: bar
-        objectName: "bar"
-        anchors.left: parent.left; anchors.right: parent.right
-        anchors.leftMargin: shell.panelMarginLeft; anchors.rightMargin: shell.panelMarginRight
-        anchors.bottom: root.onTop ? undefined : parent.bottom
-        anchors.top: root.onTop ? parent.top : undefined
-        anchors.bottomMargin: shell.panelMarginBottom; anchors.topMargin: shell.panelMarginTop
-        height: shell.panelHeight
-        color: Theme.bar
-        radius: shell.panelRadius
-        // A floating bar gets an outline; a docked one a line along its inner edge.
-        border.width: root.floating ? 1 : 0
-        border.color: Theme.border
-        Rectangle {
-            visible: !root.floating
-            y: root.onTop ? parent.height - 1 : 0
-            width: parent.width; height: 1; color: Theme.border
-        }
-        // Right-clicking the bar anywhere but on a task opens the bar's own menu.
-        MouseArea {
+    // The taskbar along the panel's edge, or the dock, as the style has it.
+    Loader {
+        id: taskbarLoader
+        anchors.fill: parent
+        active: !root.macos
+        sourceComponent: Component { Taskbar { panel: root } }
+    }
+    Loader {
+        id: dockLoader
+        anchors.fill: parent
+        active: root.macos
+        sourceComponent: Component { Dock { panel: root } }
+    }
+    // The panel's surface takes the pointer only over the dock (ShellView's inputRects): the
+    // desktop beside it, and the room above it for an icon to bounce in, stay reachable.
+    Binding {
+        target: root.shellView
+        property: "inputRects"
+        value: root.dock ? [root.dock.area] : []
+    }
+
+    // The menu bar of the macOS style, along the output's top edge in a surface of its own
+    // (MenuBarWindow in view.hpp), there while the style is macOS.
+    MenuBarWindow {
+        id: menuBarWindow
+        panel: root.shellView
+        shown: root.macos
+        barHeight: Theme.menuBarHeight
+        Loader {
+            id: menuBarLoader
             anchors.fill: parent
-            acceptedButtons: Qt.RightButton
-            onPressed: (mouse) => root.openContextMenu(bar, mouse.x, -1)
-        }
-        // Scrolling the bar anywhere its widgets leave the wheel alone pages through this
-        // output's workspaces: a wheel notch (or a touchpad's worth of travel) moves one,
-        // stopping at either end; down or right goes to the next.
-        WheelHandler {
-            property real travel: 0
-            onWheel: (event) => {
-                travel += event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x
-                var steps = travel > 0 ? Math.floor(travel / 120) : Math.ceil(travel / 120)
-                travel -= steps * 120
-                if (steps !== 0) {
-                    var target = workspaceIndicator.workspaceState.current - steps
-                    workspaceIndicator.show(Math.max(1, Math.min(shell.workspaceCount, target)))
-                }
-            }
-        }
-        RowLayout {
-            anchors.fill: parent; anchors.leftMargin: Theme.spacingM; anchors.rightMargin: Theme.spacingM
-            spacing: Theme.spacingS
-            FlatButton {
-                id: start
-                Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
-                active: root.launcherOpen
-                onClicked: root.launcherOpen = !root.launcherOpen
-                Accessible.name: "Applications"
-                BarTip { panel: root; owner: start; text: "Start" }
-                // Four squares in the accent colour, which shrink a little while pressed as an
-                // application's icon does.
-                contentItem: Item {
-                    Grid {
-                        anchors.centerIn: parent; columns: 2; spacing: 3
-                        scale: start.pressed ? Theme.pressScale : 1
-                        Behavior on scale { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
-                        Repeater { model: 4; Rectangle { width: 9; height: 9; radius: 2; color: Theme.accent } }
-                    }
-                }
-            }
-            PinnedSlots { id: pinnedSlots; panel: root }
-            Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: Theme.barButtonHeight / 2 + Theme.spacingS; color: Theme.divider }
-            TaskList { id: taskList; panel: root }
-            WorkspaceIndicator { id: workspaceIndicator; panel: root }
-            // The wallpaper picker.
-            FlatButton {
-                id: wallpapersButton
-                objectName: "wallpapersButton"
-                visible: shell.widgets.wallpapers === "bar"
-                Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
-                active: root.audioPopup === "wallpapers"
-                onClicked: root.toggleAudioPopup("wallpapers", wallpapersButton)
-                Accessible.name: "Wallpapers"
-                BarTip { panel: root; owner: wallpapersButton; text: "Wallpapers" }
-                contentItem: Item {
-                    Icon { anchors.centerIn: parent; name: "image"; color: wallpapersButton.active ? Theme.accent : Theme.text }
-                }
-            }
-            // The appearance profile in use; clicking lists the profiles to switch to.
-            FlatButton {
-                id: profilesButton
-                objectName: "profilesButton"
-                visible: shell.widgets.profiles === "bar" && shell.profiles.length > 1
-                Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
-                active: root.audioPopup === "profiles"
-                onClicked: root.toggleAudioPopup("profiles", profilesButton)
-                Accessible.name: "Appearance: " + (shell.profile || "none")
-                BarTip { panel: root; owner: profilesButton; text: "Appearance: " + (shell.profile || "none") }
-                // Three swatches of the profile in use: accent, desktop background, text.
-                contentItem: Item {
-                    Row {
-                        anchors.centerIn: parent; spacing: Theme.spacingXS
-                        Repeater {
-                            model: [shell.accent, shell.background, shell.textColor]
-                            // A ring in the text colour keeps a swatch close to the panel's own
-                            // colour visible.
-                            Rectangle {
-                                required property color modelData
-                                width: 10; height: 10; radius: 5
-                                color: modelData
-                                border.width: 1
-                                border.color: Theme.alpha(Theme.text, 0.5)
-                            }
-                        }
-                    }
-                }
-            }
-            FlatButton {
-                id: tilingToggle
-                objectName: "tilingToggle"
-                visible: shell.widgets.tiling === "bar"
-                Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
-                enabled: shell.tilingAvailable
-                opacity: enabled ? 1 : 0.4
-                active: root.tiling
-                onClicked: { root.closeMenus(); shell.toggleTiling(outputName) }
-                Accessible.name: root.tiling ? "Tiling on" : "Tiling off"
-                BarTip { panel: root; owner: tilingToggle; text: root.tiling ? "Tiling on: click for floating" : "Floating: click to tile" }
-                // On: a split layout in the accent colour. Off: two overlapping windows.
-                contentItem: Item {
-                    FadingIcon {
-                        objectName: "tilingIcon"
-                        anchors.centerIn: parent
-                        name: root.tiling ? "layout-panel-left" : "copy"
-                        color: root.tiling ? Theme.accent : Theme.text
-                    }
-                }
-            }
-            // The system tray: the status icons of applications, in the order they appeared.
-            // Passive ones stay hidden, and so does the tray when none is left.
-            Row {
-                id: tray
-                objectName: "tray"
-                visible: shell.widgets.tray && shell.tray.shown > 0
-                Layout.alignment: Qt.AlignVCenter
-                Repeater {
-                    model: shell.tray
-                    delegate: TrayButton { panel: root }
-                }
-            }
-            NotificationBell { id: bell; panel: root }
-            NetworkWidget { panel: root }
-            BatteryWidget { panel: root }
-            VolumeButton { id: audioWidget; panel: root }
-            KeyboardLayout { panel: root }
-            QuickSettingsButton { id: quickButton; panel: root }
-            ClockButton { id: clockButton; panel: root }
-            // A sliver at the bar's end, its line taking the accent colour under the pointer.
-            Button {
-                id: showDesktopButton
-                Layout.preferredWidth: Theme.spacingL + Theme.spacingXS; Layout.fillHeight: true
-                onClicked: { root.closeMenus(); shell.tasks.showDesktop() }
-                Accessible.name: "Show desktop"
-                BarTip { panel: root; owner: showDesktopButton; text: "Show desktop" }
-                background: Rectangle {
-                    anchors.right: parent.right
-                    width: 3
-                    color: showDesktopButton.pressed ? Theme.accentHover : showDesktopButton.hovered ? Theme.accent : Theme.border
-                    Behavior on color { ColorAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
-                }
-            }
-        }
-        Rectangle {
-            visible: shell.error.length > 0
-            anchors.fill: parent; anchors.margins: Theme.spacingS
-            color: Theme.dangerSurface; radius: Theme.radiusSmall
-            Text { anchors.left: parent.left; anchors.right: dismiss.left; anchors.verticalCenter: parent.verticalCenter; anchors.margins: Theme.spacingL; text: shell.error; color: Theme.text; elide: Text.ElideRight; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
-            CloseButton {
-                id: dismiss
-                anchors.right: parent.right; anchors.rightMargin: Theme.spacingS
-                anchors.verticalCenter: parent.verticalCenter
-                Accessible.name: "Dismiss"
-                onClicked: shell.clearError()
-            }
+            active: root.macos
+            sourceComponent: Component { TopMenuBar { panel: root } }
         }
     }
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "view.hpp"
 #include "task_filter.hpp"
+#include <QGuiApplication>
 #include <QQuickItem>
 #include <QSGRendererInterface>
 #include <QScreen>
@@ -17,7 +18,8 @@ ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop,
     setResizeMode(QQuickView::SizeRootObjectToView);
     setFlags(Qt::FramelessWindowHint);
     static const int registered = qmlRegisterType<TaskFilter>("Shaodesk", 1, 0, "TaskFilter") +
-                                  qmlRegisterType<PopoverWindow>("Shaodesk", 1, 0, "PopoverWindow");
+                                  qmlRegisterType<PopoverWindow>("Shaodesk", 1, 0, "PopoverWindow") +
+                                  qmlRegisterType<MenuBarWindow>("Shaodesk", 1, 0, "MenuBarWindow");
     Q_UNUSED(registered);
     // Known as soon as the window exists, so before any QML asks: every view of the shell draws
     // the same way.
@@ -58,11 +60,21 @@ ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop,
             QMetaObject::invokeMethod(rootObject(), "togglePowerMenu");
     });
     connect(screen, &QScreen::geometryChanged, this, [this] { resizeForContent(); });
+    // A surface made anew as the view shows takes the region again.
+    connect(this, &QWindow::visibleChanged, this, [this](bool visible) {
+        if (visible)
+            applyInput();
+    });
 }
 PopoverWindow *ShellView::popover() const {
     return rootObject() ? rootObject()->findChild<PopoverWindow *>() : nullptr;
 }
-// The panel's surface spans the output's width and the bar's margins; the bar is drawn inset.
+MenuBarWindow *ShellView::menuBar() const {
+    return rootObject() ? rootObject()->findChild<MenuBarWindow *>() : nullptr;
+}
+// The panel's surface spans the output's width and the bar's margins; the bar is drawn inset. The
+// macOS style's dock is at the bottom whatever shell.panel_position says, and its surface reaches
+// above the strip it reserves by half its height, room for an icon to bounce in.
 void ShellView::placeLayer() {
 #if SHAODESK_LAYER_SHELL
     if (!layer_)
@@ -75,14 +87,14 @@ void ShellView::placeLayer() {
         return;
     }
     layer_->setAnchors(W::Anchors(W::AnchorLeft | W::AnchorRight |
-                                  (controller_.panelTop() ? W::AnchorTop : W::AnchorBottom)));
+                                  (controller_.panelSurfaceTop() ? W::AnchorTop : W::AnchorBottom)));
     layer_->setExclusiveZone(controller_.panelExtent());
 #endif
 }
 void ShellView::resizeForContent() {
     int width = preview_ ? previewSize().width() : screen()->geometry().width();
     int height = desktop_ ? (preview_ ? 680 : screen()->geometry().height())
-                          : controller_.panelExtent();
+                          : controller_.panelExtent() + controller_.panelHeadroom();
     resize(width, height);
 #if SHAODESK_LAYER_SHELL
     if (layer_)
@@ -90,13 +102,38 @@ void ShellView::resizeForContent() {
 #endif
 }
 
+void ShellView::setInputRects(const QVariantList &rects) {
+    if (rects == inputRects_)
+        return;
+    inputRects_ = rects;
+    Q_EMIT inputRectsChanged();
+    applyInput();
+}
+void ShellView::applyInput() {
+    inputRegion_ = QRegion();
+    for (const auto &rect : std::as_const(inputRects_))
+        inputRegion_ += rect.toRectF().toAlignedRect();
+    if (!layer_)
+        return;
+    // An empty mask is no mask: the whole surface.
+    setMask(inputRegion_);
+    // The region is the surface's state, sent with its next frame.
+    update();
+}
+
 PopoverWindow::PopoverWindow(QWindow *parent) : QQuickWindow(parent) {
     setTitle("shaodesk popover");
     setColor(Qt::transparent);
     setFlags(Qt::FramelessWindowHint);
-    // Losing the keyboard while holding it means something else was chosen.
+    // Losing the keyboard while holding it means something else was chosen. The menu bar never
+    // takes it as a layer surface, but a preview's platform may give it the focus as it shows:
+    // the popover takes it back.
     connect(this, &QWindow::activeChanged, this, [this] {
-        if (!isActive() && open_ && keyboard_)
+        if (isActive() || !open_ || !keyboard_)
+            return;
+        if (panel_ && QGuiApplication::focusWindow() && QGuiApplication::focusWindow() == panel_->menuBar())
+            requestActivate();
+        else
             Q_EMIT dismissed();
     });
 }
@@ -207,6 +244,81 @@ void PopoverWindow::applyInput() {
     // The region is the surface's state, sent with its next frame.
     update();
 }
+MenuBarWindow::MenuBarWindow(QWindow *parent) : QQuickWindow(parent) {
+    setTitle("shaodesk menu bar");
+    setColor(Qt::transparent);
+    // A preview's window too leaves the focus with the panel and its popover.
+    setFlags(Qt::FramelessWindowHint | Qt::WindowDoesNotAcceptFocus);
+}
+void MenuBarWindow::setPanel(QQuickWindow *panel) {
+    auto *view = qobject_cast<ShellView *>(panel);
+    if (!view || panel_)
+        return;
+    panel_ = view;
+    QScreen *screen = view->outputScreen();
+    setScreen(screen);
+#if SHAODESK_LAYER_SHELL
+    if (view->layerShell()) {
+        using W = LayerShellQt::Window;
+        layer_ = W::get(this);
+        layer_->setScreen(screen);
+        layer_->setScope("shaodesk-menubar");
+        layer_->setLayer(W::LayerTop);
+        layer_->setAnchors(W::Anchors(W::AnchorTop | W::AnchorLeft | W::AnchorRight));
+        layer_->setKeyboardInteractivity(W::KeyboardInteractivityNone);
+        layer_->setActivateOnShow(false);
+    }
+#endif
+    fit();
+    connect(screen, &QScreen::geometryChanged, this, &MenuBarWindow::fit);
+    Q_EMIT panelChanged();
+    applyShown();
+}
+// Across the output, and as tall as the bar, which is the strip it reserves.
+void MenuBarWindow::fit() {
+    if (!panel_)
+        return;
+    const int width = layer_ ? panel_->outputScreen()->geometry().width() : ShellView::previewSize().width();
+    resize(width, barHeight_);
+#if SHAODESK_LAYER_SHELL
+    if (layer_) {
+        layer_->setDesiredSize(QSize(0, barHeight_));
+        layer_->setExclusiveZone(barHeight_);
+    }
+#endif
+}
+void MenuBarWindow::setBarHeight(int height) {
+    if (height == barHeight_ || height < 1)
+        return;
+    barHeight_ = height;
+    Q_EMIT barHeightChanged();
+    fit();
+}
+void MenuBarWindow::setShown(bool shown) {
+    if (shown == shown_)
+        return;
+    shown_ = shown;
+    Q_EMIT shownChanged();
+    applyShown();
+}
+void MenuBarWindow::applyShown() {
+    if (!panel_)
+        return;
+    const auto output = panel_->outputScreen()->name().toStdString();
+    if (shown_ && !isVisible()) {
+        // Hidden, the surface and its exclusive zone are gone; shown, it is made anew.
+        show();
+        std::cerr << "shaodesk menu bar shown on " << output << '\n';
+        connect(
+            this, &QQuickWindow::frameSwapped, this,
+            [this] { std::cerr << "shaodesk surface rendered: " << title().toStdString() << '\n'; },
+            Qt::SingleShotConnection);
+    } else if (!shown_ && isVisible()) {
+        hide();
+        std::cerr << "shaodesk menu bar hidden on " << output << '\n';
+    }
+}
+
 OverlayView::OverlayView(ShellController &controller, QScreen *screen, const char *name, bool keyboard)
     : QQuickView(controller.engine(), nullptr), controller_(controller), outputScreen_(screen), name_(name),
       keyboard_(keyboard) {
@@ -384,9 +496,10 @@ PaletteView::PaletteView(ShellController &controller, QScreen *screen)
     using W = LayerShellQt::Window;
     layer_->setScope("shaodesk-palette");
     layer_->setAnchors(W::AnchorTop);
-    layer_->setMargins(QMargins(0, screen->geometry().height() / 6, 0, 0));
     layer_->setExclusiveZone(0);
 #endif
+    place();
+    connect(&controller, &ShellController::configChanged, this, &PaletteView::place);
     load("Palette.qml");
     // The surface is as big as the palette wants, whatever size the compositor last configured
     // (a palette that opened small would otherwise stay small).
@@ -407,10 +520,7 @@ PaletteView::PaletteView(ShellController &controller, QScreen *screen)
     connect(screen, &QScreen::geometryChanged, this, [this] {
         if (rootObject())
             rootObject()->setProperty("screenSize", outputScreen_->geometry().size());
-#if SHAODESK_LAYER_SHELL
-        if (layer_)
-            layer_->setMargins(QMargins(0, outputScreen_->geometry().height() / 6, 0, 0));
-#endif
+        place();
     });
     // Clicking elsewhere takes the keyboard away, which closes the palette; giving it up as it
     // goes does not.
@@ -421,6 +531,13 @@ PaletteView::PaletteView(ShellController &controller, QScreen *screen)
             controller_.palette()->close();
     });
     connect(controller.palette(), &Palette::openChanged, this, &PaletteView::update);
+}
+// Centred, below the bars by controller.paletteDrop.
+void PaletteView::place() {
+#if SHAODESK_LAYER_SHELL
+    if (layer_)
+        layer_->setMargins(QMargins(0, controller_.paletteDrop(outputScreen_->geometry().height()), 0, 0));
+#endif
 }
 void PaletteView::update() {
     const bool mine = controller_.palette()->output() == outputScreen_->name();
@@ -535,7 +652,7 @@ void OsdView::placeLayer() {
 #if SHAODESK_LAYER_SHELL
     using W = LayerShellQt::Window;
     layer_->setAnchors(controller_.osd()->top() ? W::AnchorTop : W::AnchorBottom);
-    layer_->setMargins(QMargins(0, 48, 0, 48));
+    layer_->setMargins(QMargins(0, 48, 0, controller_.osdBottom()));
 #endif
 }
 void OsdView::update() {

@@ -8,8 +8,13 @@ namespace LayerShellQt {
 class Window;
 }
 class PopoverWindow;
+class MenuBarWindow;
 class ShellView : public QQuickView {
     Q_OBJECT
+    // Where the panel takes the pointer: rectangles in its coordinates, or the whole surface while
+    // there are none, as for the taskbar. The dock lists only its own rectangle, so that the
+    // desktop beside it and under its surface's headroom stays reachable.
+    Q_PROPERTY(QVariantList inputRects READ inputRects WRITE setInputRects NOTIFY inputRectsChanged)
   public:
     ShellView(ShellController &controller, QScreen *screen, bool desktop, bool preview);
     QScreen *outputScreen() const { return outputScreen_; }
@@ -17,16 +22,29 @@ class ShellView : public QQuickView {
     bool layerShell() const { return layer_ != nullptr; }
     // The taskbar's popover, where its popups are drawn; nullptr for the desktop.
     PopoverWindow *popover() const;
+    // The menu bar of the macOS style; nullptr for the desktop.
+    MenuBarWindow *menuBar() const;
     // The size of the output a preview stands for.
     static QSize previewSize() { return {1100, 720}; }
+    QVariantList inputRects() const { return inputRects_; }
+    void setInputRects(const QVariantList &rects);
+    // inputRects as a region, empty for the whole surface. Applied to the surface with layer shell
+    // only, as a preview's platform may have no input regions.
+    QRegion inputRegion() const { return inputRegion_; }
+
+  Q_SIGNALS:
+    void inputRectsChanged();
 
   private:
     ShellController &controller_;
     bool desktop_, preview_;
     LayerShellQt::Window *layer_ = nullptr;
     QScreen *outputScreen_;
+    QVariantList inputRects_;
+    QRegion inputRegion_;
     void placeLayer();
     void resizeForContent();
+    void applyInput();
 };
 
 // The popups of one output's taskbar, in a surface of their own over the whole output: the bar's
@@ -85,6 +103,43 @@ class PopoverWindow : public QQuickWindow {
     void applyInput();
 };
 
+// The menu bar of the macOS style along the top of one output, in a surface of its own while the
+// panel's is the dock at the bottom. Panel.qml declares it, as it declares its popover, so the
+// menu bar shares the panel's QML tree, its state and its popover; its coordinates are the
+// output's along its top edge. With layer shell it is a layer surface on the top layer, across the
+// output and `barHeight` tall, reserving that strip as an exclusive zone; without, an ordinary
+// window as wide as a preview's output.
+//
+// It is shown while `shown`, and never takes the keyboard: its menus are the popover's.
+class MenuBarWindow : public QQuickWindow {
+    Q_OBJECT
+    // The panel's view, whose output it is on. Set once, before it first shows.
+    Q_PROPERTY(QQuickWindow *panel READ panel WRITE setPanel NOTIFY panelChanged)
+    Q_PROPERTY(bool shown READ shown WRITE setShown NOTIFY shownChanged)
+    Q_PROPERTY(int barHeight READ barHeight WRITE setBarHeight NOTIFY barHeightChanged)
+  public:
+    explicit MenuBarWindow(QWindow *parent = nullptr);
+    QQuickWindow *panel() const { return panel_; }
+    void setPanel(QQuickWindow *panel);
+    bool shown() const { return shown_; }
+    void setShown(bool shown);
+    int barHeight() const { return barHeight_; }
+    void setBarHeight(int height);
+
+  Q_SIGNALS:
+    void panelChanged();
+    void shownChanged();
+    void barHeightChanged();
+
+  private:
+    ShellView *panel_ = nullptr;
+    bool shown_ = false;
+    int barHeight_ = 28;
+    LayerShellQt::Window *layer_ = nullptr;
+    void fit();
+    void applyShown();
+};
+
 // An overlay that comes in and goes out on the shell's motion: the command palette, the power
 // dialog, the overview and the window switcher. Its root item has a `shown` property, set as it
 // shows and cleared as it goes, and a `progress` from 0 to 1 that its QML animates after it; the
@@ -133,6 +188,7 @@ class PaletteView : public OverlayView {
   private:
     bool wasActive_ = false;
     void update();
+    void place();
 };
 
 // The confirmation of power off, restart and log out on one output: a dimmed cover with the

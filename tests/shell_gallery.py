@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory(prefix="shaodesk-gallery-") as directory:
     suffix = "-gpu" if renderer == "gpu" else ""
     pictures = {}
     for theme in gallery.THEMES:
-        for popup in popups:
+        for popup in (popup for popup in popups if gallery.shows(theme, popup)):
             picture = Path(directory) / f"{theme}-{popup}{suffix}.png"
             data = picture.read_bytes()
             assert data[:8] == b"\x89PNG\r\n\x1a\n", f"{picture.name} is no PNG"

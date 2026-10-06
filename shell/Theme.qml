@@ -91,9 +91,35 @@ QtObject {
     readonly property int rowHeight: 36
     readonly property int headingHeight: 30
     // A button on the bar: as tall as the bar (shell.panel_height) leaves with a small margin
-    // above and below, and an icon's as wide as Windows 11's.
-    readonly property real barButtonHeight: Math.max(0, shell.panelHeight - 2 * spacingS)
-    readonly property int barButtonWidth: 40
+    // above and below, and an icon's as wide as Windows 11's. In the macOS style the widgets are
+    // on the menu bar, and these are its buttons.
+    readonly property real barButtonHeight: macos ? menuBarHeight - 2 * menuBarInset
+                                                  : Math.max(0, shell.panelHeight - 2 * spacingS)
+    readonly property int barButtonWidth: macos ? menuBarIconSize + 2 * menuBarPadding - spacingS : 40
+
+    // The macOS style's menu bar and dock.
+    // The menu bar: as tall as macOS's for the font size (28 pixels for 13), its items padded on
+    // either side, and the highlight under an open one rounded and inset from the bar's edges.
+    readonly property int menuBarHeight: Math.round(fontSize * 2.15)
+    readonly property int menuBarPadding: 10
+    readonly property int menuBarInset: 3
+    readonly property int menuBarRadius: 5
+    readonly property int menuBarIconSize: 16
+    // The dock: applications' icons as large as shell.panel_height leaves inside its padding,
+    // this far apart, with a dot under a running one; the line before the Trash; and its outline,
+    // a light edge inside and a faint dark one outside.
+    readonly property int dockPadding: 8
+    readonly property real dockIconSize: Math.max(16, shell.panelHeight - 2 * dockPadding)
+    readonly property int dockSpacing: 6
+    readonly property int dockDotSize: 4
+    readonly property color dockSeparator: alpha(text, 0.22)
+    readonly property color dockInnerEdge: Qt.rgba(1, 1, 1, light ? 0.55 : 0.14)
+    readonly property color dockOuterEdge: Qt.rgba(0, 0, 0, light ? 0.12 : 0.5)
+    // An icon bouncing as its application starts (until a window opens) or asks for attention:
+    // up a share of its size and back, a bounce this long, at most this many times.
+    readonly property real dockBounceHeight: 0.35
+    readonly property int dockBounceDuration: duration(600)
+    readonly property int dockBounces: 3
 
     // Line icons in menus, line icons on the bar, applications' icons on the bar and in lists,
     // and in the launcher.

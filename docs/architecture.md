@@ -111,6 +111,20 @@ keyboard where it is. Losing the keyboard while it holds it (`dismissed`)
 closes the popups. Without layer shell (`--preview-popup`, `shell_ui_test`) it is an ordinary
 window as large as `ShellView::previewSize()`, and a preview's screenshot draws it over the bar.
 
+`Panel.qml` loads the bars of `shell.style`. The taskbar (`Taskbar.qml`) fills the panel's surface.
+The macOS style has two: the dock (`Dock.qml`) in the panel's surface, which is then at the bottom
+whatever `shell.panel_position` says and reaches above the strip it reserves by half its height,
+room for an icon to bounce in; and the menu bar (`TopMenuBar.qml`) in a `MenuBarWindow`
+(`view.cpp`) that `Panel.qml` declares as it declares its popover: a layer surface on the top
+layer along the output's top edge, reserving its strip, shown only in that style, in the panel's
+QML tree and state. The panel's surface then takes the pointer only over the dock (`ShellView`'s
+`inputRects`), so the desktop beside it and under that room stays reachable, and the popover leaves
+holes for both bars (`popoverInput`), but takes every press while Launchpad covers them. A popup
+of the bar with the widgets opens by `panel.barAnchor`, below the menu bar in the macOS style;
+one of the dock (an application's menu, the windows of one) by `panel.dockAnchor` and
+`panel.dockSide`, which on the taskbar are the bar's. A change of style makes and drops the
+bars, and the surfaces follow at once.
+
 The window switcher, the command palette, the power dialog and the overview's text are
 `OverlayView`s (`view.cpp`), a layer surface each on every output's overlay layer. `present()`
 shows one and sets its QML root's `shown`; `dismiss()` clears it, and the root animates its own
@@ -124,9 +138,11 @@ what was there.
 | File | Covers |
 | --- | --- |
 | `Theme.qml` | The design tokens (colours, type, radii, spacing, icon sizes, motion, whether effects can be drawn), derived from the appearance profile. A singleton: every file reads `Theme.surface`, `Theme.hover`, ... instead of colours and sizes of its own. |
-| `Panel.qml` | The taskbar: which popup is open and where, the bar and its smaller buttons, and the popover with a loader for each popup. Every part below takes the panel as `panel` (and a popup the bar as `barItem`) and reaches its state and functions through it; a popup is placed in `panel.popupLayer`, beside the part of the bar it belongs to (`panel.barAnchor(x, width)`). |
-| `PinnedSlots.qml`, `TaskList.qml`, `TaskButton.qml`, `TrayButton.qml`, `WorkspaceIndicator.qml`, `VolumeButton.qml`, `ClockButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `QuickSettingsButton.qml`, `BarAppIcon.qml`, `Badge.qml`, `BarTip.qml` | Parts of the bar: widgets, an application's icon on it, a count on a pill, and the tooltip for things on it. |
-| `ClockFlyout.qml`, `QuickSettings.qml`, `AudioMixer.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
+| `Panel.qml` | The panel on one output: which popup is open and where, the bars of the style (a loader for each), and the popover with a loader for each popup. Every part below takes the panel as `panel` (and a popup the bar as `barItem`) and reaches its state and functions through it; a popup is placed in `panel.popupLayer`, beside the part of the bar it belongs to (`panel.barAnchor(x, width)`). |
+| `Taskbar.qml` | The taskbar: the bar along the panel's edge with the start button, the pinned applications, the windows, the widgets and the clock, and its smaller buttons. |
+| `TopMenuBar.qml`, `Dock.qml`, `DockIcon.qml` | The bars of the macOS style (`shell.style`): the menu bar along the top in a `MenuBarWindow` of its own, with the system, application and Window menus, the widgets, search, Quick Settings and the clock; and the dock in the panel's surface, an icon for each application, pinned or running, with the applications button and the Trash. |
+| `PinnedSlots.qml`, `TaskList.qml`, `TaskButton.qml`, `TrayButton.qml`, `WorkspaceIndicator.qml`, `VolumeButton.qml`, `ClockButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `QuickSettingsButton.qml`, `WallpapersButton.qml`, `ProfilesButton.qml`, `TilingButton.qml`, `BarAppIcon.qml`, `Badge.qml`, `BarTip.qml` | Parts of the bar: widgets, an application's icon on it, a count on a pill, and the tooltip for things on it. |
+| `ClockFlyout.qml`, `QuickSettings.qml`, `AudioMixer.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml`, `MenuBarMenu.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
 | `CalendarPopup.qml`, `NotificationHistory.qml` | The clock flyout's cards: the month calendar, and the notifications grouped by application. |
 | `QuickTile.qml` | A tile of Quick Settings: a toggle, a list it opens, or a state. |
 | `Icon.qml`, `FadingIcon.qml`, `SpeakerIcon.qml`, `BatteryIcon.qml` | Line icons (Lucide), drawn as vectors in any colour; one that crossfades as the state it shows changes, the loudspeaker for a volume, and a battery filled to its charge. |
@@ -138,6 +154,7 @@ what was there.
 | `EmptyState.qml` | What a list says while it has nothing to show: an icon, a line and a hint. |
 | `PopupCard.qml` | A popup's card: surface, outline, corners, a shadow through the GPU, the open and close animation, and its place beside what it belongs to. |
 | `PopupMenu.qml`, `MenuRow.qml` | A menu of plain entries on popup cards, with cascading submenus and keyboard navigation, and one row of it. |
+| `WindowMenu.js` | The entries of a menu about windows that move them to another workspace or monitor. |
 | `AudioSlider.qml`, `MuteButton.qml`, `StreamRow.qml` | Controls the mixer and Quick Settings use: a volume's slider, a mute button, and an application playing sound. |
 | `StartHome.qml`, `StartAllApps.qml`, `StartSearch.qml`, `StartBestMatch.qml`, `StartTile.qml`, `StartRow.qml`, `UserAvatar.qml` | Parts of the start menu (`Launcher.qml`): its pinned and recent applications, every application from A to Z, what its search finds and the best match of it, a pinned application, a row of its lists, the user's picture. |
 | `Launchpad.qml` | The launcher of the macOS style, in the start menu's place: every application on pages of a grid over the whole output, with a search. |
@@ -215,11 +232,14 @@ the highlighted one is filled with the accent, its text white, as macOS draws me
    `required property Item barItem`, `parent: panel.popupLayer`, `open:` that property,
    `anchorRect: panel.barAnchor(x, width)`, `side: panel.popupSide` and
    `bounds: panel.popupArea` (the output but the bar), so that it opens away from the bar on a
-   top panel as on a bottom one. A menu's `onDismissed` clears the property.
+   top panel as on a bottom one, and below the menu bar in the macOS style; one that belongs to
+   the dock's icons takes `panel.dockAnchor(x, width)` and `panel.dockSide` instead. A menu's
+   `onDismissed` clears the property.
 3. A `Loader` for it in the popover in `Panel.qml`, like the others: made when first opened or a
    moment after startup (`root.warm`), kept once made.
 4. The file in `QML_FILES` in `shell/CMakeLists.txt` and in the table above; a name in
-   `previewPopup` (`Panel.qml`), `--preview-popup`'s help (`main.cpp`) and `POPUPS`
+   `previewPopup` (`Panel.qml`; `previewMacos` for one only the macOS style has, which goes in
+   `MACOS_POPUPS` too), `--preview-popup`'s help (`main.cpp`) and `POPUPS`
    (`tools/shell_gallery.py`), and a look at the gallery's pictures.
 5. Tests in `shell_ui_test`: `find(view.rootObject(), NAME)` finds the popover's items too,
    `click(item)` clicks one in its own window, `inPopover(popup)` says it is open, settled and
@@ -261,7 +281,9 @@ its own only where all of it does (Launchpad).
 
 `shaodesk-shell --config FILE --preview-popup NAME --screenshot OUT.png --quit-after 400`
 renders the taskbar offscreen with one popup open, on stand-in windows, sound, tray items and
-notifications, over the configured wallpaper (`--preview-popup` lists the names). The overlay
+notifications, over the configured wallpaper (`--preview-popup` lists the names); in the macOS
+style the dock and the menu bar, over the style's drawn wallpaper while none is set, with the
+menu bar's menus as `system-menu`, `app-menu`, `window-menu` and `window-submenu`. The overlay
 surfaces have names there too (`osd-volume`, `osd-text`, `cards`, `power-dialog`, `palette`,
 `palette-empty`, `switcher`, `overview`): `PreviewData` in `preview.cpp` shows one in a window of its own over the
 bar alone, with stand-ins for what the compositor would tell it, and the screenshot draws it where

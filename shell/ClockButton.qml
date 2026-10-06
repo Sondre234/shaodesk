@@ -50,9 +50,13 @@ FlatButton {
                 objectName: "clock"
                 property date now: new Date()
                 anchors.verticalCenter: parent.verticalCenter
-                text: Qt.formatTime(now, "HH:mm")
+                // The macOS style's menu bar has the date before the time, with the day and the
+                // month in the order the locale writes them: "Tue 6 Oct  14:32".
+                readonly property string shortDate: Qt.locale().dateFormat(Locale.ShortFormat)
+                readonly property string dateFormat: shortDate.indexOf("d") < shortDate.indexOf("M") ? "ddd d MMM" : "ddd MMM d"
+                text: Theme.macos ? Qt.formatDate(now, dateFormat) + "  " + Qt.formatTime(now, "HH:mm") : Qt.formatTime(now, "HH:mm")
                 color: Theme.text
-                font.pixelSize: Theme.fontSize; font.weight: Font.DemiBold; font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSize; font.weight: Theme.macos ? Font.Normal : Font.DemiBold; font.family: Theme.fontFamily
                 // The clock shows minutes, so it wakes once a minute, just after the minute changes.
                 Timer {
                     id: tick

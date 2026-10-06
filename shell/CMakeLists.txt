@@ -42,10 +42,13 @@ set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_ima
 qt_add_library(shaodesk_shell_qml STATIC)
 # Theme is the design tokens every QML file reads, one instance per engine.
 set_source_files_properties(Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+# The menus that use WindowMenu.js import it by its path, so the module leaves it out of its qmldir,
+# which would evaluate it for every file.
+set_source_files_properties(WindowMenu.js PROPERTIES QT_QML_SKIP_QMLDIR_ENTRY TRUE)
 qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREFIX /shell
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/ShaodeskShell
     NO_PLUGIN NO_GENERATE_QMLTYPES
-    QML_FILES Theme.qml EmptyState.qml FlatButton.qml ButtonFill.qml PushButton.qml TextButton.qml CloseButton.qml SearchInput.qml PopupCard.qml PopupMenu.qml MenuRow.qml Panel.qml Icon.qml FadingIcon.qml Desktop.qml Switcher.qml Palette.qml Overview.qml NotificationCards.qml Osd.qml ConfigError.qml NotificationBell.qml NotificationHistory.qml
+    QML_FILES Theme.qml EmptyState.qml FlatButton.qml ButtonFill.qml PushButton.qml TextButton.qml CloseButton.qml SearchInput.qml PopupCard.qml PopupMenu.qml MenuRow.qml Panel.qml Taskbar.qml Icon.qml FadingIcon.qml Desktop.qml Switcher.qml Palette.qml Overview.qml NotificationCards.qml Osd.qml ConfigError.qml NotificationBell.qml NotificationHistory.qml
     KeyboardLayout.qml BarTip.qml BarAppIcon.qml Badge.qml TaskButton.qml TaskList.qml PinnedSlots.qml TrayButton.qml
     WorkspaceIndicator.qml VolumeButton.qml ClockButton.qml BatteryWidget.qml NetworkWidget.qml SpeakerIcon.qml AudioSlider.qml MuteButton.qml StreamRow.qml
     AudioMixer.qml
@@ -65,6 +68,7 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     UserAvatar.qml
     PowerMenu.qml
     TaskbarMenu.qml
+    WindowMenu.js
     TrayMenu.qml
     GroupList.qml
 
@@ -72,6 +76,13 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     ClockFlyout.qml
     BatteryIcon.qml
     QuickSettingsButton.qml
+    WallpapersButton.qml
+    ProfilesButton.qml
+    TilingButton.qml
+    Dock.qml
+    DockIcon.qml
+    TopMenuBar.qml
+    MenuBarMenu.qml
     QuickSettings.qml
     QuickTile.qml)
 add_executable(shaodesk-shell main.cpp ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp task_model.cpp task_model.hpp
@@ -313,6 +324,10 @@ if(BUILD_TESTING)
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>
             "${GRIM_ARGUMENT}")
         set_tests_properties(popover_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME macos_shell_smoke COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/macos_shell_smoke.py $<TARGET_FILE:shaodesk>
+            $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>)
+        set_tests_properties(macos_shell_smoke PROPERTIES TIMEOUT 90)
         if(SHAODESK_DBUS)
             add_test(NAME notifications_smoke COMMAND ${Python3_EXECUTABLE}
                 ${PROJECT_SOURCE_DIR}/tests/notifications_smoke.py $<TARGET_FILE:shaodesk>

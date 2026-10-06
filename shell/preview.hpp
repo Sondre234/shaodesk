@@ -42,6 +42,9 @@ class PreviewData : public QObject {
 
   private:
     ShellController &controller_;
+    // The panel filled, whose menu bar (the macOS style's) is reserved too.
+    QQuickItem *panel_ = nullptr;
+    QRect usableArea() const;
     std::unique_ptr<QQuickView> surface_;
     QString surfaceName_;
     bool showSurface(QScreen *screen, const QString &name);
@@ -53,8 +56,8 @@ class PreviewData : public QObject {
 };
 
 // A screenshot of the panel's preview as the output would show it: the desktop (the wallpaper, or
-// the background colour), the bar along its edge, and the popover with its popups over both, so
-// that a translucent colour shows what it would show there. `popover` is null while nothing is
-// open.
-QImage previewOnDesktop(QImage panel, QImage popover, bool panelTop,
-                        const ShellController &controller);
+// the background colour), the bar along its edge, the menu bar of the macOS style along the top,
+// and the popover with its popups over them all, so that a translucent colour shows what it would
+// show there. `popover` is null while nothing is open, `menuBar` without a menu bar.
+QImage previewOnDesktop(QImage panel, QImage popover, QImage menuBar, bool panelTop,
+                        ShellController &controller);
