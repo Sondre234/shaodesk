@@ -85,7 +85,8 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
 
     # A taskbar profile: the menu bar goes with its strip, and the window grows into it.
     profile("plain")
-    desktop.wait_for(lambda: menu_bar not in layers() or layers()[menu_bar][1] == "0",
+    # One reading of the layers: the menu bar may go between two.
+    desktop.wait_for(lambda: layers().get(menu_bar, ["", "0"])[1] == "0",
                      "the menu bar gone with the taskbar profile")
     desktop.wait_for(lambda: maximized([0, 0, WIDTH, HEIGHT - TASKBAR]), "the window maximized above the taskbar")
     assert layers().get(panel) == ["2", "1"], layers()
