@@ -92,6 +92,14 @@ struct ShellWidgets {
     WidgetPlace notifications = WidgetPlace::Quick;
 };
 
+// Lua `shell.thumbnails`: pictures of the windows of a taskbar button resting under the pointer.
+struct ShellThumbnails {
+    bool enabled = true;
+    int delay = 400; // milliseconds the pointer rests on the button first
+    int size = 240;  // width of one picture in pixels; 5/8 of it tall
+    bool live = true; // the pictures follow the windows while shown; false: one as the card opens
+};
+
 struct ShellConfig {
     bool enabled = true;
     bool macos_style = false;           // style = "macos": a menu bar and a dock
@@ -104,6 +112,7 @@ struct ShellConfig {
     bool icons_only = true; // taskbar buttons show the window's icon, its title as a tooltip
     bool software_renderer = false; // renderer = "software": Qt Quick without the GPU, faster to start
     bool group_windows = true; // one taskbar button per application, its windows listed on hover
+    ShellThumbnails thumbnails;
     int workspaces_shown = 0;  // the workspace indicator shows this many, around the current; 0: all
     std::string accent = "#7da8ff";
     std::string panel_color = "#151e2c";
