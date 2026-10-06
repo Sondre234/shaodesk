@@ -311,40 +311,6 @@ Item {
                                      shell.panelMarginBottom > 0
     Keys.onEscapePressed: closeMenus()
 
-    // A loudspeaker with a wave per half of the volume, or crossed out while muted.
-    component SpeakerIcon: Icon {
-        property int level: 0
-        property bool muted: false
-        name: muted || level === 0 ? "volume-x" : level > 50 ? "volume-2" : "volume-1"
-    }
-    component AudioSlider: Slider {
-        id: slider
-        property bool muted: false
-        from: 0; to: 100; stepSize: 1
-        background: Rectangle {
-            x: slider.leftPadding; y: slider.topPadding + slider.availableHeight / 2 - height / 2
-            width: slider.availableWidth; height: 4; radius: 2
-            color: Qt.lighter(shell.panelColor, 1.8)
-            Rectangle { width: slider.visualPosition * parent.width; height: parent.height; radius: 2; color: slider.muted ? "#627084" : shell.accent }
-        }
-        handle: Rectangle {
-            x: slider.leftPadding + slider.visualPosition * (slider.availableWidth - width)
-            y: slider.topPadding + slider.availableHeight / 2 - height / 2
-            width: 14; height: 14; radius: 7
-            color: slider.muted ? "#8a96a8" : (slider.pressed || slider.hovered ? Qt.lighter(shell.accent, 1.15) : shell.accent)
-        }
-    }
-    // A mute toggle drawn as the speaker it silences.
-    component MuteButton: Button {
-        id: mute
-        property int level: 0
-        property bool muted: false
-        width: 32; height: 32
-        Layout.preferredWidth: 32; Layout.preferredHeight: 32
-        background: Rectangle { radius: 6; color: mute.hovered ? Qt.lighter(shell.panelColor, 1.5) : "transparent" }
-        contentItem: Item { SpeakerIcon { anchors.centerIn: parent; level: mute.level; muted: mute.muted; color: mute.muted ? "#8a96a8" : shell.textColor } }
-    }
-
     MouseArea {
         anchors.fill: parent
         visible: root.menuOpen
