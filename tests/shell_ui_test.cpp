@@ -873,6 +873,30 @@ ListModel {
         if (!QTest::qWaitFor([&] { return !popover->isVisible() && controller.workspaces().size() == 1; }))
             return fail("the popover did not close after moving the window to another monitor");
     }
+    // Keeping it on every workspace, and floating it where its workspace tiles.
+    {
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Keep on all workspaces"); }) ||
+            menuItem("Keep on all workspaces")->property("marked").toBool() || menuItem("Float"))
+            return fail("a window's menu does not offer to keep it on all workspaces, or floats it "
+                        "where nothing tiles");
+        editTasks("model.setProperty(0, 'tiling', true)");
+        if (!QTest::qWaitFor([&] { return menuItem("Float"); }) ||
+            menuItem("Float")->property("marked").toBool())
+            return fail("a tiled window's menu does not offer to float it");
+        click(menuItem("Float"));
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Keep on all workspaces"); }))
+            return fail("the window's menu did not open again");
+        click(menuItem("Keep on all workspaces"));
+        if (const auto asked = taskRequests(); asked != "floating 7 true|sticky 7 true") {
+            std::cerr << "floating and sticking from a task's menu asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        editTasks("model.setProperty(0, 'tiling', false)");
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the popover did not close after making the window sticky");
+    }
     // The task's window belongs to an installed application, which its menu pins. Pinned, the
     // window takes over the application's slot instead of adding a button; with no window left
     // the slot's launcher returns, and its own menu unpins it. Pins are remembered in the state

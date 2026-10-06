@@ -61,6 +61,8 @@ class ShellController : public QObject {
     // software renderer cannot draw them. Set from what the views actually use.
     Q_PROPERTY(bool effects READ effects NOTIFY effectsChanged)
     Q_PROPERTY(bool groupWindows READ groupWindows NOTIFY configChanged)
+    // features.sticky: whether a window can be shown on every workspace of its monitor.
+    Q_PROPERTY(bool stickyWindows READ stickyWindows NOTIFY configChanged)
     // Which panel widgets Lua enables: {workspaces, battery, network, volume, clock, calendar,
     // tiling, profiles, wallpapers, keyboard_layout, power, tray}.
     Q_PROPERTY(QVariantMap widgets READ widgets NOTIFY configChanged)
@@ -155,6 +157,7 @@ class ShellController : public QObject {
     bool effects() const { return effects_; }
     void setEffects(bool effects);
     bool groupWindows() const { return config_.shell.group_windows; }
+    bool stickyWindows() const { return config_.settings.sticky; }
     bool enabled() const { return config_.shell.enabled; }
     QStringList profiles() const;
     QString profile() const { return QString::fromStdString(config_.profile); }

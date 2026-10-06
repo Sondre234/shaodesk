@@ -75,7 +75,15 @@ PopupMenu {
                  run: function() { tasks.maximize(id) } },
                { text: "Fullscreen", toggle: "check", checked: window.fullscreen === true,
                  run: function() { tasks.setFullscreen(id, window.fullscreen !== true) } }]
-        return entries.concat(placeEntries([window], tasks))
+        entries = entries.concat(placeEntries([window], tasks))
+        if (window.workspace > 0 && shell.stickyWindows)
+            entries.push({ text: "Keep on all workspaces", toggle: "check", checked: window.sticky === true,
+                           run: function() { tasks.setSticky(id, window.sticky !== true) } })
+        // Only where windows tile is there a tiling to leave.
+        if (window.workspace > 0 && window.tiling === true)
+            entries.push({ text: "Float", toggle: "check", checked: window.floating === true,
+                           run: function() { tasks.setFloating(id, window.floating !== true) } })
+        return entries
     }
     // Where the windows can go, once the compositor has said where they are (workspace from 1):
     // the workspaces of their monitors, the one they are all on marked.
