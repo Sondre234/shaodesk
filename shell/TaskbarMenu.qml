@@ -63,6 +63,19 @@ PopupMenu {
             : entries.concat([{ text: open, icon: open === "Open" ? "app-window" : "plus",
                                 run: function() { shell.launch(record.appId) } }])
     }
+    // What can be done to the window `window` (its roles, as menuWindows lists them), labelled
+    // by its state, through `tasks`, the panel's source of windows: a minimized one is only
+    // restored.
+    function windowEntries(window, tasks) {
+        var id = window.taskId
+        if (window.minimized)
+            return [{ text: "Restore", icon: "app-window", run: function() { tasks.activate(id) } }]
+        return [{ text: "Minimize", icon: "minus", run: function() { tasks.minimize(id) } },
+                { text: window.maximized ? "Restore" : "Maximize", icon: window.maximized ? "copy" : "square",
+                  run: function() { tasks.maximize(id) } },
+                { text: "Fullscreen", toggle: "check", checked: window.fullscreen === true,
+                  run: function() { tasks.setFullscreen(id, window.fullscreen !== true) } }]
+    }
     // The groups of entries, with a line between those that have any.
     function sections(groups) {
         var entries = []
@@ -76,17 +89,19 @@ PopupMenu {
         return entries
     }
 
+    // A task menu acts on the windows through the panel's source of them, which the tests replace
+    // with one that notes what it is asked.
     entries: {
         var task = panel.taskMenuId
+        var tasks = panel.taskSource
         if (task >= 0) {
-            var window = menuWindows.windows[0] || { appId: "", title: "" }
+            var window = menuWindows.windows[0] || { taskId: task, appId: "", title: "" }
             var record = appRecord(window.appId)
             return sections([[titleEntry(record, window.appId, window.title)],
                              launchEntries(record, "New window"),
-                             [{ text: "Maximize / restore", run: function() { shell.tasks.maximize(task) } },
-                              { text: "Minimize", run: function() { shell.tasks.minimize(task) } }]
-                                 .concat(panel.taskMenuApp ? [panel.pinAction(panel.taskMenuApp)] : [])
-                                 .concat([{ text: "Close window", run: function() { shell.tasks.close(task) } }])])
+                             windowEntries(window, tasks),
+                             (panel.taskMenuApp ? [panel.pinAction(panel.taskMenuApp)] : [])
+                                 .concat([{ text: "Close window", run: function() { tasks.close(task) } }])])
         }
         // A pinned application without windows.
         var app = panel.pinMenuApp

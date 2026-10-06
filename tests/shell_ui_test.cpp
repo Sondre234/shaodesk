@@ -679,15 +679,37 @@ int main(int argc, char **argv) {
     }
     // Context menus: a task's, then the bar's. Stand-in tasks replace the Wayland ones.
     auto *tasks = view.rootObject()->findChild<QQuickItem *>("taskList");
+    // It notes what the taskbar's menus ask of the windows, as "minimize 7".
     QQmlComponent fakeTasks(view.engine());
-    fakeTasks.setData("import QtQml.Models\nListModel { ListElement { taskId: 7; title: 'Fake'; "
-                      "appId: 'fake'; active: false; minimized: false; urgent: false } }",
+    fakeTasks.setData(R"(import QtQml.Models
+ListModel {
+    property var requests: []
+    function note(request) { requests = requests.concat([request]) }
+    function activate(id) { note("activate " + id) }
+    function minimize(id) { note("minimize " + id) }
+    function maximize(id) { note("maximize " + id) }
+    function setFullscreen(id, on) { note("fullscreen " + id + " " + on) }
+    function close(id) { note("close " + id) }
+    function moveToWorkspace(id, number) { note("workspace " + id + " " + number) }
+    function moveToOutput(id, output) { note("output " + id + " " + output) }
+    function setSticky(id, on) { note("sticky " + id + " " + on) }
+    function setFloating(id, on) { note("floating " + id + " " + on) }
+    ListElement { taskId: 7; title: 'Fake'; appId: 'fake'; active: false; minimized: false; urgent: false
+                  maximized: false; fullscreen: false; output: 'TEST-1'; workspace: 2; sticky: false
+                  floating: false; tiling: false }
+})",
                       QUrl());
     QObject *fakeModel = fakeTasks.create();
     if (!tasks || !fakeModel)
         return fail("the task models did not load");
     QQmlEngine::setObjectOwnership(fakeModel, QQmlEngine::CppOwnership);
     view.rootObject()->setProperty("taskSource", QVariant::fromValue(fakeModel));
+    // What the menus asked of the stand-in windows since the last call, joined by "|".
+    auto taskRequests = [&] {
+        const auto asked = fakeModel->property("requests").value<QJSValue>().toVariant().toStringList();
+        fakeModel->setProperty("requests", QVariant::fromValue(view.engine()->newArray()));
+        return asked.join("|");
+    };
     // ListModel's methods take JavaScript arguments, so they are reached through the engine.
     auto editTasks = [&](const QString &body) {
         view.engine()
@@ -755,7 +777,7 @@ int main(int argc, char **argv) {
     if (!QTest::qWaitFor([&] {
             return view.rootObject()->property("taskMenuId").toInt() == 7 && menuShown();
         }) ||
-        !menuItem("Maximize / restore") || !menuItem("Minimize") || !menuItem("Close window")) {
+        !menuItem("Maximize") || !menuItem("Minimize") || !menuItem("Close window")) {
         std::cerr << "right-clicking a task did not show its menu\n";
         return 1;
     }
@@ -764,6 +786,46 @@ int main(int argc, char **argv) {
         !QTest::qWaitFor([&] { return !popover->isVisible(); })) {
         std::cerr << "choosing a task menu item did not close the menu\n";
         return 1;
+    }
+    if (const auto asked = taskRequests(); asked != "minimize 7") {
+        std::cerr << "minimizing from a task's menu asked " << asked.toStdString() << '\n';
+        return 1;
+    }
+    // The window's entries follow its state, while the menu is open too: maximized, it offers to
+    // restore it, and fullscreen is checked; minimized, it offers only to restore it.
+    {
+        auto checked = [&](const QString &text) {
+            return menuItem(text) && menuItem(text)->property("marked").toBool();
+        };
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Maximize"); }) ||
+            !menuItem("Fullscreen") || checked("Fullscreen") || menuItem("Restore"))
+            return fail("a window's menu does not offer to maximize it and make it fullscreen");
+        editTasks("model.setProperty(0, 'maximized', true); model.setProperty(0, 'fullscreen', true)");
+        if (!QTest::qWaitFor([&] {
+                return menuItem("Restore") && !menuItem("Maximize") && checked("Fullscreen") &&
+                       menuItem("Restore")->property("modelData").toMap()["icon"] == "copy";
+            }))
+            return fail("the window's menu did not follow it maximized and fullscreen");
+        click(menuItem("Fullscreen"));
+        if (const auto asked = taskRequests(); asked != "fullscreen 7 false") {
+            std::cerr << "leaving fullscreen from a task's menu asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        editTasks("model.setProperty(0, 'minimized', true)");
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Restore"); }) ||
+            menuItem("Minimize") || menuItem("Maximize") || menuItem("Fullscreen"))
+            return fail("a minimized window's menu offers more than to restore it");
+        click(menuItem("Restore"));
+        if (const auto asked = taskRequests(); asked != "activate 7") {
+            std::cerr << "restoring from a task's menu asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        editTasks("model.setProperty(0, 'minimized', false); model.setProperty(0, 'maximized', false); "
+                  "model.setProperty(0, 'fullscreen', false)");
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the popover did not close after restoring");
     }
     // The task's window belongs to an installed application, which its menu pins. Pinned, the
     // window takes over the application's slot instead of adding a button; with no window left
