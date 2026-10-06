@@ -11,8 +11,9 @@ Item {
     // The compositor's switcher, unless set (as a preview sets them).
     property var windows: shell.switcherWindows
     property int selected: shell.switcherSelected
-    readonly property int cell: 132
-    readonly property int padding: 16
+    // A window's cell: its icon over two lines of its title.
+    readonly property int cell: Theme.appIconSizeDisplay + 10 * Theme.spacingM
+    readonly property int padding: Theme.spacingXL
     // As many columns as fit in most of the output's width, and rows up to most of its height;
     // the grid scrolls to the selection past that.
     readonly property int columns: Math.max(1, Math.min(windows.length, Math.floor((screenSize.width * 0.9 - 2 * padding) / cell)))
@@ -81,12 +82,14 @@ Item {
                 Image {
                     id: icon
                     anchors.horizontalCenter: parent.horizontalCenter
-                    y: 18; width: 56; height: 56; sourceSize: Qt.size(56, 56)
+                    y: Theme.spacingXL
+                    width: Theme.appIconSizeDisplay; height: Theme.appIconSizeDisplay
+                    sourceSize: Qt.size(2 * Theme.appIconSizeDisplay, 2 * Theme.appIconSizeDisplay)
                     source: "image://icons/" + shell.iconFor(entry.modelData.appId)
                 }
                 Text {
-                    anchors.top: icon.bottom; anchors.topMargin: 8
-                    anchors.left: parent.left; anchors.right: parent.right; anchors.margins: 8
+                    anchors.top: icon.bottom; anchors.topMargin: Theme.spacingM + Theme.spacingXS
+                    anchors.left: parent.left; anchors.right: parent.right; anchors.margins: Theme.spacingM
                     text: entry.modelData.title.length > 0 ? entry.modelData.title : entry.modelData.appId
                     textFormat: Text.PlainText
                     color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize

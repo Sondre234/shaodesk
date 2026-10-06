@@ -95,6 +95,8 @@ QtObject {
     readonly property int appIconSizeLarge: 30
     // A line icon saying what an overlay shows, as the on-screen display's.
     readonly property int iconSizeLarge: 22
+    // An application's icon standing for a window in an overlay, as in the switcher's grid.
+    readonly property int appIconSizeDisplay: 64
 
     // Motion, following animations.enabled and animations.speed: every duration is 0 while
     // animations are off.
