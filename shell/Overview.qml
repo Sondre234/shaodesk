@@ -99,22 +99,24 @@ Item {
             }
             Rectangle {
                 anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-                height: 24
-                color: Theme.alpha(Theme.surface, entry.selected ? 0.92 : 0.8)
+                height: Theme.iconSizeSmall + 2 * Theme.spacingS
+                color: Theme.alpha(Theme.surface, entry.selected ? 0.94 : 0.82)
                 Image {
                     id: icon
-                    x: 4; anchors.verticalCenter: parent.verticalCenter
-                    width: 16; height: 16; sourceSize: Qt.size(16, 16)
+                    x: Theme.spacingS; anchors.verticalCenter: parent.verticalCenter
+                    width: Theme.iconSizeSmall; height: Theme.iconSizeSmall
+                    sourceSize: Qt.size(2 * Theme.iconSizeSmall, 2 * Theme.iconSizeSmall)
                     source: "image://icons/" + shell.iconFor(entry.modelData.appId)
                 }
                 Text {
-                    anchors.left: icon.right; anchors.leftMargin: 6
-                    anchors.right: parent.right; anchors.rightMargin: 6
+                    anchors.left: icon.right; anchors.leftMargin: Theme.spacingS + Theme.spacingXS
+                    anchors.right: parent.right; anchors.rightMargin: Theme.spacingS + Theme.spacingXS
                     anchors.verticalCenter: parent.verticalCenter
                     text: entry.title; textFormat: Text.PlainText
                     elide: Text.ElideRight
                     color: Theme.text
-                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize; font.bold: entry.selected
+                    font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize
+                    font.weight: entry.selected ? Font.DemiBold : Font.Normal
                 }
             }
         }
