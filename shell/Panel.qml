@@ -58,11 +58,20 @@ Item {
     // opens under a window being typed in.
     readonly property bool expanded: menuOpen || groupOpen
     onMenuOpenChanged: if (menuOpen) groupOpen = false
+    // The bars the style has: the taskbar (Taskbar.qml).
+    readonly property Item taskbar: taskbarLoader.item
+    // The bar along the panel's edge, which its popups open by; the panel itself while it is
+    // being made.
+    readonly property Item bar: taskbar ? taskbar.barItem : root
+    // The bar with the status widgets (the clock, Quick Settings, the tray, ...), whose popups
+    // open by it, and the part that holds them and names the buttons they open by.
+    readonly property Item statusBar: bar
+    readonly property Item statusArea: taskbar
     // The surface the popups are drawn in, and the bar's top edge in its coordinates: the bar's
     // surface lies along its top or bottom edge, across its width.
     readonly property Item popupLayer: popupLayer
     // What Quick Settings opens the wallpaper picker by.
-    readonly property Item quickSettingsButton: quickButton
+    readonly property Item quickSettingsButton: statusArea ? statusArea.quickSettings : null
     readonly property real barTop: (onTop ? 0 : popover.height - height) + bar.y
     // A popup of the bar opens away from the screen edge the bar is on (PopupCard's side), beside
     // the rectangle barAnchor gives: from `x`, `width` wide, and across the bar.
@@ -149,6 +158,9 @@ Item {
     // the way its button would. "bar" opens none. Returns false for a name it does not know, or
     // when what the popup belongs to is not on the bar.
     function previewPopup(name) {
+        var taskList = taskbar.tasks, pinnedSlots = taskbar.pins, tray = taskbar.trayRow
+        var clockButton = statusArea.clock, audioWidget = statusArea.volume, quickButton = statusArea.quickSettings
+        var profilesButton = statusArea.profiles, wallpapersButton = statusArea.wallpapers
         taskList.forceLayout()
         var i
         switch (name) {
@@ -398,9 +410,6 @@ Item {
         return state && state.tiling !== undefined ? state.tiling : shell.tiling
     }
     readonly property bool onTop: shell.panelTop
-    readonly property bool floating: shell.panelRadius > 0 || shell.panelMarginLeft > 0 ||
-                                     shell.panelMarginRight > 0 || shell.panelMarginTop > 0 ||
-                                     shell.panelMarginBottom > 0
 
     // A click on the bar's empty space closes what is open.
     MouseArea {
@@ -449,7 +458,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { AudioMixer { panel: root; barItem: bar } }
+                sourceComponent: Component { AudioMixer { panel: root; barItem: root.statusBar } }
             }
 
             // Clicking the clock: the notifications and a month calendar, at the bar's right end.
@@ -460,7 +469,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { ClockFlyout { panel: root; barItem: bar } }
+                sourceComponent: Component { ClockFlyout { panel: root; barItem: root.statusBar } }
             }
 
             // Right-clicking the volume control: the outputs to play through.
@@ -471,7 +480,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { AudioOutputs { panel: root; barItem: bar } }
+                sourceComponent: Component { AudioOutputs { panel: root; barItem: root.statusBar } }
             }
 
             // The profile button: the appearance profiles, the one in use marked.
@@ -482,7 +491,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { ProfileList { panel: root; barItem: bar } }
+                sourceComponent: Component { ProfileList { panel: root; barItem: root.statusBar } }
             }
 
             // The wallpaper button: thumbnails of the pictures in shell.wallpapers, by subfolder, with
@@ -494,7 +503,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { WallpaperPicker { panel: root; barItem: bar } }
+                sourceComponent: Component { WallpaperPicker { panel: root; barItem: root.statusBar } }
             }
 
             Loader {
@@ -504,7 +513,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { Launcher { panel: root; barItem: bar } }
+                sourceComponent: Component { Launcher { panel: root; barItem: root.bar } }
             }
 
             Loader {
@@ -514,7 +523,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { TaskbarMenu { panel: root; barItem: bar } }
+                sourceComponent: Component { TaskbarMenu { panel: root; barItem: root.bar } }
             }
 
             // A tray item's menu, in the style of the bar's own, its submenus beside it.
@@ -525,7 +534,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { TrayMenu { panel: root; barItem: bar } }
+                sourceComponent: Component { TrayMenu { panel: root; barItem: root.statusBar } }
             }
 
             // The windows of the hovered stacked button: clicking one focuses it (or minimizes it when
@@ -537,7 +546,7 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { GroupList { panel: root; barItem: bar } }
+                sourceComponent: Component { GroupList { panel: root; barItem: root.bar } }
             }
 
             // The Quick Settings button: tiles, the volume and brightness, the battery.
@@ -548,186 +557,15 @@ Item {
                 // Once made, a popup stays, so closing it never destroys the item its handler runs in.
                 property bool used: false
                 onLoaded: used = true
-                sourceComponent: Component { QuickSettings { panel: root; barItem: bar } }
+                sourceComponent: Component { QuickSettings { panel: root; barItem: root.statusBar } }
             }
         }
     }
 
-    Rectangle {
-        id: bar
-        objectName: "bar"
-        anchors.left: parent.left; anchors.right: parent.right
-        anchors.leftMargin: shell.panelMarginLeft; anchors.rightMargin: shell.panelMarginRight
-        anchors.bottom: root.onTop ? undefined : parent.bottom
-        anchors.top: root.onTop ? parent.top : undefined
-        anchors.bottomMargin: shell.panelMarginBottom; anchors.topMargin: shell.panelMarginTop
-        height: shell.panelHeight
-        color: Theme.bar
-        radius: shell.panelRadius
-        // A floating bar gets an outline; a docked one a line along its inner edge.
-        border.width: root.floating ? 1 : 0
-        border.color: Theme.border
-        Rectangle {
-            visible: !root.floating
-            y: root.onTop ? parent.height - 1 : 0
-            width: parent.width; height: 1; color: Theme.border
-        }
-        // Right-clicking the bar anywhere but on a task opens the bar's own menu.
-        MouseArea {
-            anchors.fill: parent
-            acceptedButtons: Qt.RightButton
-            onPressed: (mouse) => root.openContextMenu(bar, mouse.x, -1)
-        }
-        // Scrolling the bar anywhere its widgets leave the wheel alone pages through this
-        // output's workspaces: a wheel notch (or a touchpad's worth of travel) moves one,
-        // stopping at either end; down or right goes to the next.
-        WheelHandler {
-            property real travel: 0
-            onWheel: (event) => {
-                travel += event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x
-                var steps = travel > 0 ? Math.floor(travel / 120) : Math.ceil(travel / 120)
-                travel -= steps * 120
-                if (steps !== 0) {
-                    var target = workspaceIndicator.workspaceState.current - steps
-                    workspaceIndicator.show(Math.max(1, Math.min(shell.workspaceCount, target)))
-                }
-            }
-        }
-        RowLayout {
-            anchors.fill: parent; anchors.leftMargin: Theme.spacingM; anchors.rightMargin: Theme.spacingM
-            spacing: Theme.spacingS
-            FlatButton {
-                id: start
-                Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
-                active: root.launcherOpen
-                onClicked: root.launcherOpen = !root.launcherOpen
-                Accessible.name: "Applications"
-                BarTip { panel: root; owner: start; text: "Start" }
-                // Four squares in the accent colour, which shrink a little while pressed as an
-                // application's icon does.
-                contentItem: Item {
-                    Grid {
-                        anchors.centerIn: parent; columns: 2; spacing: 3
-                        scale: start.pressed ? Theme.pressScale : 1
-                        Behavior on scale { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
-                        Repeater { model: 4; Rectangle { width: 9; height: 9; radius: 2; color: Theme.accent } }
-                    }
-                }
-            }
-            PinnedSlots { id: pinnedSlots; panel: root }
-            Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: Theme.barButtonHeight / 2 + Theme.spacingS; color: Theme.divider }
-            TaskList { id: taskList; panel: root }
-            WorkspaceIndicator { id: workspaceIndicator; panel: root }
-            // The wallpaper picker.
-            FlatButton {
-                id: wallpapersButton
-                objectName: "wallpapersButton"
-                visible: shell.widgets.wallpapers === "bar"
-                Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
-                active: root.audioPopup === "wallpapers"
-                onClicked: root.toggleAudioPopup("wallpapers", wallpapersButton)
-                Accessible.name: "Wallpapers"
-                BarTip { panel: root; owner: wallpapersButton; text: "Wallpapers" }
-                contentItem: Item {
-                    Icon { anchors.centerIn: parent; name: "image"; color: wallpapersButton.active ? Theme.accent : Theme.text }
-                }
-            }
-            // The appearance profile in use; clicking lists the profiles to switch to.
-            FlatButton {
-                id: profilesButton
-                objectName: "profilesButton"
-                visible: shell.widgets.profiles === "bar" && shell.profiles.length > 1
-                Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
-                active: root.audioPopup === "profiles"
-                onClicked: root.toggleAudioPopup("profiles", profilesButton)
-                Accessible.name: "Appearance: " + (shell.profile || "none")
-                BarTip { panel: root; owner: profilesButton; text: "Appearance: " + (shell.profile || "none") }
-                // Three swatches of the profile in use: accent, desktop background, text.
-                contentItem: Item {
-                    Row {
-                        anchors.centerIn: parent; spacing: Theme.spacingXS
-                        Repeater {
-                            model: [shell.accent, shell.background, shell.textColor]
-                            // A ring in the text colour keeps a swatch close to the panel's own
-                            // colour visible.
-                            Rectangle {
-                                required property color modelData
-                                width: 10; height: 10; radius: 5
-                                color: modelData
-                                border.width: 1
-                                border.color: Theme.alpha(Theme.text, 0.5)
-                            }
-                        }
-                    }
-                }
-            }
-            FlatButton {
-                id: tilingToggle
-                objectName: "tilingToggle"
-                visible: shell.widgets.tiling === "bar"
-                Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
-                enabled: shell.tilingAvailable
-                opacity: enabled ? 1 : 0.4
-                active: root.tiling
-                onClicked: { root.closeMenus(); shell.toggleTiling(outputName) }
-                Accessible.name: root.tiling ? "Tiling on" : "Tiling off"
-                BarTip { panel: root; owner: tilingToggle; text: root.tiling ? "Tiling on: click for floating" : "Floating: click to tile" }
-                // On: a split layout in the accent colour. Off: two overlapping windows.
-                contentItem: Item {
-                    FadingIcon {
-                        objectName: "tilingIcon"
-                        anchors.centerIn: parent
-                        name: root.tiling ? "layout-panel-left" : "copy"
-                        color: root.tiling ? Theme.accent : Theme.text
-                    }
-                }
-            }
-            // The system tray: the status icons of applications, in the order they appeared.
-            // Passive ones stay hidden, and so does the tray when none is left.
-            Row {
-                id: tray
-                objectName: "tray"
-                visible: shell.widgets.tray && shell.tray.shown > 0
-                Layout.alignment: Qt.AlignVCenter
-                Repeater {
-                    model: shell.tray
-                    delegate: TrayButton { panel: root }
-                }
-            }
-            NotificationBell { id: bell; panel: root }
-            NetworkWidget { panel: root }
-            BatteryWidget { panel: root }
-            VolumeButton { id: audioWidget; panel: root }
-            KeyboardLayout { panel: root }
-            QuickSettingsButton { id: quickButton; panel: root }
-            ClockButton { id: clockButton; panel: root }
-            // A sliver at the bar's end, its line taking the accent colour under the pointer.
-            Button {
-                id: showDesktopButton
-                Layout.preferredWidth: Theme.spacingL + Theme.spacingXS; Layout.fillHeight: true
-                onClicked: { root.closeMenus(); shell.tasks.showDesktop() }
-                Accessible.name: "Show desktop"
-                BarTip { panel: root; owner: showDesktopButton; text: "Show desktop" }
-                background: Rectangle {
-                    anchors.right: parent.right
-                    width: 3
-                    color: showDesktopButton.pressed ? Theme.accentHover : showDesktopButton.hovered ? Theme.accent : Theme.border
-                    Behavior on color { ColorAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
-                }
-            }
-        }
-        Rectangle {
-            visible: shell.error.length > 0
-            anchors.fill: parent; anchors.margins: Theme.spacingS
-            color: Theme.dangerSurface; radius: Theme.radiusSmall
-            Text { anchors.left: parent.left; anchors.right: dismiss.left; anchors.verticalCenter: parent.verticalCenter; anchors.margins: Theme.spacingL; text: shell.error; color: Theme.text; elide: Text.ElideRight; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
-            CloseButton {
-                id: dismiss
-                anchors.right: parent.right; anchors.rightMargin: Theme.spacingS
-                anchors.verticalCenter: parent.verticalCenter
-                Accessible.name: "Dismiss"
-                onClicked: shell.clearError()
-            }
-        }
+    // The taskbar along the panel's edge.
+    Loader {
+        id: taskbarLoader
+        anchors.fill: parent
+        sourceComponent: Component { Taskbar { panel: root } }
     }
 }
