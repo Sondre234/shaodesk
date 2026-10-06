@@ -95,6 +95,10 @@ Item {
         id: groupHide; interval: 300
         onTriggered: if (!root.groupListHovered && !(root.groupPending && root.groupPending.hovered)) root.groupOpen = false
     }
+    // The pointer entering the list keeps it, and leaving it hides it a moment later.
+    function hoverGroupList(hovered) {
+        if (hovered) groupHide.stop(); else groupHide.restart()
+    }
     // Opens on press, as a desktop context menu does: waiting for a tap lost a press held
     // past the long-press time or moved while held. The new menu opens before the old one
     // closes, so the surface does not collapse in between.
@@ -425,94 +429,7 @@ Item {
         // Once made, a popup stays, so closing it never destroys the item its handler runs in.
         property bool used: false
         onLoaded: used = true
-        sourceComponent: Component {
-            Rectangle {
-                id: groupList
-                parent: root
-                objectName: "groupList"
-                readonly property int rowHeight: 40
-                visible: root.groupOpen
-                width: 280; height: 12 + groupWindows.count * rowHeight + Math.max(0, groupWindows.count - 1) * 2
-                x: Math.max(8, Math.min(root.groupX - width / 2, root.width - width - 8))
-                y: root.onTop ? bar.y + bar.height + 8 : bar.y - height - 8
-                color: shell.panelColor; radius: 10
-                border.color: Qt.lighter(shell.panelColor, 1.6)
-                HoverHandler {
-                    id: groupHover
-                    onHoveredChanged: if (hovered) groupHide.stop(); else groupHide.restart()
-                }
-                readonly property bool hovered: groupHover.hovered
-                TaskFilter {
-                    id: groupWindows
-                    controller: shell; sourceModel: root.taskSource
-                    app: root.groupSlot; windowApp: root.groupWindowApp
-                    // A window closing may leave nothing to choose between.
-                    onCountChanged: if (count < 2) root.groupOpen = false
-                }
-                Column {
-                    anchors.fill: parent; anchors.margins: 6; spacing: 2
-                    Repeater {
-                        model: root.groupOpen ? groupWindows : null
-                        delegate: Button {
-                            id: groupWindow
-                            required property int taskId
-                            required property string title
-                            required property string appId
-                            required property bool active
-                            required property bool minimized
-                            required property bool urgent
-                            objectName: "groupWindow"
-                            width: parent.width; height: groupList.rowHeight
-                            Accessible.name: title
-                            // Closing the list destroys this row, so it goes last.
-                            onClicked: { shell.tasks.activate(taskId); root.groupOpen = false }
-                            background: Rectangle {
-                                radius: 6
-                                color: groupWindow.hovered ? Qt.lighter(shell.panelColor, 1.5) : (groupWindow.active ? Qt.lighter(shell.panelColor, 1.3) : "transparent")
-                                Rectangle { visible: groupWindow.active; x: 0; anchors.verticalCenter: parent.verticalCenter; width: 3; height: 16; radius: 1; color: shell.accent }
-                                Rectangle { objectName: "groupWindowUrgent"; visible: groupWindow.urgent; x: 0; anchors.verticalCenter: parent.verticalCenter; width: 3; height: 16; radius: 1; color: shell.urgentColor }
-                            }
-                            contentItem: RowLayout {
-                                spacing: 8
-                                Image {
-                                    Layout.leftMargin: 4
-                                    Layout.preferredWidth: 20; Layout.preferredHeight: 20
-                                    source: "image://icons/" + root.groupIcon; sourceSize: Qt.size(20, 20)
-                                    opacity: groupWindow.minimized ? 0.5 : 1
-                                }
-                                Text {
-                                    Layout.fillWidth: true
-                                    text: groupWindow.title; textFormat: Text.PlainText; elide: Text.ElideRight
-                                    color: groupWindow.urgent ? shell.urgentColor : groupWindow.minimized ? Qt.darker(shell.textColor, 1.4) : shell.textColor
-                                    font.pixelSize: shell.fontSize; font.family: root.uiFont
-                                }
-                                Button {
-                                    id: closeWindow
-                                    objectName: "groupWindowClose"
-                                    visible: groupWindow.hovered || hovered
-                                    Layout.preferredWidth: 24; Layout.preferredHeight: 24
-                                    Accessible.name: "Close " + groupWindow.title
-                                    onClicked: shell.tasks.close(groupWindow.taskId)
-                                    background: Rectangle { radius: 5; color: closeWindow.hovered ? "#c4443c" : "transparent" }
-                                    contentItem: Text { text: "\u2715"; color: shell.textColor; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter; font.pixelSize: 12 }
-                                }
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                acceptedButtons: Qt.RightButton | Qt.MiddleButton
-                                onPressed: (mouse) => {
-                                    if (mouse.button === Qt.RightButton)
-                                        root.openContextMenu(groupWindow, 0, groupWindow.taskId, groupWindow.appId)
-                                }
-                                onClicked: (mouse) => {
-                                    if (mouse.button === Qt.MiddleButton) shell.tasks.close(groupWindow.taskId)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        sourceComponent: Component { GroupList { panel: root; barItem: bar } }
     }
 
     Rectangle {
