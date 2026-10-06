@@ -311,69 +311,6 @@ Item {
                                      shell.panelMarginBottom > 0
     Keys.onEscapePressed: closeMenus()
 
-    // The battery: an outline filled to the charge, red when nearly empty and not charging,
-    // in the accent colour while charging.
-    component BatteryWidget: Button {
-        id: battery
-        objectName: "batteryWidget"
-        readonly property var status: root.statusSource
-        readonly property bool low: status.batteryPercent <= 15 && status.batteryState !== "charging"
-        readonly property color tint: low ? "#ff6b6b" : (status.batteryState === "charging" ? shell.accent : shell.textColor)
-        visible: shell.widgets.battery && status.batteryPresent
-        Layout.preferredWidth: 62; Layout.preferredHeight: bar.height - 10
-        hoverEnabled: true
-        Accessible.name: status.batteryText
-        background: Rectangle { radius: 7; color: battery.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
-        BarTip { panel: root; owner: battery; text: battery.status.batteryText }
-        contentItem: Row {
-            spacing: 5
-            anchors.centerIn: parent
-            Item {
-                anchors.verticalCenter: parent.verticalCenter; width: 24; height: 12
-                Rectangle {
-                    width: 21; height: 12; radius: 2; color: "transparent"
-                    border.color: battery.tint; border.width: 1
-                    Rectangle {
-                        objectName: "batteryLevel"
-                        x: 2; y: 2; height: parent.height - 4; radius: 1
-                        width: Math.max(1, (parent.width - 4) * battery.status.batteryPercent / 100)
-                        color: battery.tint
-                    }
-                }
-                Rectangle { x: 21; y: 4; width: 2; height: 4; color: battery.tint }
-            }
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: battery.status.batteryPercent + "%"
-                color: battery.tint
-                font.pixelSize: Math.max(6, shell.fontSize - 1); font.family: root.uiFont
-            }
-        }
-    }
-
-    // The network: ascending bars for Wi-Fi, a plug for a wired link, dimmed and struck through
-    // when the interface is down.
-    component NetworkWidget: Button {
-        id: network
-        objectName: "networkWidget"
-        readonly property var status: root.statusSource
-        readonly property bool linkDown: status.networkState === "disconnected"
-        readonly property color tint: down ? "#8a96a8" : shell.textColor
-        visible: shell.widgets.network && status.networkState !== "none"
-        Layout.preferredWidth: 34; Layout.preferredHeight: bar.height - 10
-        hoverEnabled: true
-        Accessible.name: status.networkText
-        background: Rectangle { radius: 7; color: network.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
-        BarTip { panel: root; owner: network; text: network.status.networkText }
-        contentItem: Item {
-            Icon {
-                anchors.centerIn: parent
-                name: network.status.networkState === "ethernet" ? "ethernet-port" : (network.linkDown ? "wifi-off" : "wifi")
-                color: network.tint
-            }
-        }
-    }
-
     // A loudspeaker with a wave per half of the volume, or crossed out while muted.
     component SpeakerIcon: Icon {
         property int level: 0
@@ -1805,8 +1742,8 @@ Item {
                 }
             }
             NotificationBell { id: bell; panel: root; barHeight: bar.height }
-            NetworkWidget {}
-            BatteryWidget {}
+            NetworkWidget { panel: root; barHeight: bar.height }
+            BatteryWidget { panel: root; barHeight: bar.height }
             // The default output's volume. Left-click: per-application volumes; right-click: the
             // output; wheel: louder or quieter; middle-click: mute.
             Button {
