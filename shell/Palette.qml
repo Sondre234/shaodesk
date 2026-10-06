@@ -10,8 +10,9 @@ import QtQuick.Effects
 Item {
     id: root
     required property size screenSize
-    readonly property int padding: 12
-    readonly property int rowHeight: 48
+    readonly property int padding: Theme.spacingL
+    // A result's row: a title over a subtitle.
+    readonly property int rowHeight: Theme.rowHeight + Theme.spacingL
     readonly property int visibleRows: Math.max(1, Math.min(8, Math.floor((screenSize.height * 0.6 - 3 * padding - input.height) / rowHeight)))
     readonly property var kindLabels: ({ window: "Window", app: "App", workspace: "Workspace", action: "Action", session: "Session" })
     width: card.width + 2 * Theme.shadowMargin
@@ -117,13 +118,15 @@ Item {
             interactive: false
             model: shell.palette.results
             currentIndex: shell.palette.selected
+            // The selection is shaded as a menu's row is, it being what Enter runs; it moves at
+            // once, as fast as the keys go.
             highlightMoveDuration: 0
             highlight: Rectangle {
                 radius: Theme.radiusSmall
-                color: Theme.accentSubtle
-                border.color: Theme.accent
+                color: Theme.selected
             }
             onCurrentIndexChanged: positionViewAtIndex(currentIndex, ListView.Contain)
+            // A result: its icon, its title over what it is, and its kind on a pill at the end.
             delegate: Item {
                 id: row
                 required property var modelData
@@ -131,18 +134,28 @@ Item {
                 width: list.width; height: root.rowHeight
                 Image {
                     id: icon
-                    x: 8; anchors.verticalCenter: parent.verticalCenter
-                    width: 28; height: 28; sourceSize: Qt.size(28, 28)
+                    x: Theme.spacingM; anchors.verticalCenter: parent.verticalCenter
+                    width: Theme.appIconSizeLarge; height: Theme.appIconSizeLarge
+                    sourceSize: Qt.size(2 * Theme.appIconSizeLarge, 2 * Theme.appIconSizeLarge)
                     source: "image://icons/" + row.modelData.icon
                 }
+                // A window asking for attention has a dot in the urgent colour on its icon, as
+                // in the switcher.
+                Rectangle {
+                    visible: row.modelData.urgent === true
+                    x: icon.x + icon.width - width + Theme.spacingXS; y: icon.y - Theme.spacingXS
+                    width: Theme.spacingL; height: width; radius: width / 2
+                    color: Theme.urgent; border.width: 2; border.color: Theme.surface
+                }
                 Column {
-                    anchors.left: icon.right; anchors.leftMargin: 12
-                    anchors.right: kind.left; anchors.rightMargin: 8
+                    anchors.left: icon.right; anchors.leftMargin: Theme.spacingL
+                    anchors.right: kind.left; anchors.rightMargin: Theme.spacingM
                     anchors.verticalCenter: parent.verticalCenter
+                    spacing: Theme.spacingXS
                     Text {
                         width: parent.width
                         text: row.modelData.title; textFormat: Text.PlainText
-                        color: row.modelData.urgent === true ? Theme.urgent : Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeLarge
+                        color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeLarge
                         elide: Text.ElideRight
                     }
                     Text {
@@ -152,12 +165,22 @@ Item {
                         elide: Text.ElideRight
                     }
                 }
-                Text {
+                Rectangle {
                     id: kind
-                    anchors.right: parent.right; anchors.rightMargin: 10
+                    anchors.right: parent.right; anchors.rightMargin: Theme.spacingM
                     anchors.verticalCenter: parent.verticalCenter
-                    text: root.kindLabels[row.modelData.kind] || ""
-                    color: Theme.textMuted; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeSmall
+                    width: kindLabel.implicitWidth + 2 * Theme.spacingM
+                    height: kindLabel.implicitHeight + 2 * Theme.spacingXS
+                    radius: height / 2
+                    color: "transparent"
+                    border.color: Theme.border
+                    Text {
+                        id: kindLabel
+                        anchors.centerIn: parent
+                        text: root.kindLabels[row.modelData.kind] || ""
+                        color: Theme.textMuted
+                        font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeCaption; font.weight: Font.Medium
+                    }
                 }
                 MouseArea {
                     anchors.fill: parent
