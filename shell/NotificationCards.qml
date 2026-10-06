@@ -213,26 +213,41 @@ Item {
                                     radius: height / 2; color: Theme.accent
                                 }
                             }
-                            Flow {
-                                visible: entry.actions.length > 0
-                                Layout.fillWidth: true; Layout.topMargin: 4
-                                spacing: 6
-                                Repeater {
-                                    model: entry.actions
-                                    delegate: Button {
-                                        id: action
-                                        required property var modelData
-                                        objectName: "notificationAction"
-                                        text: modelData.label
-                                        padding: 6; leftPadding: 12; rightPadding: 12
-                                        onClicked: cards.center.invoke(entry.notificationId, modelData.key)
-                                        background: Rectangle { radius: Theme.radiusSmall; color: action.pressed ? Theme.pressed : action.hovered ? Theme.selected : Theme.hover }
-                                        contentItem: Text {
-                                            text: action.text; color: Theme.text
-                                            font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
-                                            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
-                                        }
+                        }
+                    }
+                    // The application's actions, as buttons of one width across the card, up to
+                    // three to a row.
+                    GridLayout {
+                        visible: entry.actions.length > 0
+                        Layout.fillWidth: true; Layout.topMargin: Theme.spacingXS
+                        columns: Math.min(3, entry.actions.length)
+                        columnSpacing: Theme.spacingM; rowSpacing: Theme.spacingM
+                        Repeater {
+                            model: entry.actions
+                            delegate: Button {
+                                id: action
+                                required property var modelData
+                                objectName: "notificationAction"
+                                text: modelData.label
+                                Layout.fillWidth: true; Layout.preferredWidth: 1
+                                implicitHeight: Theme.rowHeight - Theme.spacingS
+                                padding: Theme.spacingS; leftPadding: Theme.spacingM; rightPadding: Theme.spacingM
+                                onClicked: cards.center.invoke(entry.notificationId, modelData.key)
+                                background: Rectangle {
+                                    radius: Theme.radiusSmall
+                                    color: action.hovered ? Theme.surfaceRaisedHover : Theme.surfaceRaised
+                                    border.color: Theme.border
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        radius: parent.radius
+                                        color: action.pressed ? Theme.pressed : "transparent"
                                     }
+                                }
+                                contentItem: Text {
+                                    text: action.text; color: Theme.text
+                                    font.pixelSize: Theme.fontSize; font.weight: Font.Medium; font.family: Theme.fontFamily
+                                    horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideRight
                                 }
                             }
                         }
