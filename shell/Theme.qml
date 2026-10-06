@@ -185,6 +185,18 @@ QtObject {
     readonly property int spotlightRowHeight: 40
     readonly property int spotlightIconSize: 28
     readonly property int spotlightHeadingHeight: 26
+    // Control Center, Quick Settings in the macOS style: its width and surface, and its modules,
+    // cards lighter than the surface under them, with their corners, the room inside them, a
+    // heading's height, a tile's height and its round button.
+    readonly property int controlCenterWidth: 344
+    readonly property color controlCenterSurface: macos && light ? mix(popupSurface, text, 0.05) : popupSurface
+    readonly property color moduleColor: light ? Qt.rgba(1, 1, 1, 0.92) : mix(popupSurface, Qt.rgba(1, 1, 1, 1), 0.07)
+    readonly property color moduleOutline: alpha(text, light ? 0.07 : 0.06)
+    readonly property int moduleRadius: 12
+    readonly property int modulePadding: 10
+    readonly property int moduleHeadingHeight: 22
+    readonly property int moduleTileHeight: 52
+    readonly property int moduleButtonSize: 28
 
     // `milliseconds` at the animation speed, 0 with animations off.
     function duration(milliseconds) { return Math.round(milliseconds * motionScale) }
