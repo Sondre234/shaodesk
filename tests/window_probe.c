@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #define _GNU_SOURCE
 #include "ext-foreign-toplevel-list-v1-client-protocol.h"
-#include "ext-image-capture-source-v1-client-protocol.h" // before the next, which names its interface
+#include "ext-image-capture-source-v1-client-protocol.h" // before the window control's, which names its interface
 #include "ext-image-copy-capture-v1-client-protocol.h"
 #include "shaodesk-window-control-v1-client-protocol.h"
 #include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
@@ -60,10 +60,11 @@ struct capture {
     struct wl_shm *shm;
     struct ext_image_copy_capture_session_v1 *session;
     struct ext_image_copy_capture_frame_v1 *frame; // the one being copied, or NULL
-    int width, height; // the constraints the session last sent
-    uint32_t format;   // the shm format chosen from them, or NO_FORMAT
-    bool changed;      // since the buffer was made
-    bool done;         // the constraints are complete
+    /* The constraints the session last sent, the shm format chosen from them (or NO_FORMAT),
+     * whether they changed since the buffer was made, and whether they are complete. */
+    int width, height;
+    uint32_t format;
+    bool changed, done;
     struct wl_buffer *buffer;
     int buffer_width, buffer_height;
     uint32_t *pixels;
@@ -251,8 +252,8 @@ static void frame_ready(void *data, struct ext_image_copy_capture_frame_v1 *fram
     ext_image_copy_capture_frame_v1_destroy(frame);
     capture->frame = NULL;
     printf("%dx%d %06x %06x\n", capture->buffer_width, capture->buffer_height,
-           colour(capture, 0, 0), colour(capture, capture->buffer_width / 2,
-                                         capture->buffer_height / 2));
+           colour(capture, 0, 0),
+           colour(capture, capture->buffer_width / 2, capture->buffer_height / 2));
     fflush(stdout);
     if (capture->watch)
         capture_next(capture);
@@ -446,8 +447,8 @@ int main(int argc, char **argv) {
         if (!listed)
             die("no listed window has that title");
         capture(&probe, display,
-                ext_foreign_toplevel_image_capture_source_manager_v1_create_source(
-                    probe.sources, listed->object),
+                ext_foreign_toplevel_image_capture_source_manager_v1_create_source(probe.sources,
+                                                                                   listed->object),
                 !strcmp(argument, "watch"));
     } else {
         die("unknown command");
