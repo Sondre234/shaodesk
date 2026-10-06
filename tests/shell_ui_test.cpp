@@ -1799,6 +1799,12 @@ int main(int argc, char **argv) {
         key(Qt::Key_Up);
         if (!QTest::qWaitFor([&] { return item("startBestMatch")->property("current").toBool(); }))
             return fail("Up did not move back to the best match");
+        // Moving the pointer onto a result chooses it. (Results appearing under the pointer
+        // where it rests do not: the best match stayed chosen above, and below.)
+        QTest::mouseMove(popover, centre(item("startResult:" + next)) + QPoint(0, 2));
+        QTest::mouseMove(popover, centre(item("startResult:" + next)));
+        if (!QTest::qWaitFor([&] { return item("startResult:" + next)->property("current").toBool(); }))
+            return fail("moving the pointer onto a result did not choose it");
         // Escape clears the search, then closes the menu.
         key(Qt::Key_Escape);
         if (!QTest::qWaitFor([&] { return search->property("text").toString().isEmpty(); }) || !launcherOpen() ||
