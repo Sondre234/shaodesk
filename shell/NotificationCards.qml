@@ -95,6 +95,30 @@ Item {
             // else its own icon when the header shows the application's instead.
             readonly property string picture: hasImage ? "image://notify/" + notificationId + "/" + Number(time)
                 : icon.length > 0 && appIcon.length > 0 && icon !== appIcon ? "image://icons/" + icon : ""
+            // How long it stays, from when it came or was last replaced (`time`), 0 for until it
+            // is dismissed; and how much of that is left, from 1 to 0, run down as the daemon's
+            // timer runs, held while the pointer holds that.
+            readonly property int lifetime: {
+                time // asked again when the notification is replaced
+                return cards.center.cardLifetime(notificationId)
+            }
+            property real remaining: 1
+            function countDown() {
+                countdown.stop()
+                remaining = 1
+                if (lifetime > 0) {
+                    countdown.start()
+                    countdown.paused = hover.hovered
+                }
+            }
+            onLifetimeChanged: countDown()
+            onTimeChanged: countDown()
+            Component.onCompleted: countDown()
+            NumberAnimation {
+                id: countdown
+                target: entry; property: "remaining"
+                from: 1; to: 0; duration: entry.lifetime
+            }
             width: list.width
             height: card.height
 
@@ -134,12 +158,27 @@ Item {
                 // The pointer anywhere on the card, its buttons too, holds its timer.
                 HoverHandler {
                     id: hover
-                    onHoveredChanged: cards.center.hold(entry.notificationId, hovered)
+                    onHoveredChanged: {
+                        cards.center.hold(entry.notificationId, hovered)
+                        if (countdown.running) countdown.paused = hovered
+                    }
                 }
                 Component.onDestruction: cards.center.hold(entry.notificationId, false)
                 MouseArea {
                     anchors.fill: parent
                     onClicked: cards.center.activate(entry.notificationId)
+                }
+                // The time it has left, a line along its bottom edge that shortens towards its
+                // start; with animations off it is not drawn.
+                Rectangle {
+                    objectName: "notificationCountdown"
+                    visible: entry.lifetime > 0 && Theme.animations
+                    x: Theme.radiusLarge
+                    y: parent.height - height - 1
+                    width: (parent.width - 2 * Theme.radiusLarge) * entry.remaining
+                    height: Theme.spacingXS
+                    radius: height / 2
+                    color: Theme.accent
                 }
                 ColumnLayout {
                     id: content

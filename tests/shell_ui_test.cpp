@@ -1931,6 +1931,40 @@ int main(int argc, char **argv) {
             std::cerr << "the dismissed card stayed\n";
             return 1;
         }
+        // A card's countdown line runs down with its timer, and both stop while the pointer is
+        // on the card.
+        {
+            Notification n;
+            n.app = "Test";
+            n.summary = "Counting down";
+            n.timeout = 5000;
+            const uint id = daemon->notify(n);
+            QQuickItem *line = nullptr;
+            if (!QTest::qWaitFor([&] {
+                    line = find(cards.rootObject(), "notificationCountdown");
+                    return cards.isVisible() && card() && line && line->isVisible() && line->width() > 0;
+                }))
+                return fail("a card with a timeout has no countdown line");
+            const qreal start = line->width();
+            if (!QTest::qWaitFor([&] { return line->width() < start - 2; }))
+                return fail("a card's countdown line does not run down");
+            QTest::mouseMove(&cards, centre(card()));
+            if (!QTest::qWaitFor([&] { return !daemon->timerRunning(id); }))
+                return fail("the pointer on a card did not hold its timer");
+            const qreal held = line->width();
+            QTest::qWait(300);
+            if (line->width() != held) {
+                std::cerr << "a card's countdown line ran on while the pointer held it: "
+                          << held << " then " << line->width() << '\n';
+                return 1;
+            }
+            QTest::mouseMove(&cards, QPoint(1, 1));
+            if (!QTest::qWaitFor([&] { return daemon->timerRunning(id) && line->width() < held - 2; }))
+                return fail("a card's countdown did not run on once the pointer left it");
+            daemon->dismiss(id);
+            if (!QTest::qWaitFor([&] { return !cards.isVisible(); }, 3000))
+                return fail("the counting card stayed");
+        }
         // The history opens from the bell, marks what it shows as seen, and clears.
         auto *history = find(view.rootObject(), "notificationHistory");
         if (!history || history->isVisible()) {
