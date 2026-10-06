@@ -97,7 +97,10 @@ asked for, and shared by every client; it renders the window at its logical size
 frame, also while it is minimized or on a workspace not shown, and its sessions stop as the
 window's handles close. While the session is locked, or once the window is gone, both ways give
 an inert source, whose sessions stop at once, rather than none: a client's next request would
-then name an object that does not exist, a protocol error that disconnects it.
+then name an object that does not exist, a protocol error that disconnects it. wlroots renders
+the source again only where the window changed since it last did, and for every session at
+once: a session started while another runs on the same window gets its first frame only when
+the window next draws, so a client keeps one session per window.
 
 ## The shell (`shell/`)
 
