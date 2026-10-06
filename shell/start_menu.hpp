@@ -96,7 +96,6 @@ class StartMenu : public QObject {
   private:
     QString stateDir_;
     QVariantList apps_, sorted_;
-    QStringList taskbarPins_;
     // The pins, of installed applications or not, in their order; own once start-pinned exists.
     QStringList pins_;
     bool ownPins_ = false, previewOnly_ = false, userSet_ = false;

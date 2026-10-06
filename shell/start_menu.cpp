@@ -114,7 +114,6 @@ StartMenu::~StartMenu() {
 
 void StartMenu::setApps(const QVariantList &apps, const QStringList &taskbarPins) {
     apps_ = apps;
-    taskbarPins_ = taskbarPins;
     // By section, "#" first, then by name.
     std::vector<std::pair<QString, QVariantMap>> named;
     for (const auto &app : apps) {
