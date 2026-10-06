@@ -137,6 +137,29 @@ void untile_toplevel(struct sh_toplevel *toplevel, bool restore) {
         reflow_output(server, output);
 }
 
+/* Takes the window out of the tiling, floating where it was before it tiled, or lets it tile
+ * again: a sticky window stops being sticky to, and one that is not tiled joins the tiling of
+ * its workspace when that tiles, with `at_cursor` at the tile under the pointer. A floating
+ * window stays out of the tiling when its workspace starts tiling, a sticky one once it is no
+ * longer sticky. */
+void set_floating(struct sh_toplevel *toplevel, bool floating, bool at_cursor) {
+    if (floating && toplevel->sticky) {
+        toplevel->sticky_floating = true;
+    } else if (floating) {
+        toplevel->floating = true;
+        toplevel->placed = false;
+        untile_toplevel(toplevel, true);
+    } else if (toplevel->sticky) {
+        toplevel->sticky_floating = false; // it tiles once it is no longer sticky
+        set_sticky(toplevel, false, true);
+    } else {
+        toplevel->floating = false;
+        toplevel->scratchpad = false; // tiled, it leaves the scratchpad
+        if (wants_tiling(toplevel, NULL))
+            tile_toplevel(toplevel, NULL, NULL, at_cursor);
+    }
+}
+
 /* Tiles of an output disabled in the config join the tiling of the output they are nearest
  * now, or float there if it does not tile; windows that floated only because their output did
  * not tile join the tiling of one that does. Tiles of an unplugged output wait for it:

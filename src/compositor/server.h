@@ -904,6 +904,7 @@ void tile_toplevel_at(struct sh_toplevel *toplevel, struct wlr_output *output,
 void tile_toplevel(struct sh_toplevel *toplevel, struct wlr_output *output,
                    struct sh_toplevel *target, bool at_cursor);
 void untile_toplevel(struct sh_toplevel *toplevel, bool restore);
+void set_floating(struct sh_toplevel *toplevel, bool floating, bool at_cursor);
 void rehome_tiles(struct sh_server *server);
 void set_tiling(struct sh_server *server, struct wlr_output *output, bool enabled);
 void set_output_tiling(struct sh_server *server, struct wlr_output *output, bool enabled);
