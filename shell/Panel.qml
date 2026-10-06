@@ -110,11 +110,14 @@ Item {
     }
     // Where the popover takes the pointer while a popup is open: all but the bars, so that a
     // press on either switches popups in one press. In the macOS style that is the output but the
-    // menu bar's strip and the dock's rectangle, as the four rectangles around the dock.
+    // menu bar's strip and the dock's rectangle, as the four rectangles around the dock; but
+    // Launchpad covers both bars, and takes every press.
     readonly property var popoverInput: {
         if (!macos)
             return [popupArea]
         var top = menuBarHeight, w = popover.width, h = popover.height
+        if (launcherOpen)
+            return [Qt.rect(0, 0, w, h)]
         var left = bar.x, right = bar.x + bar.width, dockBottom = barTop + bar.height
         return [Qt.rect(0, top, w, barTop - top), Qt.rect(0, dockBottom, w, h - dockBottom),
                 Qt.rect(0, barTop, left, bar.height), Qt.rect(right, barTop, w - right, bar.height)]
