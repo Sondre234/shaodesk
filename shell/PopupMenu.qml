@@ -262,8 +262,8 @@ Item {
             }
         }
 
-        FontMetrics { id: body; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
-        FontMetrics { id: small; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily }
+        FontMetrics { id: labelFont; font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily }
+        FontMetrics { id: smallFont; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily }
         readonly property bool iconColumn: entries.some(function(e) { return !e.separator && !e.header && (e.icon || e.toggle) })
         // As wide as its widest row wants, within the menu's bounds.
         readonly property real naturalWidth: {
@@ -273,12 +273,12 @@ Item {
                 if (e.separator)
                     continue
                 if (e.header) {
-                    label = Math.max(label, small.advanceWidth(e.header))
+                    label = Math.max(label, smallFont.advanceWidth(e.header))
                     continue
                 }
-                label = Math.max(label, body.advanceWidth(e.text || ""))
+                label = Math.max(label, labelFont.advanceWidth(e.text || ""))
                 if (e.secondary)
-                    secondary = Math.max(secondary, small.advanceWidth(e.secondary))
+                    secondary = Math.max(secondary, smallFont.advanceWidth(e.secondary))
                 submenu = submenu || !!e.submenu
             }
             return Theme.spacingL + (iconColumn ? Theme.iconSizeSmall + Theme.spacingL : 0) + label +
