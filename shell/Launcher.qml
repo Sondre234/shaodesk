@@ -207,34 +207,77 @@ PopupCard {
         }
         Keys.onPressed: (event) => launcher.key(event)
     }
-    // The views, between the search field and the footer, across the card's whole width.
+    // A view, shown or not: it fades in sliding from `away` (a horizontal and a vertical
+    // distance), and out back there. Changes are instant while the menu opens, which resets them.
+    component View: Item {
+        id: shownView
+        property bool shown: false
+        property point away: Qt.point(0, 0)
+        property bool animated: false
+        anchors.fill: parent
+        opacity: shown ? 1 : 0
+        visible: opacity > 0
+        enabled: shown
+        property real offsetX: shown ? 0 : away.x
+        property real offsetY: shown ? 0 : away.y
+        transform: Translate { x: shownView.offsetX; y: shownView.offsetY }
+        Behavior on opacity {
+            enabled: shownView.animated
+            NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing }
+        }
+        Behavior on offsetX {
+            enabled: shownView.animated
+            NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing }
+        }
+        Behavior on offsetY {
+            enabled: shownView.animated
+            NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing }
+        }
+    }
+    readonly property bool settled: open && progress === 1
+    readonly property real slide: 2 * Theme.spacingXXL
+    // The views, between the search field and the footer, across the card's whole width: All
+    // apps comes in from the right as the pinned applications leave to the left, and what the
+    // search finds rises over either.
     Item {
         id: views
         anchors.left: parent.left; anchors.right: parent.right
         anchors.top: search.bottom; anchors.bottom: footer.top
         anchors.topMargin: Theme.spacingL; anchors.bottomMargin: Theme.spacingM
         clip: true
-        StartHome {
-            id: home
-            anchors.fill: parent
-            launcher: launcher
-            inset: launcher.padding - Theme.spacingM
-            visible: launcher.view === "home"
+        View {
+            shown: launcher.view === "home"
+            away: Qt.point(launcher.view === "all" ? -launcher.slide : 0, 0)
+            animated: launcher.settled
+            StartHome {
+                id: home
+                anchors.fill: parent
+                launcher: launcher
+                inset: launcher.padding - Theme.spacingM
+            }
         }
-        StartAllApps {
-            id: allView
-            anchors.fill: parent
-            launcher: launcher
-            inset: launcher.padding - Theme.spacingM
-            visible: launcher.view === "all"
+        View {
+            shown: launcher.view === "all"
+            away: Qt.point(launcher.view === "home" ? launcher.slide : 0, 0)
+            animated: launcher.settled
+            StartAllApps {
+                id: allView
+                anchors.fill: parent
+                launcher: launcher
+                inset: launcher.padding - Theme.spacingM
+            }
         }
-        StartSearch {
-            id: searchView
-            anchors.fill: parent
-            launcher: launcher
-            inset: launcher.padding - Theme.spacingM
-            query: search.text.trim()
-            visible: launcher.view === "search"
+        View {
+            shown: launcher.view === "search"
+            away: Qt.point(0, launcher.slide / 2)
+            animated: launcher.settled
+            StartSearch {
+                id: searchView
+                anchors.fill: parent
+                launcher: launcher
+                inset: launcher.padding - Theme.spacingM
+                query: search.text.trim()
+            }
         }
     }
     // Along the bottom, in a shade of its own: who is logged in, and the power button.

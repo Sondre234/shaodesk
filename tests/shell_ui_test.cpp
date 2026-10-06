@@ -1663,8 +1663,10 @@ int main(int argc, char **argv) {
             return fail("the start menu does not list what was launched lately, or kept the keyboard's place");
         // All apps lists them by letter; a letter's heading shows the letters to jump to.
         click(item("startAllApps"));
-        if (!QTest::qWaitFor([&] { return shown("startApp:shaodesk-test-other.desktop"); }) ||
-            !shown("startApp:pinned:0") || shown("startTile:shaodesk-test-app.desktop"))
+        if (!QTest::qWaitFor([&] {
+                return shown("startApp:shaodesk-test-other.desktop") && !shown("startTile:shaodesk-test-app.desktop");
+            }) ||
+            !shown("startApp:pinned:0"))
             return fail("All apps did not list every application");
         click(item("startLetter:O"));
         if (!QTest::qWaitFor([&] { return shown("startLetters") && item("startJump:F")->isEnabled(); }) ||
@@ -1807,8 +1809,10 @@ int main(int argc, char **argv) {
             return fail("moving the pointer onto a result did not choose it");
         // Escape clears the search, then closes the menu.
         key(Qt::Key_Escape);
-        if (!QTest::qWaitFor([&] { return search->property("text").toString().isEmpty(); }) || !launcherOpen() ||
-            !shown("startTile:shaodesk-test-app.desktop"))
+        if (!QTest::qWaitFor([&] {
+                return search->property("text").toString().isEmpty() && shown("startTile:shaodesk-test-app.desktop");
+            }) ||
+            !launcherOpen())
             return fail("Escape did not clear the search first");
         key(Qt::Key_Escape);
         if (!QTest::qWaitFor([&] { return !launcherOpen(); }))
