@@ -70,6 +70,10 @@ return {
     windows = {
         -- border_width = 0, -- drawn around each window; tiles shrink to keep it in their slot
         -- corner_radius = 10, -- rounds windows on monitors that tile, and their border; 0: square
+        -- round = "tiling", -- or "always": floating windows on any monitor too
+        -- controls = "flat", -- or "traffic_lights": macOS's red, yellow and green, top-left
+        -- shadow = { enabled = false, color = "#00000059", inactive_color = "#00000033",
+        --            blur = 30, offset = 10 },
         -- border_color = "#7da8ff", -- the focused window; #RRGGBBAA also works
         -- border_inactive_color = "#404a5c",
         -- opacity = 1.0,

@@ -215,7 +215,9 @@ Windows that leave decorations to the window manager (Wayland applications that 
 server-side decorations, such as kitty, and X11 applications such as Spotify) get no title
 bar. Instead, a strip of three flat buttons sits over their top-right corner (minimize,
 fullscreen, and close, from left to right) and appears when the pointer nears that corner, so
-it never covers text. Dragging the window's top edge (its top 6 pixels, as a title bar would;
+it never covers text. With `windows.controls = "traffic_lights"` they are macOS's red, yellow and
+green circles (close, minimize, fullscreen) at the top-left instead, grey while the window has
+no focus and showing their symbols while the pointer is on one. Dragging the window's top edge (its top 6 pixels, as a title bar would;
 `windows.drag_strip` changes how many) moves the window. Other windows, and windows that ask to draw their own frame, decorate
 themselves.
 
@@ -250,7 +252,16 @@ since Hyprland adds it on both sides. The `windows` table draws a border around 
 border and stay opaque. Windows on a monitor with tiling on (floating ones too) and their
 border get rounded corners (`corner_radius`, 10 by default, 0 for square ones) when wlroots is
 built with `packaging/patches/wlroots-rounded-corners.patch`; stock wlroots keeps them square.
-Blur and shadows need a renderer that wlroots' scene graph does not provide.
+`round = "always"` rounds every window, on any monitor, but for one that draws a shadow of its
+own around it (a GTK frame), which keeps its own corners; fullscreen and maximized windows stay
+square.
+
+`windows.shadow = { enabled = true }` draws a soft shadow under each window that has none of its
+own, following its corners: `color` under the focused window, the lighter `inactive_color`
+under the others, fading out over `blur` pixels and falling `offset` pixels down (or
+`{ x, y }`). Fullscreen and maximized windows have none, and a shadow takes no input and is no
+part of the window's size, so snapping, tiling and the magnet ignore it. The shadow is cut from
+one blurred image, so resizing a window costs nothing. Blur is not available.
 
 ### Window rules
 
