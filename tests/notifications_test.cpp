@@ -134,12 +134,19 @@ class NotificationsTest : public QObject {
         // Critical notifications stay until dismissed, whatever they ask for.
         QCOMPARE(center.lifetime(make("x", -1, Notification::Critical)), 0);
         QCOMPARE(center.lifetime(make("x", 100, Notification::Critical)), 0);
+        // A card's, for its countdown; none for a card that is gone.
+        const uint brief = center.notify(make("brief", 1234));
+        QCOMPARE(center.cardLifetime(brief), 1234);
+        QCOMPARE(center.cardLifetime(center.notify(make("alarm", 100, Notification::Critical))), 0);
+        center.dismiss(brief);
+        QCOMPARE(center.cardLifetime(brief), 0);
         c.timeout = 0;
         center.configure(c);
         QCOMPARE(center.lifetime(make("x")), 0);
         QCOMPARE(center.lifetime(make("x", 700)), 700);
         const uint id = center.notify(make("stays"));
         QVERIFY(!center.timerRunning(id));
+        QCOMPARE(center.cardLifetime(id), 0);
     }
     void hoverPausesTimer() {
         NotificationCenter center;

@@ -1,0 +1,106 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+import QtQuick
+import QtQuick.Controls.Basic
+
+// The best match of the start menu's search, on a card of its own: its icon large, its name,
+// what it is and what its entry says of it, and buttons for what it can do: an application's
+// Open and its desktop actions, a window's Switch to, an action's Run. `current` says the
+// keyboard is at it.
+AbstractButton {
+    id: card
+    required property var result
+    required property Item launcher
+    property bool current: false
+    readonly property bool app: result.kind === "app"
+    // Read from its desktop entry only while it shows.
+    readonly property var actions: visible && app && !result.configured ? shell.appActions(result.appId) : []
+    objectName: "startBestMatch"
+    focusPolicy: Qt.NoFocus
+    hoverEnabled: true
+    padding: Theme.spacingL
+    implicitHeight: topPadding + bottomPadding + head.height + Theme.spacingL + buttons.height
+    Accessible.name: result.title
+    onClicked: launcher.run(result)
+    // An application's menu on a right press.
+    MouseArea {
+        anchors.fill: parent
+        enabled: card.app
+        acceptedButtons: Qt.RightButton
+        onPressed: (mouse) => card.launcher.openAppMenu(card.result, card, mouse.x, mouse.y, false)
+    }
+    background: Rectangle {
+        radius: Theme.radiusMedium
+        color: card.pressed ? Theme.mix(Theme.surfaceRaisedHover, Theme.text, 0.05)
+             : card.hovered ? Theme.surfaceRaisedHover : Theme.surfaceRaised
+        border.color: card.current ? Theme.accent : Theme.border
+    }
+    contentItem: Item {
+        Item {
+            id: head
+            width: parent.width
+            height: Math.max(image.height, about.height)
+            Image {
+                id: image
+                width: 2 * Theme.appIconSizeLarge; height: width
+                sourceSize: Qt.size(width, height)
+                source: "image://icons/" + card.result.icon
+            }
+            Column {
+                id: about
+                anchors.left: image.right; anchors.leftMargin: Theme.spacingL
+                anchors.right: parent.right
+                anchors.verticalCenter: image.verticalCenter
+                spacing: Theme.spacingXS
+                Text {
+                    width: parent.width
+                    text: card.result.title; textFormat: Text.PlainText
+                    elide: Text.ElideRight
+                    color: Theme.text
+                    font.pixelSize: Theme.fontSizeTitle; font.weight: Font.DemiBold; font.family: Theme.fontFamily
+                }
+                Text {
+                    width: parent.width
+                    text: card.app ? (card.result.genericName ? "App · " + card.result.genericName : "App")
+                                   : card.result.subtitle
+                    textFormat: Text.PlainText
+                    elide: Text.ElideRight
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+                }
+                Text {
+                    width: parent.width
+                    visible: text !== ""
+                    text: card.app ? card.result.description || "" : ""
+                    textFormat: Text.PlainText
+                    wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
+                    color: Theme.textMuted
+                    font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+                }
+            }
+        }
+        Flow {
+            id: buttons
+            y: head.height + Theme.spacingL
+            width: parent.width
+            spacing: Theme.spacingM
+            StartButton {
+                objectName: "startBestOpen"
+                primary: true
+                chevron: false
+                text: card.app ? "Open" : card.result.kind === "window" ? "Switch to" : "Run"
+                onClicked: card.launcher.run(card.result)
+            }
+            Repeater {
+                model: card.actions
+                delegate: StartButton {
+                    required property var modelData
+                    objectName: "startBestAction:" + modelData.action
+                    chevron: false
+                    iconName: modelData.icon
+                    text: modelData.name
+                    onClicked: card.launcher.launchAction(card.result.appId, modelData.action)
+                }
+            }
+        }
+    }
+}

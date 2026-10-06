@@ -151,6 +151,27 @@ class TaskFilterTest : public QObject {
         source.changed(0, {FakeTasks::Active});
         QCOMPARE(filters[0]->activeTask(), -1);
     }
+    // One window by its id, wherever it belongs, and the windows as data that follows changes.
+    void oneWindowAndItsData() {
+        TaskFilter one;
+        one.setSourceModel(&source);
+        one.setApp("pinned-app");
+        one.setTaskId(source.rows[2].id);
+        QCOMPARE(taskIds(one), QList<int>{source.rows[2].id});
+        auto windows = one.windows();
+        QCOMPARE(windows.size(), 1);
+        QCOMPARE(windows[0].toMap()["title"], source.rows[2].title);
+        QCOMPARE(windows[0].toMap()["appId"], source.rows[2].appId);
+        QSignalSpy summaries(&one, &TaskFilter::summaryChanged);
+        source.rows[2].minimized = true;
+        source.changed(2, {FakeTasks::Minimized});
+        QVERIFY(summaries.count() >= 1);
+        QCOMPARE(one.windows()[0].toMap()["minimized"], true);
+        source.rows[2].minimized = false;
+        source.changed(2, {FakeTasks::Minimized});
+        one.setTaskId(-1); // back to the pinned application's windows, of which there are none
+        QVERIFY(one.windows().isEmpty());
+    }
     // A stacked button is urgent when any window of its application is.
     void urgencyOfAStackedButton() {
         TaskFilter app3, app4;

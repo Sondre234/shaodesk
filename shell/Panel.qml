@@ -21,6 +21,9 @@ Item {
     // when barMenuOpen is set. A task's menu offers to pin the application it belongs to.
     property int taskMenuId: -1
     property string taskMenuApp: ""
+    // A stacked button's menu is about all its windows: where its hover list finds them, as
+    // {slot, windowApp}; null for one window's.
+    property var taskMenuGroup: null
     property var pinMenuApp: null
     property bool barMenuOpen: false
     property real contextMenuX: 0
@@ -120,6 +123,7 @@ Item {
     // closes, so the popover stays up in between.
     function openContextMenu(item, x, taskId, app) {
         contextMenuX = item.mapToItem(root, x, 0).x
+        taskMenuGroup = taskId >= 0 && item.stacked === true ? { slot: item.groupSlot, windowApp: item.groupWindowApp } : null
         if (taskId >= 0) { taskMenuId = taskId; taskMenuApp = shell.appFor(app || ""); pinMenuApp = null; barMenuOpen = false }
         else if (app) { pinMenuApp = app; taskMenuId = -1; barMenuOpen = false }
         else { barMenuOpen = true; taskMenuId = -1; pinMenuApp = null }
@@ -154,6 +158,12 @@ Item {
         case "launcher":
             launcherOpen = true
             return true
+        case "launcher-all":
+        case "launcher-search":
+        case "launcher-menu":
+            // The start menu's other views, as Launcher.preview names them.
+            launcherOpen = true
+            return launcherLoader.item.preview(name)
         case "power":
             togglePowerMenu()
             return powerOpen
@@ -172,10 +182,26 @@ Item {
                 openContextMenu(task, 0, task.taskId, task.appId)
             return task !== null
         case "pin-menu":
+            // An installed application's slot when there is one, whose menu has more to show.
             var slot = pinnedSlots.itemAt(0)
+            for (i = pinnedSlots.count - 1; i >= 0; --i)
+                if (!pinnedSlots.itemAt(i).modelData.configured)
+                    slot = pinnedSlots.itemAt(i)
             if (slot)
                 openContextMenu(slot, 0, -1, slot.modelData)
             return slot !== null
+        case "stack-menu":
+            // A stacked button's menu, with the workspaces to move its windows to beside it.
+            for (i = 0; i < taskList.count; ++i) {
+                var stack = taskList.itemAtIndex(i)
+                if (stack && stack.stacked) {
+                    openContextMenu(stack, 0, stack.taskId, stack.appId)
+                    previewSubmenu.menu = contextMenuLoader
+                    previewSubmenu.start()
+                    return true
+                }
+            }
+            return false
         case "group":
             // A stacked button, in the task list or in a pinned slot.
             var buttons = []
@@ -362,8 +388,8 @@ Item {
         // Reading shell.pinned re-evaluates the menu when pins change. Pinning waits until
         // the click is handled: the change rebuilds the menu, destroying the clicked item.
         var pinned = shell.pinned.some(function(app) { return app.appId === appId })
-        return pinned ? { text: "Unpin from taskbar", run: function() { Qt.callLater(function() { shell.unpin(appId) }) } }
-                      : { text: "Pin to taskbar", run: function() { Qt.callLater(function() { shell.pin(appId) }) } }
+        return pinned ? { text: "Unpin from taskbar", icon: "pin-off", run: function() { Qt.callLater(function() { shell.unpin(appId) }) } }
+                      : { text: "Pin to taskbar", icon: "pin", run: function() { Qt.callLater(function() { shell.pin(appId) }) } }
     }
     // Popups open away from the screen edge the bar sits on.
     // Tiling is per monitor: this panel shows and toggles its own.

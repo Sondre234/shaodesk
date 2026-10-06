@@ -69,6 +69,10 @@ class PaletteTest : public QObject {
         // A window ties with the application it is of; the open window comes first.
         QCOMPARE(titles(fuzzy::rank(entries, "termi"))[0], QString("Terminal - htop"));
         QCOMPARE(titles(fuzzy::rank(entries, "termi")).size(), 2);
+        // Each says how well it matched, for a search that mixes them with results of its own.
+        const auto ranked = fuzzy::rank(entries, "termi");
+        QVERIFY(ranked[0].toMap()["score"].toDouble() > ranked[1].toMap()["score"].toDouble());
+        QCOMPARE(ranked[1].toMap()["score"].toDouble(), fuzzy::score("termi", "Terminal"));
         // The subtitle is searched too, less weighted.
         QCOMPARE(titles(fuzzy::rank(entries, "kitty")), QStringList{"Terminal - htop"});
         QCOMPARE(titles(fuzzy::rank(entries, "toggle_tiling")), QStringList{"Toggle tiling"});

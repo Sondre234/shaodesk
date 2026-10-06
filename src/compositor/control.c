@@ -494,6 +494,7 @@ static bool control_send_state(struct sh_control_client *client, const char *sta
 
 void notify_subscribers(struct sh_server *server) {
     overview_touch(server, true); // a change of windows or workspaces, when it is open
+    window_objects_changed(server);
     char state[sizeof(server->sent_state)];
     describe_state(server, state, sizeof(state));
     if (!strcmp(state, server->sent_state))

@@ -33,6 +33,12 @@ class Palette : public QObject {
     Q_INVOKABLE void move(int delta);
     // Runs the result at `index` (the selected one when negative) and closes the palette.
     Q_INVOKABLE void activate(int index = -1);
+    // What the palette searches but the applications, for a search of its own (the start
+    // menu's): the windows of `windows`, a model with TaskModel's roles (the taskbar's, or a
+    // stand-in for it), saved sessions, workspaces and actions.
+    Q_INVOKABLE QVariantList entries(QObject *windows) const;
+    // Runs one of its entries as choosing it here does, on monitor `output`.
+    Q_INVOKABLE void run(const QVariantMap &entry, const QString &output);
   Q_SIGNALS:
     void openChanged();
     void queryChanged();

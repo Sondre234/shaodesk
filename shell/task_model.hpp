@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include "shaodesk-window-control-v1-client-protocol.h"
 #include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
 #include <QAbstractListModel>
 #include <QSocketNotifier>
@@ -7,10 +8,28 @@
 #include <vector>
 #include <wayland-client.h>
 
+// The windows the compositor lists for taskbars (wlr-foreign-toplevel), with where each is from
+// shaodesk-window-control-v1 when the compositor offers it: `output` (connector name), `workspace`
+// (of that output, from 1; 0 until it is known), whether it is `sticky` or `floating`, and whether
+// its workspace is `tiling`.
 class TaskModel : public QAbstractListModel {
     Q_OBJECT
   public:
-    enum Role { TaskId = Qt::UserRole + 1, Title, AppId, Active, Minimized, Maximized, Urgent };
+    enum Role {
+        TaskId = Qt::UserRole + 1,
+        Title,
+        AppId,
+        Active,
+        Minimized,
+        Maximized,
+        Urgent,
+        Fullscreen,
+        Output,
+        Workspace,
+        Sticky,
+        Floating,
+        Tiling
+    };
     explicit TaskModel(QObject *parent = nullptr);
     ~TaskModel() override;
     bool connectDisplay();
@@ -20,6 +39,14 @@ class TaskModel : public QAbstractListModel {
     Q_INVOKABLE void activate(int id);
     Q_INVOKABLE void minimize(int id);
     Q_INVOKABLE void maximize(int id);
+    Q_INVOKABLE void setFullscreen(int id, bool fullscreen);
+    // Through the window control, which these need: to workspace `number` (from 1) of the output
+    // the window is on, onto another output, shown on every workspace, kept out of the tiling.
+    // None of them focuses the window.
+    Q_INVOKABLE void moveToWorkspace(int id, int number);
+    Q_INVOKABLE void moveToOutput(int id, const QString &output);
+    Q_INVOKABLE void setSticky(int id, bool sticky);
+    Q_INVOKABLE void setFloating(int id, bool floating);
     Q_INVOKABLE void close(int id);
     Q_INVOKABLE void showDesktop();
     // The windows the compositor says are asking for attention, as {appId, title} pairs: the
@@ -32,21 +59,28 @@ class TaskModel : public QAbstractListModel {
     void disconnected();
 
   private:
+    // What a window is, as the compositor last said.
+    struct State {
+        QString title, appId, output;
+        bool active = false, minimized = false, maximized = false, fullscreen = false, urgent = false;
+        int workspace = 0;
+        bool sticky = false, floating = false, tiling = false;
+    };
     struct Task {
         TaskModel *model;
         zwlr_foreign_toplevel_handle_v1 *handle;
+        shaodesk_window_v1 *window = nullptr;
         int id;
-        QString title, appId;
-        bool active = false, minimized = false, maximized = false, urgent = false;
+        State state;
         // What the model last announced; a `done` that changes none of it announces nothing.
-        QString shownTitle, shownAppId;
-        bool shownActive = false, shownMinimized = false, shownMaximized = false, shownUrgent = false;
+        State shown;
     };
     std::vector<std::unique_ptr<Task>> tasks_;
     wl_display *display_ = nullptr;
     wl_registry *registry_ = nullptr;
     wl_seat *seat_ = nullptr;
     zwlr_foreign_toplevel_manager_v1 *manager_ = nullptr;
+    shaodesk_window_control_v1 *control_ = nullptr;
     std::unique_ptr<QSocketNotifier> read_, write_;
     QList<QPair<QString, QString>> urgent_;
     int nextId_ = 1;
@@ -55,6 +89,8 @@ class TaskModel : public QAbstractListModel {
     // Works out which tasks are urgent; those but `except` that change announce it.
     void matchUrgent(const Task *except = nullptr);
     void changed(Task *task);
+    // Asks the compositor where the task's window is, and to keep saying.
+    void watch(Task *task);
     void removed(Task *task);
     static void global(void *, wl_registry *, uint32_t, const char *, uint32_t);
     static void globalRemoved(void *, wl_registry *, uint32_t);
@@ -67,4 +103,8 @@ class TaskModel : public QAbstractListModel {
     static void state(void *, zwlr_foreign_toplevel_handle_v1 *, wl_array *);
     static void done(void *, zwlr_foreign_toplevel_handle_v1 *);
     static void closed(void *, zwlr_foreign_toplevel_handle_v1 *);
+    static void windowOutput(void *, shaodesk_window_v1 *, const char *);
+    static void windowWorkspace(void *, shaodesk_window_v1 *, uint32_t);
+    static void windowState(void *, shaodesk_window_v1 *, uint32_t);
+    static void windowDone(void *, shaodesk_window_v1 *);
 };
