@@ -175,6 +175,16 @@ QtObject {
     readonly property int launchpadFieldWidth: 240
     readonly property int launchpadFieldHeight: 28
     readonly property int launchpadDot: 7
+    // Spotlight, the command palette of the macOS style: its card's corners; its field, without a
+    // frame of its own, with the text and the magnifier large; a result's row and icon, the one
+    // chosen filled with the accent; and a group's heading over its results.
+    readonly property int spotlightRadius: macos ? 12 : radiusLarge
+    readonly property int spotlightFieldHeight: 52
+    readonly property int spotlightFontSize: Math.round(fontSize * 1.7)
+    readonly property int spotlightGlyph: 22
+    readonly property int spotlightRowHeight: 40
+    readonly property int spotlightIconSize: 28
+    readonly property int spotlightHeadingHeight: 26
 
     // `milliseconds` at the animation speed, 0 with animations off.
     function duration(milliseconds) { return Math.round(milliseconds * motionScale) }
