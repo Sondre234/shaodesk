@@ -5,6 +5,7 @@
 #include "view.hpp"
 #include <QCommandLineParser>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QQmlEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
@@ -12,6 +13,7 @@
 #include <string_view>
 #include <QScreen>
 #include <QSocketNotifier>
+#include <QStandardPaths>
 #include <QTimer>
 #include <cerrno>
 #include <csignal>
@@ -73,7 +75,19 @@ int main(int argc, char **argv) {
          "the popup opening",
          "milliseconds"});
     parser.addOption({"screenshot", "Save a preview screenshot before exiting", "path"});
+    parser.addOption({"icon-theme",
+                      "Look icons up in this theme instead of the platform's (a preview on the "
+                      "offscreen platform has none)",
+                      "name"});
     parser.process(app);
+    if (parser.isSet("icon-theme")) {
+        // The offscreen platform looks for icon themes in no folder but Qt's resources.
+        QIcon::setThemeSearchPaths(QIcon::themeSearchPaths() +
+                                   QStandardPaths::locateAll(QStandardPaths::GenericDataLocation,
+                                                             "icons",
+                                                             QStandardPaths::LocateDirectory));
+        QIcon::setThemeName(parser.value("icon-theme"));
+    }
     if (!parser.isSet("config"))
         parser.showHelp(1);
     const bool preview = parser.isSet("preview") || parser.isSet("preview-popup");
