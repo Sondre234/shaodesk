@@ -188,6 +188,7 @@ class PaletteView : public OverlayView {
   private:
     bool wasActive_ = false;
     void update();
+    void place();
 };
 
 // The confirmation of power off, restart and log out on one output: a dimmed cover with the

@@ -383,9 +383,9 @@ QImage PreviewData::withSurface(QImage desktop) const {
         at = QPoint((output.width() - size.width()) / 2,
                     controller_.osd()->top() ? 48 : output.height() - 48 - size.height());
     } else if (surfaceName_.startsWith("palette")) {
-        // PaletteView: centred, a sixth of the output's height down.
+        // PaletteView: centred, below the bars by ShellController::paletteDrop.
         at = QPoint(usable.left() + (usable.width() - size.width()) / 2,
-                    usable.top() + output.height() / 6);
+                    usable.top() + controller_.paletteDrop(output.height()));
     } else if (surfaceName_ == "switcher") {
         // SwitcherView: centred.
         at = usable.center() - QPoint(size.width() / 2, size.height() / 2);

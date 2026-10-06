@@ -496,9 +496,10 @@ PaletteView::PaletteView(ShellController &controller, QScreen *screen)
     using W = LayerShellQt::Window;
     layer_->setScope("shaodesk-palette");
     layer_->setAnchors(W::AnchorTop);
-    layer_->setMargins(QMargins(0, screen->geometry().height() / 6, 0, 0));
     layer_->setExclusiveZone(0);
 #endif
+    place();
+    connect(&controller, &ShellController::configChanged, this, &PaletteView::place);
     load("Palette.qml");
     // The surface is as big as the palette wants, whatever size the compositor last configured
     // (a palette that opened small would otherwise stay small).
@@ -519,10 +520,7 @@ PaletteView::PaletteView(ShellController &controller, QScreen *screen)
     connect(screen, &QScreen::geometryChanged, this, [this] {
         if (rootObject())
             rootObject()->setProperty("screenSize", outputScreen_->geometry().size());
-#if SHAODESK_LAYER_SHELL
-        if (layer_)
-            layer_->setMargins(QMargins(0, outputScreen_->geometry().height() / 6, 0, 0));
-#endif
+        place();
     });
     // Clicking elsewhere takes the keyboard away, which closes the palette; giving it up as it
     // goes does not.
@@ -533,6 +531,13 @@ PaletteView::PaletteView(ShellController &controller, QScreen *screen)
             controller_.palette()->close();
     });
     connect(controller.palette(), &Palette::openChanged, this, &PaletteView::update);
+}
+// Centred, below the bars by controller.paletteDrop.
+void PaletteView::place() {
+#if SHAODESK_LAYER_SHELL
+    if (layer_)
+        layer_->setMargins(QMargins(0, controller_.paletteDrop(outputScreen_->geometry().height()), 0, 0));
+#endif
 }
 void PaletteView::update() {
     const bool mine = controller_.palette()->output() == outputScreen_->name();
