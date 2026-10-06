@@ -71,10 +71,21 @@ its control socket and holds the models; QML reaches it as the context property 
 QML engine. The QML is compiled into the binary (`qt_add_qml_module` in `shell/CMakeLists.txt`,
 which lists every file).
 
+The taskbar's popups are drawn in a surface of their own, a `PopoverWindow` (`view.cpp`) that
+`Panel.qml` declares, so they stay in the panel's QML tree and state while the bar's surface
+keeps its size. It is an overlay layer surface covering the output (exclusive zone -1, so its
+coordinates are the output's), above fullscreen windows too, and hidden while nothing is open.
+While a menu or popup is open it holds the keyboard and takes every press but those on the bar's
+strip, where `inputRects` leaves a hole: a press on another bar button still switches popups in
+one press, and a press beside the popups closes them. The windows of a stacked button, shown on
+hover, take only the pointer over their list. Losing the keyboard while it holds it (`dismissed`)
+closes the popups. Without layer shell (`--preview-popup`, `shell_ui_test`) it is an ordinary
+window as large as `ShellView::previewSize()`, and a preview's screenshot draws it over the bar.
+
 | File | Covers |
 | --- | --- |
 | `Theme.qml` | The design tokens (colours, type, radii, spacing, icon sizes, motion, whether effects can be drawn), derived from the appearance profile. A singleton: every file reads `Theme.surface`, `Theme.hover`, ... instead of colours and sizes of its own. |
-| `Panel.qml` | The taskbar: which popup is open and where, the bar and its smaller buttons, and a loader for each popup. The popups are drawn in the bar's own surface, which `view.cpp` grows while one is open. Every part below takes the panel as `panel` (and the bar's height, or the bar as `barItem`) and reaches its state and functions through it. |
+| `Panel.qml` | The taskbar: which popup is open and where, the bar and its smaller buttons, and the popover with a loader for each popup. Every part below takes the panel as `panel` (and the bar's height, or the bar as `barItem`) and reaches its state and functions through it; a popup is placed in `panel.popupLayer`, by the bar's edges there (`panel.barTop`, `panel.barBottom`). |
 | `PinnedSlots.qml`, `TaskList.qml`, `TaskButton.qml`, `TrayButton.qml`, `WorkspaceIndicator.qml`, `VolumeButton.qml`, `ClockButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `BarTip.qml` | Parts of the bar: widgets, and the tooltip for things on it. |
 | `NotificationHistory.qml`, `AudioMixer.qml`, `CalendarPopup.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
 | `Icon.qml`, `SpeakerIcon.qml` | Line icons (Lucide), drawn as vectors in any colour, and the loudspeaker for a volume. |
