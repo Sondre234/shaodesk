@@ -57,7 +57,7 @@ Repeater {
             return 0
         }
         property real shiftX: shift
-        Behavior on shiftX { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+        Behavior on shiftX { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
         spacing: 4
         z: dragging ? 1 : 0
         // The transform's own x, not the item's: it does not fight the layout.

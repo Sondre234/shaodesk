@@ -20,7 +20,7 @@ ListView {
     property int dragTo: -1
     property real dragStep: 0
     model: TaskFilter { controller: shell; sourceModel: taskList.panel.taskSource; grouped: shell.groupWindows }
-    moveDisplaced: Transition { NumberAnimation { property: "x"; duration: 120; easing.type: Easing.OutCubic } }
+    moveDisplaced: Transition { NumberAnimation { property: "x"; duration: Theme.durationFast; easing.type: Theme.easing } }
     WheelHandler {
         enabled: taskList.contentWidth > taskList.width
         onWheel: (event) => {
@@ -49,7 +49,7 @@ ListView {
             return 0
         }
         property real shiftX: shift
-        Behavior on shiftX { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+        Behavior on shiftX { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
         transform: Translate { x: reorder.active ? reorder.activeTranslation.x : taskButton.shiftX }
         // The task follows the pointer through the list, the tasks it passes halfway
         // over making way, and moves on release; the press never becomes a click.
