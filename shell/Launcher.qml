@@ -159,12 +159,15 @@ PopupCard {
         return entries
     }
     // For a preview (Panel.previewPopup): shows "launcher-all", every application,
-    // "launcher-search", what a search finds, or "launcher-menu", a pinned tile's menu.
+    // "launcher-search", what a search finds, "launcher-empty", a search finding nothing, or
+    // "launcher-menu", a pinned tile's menu.
     function preview(name) {
         if (name === "launcher-all") {
             allApps = true
         } else if (name === "launcher-search") {
             search.text = "fi"
+        } else if (name === "launcher-empty") {
+            search.text = "zqxw"
         } else if (name === "launcher-menu") {
             // The fourth tile's, which can move to the front, once the tiles are laid out.
             home.current = Math.min(3, home.pins.length - 1)

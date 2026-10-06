@@ -37,7 +37,7 @@ POPUPS = ["bar", "launcher", "power", "bar-menu", "bar-submenu", "task-menu", "s
 POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switcher",
            "overview", "palette-empty"]
 # The start menu's other views and its menus.
-POPUPS += ["launcher-all", "launcher-search", "launcher-menu"]
+POPUPS += ["launcher-all", "launcher-search", "launcher-empty", "launcher-menu"]
 POPUPS += ["quick-settings", "quick-settings-mixer", "bar-all"]
 
 # Pictures taken with settings of their own, put in the shell table: name -> (popup, settings).
