@@ -35,6 +35,9 @@ class PreviewData : public QObject {
     QObject *tasks_ = nullptr;
 };
 
-// A screenshot of the panel's preview drawn over the desktop under it (the wallpaper, or the
-// background colour), so that a translucent colour shows what it would show there.
-QImage previewOnDesktop(QImage panel, const ShellController &controller);
+// A screenshot of the panel's preview as the output would show it: the desktop (the wallpaper, or
+// the background colour), the bar along its edge, and the popover with its popups over both, so
+// that a translucent colour shows what it would show there. `popover` is null while nothing is
+// open.
+QImage previewOnDesktop(QImage panel, QImage popover, bool panelTop,
+                        const ShellController &controller);

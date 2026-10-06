@@ -8,7 +8,7 @@ Rectangle {
     id: contextMenu
     required property var panel
     required property Item barItem
-    parent: panel
+    parent: panel.popupLayer
     objectName: "contextMenu"
     readonly property var actions: panel.taskMenuId >= 0
         ? [{ text: "Maximize / restore", run: function(id) { shell.tasks.maximize(id) } },
@@ -34,7 +34,7 @@ Rectangle {
     visible: panel.taskMenuId >= 0 || panel.pinMenuApp !== null || panel.barMenuOpen
     width: 220; height: 12 + actions.length * 44 + (actions.length - 1) * 2
     x: Math.max(8, Math.min(panel.contextMenuX, panel.width - width - 8))
-    y: panel.onTop ? barItem.y + barItem.height + 8 : barItem.y - height - 8
+    y: panel.onTop ? panel.barBottom + 8 : panel.barTop - height - 8
     color: Theme.surface; radius: Theme.radiusMedium
     border.color: Theme.border
     MouseArea { anchors.fill: parent }

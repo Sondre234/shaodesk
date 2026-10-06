@@ -10,13 +10,13 @@ Rectangle {
     id: groupList
     required property var panel
     required property Item barItem
-    parent: panel
+    parent: panel.popupLayer
     objectName: "groupList"
     readonly property int rowHeight: 40
     visible: panel.groupOpen
     width: 280; height: 12 + groupWindows.count * rowHeight + Math.max(0, groupWindows.count - 1) * 2
     x: Math.max(8, Math.min(panel.groupX - width / 2, panel.width - width - 8))
-    y: panel.onTop ? barItem.y + barItem.height + 8 : barItem.y - height - 8
+    y: panel.onTop ? panel.barBottom + 8 : panel.barTop - height - 8
     color: Theme.surface; radius: Theme.radiusMedium
     border.color: Theme.border
     HoverHandler {

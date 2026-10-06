@@ -9,7 +9,7 @@ Rectangle {
     id: wallpaperPicker
     required property var panel
     required property Item barItem
-    parent: panel
+    parent: panel.popupLayer
     objectName: "wallpaperPicker"
     visible: panel.audioPopup === "wallpapers"
     // "" shows every folder.
@@ -33,9 +33,10 @@ Rectangle {
     onVisibleChanged: if (visible) opened()
     Component.onCompleted: if (visible) opened()
     width: Math.min(880, panel.width - 16)
-    height: Math.max(220, Math.min(500, panel.height - barItem.height - shell.panelMarginTop - shell.panelMarginBottom - 16))
+    // As tall as when it shared the bar's surface, which grew to at most 560 pixels.
+    height: Math.max(220, Math.min(500, Math.min(560, panel.popupLayer.height) - barItem.height - shell.panelMarginTop - shell.panelMarginBottom - 16))
     x: Math.max(8, Math.min(panel.audioPopupX - width / 2, panel.width - width - 8))
-    y: panel.onTop ? barItem.y + barItem.height + 8 : barItem.y - height - 8
+    y: panel.onTop ? panel.barBottom + 8 : panel.barTop - height - 8
     color: Theme.surface; radius: 10
     border.color: Theme.border
     MouseArea { anchors.fill: parent }

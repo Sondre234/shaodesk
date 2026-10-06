@@ -9,7 +9,7 @@ Rectangle {
     id: launcher
     required property var panel
     required property Item barItem
-    parent: panel
+    parent: panel.popupLayer
     objectName: "launcher"
     visible: panel.launcherOpen
     function opened() { search.text = ""; takeFocus() }
@@ -25,10 +25,10 @@ Rectangle {
         function onPowerOpenChanged() { if (launcher.visible) launcher.takeFocus() }
     }
     width: Math.min(460, panel.width - 24)
-    height: panel.height - shell.panelExtent - 20
+    height: Math.min(560, panel.popupLayer.height) - shell.panelExtent - 20
     anchors.left: parent.left
     anchors.leftMargin: 12 + shell.panelMarginLeft
-    y: panel.onTop ? barItem.y + barItem.height + 10 : barItem.y - height - 10
+    y: panel.onTop ? panel.barBottom + 10 : panel.barTop - height - 10
     color: Theme.surface
     border.color: Theme.border
     radius: Theme.radiusLarge

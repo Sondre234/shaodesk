@@ -8,7 +8,7 @@ Rectangle {
     id: calendar
     required property var panel
     required property Item barItem
-    parent: panel
+    parent: panel.popupLayer
     objectName: "calendar"
     property int month: new Date().getMonth()
     property int year: new Date().getFullYear()
@@ -21,7 +21,7 @@ Rectangle {
     onVisibleChanged: if (visible) today()
     width: 288; height: 330
     x: Math.max(8, Math.min(panel.audioPopupX - width / 2, panel.width - width - 8))
-    y: panel.onTop ? barItem.y + barItem.height + 8 : barItem.y - height - 8
+    y: panel.onTop ? panel.barBottom + 8 : panel.barTop - height - 8
     color: Theme.surface; radius: Theme.radiusLarge
     border.color: Theme.border
     MouseArea { anchors.fill: parent }

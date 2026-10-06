@@ -11,7 +11,7 @@ Rectangle {
     required property Item barItem
     readonly property var center: shell.notifications
     objectName: "notificationHistory"
-    parent: panel
+    parent: panel.popupLayer
     visible: panel.audioPopup === "notifications"
     // Looking at the list is reading it, also when it was made open.
     onVisibleChanged: if (visible) center.markAllRead()
@@ -27,7 +27,7 @@ Rectangle {
     width: 380
     height: Math.min(460, 56 + Math.max(90, list.contentHeight) + 8)
     x: Math.max(8, Math.min(panel.audioPopupX - width / 2, panel.width - width - 8))
-    y: panel.onTop ? barItem.y + barItem.height + 8 : barItem.y - height - 8
+    y: panel.onTop ? panel.barBottom + 8 : panel.barTop - height - 8
     color: Theme.surface; radius: Theme.radiusLarge
     border.color: Theme.border
     MouseArea { anchors.fill: parent }

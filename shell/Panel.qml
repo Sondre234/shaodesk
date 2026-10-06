@@ -53,13 +53,15 @@ Item {
     property string groupIcon: ""
     property real groupX: 0
     property Item groupPending: null
-    // The list needs room too, but not the keyboard: it opens under a window being typed in.
+    // Something is open in the popover. The list shown on hover does not take the keyboard: it
+    // opens under a window being typed in.
     readonly property bool expanded: menuOpen || groupOpen
-    onExpandedChanged: shellView.setExpanded(expanded, menuOpen)
-    onMenuOpenChanged: {
-        if (menuOpen) groupOpen = false
-        shellView.setExpanded(expanded, menuOpen)
-    }
+    onMenuOpenChanged: if (menuOpen) groupOpen = false
+    // The surface the popups are drawn in, and the bar's edges in its coordinates: the bar's
+    // surface lies along its top or bottom edge, across its width.
+    readonly property Item popupLayer: popupLayer
+    readonly property real barTop: (onTop ? 0 : popover.height - height) + bar.y
+    readonly property real barBottom: barTop + bar.height
     onLauncherOpenChanged: {
         if (launcherOpen) { taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; trayMenuKey = "" }
         else powerOpen = false
@@ -101,7 +103,7 @@ Item {
     }
     // Opens on press, as a desktop context menu does: waiting for a tap lost a press held
     // past the long-press time or moved while held. The new menu opens before the old one
-    // closes, so the surface does not collapse in between.
+    // closes, so the popover stays up in between.
     function openContextMenu(item, x, taskId, app) {
         contextMenuX = item.mapToItem(root, x, 0).x
         if (taskId >= 0) { taskMenuId = taskId; taskMenuApp = shell.appFor(app || ""); pinMenuApp = null; barMenuOpen = false }
@@ -312,123 +314,160 @@ Item {
     readonly property bool floating: shell.panelRadius > 0 || shell.panelMarginLeft > 0 ||
                                      shell.panelMarginRight > 0 || shell.panelMarginTop > 0 ||
                                      shell.panelMarginBottom > 0
-    Keys.onEscapePressed: closeMenus()
 
+    // A click on the bar's empty space closes what is open.
     MouseArea {
         anchors.fill: parent
         visible: root.menuOpen
         onClicked: root.closeMenus()
     }
 
-    // Left-clicking the volume control: the default output's volume, then each application's.
-    Loader {
-        id: mixerLoader
-        asynchronous: !(root.audioPopup === "mixer")
-        active: root.audioPopup === "mixer" || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { AudioMixer { panel: root; barItem: bar } }
-    }
+    // The popups' surface, over the whole output (PopoverWindow in view.hpp). While a menu is
+    // open it takes the keyboard and every press but those on the bar, and a press beside the
+    // popups closes them; the list shown on hover takes only the pointer over it. It stays up
+    // while what closed fades out.
+    PopoverWindow {
+        id: popover
+        panel: root.shellView
+        keyboard: root.menuOpen
+        inputRects: root.menuOpen
+            ? [Qt.rect(0, root.onTop ? root.height : 0, popover.width, popover.height - root.height)]
+            : root.groupOpen && groupListLoader.item
+            ? [Qt.rect(groupListLoader.item.x, groupListLoader.item.y, groupListLoader.item.width,
+                       groupListLoader.item.height)]
+            : []
+        onDismissed: root.closeMenus()
+        Timer { id: closing; interval: Theme.durationNormal; onTriggered: if (!root.expanded) popover.open = false }
+        Connections {
+            target: root
+            function onExpandedChanged() {
+                if (root.expanded) popover.open = true
+                else closing.restart()
+            }
+        }
 
-    // Clicking the clock: a month calendar with the current day marked.
-    Loader {
-        id: calendarLoader
-        asynchronous: !(root.audioPopup === "calendar")
-        active: root.audioPopup === "calendar" || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { CalendarPopup { panel: root; barItem: bar } }
-    }
+        Item {
+            id: popupLayer
+            anchors.fill: parent
+            focus: true
+            Keys.onEscapePressed: root.closeMenus()
+            MouseArea {
+                anchors.fill: parent
+                enabled: root.menuOpen
+                onPressed: root.closeMenus()
+            }
 
-    // Right-clicking the volume control: the outputs to play through.
-    Loader {
-        id: outputsLoader
-        asynchronous: !(root.audioPopup === "outputs")
-        active: root.audioPopup === "outputs" || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { AudioOutputs { panel: root; barItem: bar } }
-    }
+            // Left-clicking the volume control: the default output's volume, then each application's.
+            Loader {
+                id: mixerLoader
+                asynchronous: !(root.audioPopup === "mixer")
+                active: root.audioPopup === "mixer" || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { AudioMixer { panel: root; barItem: bar } }
+            }
 
-    // The profile button: the appearance profiles, the one in use marked.
-    Loader {
-        id: profilesLoader
-        asynchronous: !(root.audioPopup === "profiles")
-        active: root.audioPopup === "profiles" || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { ProfileList { panel: root; barItem: bar } }
-    }
+            // Clicking the clock: a month calendar with the current day marked.
+            Loader {
+                id: calendarLoader
+                asynchronous: !(root.audioPopup === "calendar")
+                active: root.audioPopup === "calendar" || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { CalendarPopup { panel: root; barItem: bar } }
+            }
 
-    // The wallpaper button: thumbnails of the pictures in shell.wallpapers, by subfolder, with
-    // a filter; clicking one shows it at once and keeps the picker open to try another.
-    Loader {
-        id: wallpapersLoader
-        asynchronous: !(root.audioPopup === "wallpapers")
-        active: root.audioPopup === "wallpapers" || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { WallpaperPicker { panel: root; barItem: bar } }
-    }
+            // Right-clicking the volume control: the outputs to play through.
+            Loader {
+                id: outputsLoader
+                asynchronous: !(root.audioPopup === "outputs")
+                active: root.audioPopup === "outputs" || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { AudioOutputs { panel: root; barItem: bar } }
+            }
 
-    // The bell's notification history.
-    Loader {
-        id: historyLoader
-        asynchronous: !(root.audioPopup === "notifications")
-        active: shell.notifications.serving && (root.audioPopup === "notifications" || root.warm || used)
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { NotificationHistory { panel: root; barItem: bar } }
-    }
+            // The profile button: the appearance profiles, the one in use marked.
+            Loader {
+                id: profilesLoader
+                asynchronous: !(root.audioPopup === "profiles")
+                active: root.audioPopup === "profiles" || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { ProfileList { panel: root; barItem: bar } }
+            }
 
-    Loader {
-        id: launcherLoader
-        asynchronous: !(root.launcherOpen)
-        active: root.launcherOpen || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { Launcher { panel: root; barItem: bar } }
-    }
+            // The wallpaper button: thumbnails of the pictures in shell.wallpapers, by subfolder, with
+            // a filter; clicking one shows it at once and keeps the picker open to try another.
+            Loader {
+                id: wallpapersLoader
+                asynchronous: !(root.audioPopup === "wallpapers")
+                active: root.audioPopup === "wallpapers" || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { WallpaperPicker { panel: root; barItem: bar } }
+            }
 
-    Loader {
-        id: contextMenuLoader
-        asynchronous: !(root.taskMenuId >= 0 || root.pinMenuApp !== null || root.barMenuOpen)
-        active: root.taskMenuId >= 0 || root.pinMenuApp !== null || root.barMenuOpen || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { TaskbarMenu { panel: root; barItem: bar } }
-    }
+            // The bell's notification history.
+            Loader {
+                id: historyLoader
+                asynchronous: !(root.audioPopup === "notifications")
+                active: shell.notifications.serving && (root.audioPopup === "notifications" || root.warm || used)
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { NotificationHistory { panel: root; barItem: bar } }
+            }
 
-    // A tray item's menu, in the style of the bar's own: a submenu's entries take the place of
-    // the menu's, with a way back, as the bar menu's appearance entry does. A long one scrolls.
-    Loader {
-        id: trayMenuLoader
-        asynchronous: root.trayMenuKey === ""
-        active: root.trayMenuKey !== "" || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { TrayMenu { panel: root; barItem: bar } }
-    }
+            Loader {
+                id: launcherLoader
+                asynchronous: !(root.launcherOpen)
+                active: root.launcherOpen || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { Launcher { panel: root; barItem: bar } }
+            }
 
-    // The windows of the hovered stacked button: clicking one focuses it (or minimizes it when
-    // focused already), the cross or a middle click closes it, and a right click opens its menu.
-    Loader {
-        id: groupListLoader
-        asynchronous: !(root.groupOpen)
-        active: root.groupOpen || root.warm || used
-        // Once made, a popup stays, so closing it never destroys the item its handler runs in.
-        property bool used: false
-        onLoaded: used = true
-        sourceComponent: Component { GroupList { panel: root; barItem: bar } }
+            Loader {
+                id: contextMenuLoader
+                asynchronous: !(root.taskMenuId >= 0 || root.pinMenuApp !== null || root.barMenuOpen)
+                active: root.taskMenuId >= 0 || root.pinMenuApp !== null || root.barMenuOpen || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { TaskbarMenu { panel: root; barItem: bar } }
+            }
+
+            // A tray item's menu, in the style of the bar's own: a submenu's entries take the place of
+            // the menu's, with a way back, as the bar menu's appearance entry does. A long one scrolls.
+            Loader {
+                id: trayMenuLoader
+                asynchronous: root.trayMenuKey === ""
+                active: root.trayMenuKey !== "" || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { TrayMenu { panel: root; barItem: bar } }
+            }
+
+            // The windows of the hovered stacked button: clicking one focuses it (or minimizes it when
+            // focused already), the cross or a middle click closes it, and a right click opens its menu.
+            Loader {
+                id: groupListLoader
+                asynchronous: !(root.groupOpen)
+                active: root.groupOpen || root.warm || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { GroupList { panel: root; barItem: bar } }
+            }
+        }
     }
 
     Rectangle {
