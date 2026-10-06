@@ -111,6 +111,20 @@ keyboard where it is. Losing the keyboard while it holds it (`dismissed`)
 closes the popups. Without layer shell (`--preview-popup`, `shell_ui_test`) it is an ordinary
 window as large as `ShellView::previewSize()`, and a preview's screenshot draws it over the bar.
 
+`Panel.qml` loads the bars of `shell.style`. The taskbar (`Taskbar.qml`) fills the panel's surface.
+The macOS style has two: the dock (`Dock.qml`) in the panel's surface, which is then at the bottom
+whatever `shell.panel_position` says and reaches above the strip it reserves by half its height,
+room for an icon to bounce in; and the menu bar (`TopMenuBar.qml`) in a `MenuBarWindow`
+(`view.cpp`) that `Panel.qml` declares as it declares its popover: a layer surface on the top
+layer along the output's top edge, reserving its strip, shown only in that style, in the panel's
+QML tree and state. The panel's surface then takes the pointer only over the dock (`ShellView`'s
+`inputRects`), so the desktop beside it and under that room stays reachable, and the popover leaves
+holes for both bars (`popoverInput`), but takes every press while Launchpad covers them. A popup
+of the bar with the widgets opens by `panel.barAnchor`, below the menu bar in the macOS style;
+one of the dock (an application's menu, the windows of one) by `panel.dockAnchor` and
+`panel.dockSide`, which on the taskbar are the bar's. A change of style makes and drops the
+bars, and the surfaces follow at once.
+
 The window switcher, the command palette, the power dialog and the overview's text are
 `OverlayView`s (`view.cpp`), a layer surface each on every output's overlay layer. `present()`
 shows one and sets its QML root's `shown`; `dismiss()` clears it, and the root animates its own
@@ -218,11 +232,14 @@ the highlighted one is filled with the accent, its text white, as macOS draws me
    `required property Item barItem`, `parent: panel.popupLayer`, `open:` that property,
    `anchorRect: panel.barAnchor(x, width)`, `side: panel.popupSide` and
    `bounds: panel.popupArea` (the output but the bar), so that it opens away from the bar on a
-   top panel as on a bottom one. A menu's `onDismissed` clears the property.
+   top panel as on a bottom one, and below the menu bar in the macOS style; one that belongs to
+   the dock's icons takes `panel.dockAnchor(x, width)` and `panel.dockSide` instead. A menu's
+   `onDismissed` clears the property.
 3. A `Loader` for it in the popover in `Panel.qml`, like the others: made when first opened or a
    moment after startup (`root.warm`), kept once made.
 4. The file in `QML_FILES` in `shell/CMakeLists.txt` and in the table above; a name in
-   `previewPopup` (`Panel.qml`), `--preview-popup`'s help (`main.cpp`) and `POPUPS`
+   `previewPopup` (`Panel.qml`; `previewMacos` for one only the macOS style has, which goes in
+   `MACOS_POPUPS` too), `--preview-popup`'s help (`main.cpp`) and `POPUPS`
    (`tools/shell_gallery.py`), and a look at the gallery's pictures.
 5. Tests in `shell_ui_test`: `find(view.rootObject(), NAME)` finds the popover's items too,
    `click(item)` clicks one in its own window, `inPopover(popup)` says it is open, settled and
@@ -264,7 +281,9 @@ its own only where all of it does (Launchpad).
 
 `shaodesk-shell --config FILE --preview-popup NAME --screenshot OUT.png --quit-after 400`
 renders the taskbar offscreen with one popup open, on stand-in windows, sound, tray items and
-notifications, over the configured wallpaper (`--preview-popup` lists the names). The overlay
+notifications, over the configured wallpaper (`--preview-popup` lists the names); in the macOS
+style the dock and the menu bar, over the style's drawn wallpaper while none is set, with the
+menu bar's menus as `system-menu`, `app-menu`, `window-menu` and `window-submenu`. The overlay
 surfaces have names there too (`osd-volume`, `osd-text`, `cards`, `power-dialog`, `palette`,
 `palette-empty`, `switcher`, `overview`): `PreviewData` in `preview.cpp` shows one in a window of its own over the
 bar alone, with stand-ins for what the compositor would tell it, and the screenshot draws it where
