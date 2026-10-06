@@ -618,7 +618,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         target_link_libraries(animation_tests PRIVATE shaodesk_config PkgConfig::WLROOTS
             PkgConfig::WAYLAND m)
         add_test(NAME animation COMMAND animation_tests)
-        add_executable(decoration_tests tests/decoration_tests.c src/decoration.c)
+        add_executable(decoration_tests tests/decoration_tests.c src/decoration.c src/shadow.c)
         target_compile_definitions(decoration_tests PRIVATE WLR_USE_UNSTABLE)
         target_compile_options(decoration_tests PRIVATE -Wall -Wextra -Wno-unused-parameter)
         target_include_directories(decoration_tests PRIVATE include)

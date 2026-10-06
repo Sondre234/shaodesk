@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-/* What the compositor draws for a window, as pixels: the window controls in both styles. */
+/* What the compositor draws for a window, as pixels: the window controls in both styles, and
+ * shadows put together from slices. */
 #include "shaodesk/decoration.h"
+#include "shaodesk/shadow.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -189,14 +191,150 @@ static void rendered_buffer(void) {
     free(expected);
 }
 
+/* The alpha of a painted shadow at device pixel (x, y) of a window's image, 0 outside it. */
+static int shadow_alpha(const uint32_t *pixels, int width, int height, int x, int y) {
+    return x < 0 || y < 0 || x >= width || y >= height ? 0 : alpha(pixels[y * width + x]);
+}
+
+/* Draws the shadow of a window of `width` by `height` from its slices, as the compositor does,
+ * and compares it with the shadow painted for that size whole: they match, the slices never
+ * overlap, and they cover all around the window. */
+static void shadow_slices_match(const struct sh_shadow *shadow, int width, int height, int scale) {
+    struct sh_shadow_layout l;
+    sh_shadow_layout(shadow, &l);
+    int image_width, image_height;
+    sh_shadow_image_size(&l, width, height, &image_width, &image_height);
+    int iw = (l.left + image_width + l.right) * scale, ih = (l.top + image_height + l.bottom) * scale;
+    int fw = (l.left + width + l.right) * scale, fh = (l.top + height + l.bottom) * scale;
+    uint32_t *image = calloc((size_t)iw * ih, sizeof(*image));
+    uint32_t *whole = calloc((size_t)fw * fh, sizeof(*whole));
+    int *drawn = calloc((size_t)fw * fh, sizeof(*drawn)), *covered = calloc((size_t)fw * fh, sizeof(*covered));
+    CHECK(sh_shadow_paint(image, shadow, image_width, image_height, scale) &&
+              sh_shadow_paint(whole, shadow, width, height, scale),
+          "painting failed");
+    struct sh_shadow_slice slices[SH_SHADOW_SLICES];
+    sh_shadow_slices(&l, image_width, image_height, width, height, slices);
+    int outside = 0;
+    for (int i = 0; i < SH_SHADOW_SLICES; ++i) {
+        const struct sh_shadow_slice *s = &slices[i];
+        for (int dy = 0; dy < s->to_height * scale; ++dy) {
+            for (int dx = 0; dx < s->to_width * scale; ++dx) {
+                int sx = s->x * scale + (int)((long long)dx * s->width / s->to_width);
+                int sy = s->y * scale + (int)((long long)dy * s->height / s->to_height);
+                int x = (l.left + s->to_x) * scale + dx, y = (l.top + s->to_y) * scale + dy;
+                if (x < 0 || y < 0 || x >= fw || y >= fh || sx >= iw || sy >= ih) {
+                    ++outside;
+                    continue;
+                }
+                drawn[y * fw + x] = alpha(image[sy * iw + sx]);
+                ++covered[y * fw + x];
+            }
+        }
+    }
+    CHECK(outside == 0, "%dx%d at scale %d: slices reach past the images", width, height, scale);
+    int worst = 0, overlaps = 0, holes = 0;
+    for (int y = 0; y < fh; ++y) {
+        for (int x = 0; x < fw; ++x) {
+            int c = covered[y * fw + x], expected = alpha(whole[y * fw + x]);
+            bool inside = x >= l.left * scale && x < (l.left + width) * scale &&
+                          y >= l.top * scale && y < (l.top + height) * scale;
+            overlaps += c > 1;
+            holes += !inside && c == 0;
+            int difference = abs(drawn[y * fw + x] - expected); // 0 where no slice is drawn
+            if (difference > worst)
+                worst = difference;
+        }
+    }
+    CHECK(overlaps == 0 && holes == 0, "%dx%d at scale %d: %d pixels overlap, %d left out",
+          width, height, scale, overlaps, holes);
+    CHECK(worst <= 1, "%dx%d at scale %d: slices differ from the whole by %d", width, height,
+          scale, worst);
+    free(image);
+    free(whole);
+    free(drawn);
+    free(covered);
+}
+
+static void shadows(void) {
+    struct sh_shadow shadow = {.radius = 10, .blur = 30, .offset_x = 0, .offset_y = 10,
+                               .color = {0, 0, 0, 0.35F}};
+    struct sh_shadow_layout l;
+    sh_shadow_layout(&shadow, &l);
+    // It reaches past the blur's 1.5 sigma on each side, further down than up by twice the
+    // offset; the image to slice holds both corners and a column and row between them.
+    CHECK(l.left == l.right && l.left > 45 && l.bottom - l.top == 20, "reach %d %d %d %d",
+          l.left, l.top, l.right, l.bottom);
+    CHECK(l.width == l.inner_left + l.inner_right + 1 &&
+              l.height == l.inner_top + l.inner_bottom + 1 && l.inner_left >= shadow.radius + 45,
+          "corners %d %d %d %d", l.inner_left, l.inner_top, l.inner_right, l.inner_bottom);
+    int image_width, image_height;
+    sh_shadow_image_size(&l, 800, 600, &image_width, &image_height);
+    CHECK(image_width == l.width && image_height == l.height, "a large window paints anew");
+    sh_shadow_image_size(&l, 60, 600, &image_width, &image_height);
+    CHECK(image_width == 60 && image_height == l.height, "a narrow window shares an image");
+
+    for (int scale = 1; scale <= 2; ++scale) {
+        // Large, just large enough, and too small along one side or both.
+        shadow_slices_match(&shadow, 400, 250, scale);
+        shadow_slices_match(&shadow, l.inner_left + l.inner_right, l.height, scale);
+        shadow_slices_match(&shadow, 300, 70, scale);
+        shadow_slices_match(&shadow, 40, 30, scale);
+    }
+    struct sh_shadow sideways = {.radius = 0, .blur = 12, .offset_x = -20, .offset_y = 4,
+                                 .color = {0.5F, 0, 0, 0.5F}};
+    shadow_slices_match(&sideways, 200, 150, 1);
+    struct sh_shadow hard = {.radius = 6, .blur = 0, .offset_x = 0, .offset_y = 3,
+                             .color = {0, 0, 0, 1}};
+    shadow_slices_match(&hard, 100, 80, 2);
+
+    for (int scale = 1; scale <= 2; ++scale) {
+        int width = 300, height = 200;
+        int fw = (l.left + width + l.right) * scale, fh = (l.top + height + l.bottom) * scale;
+        uint32_t *pixels = calloc((size_t)fw * fh, sizeof(*pixels));
+        sh_shadow_paint(pixels, &shadow, width, height, scale);
+        int cx = (l.left + width / 2) * scale; // the middle of the window, across
+        int top = l.top * scale, bottom = (l.top + height) * scale;
+        // Cut out under the window, darkest just below it and never past its color.
+        CHECK(shadow_alpha(pixels, fw, fh, cx, (top + bottom) / 2) == 0 &&
+                  shadow_alpha(pixels, fw, fh, (l.left + 10) * scale, top + 1) == 0,
+              "shadow under the window");
+        int below = shadow_alpha(pixels, fw, fh, cx, bottom), above = shadow_alpha(pixels, fw, fh, cx, top - 1);
+        CHECK(below > above && below <= 90 && below > 40, "below %d, above %d", below, above);
+        // It fades out smoothly: every step away from the window lighter, by little at a time,
+        // and nothing at the image's edges.
+        int steps = 0;
+        for (int y = bottom; y + 1 < fh; ++y) {
+            int a = shadow_alpha(pixels, fw, fh, cx, y), b = shadow_alpha(pixels, fw, fh, cx, y + 1);
+            steps += a < b || a - b > 3;
+        }
+        for (int x = (l.left + width) * scale; x + 1 < fw; ++x) {
+            int a = shadow_alpha(pixels, fw, fh, x, fh / 2), b = shadow_alpha(pixels, fw, fh, x + 1, fh / 2);
+            steps += a < b || a - b > 3;
+        }
+        CHECK(steps == 0, "%d rough steps fading out at scale %d", steps, scale);
+        int rim = 0;
+        for (int x = 0; x < fw; ++x)
+            rim += shadow_alpha(pixels, fw, fh, x, 0) + shadow_alpha(pixels, fw, fh, x, fh - 1);
+        for (int y = 0; y < fh; ++y)
+            rim += shadow_alpha(pixels, fw, fh, 0, y) + shadow_alpha(pixels, fw, fh, fw - 1, y);
+        CHECK(rim == 0, "the shadow is cut off at the image's edge at scale %d", scale);
+        // The corner follows the window's: just outside its curve the shadow shows, where
+        // a square window would cover it.
+        int corner = shadow_alpha(pixels, fw, fh, (l.left + width) * scale - 2, bottom - 2);
+        CHECK(corner > 20, "nothing outside the rounded corner at scale %d (%d)", scale, corner);
+        free(pixels);
+    }
+}
+
 int main(void) {
     flat_strip();
     traffic_lights();
     rendered_buffer();
+    shadows();
     if (failures) {
         fprintf(stderr, "%d decoration checks failed\n", failures);
         return EXIT_FAILURE;
     }
-    printf("Window controls passed\n");
+    printf("Window controls and shadows passed\n");
     return EXIT_SUCCESS;
 }
