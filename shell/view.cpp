@@ -17,7 +17,8 @@ ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop,
     setResizeMode(QQuickView::SizeRootObjectToView);
     setFlags(Qt::FramelessWindowHint);
     static const int registered = qmlRegisterType<TaskFilter>("Shaodesk", 1, 0, "TaskFilter") +
-                                  qmlRegisterType<PopoverWindow>("Shaodesk", 1, 0, "PopoverWindow");
+                                  qmlRegisterType<PopoverWindow>("Shaodesk", 1, 0, "PopoverWindow") +
+                                  qmlRegisterType<MenuBarWindow>("Shaodesk", 1, 0, "MenuBarWindow");
     Q_UNUSED(registered);
     // Known as soon as the window exists, so before any QML asks: every view of the shell draws
     // the same way.
@@ -66,6 +67,9 @@ ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop,
 }
 PopoverWindow *ShellView::popover() const {
     return rootObject() ? rootObject()->findChild<PopoverWindow *>() : nullptr;
+}
+MenuBarWindow *ShellView::menuBar() const {
+    return rootObject() ? rootObject()->findChild<MenuBarWindow *>() : nullptr;
 }
 // The panel's surface spans the output's width and the bar's margins; the bar is drawn inset.
 void ShellView::placeLayer() {
@@ -231,6 +235,81 @@ void PopoverWindow::applyInput() {
     // The region is the surface's state, sent with its next frame.
     update();
 }
+MenuBarWindow::MenuBarWindow(QWindow *parent) : QQuickWindow(parent) {
+    setTitle("shaodesk menu bar");
+    setColor(Qt::transparent);
+    // A preview's window too leaves the focus with the panel and its popover.
+    setFlags(Qt::FramelessWindowHint | Qt::WindowDoesNotAcceptFocus);
+}
+void MenuBarWindow::setPanel(QQuickWindow *panel) {
+    auto *view = qobject_cast<ShellView *>(panel);
+    if (!view || panel_)
+        return;
+    panel_ = view;
+    QScreen *screen = view->outputScreen();
+    setScreen(screen);
+#if SHAODESK_LAYER_SHELL
+    if (view->layerShell()) {
+        using W = LayerShellQt::Window;
+        layer_ = W::get(this);
+        layer_->setScreen(screen);
+        layer_->setScope("shaodesk-menubar");
+        layer_->setLayer(W::LayerTop);
+        layer_->setAnchors(W::Anchors(W::AnchorTop | W::AnchorLeft | W::AnchorRight));
+        layer_->setKeyboardInteractivity(W::KeyboardInteractivityNone);
+        layer_->setActivateOnShow(false);
+    }
+#endif
+    fit();
+    connect(screen, &QScreen::geometryChanged, this, &MenuBarWindow::fit);
+    Q_EMIT panelChanged();
+    applyShown();
+}
+// Across the output, and as tall as the bar, which is the strip it reserves.
+void MenuBarWindow::fit() {
+    if (!panel_)
+        return;
+    const int width = layer_ ? panel_->outputScreen()->geometry().width() : ShellView::previewSize().width();
+    resize(width, barHeight_);
+#if SHAODESK_LAYER_SHELL
+    if (layer_) {
+        layer_->setDesiredSize(QSize(0, barHeight_));
+        layer_->setExclusiveZone(barHeight_);
+    }
+#endif
+}
+void MenuBarWindow::setBarHeight(int height) {
+    if (height == barHeight_ || height < 1)
+        return;
+    barHeight_ = height;
+    Q_EMIT barHeightChanged();
+    fit();
+}
+void MenuBarWindow::setShown(bool shown) {
+    if (shown == shown_)
+        return;
+    shown_ = shown;
+    Q_EMIT shownChanged();
+    applyShown();
+}
+void MenuBarWindow::applyShown() {
+    if (!panel_)
+        return;
+    const auto output = panel_->outputScreen()->name().toStdString();
+    if (shown_ && !isVisible()) {
+        // Hidden, the surface and its exclusive zone are gone; shown, it is made anew.
+        show();
+        std::cerr << "shaodesk menu bar shown on " << output << '\n';
+        connect(
+            this, &QQuickWindow::frameSwapped, this,
+            [this] { std::cerr << "shaodesk surface rendered: " << title().toStdString() << '\n'; },
+            Qt::SingleShotConnection);
+    } else if (!shown_ && isVisible()) {
+        hide();
+        std::cerr << "shaodesk menu bar hidden on " << output << '\n';
+    }
+}
+
 OverlayView::OverlayView(ShellController &controller, QScreen *screen, const char *name, bool keyboard)
     : QQuickView(controller.engine(), nullptr), controller_(controller), outputScreen_(screen), name_(name),
       keyboard_(keyboard) {
