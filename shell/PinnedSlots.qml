@@ -64,7 +64,7 @@ Repeater {
         // qmllint disable Quick.layout-positioning
         transform: Translate { x: pinnedSlot.dragging ? pinnedSlot.dragX : pinnedSlot.shiftX }
         // qmllint enable Quick.layout-positioning
-        Button {
+        FlatButton {
             id: pinnedButton
             objectName: "pinned:" + pinnedSlot.modelData.appId
             visible: pinnedTasks.count === 0
@@ -73,10 +73,9 @@ Repeater {
             topPadding: 2; bottomPadding: 6
             onClicked: { if (shell.launch(pinnedSlot.modelData.appId)) pinnedSlots.panel.closeMenus() }
             Accessible.name: pinnedSlot.modelData.name
-            background: Rectangle { radius: 7; color: parent.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
             contentItem: Item {
                 Image {
-                    readonly property int size: Math.min(22, parent.height)
+                    readonly property int size: Math.min(Theme.appIconSize, parent.height)
                     anchors.centerIn: parent; width: size; height: size
                     source: "image://icons/" + pinnedSlot.modelData.icon; sourceSize: Qt.size(size, size)
                 }
