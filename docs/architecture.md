@@ -90,6 +90,7 @@ window as large as `ShellView::previewSize()`, and a preview's screenshot draws 
 | `NotificationHistory.qml`, `AudioMixer.qml`, `CalendarPopup.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
 | `Icon.qml`, `SpeakerIcon.qml` | Line icons (Lucide), drawn as vectors in any colour, and the loudspeaker for a volume. |
 | `FlatButton.qml` | The frameless button of the bar and of menus, showing the hover, pressed and active states. |
+| `PopupCard.qml` | A popup's card: surface, outline, corners, a shadow through the GPU, the open and close animation, and its place beside what it belongs to. |
 | `AudioSlider.qml`, `MuteButton.qml` | Controls the mixer uses. |
 | `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |
 | `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |

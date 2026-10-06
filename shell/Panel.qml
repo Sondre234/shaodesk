@@ -63,6 +63,10 @@ Item {
     readonly property Item popupLayer: popupLayer
     readonly property real barTop: (onTop ? 0 : popover.height - height) + bar.y
     readonly property real barBottom: barTop + bar.height
+    // A popup of the bar opens away from the screen edge the bar is on (PopupCard's side), beside
+    // the rectangle barAnchor gives: from `x`, `width` wide, and across the bar.
+    readonly property int popupSide: onTop ? Qt.BottomEdge : Qt.TopEdge
+    function barAnchor(x, width) { return Qt.rect(x, barTop, width, bar.height) }
     onLauncherOpenChanged: {
         if (launcherOpen) { taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; trayMenuKey = "" }
         else powerOpen = false

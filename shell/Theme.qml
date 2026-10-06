@@ -103,6 +103,11 @@ QtObject {
 
     // Whether shader effects (shadows) can be drawn: only through the GPU.
     readonly property bool effects: shell.effects
+    // The shadow under a popup (PopupCard), drawn only with effects: how dark, how soft and how
+    // far down. A light profile needs less of it to show.
+    readonly property color shadow: Qt.rgba(0, 0, 0, light ? 0.3 : 0.6)
+    readonly property int shadowBlur: 20
+    readonly property int shadowOffset: 6
 
     // `milliseconds` at the animation speed, 0 with animations off.
     function duration(milliseconds) { return Math.round(milliseconds * motionScale) }
