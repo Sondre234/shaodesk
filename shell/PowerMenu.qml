@@ -23,14 +23,14 @@ Rectangle {
     Keys.onReturnPressed: run(current)
     Keys.onEnterPressed: run(current)
     width: 220; height: 12 + shell.power.entries.length * 44 + Math.max(0, shell.power.entries.length - 1) * 2
-    color: Qt.lighter(shell.panelColor, 1.2); radius: 10
-    border.color: Qt.lighter(shell.panelColor, 1.8)
+    color: Theme.surfaceRaised; radius: Theme.radiusMedium
+    border.color: Theme.border
     MouseArea { anchors.fill: parent }
     Column {
         anchors.fill: parent; anchors.margins: 6; spacing: 2
         Repeater {
             model: shell.power.entries
-            delegate: Button {
+            delegate: FlatButton {
                 id: powerItem
                 required property var modelData
                 required property int index
@@ -38,10 +38,11 @@ Rectangle {
                 width: parent.width; height: 44
                 text: modelData.title
                 focusPolicy: Qt.NoFocus
-                palette.buttonText: shell.textColor
+                palette.buttonText: Theme.text
+                font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+                active: powerMenu.current === index
                 onClicked: powerMenu.run(index)
                 onHoveredChanged: if (hovered) powerMenu.current = index
-                background: Rectangle { color: powerItem.hovered || powerMenu.current === powerItem.index ? Qt.lighter(shell.panelColor, 1.6) : "transparent"; radius: 6 }
             }
         }
     }

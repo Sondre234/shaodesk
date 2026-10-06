@@ -36,22 +36,22 @@ Rectangle {
     width: 220; height: 12 + actions.length * 44 + (actions.length - 1) * 2
     x: Math.max(8, Math.min(panel.contextMenuX, panel.width - width - 8))
     y: panel.onTop ? barItem.y + barItem.height + 8 : barItem.y - height - 8
-    color: shell.panelColor; radius: 10
-    border.color: Qt.lighter(shell.panelColor, 1.6)
+    color: Theme.surface; radius: Theme.radiusMedium
+    border.color: Theme.border
     MouseArea { anchors.fill: parent }
     Column {
         anchors.fill: parent; anchors.margins: 6; spacing: 2
         Repeater {
             model: contextMenu.actions
-            delegate: Button {
+            delegate: FlatButton {
                 required property var modelData
                 objectName: "contextMenuItem"
                 width: parent.width; height: 44
                 text: modelData.text
                 enabled: modelData.enabled !== false
                 opacity: enabled ? 1 : 0.4
-                palette.buttonText: shell.textColor
-                background: Rectangle { color: parent.hovered ? Qt.lighter(shell.panelColor, 1.5) : "transparent"; radius: 6 }
+                palette.buttonText: Theme.text
+                font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
                 // Run before closing, so opening the launcher keeps the surface expanded.
                 onClicked: {
                     // Running an entry can rebuild the entries, destroying this button.
