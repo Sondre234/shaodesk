@@ -196,54 +196,112 @@ PopupCard {
                         color: rowHover.hovered ? Theme.surfaceRaisedHover : Theme.surfaceRaised
                         border.color: n.urgency === 2 ? Theme.danger : "transparent"
                         HoverHandler { id: rowHover }
-                        TapHandler { onTapped: history.center.activate(row.n.notificationId) }
-                        ColumnLayout {
+                        // Under its buttons, which take their own clicks.
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: history.center.activate(row.n.notificationId)
+                        }
+                        RowLayout {
                             id: rowContent
                             x: Theme.spacingL; y: Theme.spacingM
                             width: parent.width - 2 * Theme.spacingL
-                            spacing: Theme.spacingXS
-                            RowLayout {
+                            spacing: Theme.spacingL
+                            // The notification's own picture (a sender's face, a screenshot).
+                            Image {
+                                objectName: "notificationImage"
+                                visible: row.n.hasImage
+                                Layout.alignment: Qt.AlignTop; Layout.topMargin: Theme.spacingXS
+                                Layout.preferredWidth: Theme.rowHeight; Layout.preferredHeight: Theme.rowHeight
+                                sourceSize: Qt.size(2 * Theme.rowHeight, 2 * Theme.rowHeight)
+                                fillMode: Image.PreserveAspectCrop; cache: false
+                                source: row.n.hasImage ? history.iconSource(row.n) : ""
+                            }
+                            ColumnLayout {
                                 Layout.fillWidth: true
-                                spacing: Theme.spacingS
-                                Text {
+                                spacing: Theme.spacingXS
+                                RowLayout {
                                     Layout.fillWidth: true
-                                    text: row.n.summary; textFormat: Text.PlainText
-                                    elide: Text.ElideRight; maximumLineCount: 2; wrapMode: Text.Wrap
-                                    color: Theme.text
-                                    font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
-                                    font.weight: row.n.read ? Font.DemiBold : Font.Bold
-                                }
-                                Text {
-                                    Layout.alignment: Qt.AlignTop
-                                    visible: !rowHover.hovered
-                                    text: history.ago(row.n.time)
-                                    color: Theme.textMuted
-                                    font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily
-                                }
-                                // Shown in the time's place while the pointer is over it.
-                                FlatButton {
-                                    objectName: "removeNotification"
-                                    Layout.alignment: Qt.AlignTop
-                                    Layout.preferredWidth: Theme.iconSize + Theme.spacingS
-                                    Layout.preferredHeight: Theme.iconSize + Theme.spacingS
-                                    Layout.topMargin: -Theme.spacingXS
-                                    opacity: rowHover.hovered ? 1 : 0
-                                    visible: opacity > 0
-                                    Accessible.name: "Dismiss"
-                                    onClicked: history.center.removeFromHistory(row.n.notificationId)
-                                    contentItem: Item {
-                                        Icon { anchors.centerIn: parent; name: "x"; size: Theme.iconSizeSmall; color: Theme.textMuted }
+                                    spacing: Theme.spacingS
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: row.n.summary; textFormat: Text.PlainText
+                                        elide: Text.ElideRight; maximumLineCount: 2; wrapMode: Text.Wrap
+                                        color: Theme.text
+                                        font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+                                        font.weight: row.n.read ? Font.DemiBold : Font.Bold
+                                    }
+                                    Text {
+                                        Layout.alignment: Qt.AlignTop
+                                        visible: !rowHover.hovered
+                                        text: history.ago(row.n.time)
+                                        color: Theme.textMuted
+                                        font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily
+                                    }
+                                    // Shown in the time's place while the pointer is over it.
+                                    FlatButton {
+                                        objectName: "removeNotification"
+                                        Layout.alignment: Qt.AlignTop
+                                        Layout.preferredWidth: Theme.iconSize + Theme.spacingS
+                                        Layout.preferredHeight: Theme.iconSize + Theme.spacingS
+                                        Layout.topMargin: -Theme.spacingXS
+                                        opacity: rowHover.hovered ? 1 : 0
+                                        visible: opacity > 0
+                                        Accessible.name: "Dismiss"
+                                        onClicked: history.center.removeFromHistory(row.n.notificationId)
+                                        contentItem: Item {
+                                            Icon { anchors.centerIn: parent; name: "x"; size: Theme.iconSizeSmall; color: Theme.textMuted }
+                                        }
                                     }
                                 }
-                            }
-                            Text {
-                                Layout.fillWidth: true; visible: text.length > 0
-                                text: row.n.body
-                                color: Theme.textMuted
-                                font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
-                                textFormat: Text.StyledText; linkColor: Theme.accent
-                                wrapMode: Text.Wrap; maximumLineCount: 4; elide: Text.ElideRight
-                                onLinkActivated: (link) => history.center.openLink(link)
+                                Text {
+                                    Layout.fillWidth: true; visible: text.length > 0
+                                    text: row.n.body
+                                    color: Theme.textMuted
+                                    font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+                                    textFormat: Text.StyledText; linkColor: Theme.accent
+                                    wrapMode: Text.Wrap; maximumLineCount: 4; elide: Text.ElideRight
+                                    onLinkActivated: (link) => history.center.openLink(link)
+                                }
+                                // The "value" hint, such as a download's progress.
+                                Rectangle {
+                                    visible: row.n.progress >= 0
+                                    Layout.fillWidth: true; Layout.topMargin: Theme.spacingXS
+                                    Layout.preferredHeight: Theme.spacingS
+                                    radius: height / 2; color: Theme.selected
+                                    Rectangle {
+                                        width: parent.width * Math.max(0, Math.min(100, row.n.progress)) / 100
+                                        height: parent.height; radius: parent.radius; color: Theme.accent
+                                    }
+                                }
+                                // The application's actions, but the default one a click runs.
+                                Flow {
+                                    visible: row.n.actions.length > 0
+                                    Layout.fillWidth: true; Layout.topMargin: Theme.spacingXS
+                                    spacing: Theme.spacingS
+                                    Repeater {
+                                        model: row.n.actions
+                                        Button {
+                                            id: action
+                                            objectName: "notificationHistoryAction"
+                                            required property var modelData
+                                            text: modelData.label
+                                            topPadding: Theme.spacingXS; bottomPadding: Theme.spacingXS
+                                            leftPadding: Theme.spacingL; rightPadding: Theme.spacingL
+                                            onClicked: history.center.invoke(row.n.notificationId, modelData.key)
+                                            background: Rectangle {
+                                                radius: Theme.radiusSmall
+                                                color: action.pressed ? Theme.pressed : action.hovered ? Theme.hover : "transparent"
+                                                border.color: Theme.border
+                                            }
+                                            contentItem: Text {
+                                                text: action.text; textFormat: Text.PlainText
+                                                color: Theme.text
+                                                font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+                                                horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

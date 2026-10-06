@@ -2032,7 +2032,7 @@ int main(int argc, char **argv) {
             std::cerr << "the history is missing or open at start\n";
             return 1;
         }
-        make("Kept one", false);
+        make("Kept one", true);
         make("Kept two", false);
         click(bell);
         if (!QTest::qWaitFor([&] { return history->isVisible(); }) || daemon->unread() != 0) {
@@ -2062,6 +2062,17 @@ int main(int argc, char **argv) {
         click(find(list, "groupToggle"));
         if (!QTest::qWaitFor([&] { return rows().size() == daemon->history()->count(); })) {
             std::cerr << "expanding an application did not list all its notifications\n";
+            return 1;
+        }
+        // An action's button runs it, from the history as from a card.
+        invoked.clear();
+        auto *historyAction = find(list, "notificationHistoryAction");
+        if (!historyAction || historyAction->property("text").toString() != "Yes")
+            return fail("the history has no button for a notification's action");
+        click(historyAction);
+        if (!QTest::qWaitFor([&] { return invoked.count() == 1; }) ||
+            invoked.at(0).at(1).toString() != "yes") {
+            std::cerr << "the history's action button did not run the action\n";
             return 1;
         }
         // The pointer over a notification shows its cross, which removes it.
