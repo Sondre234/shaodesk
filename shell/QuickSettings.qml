@@ -128,7 +128,7 @@ PopupCard {
                     visible: quick.widgets.network === "quick" && quick.status.networkState !== "none"
                     Layout.fillWidth: true; Layout.preferredWidth: 1
                     // Only the state: shaodesk does not manage connections.
-                    interactive: false
+                    status: true
                     glyph: quick.status.networkState === "ethernet" ? "ethernet-port"
                         : quick.status.networkState === "wifi" ? "wifi" : "wifi-off"
                     label: quick.status.networkState === "ethernet" ? "Ethernet"
