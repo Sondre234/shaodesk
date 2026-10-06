@@ -16,7 +16,7 @@ PopupCard {
     initialFocus: null
     onOpened: { search.text = ""; takeFocus() }
     function takeFocus() {
-        if (panel.powerOpen) { powerMenu.current = 0; powerMenu.forceActiveFocus() }
+        if (panel.powerOpen) powerMenu.forceActiveFocus()
         else search.forceActiveFocus()
     }
     Connections {
@@ -141,12 +141,19 @@ PopupCard {
         visible: panel.powerOpen
         onPressed: panel.powerOpen = false
     }
-    // The power menu, above the power button.
+    // The power menu, above the power button and ending where it ends, over the launcher. The
+    // button is the footer's last item, in the corner the layout's margins leave.
     PowerMenu {
         id: powerMenu
         panel: launcher.panel
-        z: 2
-        anchors.right: parent.right; anchors.rightMargin: 14
-        anchors.bottom: parent.bottom; anchors.bottomMargin: 20 + launcherFooter.height + 6
+        parent: launcher.panel.popupLayer
+        z: 1
+        anchorRect: Qt.rect(launcher.x + launcher.width - 20 - powerButton.width,
+                            launcher.y + launcher.height - 20 - powerButton.height,
+                            powerButton.width, powerButton.height)
+        side: Qt.TopEdge
+        alignment: Qt.AlignRight
+        gap: 6
+        bounds: launcher.panel.popupArea
     }
 }
