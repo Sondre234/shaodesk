@@ -92,70 +92,9 @@ Item {
             Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: Theme.barButtonHeight / 2 + Theme.spacingS; color: Theme.divider }
             TaskList { id: taskList; panel: taskbar.panel }
             WorkspaceIndicator { id: workspaceIndicator; panel: taskbar.panel }
-            // The wallpaper picker.
-            FlatButton {
-                id: wallpapersButton
-                objectName: "wallpapersButton"
-                visible: shell.widgets.wallpapers === "bar"
-                Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
-                active: taskbar.panel.audioPopup === "wallpapers"
-                onClicked: taskbar.panel.toggleAudioPopup("wallpapers", wallpapersButton)
-                Accessible.name: "Wallpapers"
-                BarTip { panel: taskbar.panel; owner: wallpapersButton; text: "Wallpapers" }
-                contentItem: Item {
-                    Icon { anchors.centerIn: parent; name: "image"; color: wallpapersButton.active ? Theme.accent : Theme.text }
-                }
-            }
-            // The appearance profile in use; clicking lists the profiles to switch to.
-            FlatButton {
-                id: profilesButton
-                objectName: "profilesButton"
-                visible: shell.widgets.profiles === "bar" && shell.profiles.length > 1
-                Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
-                active: taskbar.panel.audioPopup === "profiles"
-                onClicked: taskbar.panel.toggleAudioPopup("profiles", profilesButton)
-                Accessible.name: "Appearance: " + (shell.profile || "none")
-                BarTip { panel: taskbar.panel; owner: profilesButton; text: "Appearance: " + (shell.profile || "none") }
-                // Three swatches of the profile in use: accent, desktop background, text.
-                contentItem: Item {
-                    Row {
-                        anchors.centerIn: parent; spacing: Theme.spacingXS
-                        Repeater {
-                            model: [shell.accent, shell.background, shell.textColor]
-                            // A ring in the text colour keeps a swatch close to the panel's own
-                            // colour visible.
-                            Rectangle {
-                                required property color modelData
-                                width: 10; height: 10; radius: 5
-                                color: modelData
-                                border.width: 1
-                                border.color: Theme.alpha(Theme.text, 0.5)
-                            }
-                        }
-                    }
-                }
-            }
-            FlatButton {
-                id: tilingToggle
-                objectName: "tilingToggle"
-                visible: shell.widgets.tiling === "bar"
-                Layout.preferredWidth: Theme.barButtonWidth; Layout.preferredHeight: Theme.barButtonHeight
-                enabled: shell.tilingAvailable
-                opacity: enabled ? 1 : 0.4
-                active: taskbar.panel.tiling
-                onClicked: { taskbar.panel.closeMenus(); shell.toggleTiling(taskbar.panel.outputName) }
-                Accessible.name: taskbar.panel.tiling ? "Tiling on" : "Tiling off"
-                BarTip { panel: taskbar.panel; owner: tilingToggle; text: taskbar.panel.tiling ? "Tiling on: click for floating" : "Floating: click to tile" }
-                // On: a split layout in the accent colour. Off: two overlapping windows.
-                contentItem: Item {
-                    FadingIcon {
-                        objectName: "tilingIcon"
-                        anchors.centerIn: parent
-                        name: taskbar.panel.tiling ? "layout-panel-left" : "copy"
-                        color: taskbar.panel.tiling ? Theme.accent : Theme.text
-                    }
-                }
-            }
+            WallpapersButton { id: wallpapersButton; panel: taskbar.panel }
+            ProfilesButton { id: profilesButton; panel: taskbar.panel }
+            TilingButton { panel: taskbar.panel }
             // The system tray: the status icons of applications, in the order they appeared.
             // Passive ones stay hidden, and so does the tray when none is left.
             Row {
