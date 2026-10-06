@@ -147,6 +147,7 @@ int main(int argc, char **argv) {
     int currentWorkspace = 2;
     QStringList switches, requests;
     int layoutSwitches = 0; // "switch_layout next" requests, answered with the second layout
+    bool nightLight = false; // what "night_light_toggle" turns, and the state it then announces
     bool holdSessions = false;
     QString powerRefusal; // what the compositor answers a power action with; "" for ok
     QLocalSocket *pendingSessions = nullptr;
@@ -171,6 +172,12 @@ int main(int argc, char **argv) {
                 client->write("ok\n");
                 client->disconnectFromServer();
                 pickProfile(QString::fromUtf8(request).trimmed().section(' ', 1));
+            } else if (request == "night_light_toggle\n") {
+                requests.push_back("night_light_toggle");
+                nightLight = !nightLight;
+                client->write("ok\n");
+                client->disconnectFromServer();
+                subscriber->write(nightLight ? "night-light on on\n" : "night-light off off\n");
             } else if (request == "switch_layout next\n") {
                 ++layoutSwitches;
                 client->write("ok\n");
@@ -2151,6 +2158,99 @@ int main(int argc, char **argv) {
             std::cerr << "the bell stayed once the setting was gone\n";
             return 1;
         }
+    }
+    // Quick Settings: with the widgets placed in it, a button left of the clock shows their state,
+    // and its flyout holds a tile for each beside night light; the bar keeps none of their own.
+    {
+        const QString quickLua = QString(lua).replace(
+            "shell={", "shell={widgets={network='quick',battery='quick',volume='quick',tiling='quick',"
+                       "profiles='quick',notifications='quick',wallpapers='quick'},");
+        if (!rewrite(quickLua))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        // A battery and a link that is down, as the battery test left the fake sysfs.
+        SystemStatus fake(screens.filePath("sys"));
+        QQmlEngine::setObjectOwnership(&fake, QQmlEngine::CppOwnership);
+        view.rootObject()->setProperty("statusSource", QVariant::fromValue(&fake));
+        auto *button = find(view.rootObject(), "quickSettingsButton");
+        if (!button || !QTest::qWaitFor([&] { return button->isVisible() && button->x() > 0; }))
+            return fail("the Quick Settings button did not appear with widgets placed in it");
+        for (const char *name : {"networkWidget", "batteryWidget", "audioWidget", "tilingToggle",
+                                 "profilesButton", "wallpapersButton", "notificationBell"})
+            if (find(view.rootObject(), name)->isVisible()) {
+                std::cerr << name << " stayed on the bar while placed in Quick Settings\n";
+                return 1;
+            }
+        click(button);
+        auto *quick = find(view.rootObject(), "quickSettings");
+        if (!quick || !QTest::qWaitFor([&] { return inPopover(quick); }))
+            return fail("clicking the Quick Settings button did not open its flyout");
+        auto tile = [&](const QString &name) { return find(quick, "quickTile:" + name); };
+        for (const char *name : {"dnd", "nightLight", "tiling", "profiles", "wallpapers", "network"})
+            if (!tile(name) || !tile(name)->isVisible()) {
+                std::cerr << "Quick Settings has no " << name << " tile\n";
+                return 1;
+            }
+        if (tile("network")->property("label").toString() != "Disconnected" ||
+            tile("network")->property("detail").toString() != "wlan0" ||
+            !find(quick, "quickBattery")->isVisible())
+            return fail("Quick Settings does not show the network and the battery as they are");
+        // Do not disturb, night light (through the compositor) and this monitor's tiling.
+        auto *daemon = controller.notifications();
+        click(tile("dnd"));
+        if (!QTest::qWaitFor([&] { return daemon->dnd() && tile("dnd")->property("checked").toBool(); }))
+            return fail("the do-not-disturb tile did not turn it on");
+        click(tile("dnd"));
+        if (!QTest::qWaitFor([&] { return !daemon->dnd(); }))
+            return fail("the do-not-disturb tile did not turn it off");
+        requests.clear();
+        click(tile("nightLight"));
+        if (!QTest::qWaitFor([&] { return tile("nightLight")->property("checked").toBool(); }) ||
+            requests != QStringList{"night_light_toggle"})
+            return fail("the night light tile did not ask the compositor to toggle it");
+        click(tile("nightLight"));
+        if (!QTest::qWaitFor([&] { return !tile("nightLight")->property("checked").toBool(); }))
+            return fail("the night light tile did not toggle it back");
+        const bool tiled = panelTiling();
+        click(tile("tiling"));
+        if (!QTest::qWaitFor([&] { return panelTiling() != tiled && tile("tiling")->property("checked").toBool() != tiled; }))
+            return fail("the tiling tile did not toggle this monitor's tiling");
+        click(tile("tiling"));
+        if (!QTest::qWaitFor([&] { return panelTiling() == tiled; }))
+            return fail("the tiling tile did not toggle tiling back");
+        // The appearance tile lists the profiles under it; picking one switches to it.
+        click(tile("profiles"));
+        auto *profiles = find(quick, "quickProfiles");
+        if (!profiles || !QTest::qWaitFor([&] { return profiles->isVisible() && profiles->height() > 0; }))
+            return fail("the appearance tile did not list the profiles");
+        requests.clear();
+        QQuickItem *light = nullptr;
+        for (auto *row : profiles->childItems())
+            if (row->property("text").toString() == "light")
+                light = row;
+        if (!light)
+            return fail("the light profile is not listed in Quick Settings");
+        click(light);
+        if (!QTest::qWaitFor([&] { return controller.profile() == "light"; }) ||
+            requests != QStringList{"profile light"})
+            return fail("picking a profile in Quick Settings did not switch to it");
+        controller.pickProfile("dark");
+        if (!QTest::qWaitFor([&] { return controller.profile() == "dark"; }))
+            return fail("the dark profile did not come back");
+        // The wallpaper tile opens the bar's own picker in its place.
+        click(tile("wallpapers"));
+        auto *picker = find(view.rootObject(), "wallpaperPicker");
+        if (!QTest::qWaitFor([&] { return picker && inPopover(picker) && !quick->isVisible(); }))
+            return fail("the wallpaper tile did not open the wallpaper picker");
+        QTest::keyClick(picker->window(), Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the wallpaper picker did not close");
+        view.rootObject()->setProperty("statusSource", QVariant::fromValue(controller.status()));
+        if (!rewrite(lua))
+            return fail("could not restore the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return !button->isVisible(); }))
+            return fail("the Quick Settings button stayed with nothing placed in it");
     }
     // The system tray: hidden while empty, a button for each item shown in the order they came,
     // and clicks and the wheel passed on to the item's application. The items are put in the
