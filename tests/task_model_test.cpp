@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "task_model.hpp"
+#include "window_images.hpp"
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QProcess>
@@ -49,6 +50,11 @@ int main(int argc, char **argv) {
         model.watchPicture(id + 100, 160, true); // no such window
         model.unwatchPicture(id);
         model.unwatchPicture(id); // one more than it was watched
+        // QML asking for a picture that is not there gets an empty one, not an error.
+        QSize served;
+        const QImage none = WindowImages(model).requestImage(QString("%1/1").arg(id), &served, {});
+        if (served != QSize(1, 1) || none.size() != served || none.pixelColor(0, 0).alpha() != 0)
+            throw std::runtime_error("a missing picture was not served as an empty one");
         // Where it is comes from the compositor's window control: its only output, the first
         // workspace, floating since the example configuration does not tile.
         wait([&] { return value(TaskModel::Workspace).toInt() == 1; }, "no workspace arrived");
