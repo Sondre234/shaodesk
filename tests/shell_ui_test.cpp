@@ -280,11 +280,15 @@ int main(int argc, char **argv) {
         // The panel's popups are in the popover's window.
         return item == view.rootObject() ? find(popover->contentItem(), name) : nullptr;
     };
-    // Whether a popup is open and lies inside the popover, the bar's own surface keeping its size.
+    // Whether a popup is open and lies inside the popover, off the bar along its bottom edge, the
+    // bar's own surface keeping its size. A menu's first card stands for it.
     auto inPopover = [&](QQuickItem *popup) {
+        if (auto *card = popup->property("card").value<QQuickItem *>())
+            popup = card;
         const QRectF area = popup->mapRectToScene(QRectF(0, 0, popup->width(), popup->height()));
         return popup->isVisible() && popup->window() == popover && popover->isVisible() &&
-               area.top() >= 0 && area.left() >= 0 && area.bottom() <= popover->height() &&
+               area.top() >= 0 && area.left() >= 0 &&
+               area.bottom() <= popover->height() - view.height() &&
                area.right() <= popover->width() && view.height() == controller.panelExtent();
     };
     // The popups are made on first use, not with the panel.
@@ -826,17 +830,38 @@ int main(int argc, char **argv) {
         std::cerr << "the bar menu did not toggle tiling off\n";
         return 1;
     }
-    // The bar menu's appearance entry lists the profiles in its place; picking one switches.
+    // The bar menu's appearance entry opens the profiles beside it, the one in use marked, and
+    // the menu stays; picking one switches.
     QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, empty);
-    if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Appearance: dark …"); })) {
+    if (!QTest::qWaitFor([&] {
+            return menuShown() && menuItem("Appearance") &&
+                   menuItem("Appearance")->property("modelData").toMap()["secondary"] == "dark";
+        })) {
         std::cerr << "the bar menu lacks the appearance profiles\n";
         return 1;
     }
-    click(menuItem("Appearance: dark …"));
+    // The card a row is on, and whether one card lies right of another.
+    auto cardOf = [](QQuickItem *row) {
+        while (row && !row->property("anchorRect").isValid())
+            row = row->parentItem();
+        return row;
+    };
+    auto beside = [](QQuickItem *left, QQuickItem *right) {
+        const QRectF a = left->mapRectToScene(QRectF(0, 0, left->width(), left->height()));
+        const QRectF b = right->mapRectToScene(QRectF(0, 0, right->width(), right->height()));
+        return b.left() >= a.right() - 1 && b.top() < a.bottom() && b.bottom() > a.top();
+    };
+    click(menuItem("Appearance"));
     if (!QTest::qWaitFor([&] {
-            return menuShown() && menuItem("‹ Back") && menuItem("✓ dark") && menuItem("light");
-        }) || menuItem("Applications")) {
-        std::cerr << "the appearance entry did not list the profiles\n";
+            return menuShown() && menuItem("dark") && menuItem("light") && menuItem("Applications") &&
+                   menuItem("dark")->property("marked").toBool() &&
+                   !menuItem("light")->property("marked").toBool() &&
+                   menuItem("Appearance")->property("expanded").toBool() &&
+                   cardOf(menuItem("dark")) != cardOf(menuItem("Applications")) &&
+                   beside(cardOf(menuItem("Applications")), cardOf(menuItem("dark"))) &&
+                   inPopover(cardOf(menuItem("dark")));
+        })) {
+        std::cerr << "the appearance entry did not open the profiles beside the menu\n";
         return 1;
     }
     click(menuItem("light"));
@@ -851,9 +876,80 @@ int main(int argc, char **argv) {
     }
     requests.clear();
     QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, empty);
-    if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Appearance: light …"); }) ||
-        menuItem("‹ Back")) {
-        std::cerr << "the bar menu did not open on its own entries with the new profile\n";
+    if (!QTest::qWaitFor([&] {
+            return menuShown() && menuItem("Appearance") && !menuItem("dark") &&
+                   menuItem("Appearance")->property("modelData").toMap()["secondary"] == "light";
+        })) {
+        std::cerr << "the bar menu did not open without its submenu, with the new profile\n";
+        return 1;
+    }
+    // The keyboard: nothing is highlighted after a right click; Down and Up move, wrapping and
+    // skipping nothing that can be chosen; End and Home go to the ends; Right opens a submenu at
+    // its first entry, Left closes it; Escape closes a submenu, then the menu.
+    {
+        auto highlighted = [&] {
+            QStringList rows;
+            std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
+                for (auto *child : item->childItems()) {
+                    if (child->objectName() == "contextMenuItem" && child->isVisible() &&
+                        child->property("highlighted").toBool())
+                        rows << child->property("text").toString();
+                    walk(child);
+                }
+            };
+            walk(menu);
+            return rows.join("|");
+        };
+        auto key = [&](Qt::Key key, const QString &expected) {
+            QTest::keyClick(popover, key);
+            return QTest::qWaitFor([&] { return highlighted() == expected; }, 1000);
+        };
+        if (!highlighted().isEmpty() || !key(Qt::Key_Down, "Turn tiling on") ||
+            !key(Qt::Key_Up, "Appearance") || !key(Qt::Key_Up, "Show desktop") ||
+            !key(Qt::Key_Home, "Turn tiling on") || !key(Qt::Key_End, "Appearance") ||
+            !key(Qt::Key_Down, "Turn tiling on")) {
+            std::cerr << "the arrows, Home and End did not move through the bar menu: "
+                      << highlighted().toStdString() << '\n';
+            return 1;
+        }
+        if (!key(Qt::Key_End, "Appearance") || !key(Qt::Key_Right, "Appearance|dark") ||
+            !key(Qt::Key_Down, "Appearance|light") || !key(Qt::Key_Down, "Appearance|dark") ||
+            !key(Qt::Key_Left, "Appearance") || menuItem("dark")) {
+            std::cerr << "Right and Left did not open and close the submenu: "
+                      << highlighted().toStdString() << '\n';
+            return 1;
+        }
+        if (!key(Qt::Key_Return, "Appearance|dark") || !key(Qt::Key_Escape, "Appearance") ||
+            !view.rootObject()->property("barMenuOpen").toBool()) {
+            std::cerr << "Enter did not open the submenu, or Escape closed more than it\n";
+            return 1;
+        }
+        QTest::keyClick(popover, Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !view.rootObject()->property("menuOpen").toBool(); })) {
+            std::cerr << "Escape did not close the bar menu\n";
+            return 1;
+        }
+    }
+    // The pointer resting on a submenu's entry opens it, and resting on another closes it; the
+    // pointer crossing other entries on its way into the submenu leaves it open.
+    QTest::mouseClick(&view, Qt::RightButton, Qt::NoModifier, empty);
+    if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Appearance") && !menuItem("dark"); }))
+        return fail("the bar menu did not open again");
+    QTest::mouseMove(popover, centre(menuItem("Appearance")));
+    if (!QTest::qWaitFor([&] { return menuItem("dark") && menuItem("dark")->isVisible(); })) {
+        std::cerr << "resting on the appearance entry did not open its submenu\n";
+        return 1;
+    }
+    QTest::mouseMove(popover, centre(menuItem("Show desktop")));
+    QTest::mouseMove(popover, centre(menuItem("light")));
+    QTest::qWait(400);
+    if (!menuItem("light") || !menuItem("Appearance")->property("expanded").toBool()) {
+        std::cerr << "crossing another entry into the submenu closed it\n";
+        return 1;
+    }
+    QTest::mouseMove(popover, centre(menuItem("Show desktop")));
+    if (!QTest::qWaitFor([&] { return !menuItem("light"); })) {
+        std::cerr << "resting on another entry did not close the submenu\n";
         return 1;
     }
     click(menuItem("Show desktop"));

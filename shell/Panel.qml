@@ -23,8 +23,6 @@ Item {
     property string taskMenuApp: ""
     property var pinMenuApp: null
     property bool barMenuOpen: false
-    // The bar menu shows the appearance profiles instead of its own entries.
-    property bool profileMenu: false
     property real contextMenuX: 0
     // The windows the taskbar shows; a stand-in model replaces it in tests.
     property var taskSource: shell.tasks
@@ -116,7 +114,6 @@ Item {
         if (taskId >= 0) { taskMenuId = taskId; taskMenuApp = shell.appFor(app || ""); pinMenuApp = null; barMenuOpen = false }
         else if (app) { pinMenuApp = app; taskMenuId = -1; barMenuOpen = false }
         else { barMenuOpen = true; taskMenuId = -1; pinMenuApp = null }
-        profileMenu = false
         launcherOpen = false; audioPopup = ""; trayMenuKey = ""
     }
     // Opens (or, when it is already open, closes) one of the volume control's popups.
@@ -152,10 +149,14 @@ Item {
             togglePowerMenu()
             return powerOpen
         case "bar-menu":
-        case "profile-menu":
             openContextMenu(bar, bar.width / 2, -1)
-            profileMenu = name === "profile-menu"
             return true
+        case "bar-submenu":
+            // The appearance profiles beside the bar menu, once its rows are laid out.
+            openContextMenu(bar, bar.width / 2, -1)
+            previewSubmenu.menu = contextMenuLoader
+            previewSubmenu.start()
+            return shell.profiles.length > 0
         case "task-menu":
             var task = taskList.itemAtIndex(0)
             if (task)
@@ -204,6 +205,12 @@ Item {
             return bell.visible
         }
         return false
+    }
+    Timer {
+        id: previewSubmenu
+        property Loader menu
+        interval: 50
+        onTriggered: if (menu.item) menu.item.openSubmenu(menu.item.entries.length - 1)
     }
     // Where a tray item's icon is on the screen, which some applications place a window by: the
     // panel spans its output's width, at its top or bottom edge.
