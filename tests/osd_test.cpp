@@ -210,6 +210,36 @@ class OsdTest : public QObject {
         light.refresh();
         QCOMPARE(changed.count(), 1);
     }
+    // Set from Quick Settings: the level shows at once, and in a sysfs tree of a test's own the
+    // brightness file is written; the kernel's report that follows brings no on-screen display.
+    void backlightSet() {
+        QTemporaryDir sys;
+        write(sys.filePath("class/backlight/intel_backlight/max_brightness"), "96000\n");
+        write(sys.filePath("class/backlight/intel_backlight/brightness"), "48000\n");
+        Backlight light(sys.path());
+        QCOMPARE(light.name(), QString("intel_backlight"));
+        QSignalSpy level(&light, &Backlight::levelChanged);
+        QSignalSpy changed(&light, &Backlight::changed);
+        QSignalSpy failed(&light, &Backlight::failed);
+        light.setPercent(25);
+        QCOMPARE(light.percent(), 25);
+        QCOMPARE(level.count(), 1);
+        QFile file(sys.filePath("class/backlight/intel_backlight/brightness"));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll().trimmed(), QByteArray("24000"));
+        light.refresh();
+        QCOMPARE(changed.count(), 0);
+        light.setPercent(140);
+        QCOMPARE(light.percent(), 100);
+        QCOMPARE(failed.count(), 0);
+        // Without a backlight there is nothing to set.
+        QTemporaryDir empty;
+        Backlight none(empty.path());
+        QSignalSpy noneLevel(&none, &Backlight::levelChanged);
+        none.setPercent(50);
+        QCOMPARE(none.percent(), -1);
+        QCOMPARE(noneLevel.count(), 0);
+    }
     void uevents() {
         QVERIFY(Backlight::relevantUevent(QByteArray("ACTION=change\0SUBSYSTEM=backlight\0", 34)));
         QVERIFY(!Backlight::relevantUevent(QByteArray("ACTION=change\0SUBSYSTEM=power_supply\0", 38)));
