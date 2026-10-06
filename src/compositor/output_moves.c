@@ -66,7 +66,16 @@ static void relocate_toplevel(struct sh_toplevel *toplevel, struct wlr_box from,
     if (was_tiled && tile && wants_tiling(toplevel, to)) {
         tile_toplevel_at(toplevel, to, NULL, false, 0, 0);
     } else if (was_tiled) {
-        restore_toplevel(toplevel); // floats where it was
+        // It floats where it floated before, moved over above, or where its tile is when it
+        // opened tiled; not by restore_toplevel, which places it by where its tile still is.
+        struct wlr_box floating = toplevel->restore_box;
+        if (floating.width <= 0 || floating.height <= 0) {
+            floating.x = box.x;
+            floating.y = box.y;
+        }
+        toplevel->arranged = false;
+        toplevel_set_states(toplevel, false, 0);
+        toplevel_configure_box(toplevel, floating);
     } else if (toplevel_mapped(toplevel)) {
         place_on_output(toplevel, to, box);
     }
