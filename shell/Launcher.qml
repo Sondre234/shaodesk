@@ -29,9 +29,9 @@ Rectangle {
     anchors.left: parent.left
     anchors.leftMargin: 12 + shell.panelMarginLeft
     y: panel.onTop ? barItem.y + barItem.height + 10 : barItem.y - height - 10
-    color: shell.panelColor
-    border.color: Qt.lighter(shell.panelColor, 1.65)
-    radius: 14
+    color: Theme.surface
+    border.color: Theme.border
+    radius: Theme.radiusLarge
     MouseArea { anchors.fill: parent }
     ColumnLayout {
         anchors.fill: parent
@@ -39,13 +39,13 @@ Rectangle {
         spacing: 14
         RowLayout {
             Layout.fillWidth: true
-            Text { text: "Applications"; color: shell.textColor; font.pixelSize: 21; font.weight: Font.DemiBold; font.family: panel.uiFont }
+            Text { text: "Applications"; color: Theme.text; font.pixelSize: Theme.fontSizeDisplay; font.weight: Font.DemiBold; font.family: Theme.fontFamily }
             Item { Layout.fillWidth: true }
-            Button {
+            FlatButton {
                 text: "Refresh"
                 onClicked: shell.refreshApps()
-                palette.buttonText: shell.textColor
-                background: Rectangle { color: parent.hovered ? "#304058" : "transparent"; radius: 6 }
+                palette.buttonText: Theme.text
+                font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
             }
         }
         TextField {
@@ -54,15 +54,15 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 42
             placeholderText: "Search applications"
-            placeholderTextColor: Qt.darker(shell.textColor, 1.5)
-            color: shell.textColor
+            placeholderTextColor: Theme.textMuted
+            color: Theme.text
             selectByMouse: true
             leftPadding: 12
-            font.pixelSize: 14; font.family: panel.uiFont
+            font.pixelSize: Theme.fontSizeLarge; font.family: Theme.fontFamily
             background: Rectangle {
-                radius: 7
-                color: Qt.darker(shell.panelColor, 1.2)
-                border.color: search.activeFocus ? shell.accent : Qt.lighter(shell.panelColor, 1.7)
+                radius: Theme.radiusSmall
+                color: Theme.surfaceRaised
+                border.color: search.activeFocus ? Theme.accent : Theme.border
             }
             onAccepted: {
                 if (applications.count > 0 && shell.launch(applications.model[0].appId)) panel.closeMenus()
@@ -79,17 +79,16 @@ Rectangle {
                 return (app.name + " " + app.appId).toLowerCase().indexOf(search.text.toLowerCase()) >= 0
             })
             ScrollBar.vertical: ScrollBar {}
-            delegate: Button {
+            delegate: FlatButton {
                 required property var modelData
                 width: ListView.view.width - 10
                 height: 48
                 onClicked: { if (shell.launch(modelData.appId)) panel.closeMenus() }
-                background: Rectangle { radius: 7; color: parent.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent" }
                 contentItem: RowLayout {
                     spacing: 12
-                    Image { source: "image://icons/" + modelData.icon; sourceSize: Qt.size(30, 30); Layout.preferredWidth: 30; Layout.preferredHeight: 30 }
-                    Text { text: modelData.name; textFormat: Text.PlainText; color: shell.textColor; font.pixelSize: 14; elide: Text.ElideRight; Layout.fillWidth: true; font.family: panel.uiFont }
-                    Text { visible: modelData.configured; text: "Pinned"; color: shell.accent; font.pixelSize: 10; font.family: panel.uiFont }
+                    Image { source: "image://icons/" + modelData.icon; sourceSize: Qt.size(Theme.appIconSizeLarge, Theme.appIconSizeLarge); Layout.preferredWidth: Theme.appIconSizeLarge; Layout.preferredHeight: Theme.appIconSizeLarge }
+                    Text { text: modelData.name; textFormat: Text.PlainText; color: Theme.text; font.pixelSize: Theme.fontSizeLarge; elide: Text.ElideRight; Layout.fillWidth: true; font.family: Theme.fontFamily }
+                    Text { visible: modelData.configured; text: "Pinned"; color: Theme.accent; font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily }
                     // Installed applications pin and unpin here; shown while hovered or pinned.
                     Button {
                         id: pinToggle
@@ -99,13 +98,13 @@ Rectangle {
                         Accessible.name: (modelData.pinned ? "Unpin " : "Pin ") + modelData.name + (modelData.pinned ? " from" : " to") + " taskbar"
                         onClicked: modelData.pinned ? shell.unpin(modelData.appId) : shell.pin(modelData.appId)
                         Layout.preferredHeight: 26
-                        font.pixelSize: 11; font.family: panel.uiFont
-                        palette.buttonText: modelData.pinned ? shell.accent : shell.textColor
-                        background: Rectangle { radius: 5; color: pinToggle.hovered ? Qt.lighter(shell.panelColor, 1.9) : "transparent"; border.color: Qt.lighter(shell.panelColor, 1.9) }
+                        font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+                        palette.buttonText: modelData.pinned ? Theme.accent : Theme.text
+                        background: Rectangle { radius: Theme.radiusSmall; color: pinToggle.hovered ? Theme.hover : "transparent"; border.color: Theme.border }
                     }
                 }
             }
-            Text { anchors.centerIn: parent; visible: applications.count === 0; text: "No matching applications"; color: shell.textColor; font.family: panel.uiFont }
+            Text { anchors.centerIn: parent; visible: applications.count === 0; text: "No matching applications"; color: Theme.textMuted; font.family: Theme.fontFamily }
         }
         RowLayout {
             id: launcherFooter
@@ -113,26 +112,25 @@ Rectangle {
             Text {
                 Layout.fillWidth: true
                 text: "shaodesk"
-                color: Qt.darker(shell.textColor, 1.7)
-                font.pixelSize: 11; font.family: panel.uiFont
+                color: Theme.textMuted
+                font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
             }
             // Lock, suspend and the rest, as far as the compositor says they may run.
-            Button {
+            FlatButton {
                 id: powerButton
                 objectName: "powerButton"
                 visible: shell.widgets.power && shell.power.available.length > 0
                 Layout.preferredWidth: 36; Layout.preferredHeight: 36
+                active: launcher.panel.powerOpen
                 onClicked: panel.powerOpen = !panel.powerOpen
                 Accessible.name: "Power"
-                ToolTip.text: "Lock, suspend, power off"
-                ToolTip.visible: hovered && !panel.powerOpen
-                ToolTip.delay: 500
-                background: Rectangle {
-                    radius: 7
-                    color: panel.powerOpen ? Qt.lighter(shell.panelColor, 1.8) : (powerButton.hovered ? Qt.lighter(shell.panelColor, 1.55) : "transparent")
+                BarTip {
+                    panel: launcher.panel; owner: powerButton
+                    visible: powerButton.hovered && !launcher.panel.powerOpen
+                    text: "Lock, suspend, power off"
                 }
                 contentItem: Item {
-                    Icon { anchors.centerIn: parent; name: "power"; color: panel.powerOpen ? shell.accent : shell.textColor }
+                    Icon { anchors.centerIn: parent; name: "power"; color: panel.powerOpen ? Theme.accent : Theme.text }
                 }
             }
         }
