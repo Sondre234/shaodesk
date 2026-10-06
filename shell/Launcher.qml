@@ -5,35 +5,33 @@ import QtQuick.Layouts
 
 // The application menu: a search field over the installed applications, which pin and unpin
 // from here, and the power button in its bottom-right corner with its menu.
-Rectangle {
+PopupCard {
     id: launcher
     required property var panel
     required property Item barItem
     parent: panel.popupLayer
     objectName: "launcher"
-    visible: panel.launcherOpen
-    function opened() { search.text = ""; takeFocus() }
+    open: panel.launcherOpen
     // The keyboard goes to the power menu while it is open, else to the search field.
+    initialFocus: null
+    onOpened: { search.text = ""; takeFocus() }
     function takeFocus() {
         if (panel.powerOpen) { powerMenu.current = 0; powerMenu.forceActiveFocus() }
         else search.forceActiveFocus()
     }
-    onVisibleChanged: if (visible) opened()
-    Component.onCompleted: if (visible) opened()
     Connections {
         target: launcher.panel
-        function onPowerOpenChanged() { if (launcher.visible) launcher.takeFocus() }
+        function onPowerOpenChanged() { if (launcher.open) launcher.takeFocus() }
     }
-    width: Math.min(460, panel.width - 24)
-    // Up to 720 pixels, as the output leaves room for beside the bar.
-    height: Math.min(720, panel.popupLayer.height - shell.panelExtent - 20)
-    anchors.left: parent.left
-    anchors.leftMargin: 12 + shell.panelMarginLeft
-    y: panel.onTop ? panel.barBottom + 10 : panel.barTop - height - 10
-    color: Theme.surface
-    border.color: Theme.border
+    // By the bar's start, up to 720 pixels tall as the output leaves room for.
+    implicitWidth: 460
+    implicitHeight: 720
+    anchorRect: panel.barAnchor(12 + shell.panelMarginLeft, 0)
+    alignment: Qt.AlignLeft
+    side: panel.popupSide
+    gap: 10
+    margin: 10
     radius: Theme.radiusLarge
-    MouseArea { anchors.fill: parent }
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 20
