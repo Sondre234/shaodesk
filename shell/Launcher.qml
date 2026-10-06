@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 import QtQuick.Controls.Basic
-import QtQuick.Layouts
 
 // The start menu, after Windows 11's: a search field on top, the applications under it, and
 // along the bottom who is logged in and the power button, in the bottom-right corner, with its
