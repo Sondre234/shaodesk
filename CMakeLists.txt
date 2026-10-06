@@ -124,8 +124,9 @@ if(SHAODESK_BUILD_COMPOSITOR)
     find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
     set(WLR_PROTOCOL_HEADERS)
     set(WLR_CLIENT_PROTOCOL_SOURCES)
+    # wlroots implements the wlr protocols; shaodesk-window-control-v1 is the compositor's own.
     foreach(PROTOCOL wlr-layer-shell-unstable-v1 wlr-foreign-toplevel-management-unstable-v1
-            wlr-output-management-unstable-v1)
+            wlr-output-management-unstable-v1 shaodesk-window-control-v1)
         add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-protocol.h
             COMMAND ${WAYLAND_SCANNER} server-header
             ${CMAKE_CURRENT_SOURCE_DIR}/protocols/${PROTOCOL}.xml
@@ -187,6 +188,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
     )
     add_executable(shaodesk src/main.cpp ${SHAODESK_COMPOSITOR_SOURCES} src/decoration.c src/animation.c src/effects_scene.c src/sleep.c src/login1.c
         ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.h ${WLR_PROTOCOL_HEADERS})
+    # The compositor's own protocol names a taskbar handle, whose interface wlroots keeps to
+    # itself: both interfaces are compiled in here.
+    target_sources(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c
+        ${CMAKE_CURRENT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c)
     target_sources(shaodesk PRIVATE src/overview_scene.c)
     target_include_directories(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_compile_definitions(shaodesk PRIVATE WLR_USE_UNSTABLE)
