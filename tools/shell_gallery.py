@@ -157,6 +157,9 @@ def prepare(root, theme_name):
             entry += f"\n[Desktop Action {action}]\nName={title}\nExec=true\n"
             entry += f"Icon={action_icon}\n" if action_icon else ""
         (data / "applications" / f"{desktop_id}.desktop").write_text(entry)
+    # One of them pinned from the shell, without a window, so that pin-menu has actions to show.
+    (root / "state" / "shaodesk").mkdir(parents=True)
+    (root / "state" / "shaodesk" / "pinned").write_text("thunderbird.desktop\n")
     # The applications are the ones above, but the icons are the desktop's: the user's and the
     # system's icon folders are linked into the private data folders.
     home = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share")

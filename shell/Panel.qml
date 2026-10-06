@@ -172,7 +172,11 @@ Item {
                 openContextMenu(task, 0, task.taskId, task.appId)
             return task !== null
         case "pin-menu":
+            // An installed application's slot when there is one, whose menu has more to show.
             var slot = pinnedSlots.itemAt(0)
+            for (i = pinnedSlots.count - 1; i >= 0; --i)
+                if (!pinnedSlots.itemAt(i).modelData.configured)
+                    slot = pinnedSlots.itemAt(i)
             if (slot)
                 openContextMenu(slot, 0, -1, slot.modelData)
             return slot !== null
