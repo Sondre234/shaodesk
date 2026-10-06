@@ -2015,8 +2015,9 @@ int main(int argc, char **argv) {
             std::cerr << "a passive tray item stayed\n";
             return 1;
         }
-        // An item's menu opens on a right press, by the item and inside the grown surface; a
-        // submenu's entries take its place with a way back, and picking an entry closes it.
+        // An item's menu opens on a right press, above the item in the popover; a submenu opens
+        // beside its entry, the menu staying, and picking an entry closes it. The application
+        // hears of each level as it opens and closes.
         auto menuEntry = [](QVariantMap properties, std::vector<int> children = {}) {
             TrayMenuEntry entry;
             entry.properties = std::move(properties);
@@ -2107,18 +2108,20 @@ int main(int argc, char **argv) {
         }
         click(trayEntry("More"));
         if (!QTest::qWaitFor([&] {
-                return trayLabels() == QStringList{"‹ Back", "Deep", "Radio"} && opened.size() == 2 &&
-                       closed.size() == 1;
+                return trayEntry("Deep") && trayEntry("Radio") && trayEntry("Open") &&
+                       trayEntry("More")->property("expanded").toBool() && opened.size() == 2;
             }) ||
-            opened[1] != QVariantList{"menu", 3} || closed[0] != QVariantList{"menu", 0} ||
+            opened[1] != QVariantList{"menu", 3} || !closed.isEmpty() ||
             !trayEntry("Deep")->property("modelData").toMap()["checked"].toBool() ||
             trayEntry("Radio")->property("modelData").toMap()["checked"].toBool()) {
-            std::cerr << "a tray submenu did not open in place: " << trayLabels().join("|").toStdString() << '\n';
+            std::cerr << "a tray submenu did not open beside its entry: " << trayLabels().join("|").toStdString() << '\n';
             return 1;
         }
-        click(trayEntry("‹ Back"));
-        if (!QTest::qWaitFor([&] { return trayLabels() == QStringList{"Open", "More", "Disabled"} && opened.size() == 3; })) {
-            std::cerr << "going back in a tray menu did not show its top\n";
+        QTest::keyClick(popover, Qt::Key_Left);
+        if (!QTest::qWaitFor([&] { return !trayEntry("Deep") && closed.size() == 1; }) ||
+            closed[0] != QVariantList{"menu", 3} || !trayMenuShown() ||
+            trayLabels() != QStringList{"Open", "More", "Disabled"}) {
+            std::cerr << "closing a tray submenu did not tell its application, or closed the menu\n";
             return 1;
         }
         // The application changing the menu while it is open shows at once.
@@ -2130,11 +2133,15 @@ int main(int argc, char **argv) {
             std::cerr << "a tray menu did not follow its application's change\n";
             return 1;
         }
+        // Picked with a submenu open, both levels close, the deeper first.
+        click(trayEntry("More"));
+        if (!QTest::qWaitFor([&] { return trayEntry("Deep") && opened.size() == 3; }))
+            return fail("the tray submenu did not open again");
         click(trayEntry("Reopen"));
         if (!QTest::qWaitFor([&] { return picked.size() == 1 && !menuOpen(); }) ||
             picked[0] != QVariantList{"menu", 1} ||
             !QTest::qWaitFor([&] { return !popover->isVisible() && closed.size() == 3; }) ||
-            closed.last() != QVariantList{"menu", 0}) {
+            closed[1] != QVariantList{"menu", 3} || closed[2] != QVariantList{"menu", 0}) {
             std::cerr << "picking a tray menu entry did not reach the item and close the menu\n";
             return 1;
         }
@@ -2148,7 +2155,7 @@ int main(int argc, char **argv) {
             std::cerr << "a left click on a tray item that is only a menu did not open it\n";
             return 1;
         }
-        // The surface is taller while the menu is open, the bar at its bottom.
+        // A second right click closes it.
         click(trayButton("menu"), Qt::RightButton);
         if (!QTest::qWaitFor([&] { return !menuOpen(); })) {
             std::cerr << "a second right click did not close the tray menu\n";

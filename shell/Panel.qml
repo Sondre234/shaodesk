@@ -33,11 +33,8 @@ Item {
     property var statusSource: shell.status
     property string audioPopup: ""
     property real audioPopupX: 0
-    // A tray item's menu: the item it belongs to ("" while closed), the entry whose children it
-    // lists (0 for the top), and the entries passed through to get there, to go back to.
+    // A tray item's menu: the item it belongs to ("" while closed), and where its icon is.
     property string trayMenuKey: ""
-    property int trayMenuParent: 0
-    property var trayMenuTrail: []
     property real trayMenuX: 0
     // Bumped when the open menu's item changes its entries, so they are read again.
     property int trayMenuRevision: 0
@@ -152,7 +149,7 @@ Item {
             openContextMenu(bar, bar.width / 2, -1)
             return true
         case "bar-submenu":
-            // The appearance profiles beside the bar menu, once its rows are laid out.
+            // The appearance profiles beside the bar menu.
             openContextMenu(bar, bar.width / 2, -1)
             previewSubmenu.menu = contextMenuLoader
             previewSubmenu.start()
@@ -181,9 +178,14 @@ Item {
                 }
             return false
         case "tray-menu":
+        case "tray-submenu":
             for (i = 0; i < tray.children.length; ++i)
                 if (tray.children[i].hasMenu) {
                     trayMenu(tray.children[i])
+                    if (name === "tray-submenu") {
+                        previewSubmenu.menu = trayMenuLoader
+                        previewSubmenu.start()
+                    }
                     return true
                 }
             return false
@@ -206,11 +208,19 @@ Item {
         }
         return false
     }
+    // For a preview: opens the first submenu of a menu just opened, once its rows are laid out.
     Timer {
         id: previewSubmenu
         property Loader menu
         interval: 50
-        onTriggered: if (menu.item) menu.item.openSubmenu(menu.item.entries.length - 1)
+        onTriggered: {
+            var entries = menu.item ? menu.item.entries : []
+            for (var i = 0; i < entries.length; ++i)
+                if (entries[i].submenu) {
+                    menu.item.openSubmenu(i)
+                    return
+                }
+        }
     }
     // Where a tray item's icon is on the screen, which some applications place a window by: the
     // panel spans its output's width, at its top or bottom edge.
@@ -251,49 +261,46 @@ Item {
             return
         }
         trayMenuX = button.mapToItem(root, button.width / 2, 0).x
-        trayMenuTrail = []
-        trayMenuParent = 0
         trayMenuKey = button.key
         launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false
     }
-    // An entry picked: a submenu shows its entries in place, "Back" returns, anything else is
-    // the application's to carry out, and the menu closes.
-    function trayMenuPick(entry) {
-        if (entry.back) {
-            var trail = trayMenuTrail.slice()
-            trayMenuParent = trail.pop()
-            trayMenuTrail = trail
-        } else if (entry.submenu) {
-            trayMenuTrail = trayMenuTrail.concat([trayMenuParent])
-            trayMenuParent = entry.id
-        } else {
-            shell.tray.clickMenu(trayMenuKey, entry.id)
-            trayMenuKey = ""
-        }
+    // The entries of item `key`'s menu entry `parent` (0 for the top), as a PopupMenu lists them:
+    // an entry with children opens them beside it, read as it opens; any other is the
+    // application's to carry out. `revision` only makes a binding read them again when it changes.
+    function trayEntries(key, parent, revision) {
+        if (key === "")
+            return []
+        var entries = shell.tray.menu(key, parent).map(function(entry) {
+            if (entry.separator)
+                return { separator: true }
+            return { id: entry.id, text: entry.label, icon: entry.icon, enabled: entry.enabled,
+                     toggle: entry.toggle, checked: entry.checked,
+                     submenu: entry.submenu ? function() { return root.trayEntries(key, entry.id, root.trayMenuRevision) }
+                                            : undefined,
+                     run: entry.submenu ? undefined : function() { shell.tray.clickMenu(key, entry.id) } }
+        })
+        return entries.length > 0 ? entries : [{ text: "No entries", enabled: false }]
     }
-    // The entries shown; `revision` only makes the binding read them again when it changes.
-    function trayEntries(key, parent, trail, revision) {
-        var entries = key === "" ? [] : shell.tray.menu(key, parent)
-        return trail.length > 0 ? [{ id: -2, back: true, label: "\u2039 Back", enabled: true, separator: false,
-                                     toggle: "", checked: false, icon: "", submenu: false }].concat(entries)
-                                : entries
-    }
-    // The application is told which level of its menu is on screen (AboutToShow and "opened")
-    // and when it no longer is ("closed"), once a change has settled.
-    property string trayShownKey: ""
-    property int trayShownParent: 0
+    // The application is told which levels of its menu are on screen (AboutToShow and "opened"
+    // for each that appears) and which no longer are ("closed", the deepest first), once a change
+    // has settled: what it was told, as {key, id}.
+    property var trayShown: []
     function syncTrayMenu() {
-        if (trayShownKey === trayMenuKey && trayShownParent === trayMenuParent)
-            return
-        if (trayShownKey !== "")
-            shell.tray.closeMenu(trayShownKey, trayShownParent)
-        trayShownKey = trayMenuKey
-        trayShownParent = trayMenuParent
-        if (trayMenuKey !== "")
-            shell.tray.openMenu(trayMenuKey, trayMenuParent)
+        var menu = trayMenuLoader.item
+        var wanted = trayMenuKey === "" ? [] : [0].concat(menu ? menu.openEntries.map(function(entry) { return entry.id }) : [])
+        wanted = wanted.map(function(id) { return { key: trayMenuKey, id: id } })
+        function among(list, level) {
+            return list.some(function(other) { return other.key === level.key && other.id === level.id })
+        }
+        for (var i = trayShown.length - 1; i >= 0; --i)
+            if (!among(wanted, trayShown[i]))
+                shell.tray.closeMenu(trayShown[i].key, trayShown[i].id)
+        for (i = 0; i < wanted.length; ++i)
+            if (!among(trayShown, wanted[i]))
+                shell.tray.openMenu(wanted[i].key, wanted[i].id)
+        trayShown = wanted
     }
     onTrayMenuKeyChanged: Qt.callLater(syncTrayMenu)
-    onTrayMenuParentChanged: Qt.callLater(syncTrayMenu)
     Connections {
         target: shell.tray
         function onActivationRefused(key) {
@@ -458,8 +465,7 @@ Item {
                 sourceComponent: Component { TaskbarMenu { panel: root; barItem: bar } }
             }
 
-            // A tray item's menu, in the style of the bar's own: a submenu's entries take the place of
-            // the menu's, with a way back, as the bar menu's appearance entry does. A long one scrolls.
+            // A tray item's menu, in the style of the bar's own, its submenus beside it.
             Loader {
                 id: trayMenuLoader
                 asynchronous: root.trayMenuKey === ""

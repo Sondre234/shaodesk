@@ -158,13 +158,13 @@ with harness.Compositor(compositor, CONFIG, bus=True, start=False) as desktop:
         first_out.expect(r"scroll -?\d+ vertical")
 
         # A right click opens the menu above the icon; the application hears of it. Its
-        # last entry ("Quit", id 6) is the row just above the menu's bottom edge, 8 pixels
-        # over the bar.
+        # last entry ("Quit", id 6) is the 36 pixel row just above the menu's bottom edge, inside
+        # its 4 pixels of padding, 8 pixels over the bar.
         pointer("click", "right")
         first_out.expect("abouttoshow 0")
         first_out.expect("event 0 opened")
         bar_top = y - PANEL_HEIGHT // 2
-        quit_row = bar_top - 8 - 6 - 34 // 2
+        quit_row = bar_top - 8 - 4 - 36 // 2
         wait_for(lambda: panel_at(x, quit_row), "the menu drawn")
         approach(x, quit_row)
         pointer("click", "left")
