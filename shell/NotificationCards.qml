@@ -292,31 +292,12 @@ Item {
                         columnSpacing: Theme.spacingM; rowSpacing: Theme.spacingM
                         Repeater {
                             model: entry.actions
-                            delegate: Button {
-                                id: action
+                            delegate: PushButton {
                                 required property var modelData
                                 objectName: "notificationAction"
                                 text: modelData.label
                                 Layout.fillWidth: true; Layout.preferredWidth: 1
-                                implicitHeight: Theme.rowHeight - Theme.spacingS
-                                padding: Theme.spacingS; leftPadding: Theme.spacingM; rightPadding: Theme.spacingM
                                 onClicked: cards.center.invoke(entry.notificationId, modelData.key)
-                                background: Rectangle {
-                                    radius: Theme.radiusSmall
-                                    color: action.hovered ? Theme.surfaceRaisedHover : Theme.surfaceRaised
-                                    border.color: Theme.border
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        radius: parent.radius
-                                        color: action.pressed ? Theme.pressed : "transparent"
-                                    }
-                                }
-                                contentItem: Text {
-                                    text: action.text; color: Theme.text
-                                    font.pixelSize: Theme.fontSize; font.weight: Font.Medium; font.family: Theme.fontFamily
-                                    horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
-                                    elide: Text.ElideRight
-                                }
                             }
                         }
                     }

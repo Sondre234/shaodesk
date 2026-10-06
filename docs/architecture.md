@@ -121,10 +121,11 @@ window as large as `ShellView::previewSize()`, and a preview's screenshot draws 
 | `QuickTile.qml` | A tile of Quick Settings: a toggle, a list it opens, or a state. |
 | `Icon.qml`, `FadingIcon.qml`, `SpeakerIcon.qml`, `BatteryIcon.qml` | Line icons (Lucide), drawn as vectors in any colour; one that crossfades as the state it shows changes, the loudspeaker for a volume, and a battery filled to its charge. |
 | `FlatButton.qml`, `ButtonFill.qml` | The frameless button of the bar and of menus, and its background, which fades between the hover, pressed and active states. |
+| `PushButton.qml` | A framed button with text: raised, or filled for what a click mostly does or for a destructive action, with a ring for the keyboard; a dialog's, a notification's, the start menu's. |
 | `PopupCard.qml` | A popup's card: surface, outline, corners, a shadow through the GPU, the open and close animation, and its place beside what it belongs to. |
 | `PopupMenu.qml`, `MenuRow.qml` | A menu of plain entries on popup cards, with cascading submenus and keyboard navigation, and one row of it. |
 | `AudioSlider.qml`, `MuteButton.qml` | Controls the mixer uses. |
-| `StartHome.qml`, `StartAllApps.qml`, `StartSearch.qml`, `StartBestMatch.qml`, `StartTile.qml`, `StartRow.qml`, `StartButton.qml`, `UserAvatar.qml` | Parts of the start menu (`Launcher.qml`): its pinned and recent applications, every application from A to Z, what its search finds and the best match of it, a pinned application, a row of its lists, its small buttons, the user's picture. |
+| `StartHome.qml`, `StartAllApps.qml`, `StartSearch.qml`, `StartBestMatch.qml`, `StartTile.qml`, `StartRow.qml`, `UserAvatar.qml` | Parts of the start menu (`Launcher.qml`): its pinned and recent applications, every application from A to Z, what its search finds and the best match of it, a pinned application, a row of its lists, the user's picture. |
 | `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |
 | `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |
 
@@ -219,8 +220,9 @@ Animations use `durationFast`, `durationNormal`, `durationSlow` or `duration(ms)
 or `easingExit`, all 0 while `animations.enabled` is off. `effects` says whether shader effects
 (shadows) can be drawn: only through the GPU, so draw them only when it is true, as a popup's
 `shadow` colour, `shadowBlur` and `shadowOffset` are. `alpha()` and `mix()` derive a colour from
-these. A button without a frame of its own is a `FlatButton`, a tooltip for something on the bar
-is a `BarTip`, a popup is a `PopupCard` and a menu a `PopupMenu`.
+these. A button without a frame of its own is a `FlatButton`, one with a frame and text a
+`PushButton`, a tooltip for something on the bar is a `BarTip`, a popup is a `PopupCard` and a
+menu a `PopupMenu`.
 
 ### Seeing a change
 

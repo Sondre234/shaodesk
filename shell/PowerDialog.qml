@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
-import QtQuick.Controls.Basic
 import QtQuick.Effects
 import QtQuick.Layouts
 
@@ -128,56 +127,22 @@ Item {
             RowLayout {
                 Layout.alignment: Qt.AlignRight
                 spacing: Theme.spacingM
-                DialogButton {
+                PushButton {
                     id: cancel
                     objectName: "powerCancel"
+                    Layout.minimumWidth: 3 * Theme.rowHeight
                     text: "Cancel"
                     onClicked: root.power.cancel()
                 }
-                DialogButton {
+                PushButton {
                     id: confirm
                     objectName: "powerConfirm"
+                    Layout.minimumWidth: 3 * Theme.rowHeight
                     text: root.pendingTitle
                     danger: true
                     onClicked: root.power.confirm()
                 }
             }
-        }
-    }
-
-    // A button of the dialog: framed on the raised surface, or for the action itself, which
-    // cannot be taken back, filled with the danger colour. A ring in the accent colour around it
-    // says that the keyboard is on it.
-    component DialogButton: Button {
-        id: button
-        property bool danger: false
-        implicitWidth: Math.max(contentItem.implicitWidth + leftPadding + rightPadding, 3 * Theme.rowHeight)
-        implicitHeight: Theme.rowHeight
-        leftPadding: Theme.spacingXL; rightPadding: Theme.spacingXL
-        hoverEnabled: true
-        background: Rectangle {
-            radius: Theme.radiusSmall
-            color: button.danger ? (button.hovered ? Theme.mix(Theme.dangerFill, Theme.textOnDanger, 0.12) : Theme.dangerFill)
-                   : button.hovered ? Theme.surfaceRaisedHover : Theme.surfaceRaised
-            border.color: button.danger ? "transparent" : Theme.border
-            Rectangle {
-                anchors.fill: parent
-                radius: parent.radius
-                color: button.pressed ? Theme.pressed : "transparent"
-            }
-            Rectangle {
-                visible: button.activeFocus
-                anchors.fill: parent; anchors.margins: -Theme.spacingS
-                radius: parent.radius + Theme.spacingS
-                color: "transparent"
-                border.color: Theme.accent; border.width: 2
-            }
-        }
-        contentItem: Text {
-            text: button.text
-            color: button.danger ? Theme.textOnDanger : Theme.text
-            font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize; font.weight: Font.Medium
-            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
         }
     }
 }

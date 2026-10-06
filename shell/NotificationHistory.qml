@@ -299,25 +299,12 @@ PopupCard {
                                         spacing: Theme.spacingS
                                         Repeater {
                                             model: row.n.actions
-                                            Button {
-                                                id: action
-                                                objectName: "notificationHistoryAction"
+                                            PushButton {
                                                 required property var modelData
+                                                objectName: "notificationHistoryAction"
+                                                small: true
                                                 text: modelData.label
-                                                topPadding: Theme.spacingXS; bottomPadding: Theme.spacingXS
-                                                leftPadding: Theme.spacingL; rightPadding: Theme.spacingL
                                                 onClicked: history.center.invoke(row.n.notificationId, modelData.key)
-                                                background: Rectangle {
-                                                    radius: Theme.radiusSmall
-                                                    color: action.pressed ? Theme.pressed : action.hovered ? Theme.hover : "transparent"
-                                                    border.color: Theme.border
-                                                }
-                                                contentItem: Text {
-                                                    text: action.text; textFormat: Text.PlainText
-                                                    color: Theme.text
-                                                    font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
-                                                    horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
-                                                }
                                             }
                                         }
                                     }

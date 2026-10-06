@@ -139,10 +139,13 @@ Item {
             color: Theme.text
             font.pixelSize: Theme.fontSize; font.weight: Font.DemiBold; font.family: Theme.fontFamily
         }
-        StartButton {
+        PushButton {
             objectName: "startAllApps"
             anchors.right: parent.right; anchors.rightMargin: Theme.spacingM
             anchors.verticalCenter: parent.verticalCenter
+            small: true
+            chevron: true
+            focusPolicy: Qt.NoFocus
             text: "All apps"
             onClicked: home.launcher.allApps = true
         }

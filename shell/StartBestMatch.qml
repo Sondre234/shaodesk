@@ -92,21 +92,23 @@ AbstractButton {
             y: head.height + Theme.spacingL
             width: parent.width
             spacing: Theme.spacingM
-            StartButton {
+            PushButton {
                 objectName: "startBestOpen"
+                small: true
                 primary: true
-                chevron: false
+                focusPolicy: Qt.NoFocus
                 current: card.current && card.button === 0
                 text: card.app ? "Open" : card.result.kind === "window" ? "Switch to" : "Run"
                 onClicked: card.press(0)
             }
             Repeater {
                 model: card.actions
-                delegate: StartButton {
+                delegate: PushButton {
                     required property var modelData
                     required property int index
                     objectName: "startBestAction:" + modelData.action
-                    chevron: false
+                    small: true
+                    focusPolicy: Qt.NoFocus
                     current: card.current && card.button === index + 1
                     iconName: modelData.icon
                     text: modelData.name
