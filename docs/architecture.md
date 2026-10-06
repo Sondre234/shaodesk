@@ -154,9 +154,12 @@ the card, for a surface that places it itself.
     { text, icon, secondary, toggle, checked, enabled, danger, run, submenu, objectName }
     { separator: true }
     { header: "Section" }
+    { title: "Name", icon, secondary }
 
 `icon` is a Lucide name `Icon.qml` knows, else a theme icon's name or an image's URL; `secondary`
-is muted text at the row's end (a shortcut, the value in use); `toggle` is `"check"` or `"radio"`
+is muted text at the row's end (a shortcut, the value in use). A `title` is the menu's own heading
+above its entries: the icon large, the name, and the secondary text under it, elided to the width
+the entries need; `toggle` is `"check"` or `"radio"`
 with `checked`; `enabled: false` greys an entry out and `danger: true` draws it in the danger
 colour. `run` is called when the entry is chosen, and the menu then emits `dismissed()` unless it
 returns `true`; `triggered(entry)` comes first. `submenu` is an array of entries, or a function
