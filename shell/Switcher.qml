@@ -67,11 +67,15 @@ Item {
             clip: true
             model: switcher.windows
             currentIndex: switcher.selected
-            highlightMoveDuration: 0
-            highlight: Rectangle {
-                radius: Theme.radiusMedium
-                color: Theme.accentSubtle
-                border.color: Theme.accent; border.width: 2
+            // The selection glides from window to window, once the switcher has come in.
+            highlightMoveDuration: switcher.progress >= 1 ? Theme.durationNormal : 0
+            highlight: Item {
+                Rectangle {
+                    anchors.fill: parent; anchors.margins: Theme.spacingXS
+                    radius: Theme.radiusMedium
+                    color: Theme.accentSubtle
+                    border.color: Theme.accent; border.width: 2
+                }
             }
             delegate: Item {
                 id: entry
@@ -79,6 +83,11 @@ Item {
                 required property int index
                 width: switcher.cell; height: switcher.cell
                 opacity: modelData.minimized ? 0.6 : 1
+                Rectangle {
+                    anchors.fill: parent; anchors.margins: Theme.spacingXS
+                    radius: Theme.radiusMedium
+                    color: pick.containsMouse ? Theme.hover : "transparent"
+                }
                 Image {
                     id: icon
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -104,7 +113,12 @@ Item {
                     width: 12; height: 12; radius: 6
                     color: Theme.urgent; border.width: 2; border.color: Theme.surface
                 }
-                MouseArea { anchors.fill: parent; onClicked: shell.switcherPick(entry.index) }
+                MouseArea {
+                    id: pick
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    onClicked: shell.switcherPick(entry.index)
+                }
             }
         }
         Column {
