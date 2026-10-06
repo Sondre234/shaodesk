@@ -5,15 +5,16 @@ import QtQuick.Layouts
 
 // The clock flyout's notification card (ClockFlyout.qml): every notification still kept, by
 // application, the one with the newest first, under a heading with a do-not-disturb switch and a
-// button that clears them all. A click on a notification runs its default action, and the cross
-// that shows while the pointer is over it removes it.
+// button that clears them all. An application with many shows its newest two until asked for the
+// rest. A click on a notification runs its default action, and the cross that shows while the
+// pointer is over it removes it.
 PopupCard {
     id: history
     required property var panel
     readonly property var center: shell.notifications
     objectName: "notificationHistory"
     // Looking at the list is reading it, also when it was made open.
-    onOpened: { now = new Date(); center.markAllRead() }
+    onOpened: { now = new Date(); expanded = {}; center.markAllRead() }
     Connections { target: history.center; function onUnreadChanged() { if (history.open) history.center.markAllRead() } }
     // Now, for how long ago each came, refreshed while it shows.
     property date now: new Date()
@@ -34,6 +35,15 @@ PopupCard {
         return shell.appFor(known).length > 0 ? "image://icons/" + shell.iconFor(known) : ""
     }
     readonly property real padding: Theme.spacingL
+    // How many of an application's notifications show until it is expanded, and the applications
+    // expanded (by group key) since the card opened.
+    readonly property int collapsedCount: 2
+    property var expanded: ({})
+    function toggleGroup(key) {
+        var next = Object.assign({}, expanded)
+        if (next[key]) delete next[key]; else next[key] = true
+        expanded = next
+    }
     implicitHeight: 2 * padding + heading.implicitHeight + Theme.spacingM +
                     (center.history.count > 0 ? list.contentHeight : empty.implicitHeight)
     side: panel.popupSide
@@ -131,6 +141,8 @@ PopupCard {
                 id: group
                 required property var modelData
                 readonly property var notifications: modelData.notifications
+                readonly property bool collapsible: notifications.length > history.collapsedCount
+                readonly property bool open: !collapsible || history.expanded[modelData.key] === true
                 width: ListView.view.width
                 spacing: Theme.spacingS
                 RowLayout {
@@ -150,9 +162,29 @@ PopupCard {
                         color: Theme.textMuted
                         font.pixelSize: Theme.fontSizeSmall; font.weight: Font.DemiBold; font.family: Theme.fontFamily
                     }
+                    FlatButton {
+                        id: groupToggle
+                        objectName: "groupToggle"
+                        visible: group.collapsible
+                        Layout.preferredHeight: Theme.headingHeight - Theme.spacingS
+                        leftPadding: Theme.spacingM; rightPadding: Theme.spacingS
+                        onClicked: history.toggleGroup(group.modelData.key)
+                        contentItem: RowLayout {
+                            spacing: Theme.spacingXS
+                            Text {
+                                text: group.open ? "Show less" : (group.notifications.length - history.collapsedCount) + " more"
+                                color: Theme.accent
+                                font.pixelSize: Theme.fontSizeCaption; font.weight: Font.DemiBold; font.family: Theme.fontFamily
+                            }
+                            Icon {
+                                name: "chevron-right"; rotation: group.open ? -90 : 90
+                                size: Theme.iconSizeSmall; color: Theme.accent
+                            }
+                        }
+                    }
                 }
                 Repeater {
-                    model: group.notifications
+                    model: group.open ? group.notifications : group.notifications.slice(0, history.collapsedCount)
                     delegate: Rectangle {
                         id: row
                         objectName: "notificationRow"

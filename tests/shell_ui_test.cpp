@@ -2051,14 +2051,20 @@ int main(int argc, char **argv) {
                 return found;
             };
         auto rows = [&] { return list ? findAll(list, "notificationRow") : QList<QQuickItem *>(); };
-        if (!list || !QTest::qWaitFor([&] {
-                return list->property("count").toInt() == 1 && rows().size() == daemon->history()->count();
+        if (!list || daemon->history()->count() < 3 || !QTest::qWaitFor([&] {
+                return list->property("count").toInt() == 1 && rows().size() == 2;
             })) {
-            std::cerr << "the history does not list the notifications by application\n";
+            std::cerr << "the history does not list the notifications by application, the newest two of many\n";
+            return 1;
+        }
+        // Asked for, the rest show too.
+        QTest::qWait(300); // the flyout's slide in
+        click(find(list, "groupToggle"));
+        if (!QTest::qWaitFor([&] { return rows().size() == daemon->history()->count(); })) {
+            std::cerr << "expanding an application did not list all its notifications\n";
             return 1;
         }
         // The pointer over a notification shows its cross, which removes it.
-        QTest::qWait(300); // the flyout's slide in
         const int kept = daemon->history()->count();
         QTest::mouseMove(popover, centre(rows().first()));
         auto *remove = find(rows().first(), "removeNotification");
