@@ -26,6 +26,16 @@ Item {
     // The surface follows the cards' height up at once but down only after they have left, or a
     // card sliding out would be cut off.
     Timer { id: shrink; interval: 320; onTriggered: cards.settled = cards.shown }
+    // How long ago a card came, as the history says it, kept current while cards are up.
+    property date now: new Date()
+    Timer { interval: 30000; repeat: true; running: cards.active; onTriggered: cards.now = new Date() }
+    onActiveChanged: now = new Date()
+    function ago(time) {
+        var seconds = (now.getTime() - time.getTime()) / 1000
+        if (seconds < 60) return "now"
+        if (seconds < 3600) return Math.floor(seconds / 60) + " min ago"
+        return Qt.formatTime(time, "HH:mm")
+    }
     width: center.cardWidth + margin + spread
     height: active ? Math.max(1, settled + margin + spread) : 1
 
@@ -80,6 +90,13 @@ Item {
                 var known = desktopEntry.length > 0 ? desktopEntry : app.toLowerCase()
                 return shell.appFor(known).length > 0 ? "image://icons/" + shell.iconFor(known) : ""
             }
+            // The installed application's icon, "" when it is not one.
+            readonly property string appIcon: {
+                var known = desktopEntry.length > 0 ? desktopEntry : app.toLowerCase()
+                return shell.appFor(known).length > 0 ? shell.iconFor(known) : ""
+            }
+            // The header's icon: the application's, else the notification's own.
+            readonly property string headerIcon: appIcon.length > 0 ? appIcon : icon
             width: list.width
             height: card.height
 
@@ -113,88 +130,101 @@ Item {
                     onClicked: cards.center.activate(entry.notificationId)
                     Component.onDestruction: cards.center.hold(entry.notificationId, false)
                 }
-                RowLayout {
+                ColumnLayout {
                     id: content
                     x: 12; y: 12; width: parent.width - 24
-                    spacing: 10
-                    Image {
-                        visible: entry.iconSource.length > 0
-                        Layout.alignment: Qt.AlignTop
-                        Layout.preferredWidth: 40; Layout.preferredHeight: 40
-                        sourceSize: Qt.size(80, 80)
-                        fillMode: Image.PreserveAspectFit
-                        source: entry.iconSource
-                        cache: false
-                    }
-                    ColumnLayout {
+                    spacing: Theme.spacingM
+                    // Who it is from and when: the application's icon and name, and the time.
+                    RowLayout {
                         Layout.fillWidth: true
-                        spacing: 3
-                        RowLayout {
+                        spacing: Theme.spacingS + Theme.spacingXS
+                        Image {
+                            visible: entry.headerIcon.length > 0
+                            Layout.preferredWidth: Theme.iconSizeSmall; Layout.preferredHeight: Theme.iconSizeSmall
+                            sourceSize: Qt.size(2 * Theme.iconSizeSmall, 2 * Theme.iconSizeSmall)
+                            fillMode: Image.PreserveAspectFit
+                            source: entry.headerIcon.length > 0 ? "image://icons/" + entry.headerIcon : ""
+                        }
+                        Text {
                             Layout.fillWidth: true
+                            text: entry.app.length > 0 ? entry.app + " · " + cards.ago(entry.time) : cards.ago(entry.time)
+                            color: Theme.textMuted
+                            font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily
+                            textFormat: Text.PlainText; elide: Text.ElideRight
+                        }
+                        Text {
+                            objectName: "notificationClose"
+                            text: "×"
+                            color: closeArea.containsMouse ? Theme.text : Theme.textMuted
+                            font.pixelSize: 18
+                            MouseArea {
+                                id: closeArea
+                                anchors.fill: parent; anchors.margins: -6
+                                hoverEnabled: true
+                                onClicked: cards.center.dismiss(entry.notificationId)
+                            }
+                        }
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+                        Image {
+                            visible: entry.iconSource.length > 0
+                            Layout.alignment: Qt.AlignTop
+                            Layout.preferredWidth: 40; Layout.preferredHeight: 40
+                            sourceSize: Qt.size(80, 80)
+                            fillMode: Image.PreserveAspectFit
+                            source: entry.iconSource
+                            cache: false
+                        }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 3
                             Text {
                                 Layout.fillWidth: true
-                                text: entry.app
-                                color: Theme.textMuted
-                                font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily
-                                textFormat: Text.PlainText; elide: Text.ElideRight
+                                visible: text.length > 0
+                                text: entry.summary
+                                color: Theme.text
+                                font.pixelSize: Theme.fontSize + 1; font.bold: true; font.family: Theme.fontFamily
+                                textFormat: Text.PlainText
+                                wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
                             }
                             Text {
-                                objectName: "notificationClose"
-                                text: "×"
-                                color: closeArea.containsMouse ? Theme.text : Theme.textMuted
-                                font.pixelSize: 18
-                                MouseArea {
-                                    id: closeArea
-                                    anchors.fill: parent; anchors.margins: -6
-                                    hoverEnabled: true
-                                    onClicked: cards.center.dismiss(entry.notificationId)
-                                }
+                                Layout.fillWidth: true
+                                visible: text.length > 0
+                                text: entry.body
+                                color: Theme.text; opacity: 0.85
+                                font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+                                textFormat: Text.StyledText
+                                linkColor: Theme.accent
+                                wrapMode: Text.Wrap; maximumLineCount: 5; elide: Text.ElideRight
+                                onLinkActivated: (link) => cards.center.openLink(link)
                             }
-                        }
-                        Text {
-                            Layout.fillWidth: true
-                            visible: text.length > 0
-                            text: entry.summary
-                            color: Theme.text
-                            font.pixelSize: Theme.fontSize + 1; font.bold: true; font.family: Theme.fontFamily
-                            textFormat: Text.PlainText
-                            wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
-                        }
-                        Text {
-                            Layout.fillWidth: true
-                            visible: text.length > 0
-                            text: entry.body
-                            color: Theme.text; opacity: 0.85
-                            font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
-                            textFormat: Text.StyledText
-                            linkColor: Theme.accent
-                            wrapMode: Text.Wrap; maximumLineCount: 5; elide: Text.ElideRight
-                            onLinkActivated: (link) => cards.center.openLink(link)
-                        }
-                        Rectangle {
-                            visible: entry.progress >= 0
-                            Layout.fillWidth: true; Layout.preferredHeight: 6; Layout.topMargin: 3
-                            radius: 3; color: Theme.selected
-                            Rectangle { width: parent.width * Math.max(0, entry.progress) / 100; height: parent.height; radius: 3; color: Theme.accent }
-                        }
-                        Flow {
-                            visible: entry.actions.length > 0
-                            Layout.fillWidth: true; Layout.topMargin: 4
-                            spacing: 6
-                            Repeater {
-                                model: entry.actions
-                                delegate: Button {
-                                    id: action
-                                    required property var modelData
-                                    objectName: "notificationAction"
-                                    text: modelData.label
-                                    padding: 6; leftPadding: 12; rightPadding: 12
-                                    onClicked: cards.center.invoke(entry.notificationId, modelData.key)
-                                    background: Rectangle { radius: Theme.radiusSmall; color: action.pressed ? Theme.pressed : action.hovered ? Theme.selected : Theme.hover }
-                                    contentItem: Text {
-                                        text: action.text; color: Theme.text
-                                        font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
-                                        horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                            Rectangle {
+                                visible: entry.progress >= 0
+                                Layout.fillWidth: true; Layout.preferredHeight: 6; Layout.topMargin: 3
+                                radius: 3; color: Theme.selected
+                                Rectangle { width: parent.width * Math.max(0, entry.progress) / 100; height: parent.height; radius: 3; color: Theme.accent }
+                            }
+                            Flow {
+                                visible: entry.actions.length > 0
+                                Layout.fillWidth: true; Layout.topMargin: 4
+                                spacing: 6
+                                Repeater {
+                                    model: entry.actions
+                                    delegate: Button {
+                                        id: action
+                                        required property var modelData
+                                        objectName: "notificationAction"
+                                        text: modelData.label
+                                        padding: 6; leftPadding: 12; rightPadding: 12
+                                        onClicked: cards.center.invoke(entry.notificationId, modelData.key)
+                                        background: Rectangle { radius: Theme.radiusSmall; color: action.pressed ? Theme.pressed : action.hovered ? Theme.selected : Theme.hover }
+                                        contentItem: Text {
+                                            text: action.text; color: Theme.text
+                                            font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
+                                            horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
+                                        }
                                     }
                                 }
                             }
