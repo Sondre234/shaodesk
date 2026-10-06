@@ -11,7 +11,7 @@ Item {
     readonly property var pins: shell.startMenu.pinned
     readonly property int columns: 6
     readonly property real cellWidth: (width - 2 * inset) / columns
-    readonly property real cellHeight: Theme.appIconSizeLarge + 2 * Theme.spacingL + Theme.spacingM + label.height
+    readonly property real cellHeight: Theme.appIconSizeLarge + 2 * Theme.spacingL + Theme.spacingM + labelFont.height
     readonly property real headingHeight: Theme.rowHeight
     readonly property real recentRowHeight: Theme.rowHeight + Theme.spacingXL
     // Up to three rows of pins, leaving the recent list two rows.
@@ -126,7 +126,8 @@ Item {
         return false
     }
 
-    Text { id: label; visible: false; text: "Ag"; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily }
+    // A tile's name, for the height of its line.
+    FontMetrics { id: labelFont; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily }
 
     Item {
         id: pinnedHeading
