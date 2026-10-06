@@ -122,6 +122,7 @@ window as large as `ShellView::previewSize()`, and a preview's screenshot draws 
 | `PopupCard.qml` | A popup's card: surface, outline, corners, a shadow through the GPU, the open and close animation, and its place beside what it belongs to. |
 | `PopupMenu.qml`, `MenuRow.qml` | A menu of plain entries on popup cards, with cascading submenus and keyboard navigation, and one row of it. |
 | `AudioSlider.qml`, `MuteButton.qml` | Controls the mixer uses. |
+| `StartHome.qml`, `StartAllApps.qml`, `StartSearch.qml`, `StartBestMatch.qml`, `StartTile.qml`, `StartRow.qml`, `StartButton.qml`, `UserAvatar.qml` | Parts of the start menu (`Launcher.qml`): its pinned and recent applications, every application from A to Z, what its search finds and the best match of it, a pinned application, a row of its lists, its small buttons, the user's picture. |
 | `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |
 | `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |
 
@@ -130,6 +131,13 @@ The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `t
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
 `power.cpp`, `palette.cpp`. `preview.cpp` has stand-ins for all of them for
 `--preview-popup`.
+
+The start menu (`Launcher.qml` and its `Start*.qml` parts) reads `shell.startMenu`, a `StartMenu`
+(`start_menu.cpp`): its own pins, seeded from the taskbar's; the applications launched lately
+(`launch_history.cpp`, which the controller tells of every launch); every application by letter;
+its search, which takes the palette's windows, workspaces and actions from `Palette::entries` and
+runs them with `Palette::run`; and the user's name and picture. It tells the controller to read
+the applications again when GIO's monitor says they changed.
 
 ### Popups and menus
 

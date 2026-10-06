@@ -3,6 +3,7 @@
 #include "controller.hpp"
 #include "system_status.hpp"
 #include "view.hpp"
+#include <QAbstractItemModel>
 #include <QDir>
 #include <QFile>
 #include <QGuiApplication>
@@ -97,6 +98,8 @@ int main(int argc, char **argv) {
     QFile actionsFile(screens.filePath("data/applications/shaodesk-test-actions.desktop"));
     if (!actionsFile.open(QIODevice::WriteOnly) ||
         actionsFile.write(QString("[Desktop Entry]\nType=Application\nName=Action app\nExec=true\n"
+                                  "GenericName=File toucher\nKeywords=stamp;mark;\n"
+                                  "Comment=Leaves a file behind\n"
                                   "Actions=touch;missing;\n\n"
                                   "[Desktop Action touch]\nName=Touch a file\nIcon=document-new\n"
                                   "Exec=\"%1\" -E touch \"%2\"\n\n"
@@ -248,6 +251,13 @@ int main(int argc, char **argv) {
             std::cerr << "a desktop action did not run: " << controller.error().toStdString() << '\n';
             return 1;
         }
+        // The launch is remembered in the state directory, for the start menu's recent list.
+        QFile launches(screens.filePath("state/shaodesk/launches"));
+        const auto recent = controller.startMenu()->recent();
+        if (!launches.open(QIODevice::ReadOnly) ||
+            !launches.readAll().startsWith("shaodesk-test-actions.desktop\t1\t") || recent.size() != 1 ||
+            recent[0].toMap()["appId"] != "shaodesk-test-actions.desktop")
+            return fail("running a desktop action was not recorded as a launch");
         if (controller.launchAction("shaodesk-test-actions.desktop", "missing") ||
             !controller.error().startsWith("Could not launch Action app: ")) {
             std::cerr << "a desktop action whose program is missing was not reported: "
@@ -260,6 +270,35 @@ int main(int argc, char **argv) {
             return 1;
         }
         controller.clearError();
+    }
+    // An installed application's record says what else a search finds it by.
+    {
+        QVariantMap record;
+        for (const auto &app : controller.apps())
+            if (app.toMap()["appId"] == "shaodesk-test-actions.desktop")
+                record = app.toMap();
+        if (record["genericName"] != "File toucher" ||
+            record["keywords"].toStringList() != QStringList{"stamp", "mark"} ||
+            record["description"] != "Leaves a file behind")
+            return fail("an application's generic name, keywords and comment are not in its record");
+    }
+    // Applications installed or removed while the shell runs are found without being asked.
+    {
+        auto installed = [&](const QString &id) {
+            const auto apps = controller.apps();
+            return std::any_of(apps.begin(), apps.end(),
+                               [&](const QVariant &app) { return app.toMap()["appId"] == id; });
+        };
+        QFile later(screens.filePath("data/applications/shaodesk-test-later.desktop"));
+        if (!later.open(QIODevice::WriteOnly) ||
+            later.write("[Desktop Entry]\nType=Application\nName=Later app\nExec=true\n") < 0)
+            return fail("could not write an application to install");
+        later.close();
+        if (!QTest::qWaitFor([&] { return installed("shaodesk-test-later.desktop"); }, 10000))
+            return fail("an application installed while the shell ran was not found");
+        later.remove();
+        if (!QTest::qWaitFor([&] { return !installed("shaodesk-test-later.desktop"); }, 10000))
+            return fail("an application removed while the shell ran stayed listed");
     }
     view.show();
     if (!QTest::qWaitForWindowExposed(&view))
@@ -1838,6 +1877,319 @@ ListModel {
             std::cerr << "Escape did not close the palette quietly\n";
             return 1;
         }
+        // Its entries for another search (the start menu's): the windows of the model it is
+        // given, no applications; one runs as it would from the palette.
+        int windows = 0;
+        bool apps = false, tiling = false;
+        for (const auto &item : palette->entries(fakeModel)) {
+            windows += item.toMap()["kind"] == "window";
+            apps = apps || item.toMap()["kind"] == "app";
+            tiling = tiling || item.toMap()["title"] == "Toggle tiling";
+        }
+        const int rows = qobject_cast<QAbstractItemModel *>(fakeModel)->rowCount();
+        if (rows == 0 || windows != rows || apps || !tiling)
+            return fail("the palette's entries for another search are not its windows and actions");
+        palette->run({{"kind", "action"}, {"target", "toggle_tiling"}}, output);
+        if (!QTest::qWaitFor([&] { return requests == QStringList{"toggle_tiling"}; }))
+            return fail("an entry of the palette's did not run outside it");
+        requests.clear();
+        // An application it launches is among those launched lately.
+        palette->run({{"kind", "app"}, {"target", "shaodesk-test-other.desktop"}}, output);
+        if (!QTest::qWaitFor([&] {
+                return controller.startMenu()->recent().value(0).toMap()["appId"] == "shaodesk-test-other.desktop";
+            }))
+            return fail("an application launched from the palette was not recorded");
+    }
+    // The start menu: its pinned applications and those launched lately, every application from
+    // A to Z, and a search over applications, windows and actions, each moved through with the
+    // keyboard; Escape clears the search, then closes the menu.
+    {
+        auto *start = controller.startMenu();
+        auto *launcher = find(view.rootObject(), "launcher");
+        auto *search = find(view.rootObject(), "applicationSearch");
+        auto launcherOpen = [&] { return view.rootObject()->property("launcherOpen").toBool(); };
+        auto openStart = [&] {
+            view.rootObject()->setProperty("launcherOpen", true);
+            return QTest::qWaitFor([&] { return inPopover(launcher) && search->hasActiveFocus(); });
+        };
+        auto item = [&](const QString &name) { return find(view.rootObject(), name); };
+        auto shown = [&](const QString &name) { return item(name) && item(name)->isVisible(); };
+        auto key = [&](Qt::Key key) { QTest::keyClick(popover, key); };
+        auto type = [&](const QString &text) {
+            for (const QChar c : text)
+                QTest::keyClick(popover, c.toLatin1());
+        };
+        if (!launcher || !search)
+            return fail("the start menu is missing");
+        // With no pins of its own, it has the taskbar's, which are none here.
+        if (!start->pinned().isEmpty() || QFile::exists(screens.filePath("state/shaodesk/start-pinned")))
+            return fail("the start menu has pins of its own before any was made");
+        for (const auto *id : {"shaodesk-test-app.desktop", "shaodesk-test-other.desktop",
+                               "shaodesk-test-actions.desktop"})
+            start->pin(id);
+        if (!openStart() || !QTest::qWaitFor([&] { return shown("startTile:shaodesk-test-actions.desktop"); }) ||
+            !shown("startTile:shaodesk-test-app.desktop") || !shown("startAllApps"))
+            return fail("the start menu did not open on its pinned applications");
+        // Down goes to the first tile, Right to the next, and Enter launches it, recorded among
+        // those launched lately.
+        key(Qt::Key_Down);
+        if (!QTest::qWaitFor([&] { return item("startTile:shaodesk-test-app.desktop")->property("current").toBool(); }))
+            return fail("Down did not go to the first pinned application");
+        key(Qt::Key_Right);
+        if (!QTest::qWaitFor([&] { return item("startTile:shaodesk-test-other.desktop")->property("current").toBool(); }) ||
+            item("startTile:shaodesk-test-app.desktop")->property("current").toBool())
+            return fail("Right did not go to the next pinned application");
+        key(Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return !launcherOpen(); }) || start->recent().isEmpty() ||
+            start->recent()[0].toMap()["appId"] != "shaodesk-test-other.desktop")
+            return fail("Enter did not launch the pinned application the keyboard was at");
+        if (!openStart() || !QTest::qWaitFor([&] { return shown("startRecent:shaodesk-test-other.desktop"); }) ||
+            item("startRecent:shaodesk-test-other.desktop")->property("subtitle") != "Just now" ||
+            item("startTile:shaodesk-test-other.desktop")->property("current").toBool())
+            return fail("the start menu does not list what was launched lately, or kept the keyboard's place");
+        // All apps lists them by letter; a letter's heading shows the letters to jump to.
+        click(item("startAllApps"));
+        if (!QTest::qWaitFor([&] {
+                return shown("startApp:shaodesk-test-other.desktop") && !shown("startTile:shaodesk-test-app.desktop");
+            }) ||
+            !shown("startApp:pinned:0"))
+            return fail("All apps did not list every application");
+        click(item("startLetter:O"));
+        if (!QTest::qWaitFor([&] { return shown("startLetters") && item("startJump:F")->isEnabled(); }) ||
+            item("startJump:Q")->isEnabled())
+            return fail("a letter's heading did not show the letters to jump to");
+        click(item("startJump:F"));
+        if (!QTest::qWaitFor([&] { return !shown("startLetters"); }))
+            return fail("jumping to a letter did not show the list again");
+        click(item("startLetter:O"));
+        if (!QTest::qWaitFor([&] { return shown("startLetters"); }))
+            return fail("a letter's heading did not show the letters again");
+        key(Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !shown("startLetters"); }) || !launcherOpen() ||
+            !shown("startApp:shaodesk-test-other.desktop"))
+            return fail("Escape did not close only the letters");
+        key(Qt::Key_Down);
+        key(Qt::Key_Down);
+        if (!QTest::qWaitFor([&] { return item("startApp:shaodesk-test-app.desktop")->property("current").toBool(); }))
+            return fail("Down did not move through All apps past the letters' headings");
+        click(item("startBack"));
+        if (!QTest::qWaitFor([&] { return shown("startTile:shaodesk-test-app.desktop"); }))
+            return fail("Back did not show the pinned applications again");
+        // An application's menu, from a right press on its tile or row: Open, its desktop
+        // actions, pinning to the start menu and the taskbar, and a tile's Move to front.
+        auto *appMenu = item("startAppMenu");
+        auto menuFor = [&](const QString &name) {
+            click(item(name), Qt::RightButton);
+            return QTest::qWaitFor([&] { return inPopover(appMenu) && shown("startMenu:open"); });
+        };
+        auto choose = [&](const QString &entry) {
+            if (!shown(entry))
+                return false;
+            click(item(entry));
+            return QTest::qWaitFor([&] { return !appMenu->isVisible(); });
+        };
+        auto startPins = [&] {
+            QFile file(screens.filePath("state/shaodesk/start-pinned"));
+            return file.open(QIODevice::ReadOnly) ? QString::fromUtf8(file.readAll()) : QString();
+        };
+        if (!appMenu || !menuFor("startTile:shaodesk-test-other.desktop") || !shown("startMenu:unpin") ||
+            !shown("startMenu:front") || item("startMenu:taskbar")->property("text") != "Pin to taskbar" ||
+            shown("startMenu:pin"))
+            return fail("a pinned tile's menu does not offer to unpin it, move it to the front and pin it to the taskbar");
+        if (!choose("startMenu:taskbar") || !QTest::qWaitFor([&] { return controller.isPinned("shaodesk-test-other.desktop"); }) ||
+            !launcherOpen() || !search->hasActiveFocus())
+            return fail("Pin to taskbar from the start menu did not pin it, or closed more than the menu");
+        if (!menuFor("startTile:shaodesk-test-other.desktop") ||
+            item("startMenu:taskbar")->property("text") != "Unpin from taskbar" || !choose("startMenu:taskbar") ||
+            !QTest::qWaitFor([&] { return !controller.isPinned("shaodesk-test-other.desktop"); }))
+            return fail("Unpin from taskbar from the start menu did not unpin it");
+        if (!menuFor("startTile:shaodesk-test-other.desktop") || !choose("startMenu:front") ||
+            !QTest::qWaitFor([&] {
+                return startPins() == "shaodesk-test-other.desktop\nshaodesk-test-app.desktop\n"
+                                      "shaodesk-test-actions.desktop\n";
+            }))
+            return fail(("Move to front did not move the tile first: " + startPins().toStdString()).c_str());
+        if (!menuFor("startTile:shaodesk-test-other.desktop") || shown("startMenu:front") ||
+            !choose("startMenu:unpin") ||
+            !QTest::qWaitFor([&] { return !item("startTile:shaodesk-test-other.desktop"); }) ||
+            startPins() != "shaodesk-test-app.desktop\nshaodesk-test-actions.desktop\n")
+            return fail("Unpin from Start did not remove the tile and forget it");
+        // A row of All apps pins to the start menu; a configured launcher is only opened.
+        click(item("startAllApps"));
+        if (!QTest::qWaitFor([&] { return shown("startApp:shaodesk-test-other.desktop"); }) ||
+            !menuFor("startApp:shaodesk-test-other.desktop") || shown("startMenu:unpin") || shown("startMenu:front") ||
+            !choose("startMenu:pin") ||
+            !QTest::qWaitFor([&] { return startPins().endsWith("shaodesk-test-other.desktop\n"); }))
+            return fail("Pin to Start from All apps did not pin it at the end");
+        if (!menuFor("startApp:pinned:0") || shown("startMenu:pin") || shown("startMenu:taskbar"))
+            return fail("a configured launcher's menu offers to pin it");
+        key(Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !appMenu->isVisible() && search->hasActiveFocus(); }) || !launcherOpen())
+            return fail("Escape in an application's menu did not close only the menu");
+        click(item("startBack"));
+        // The menu key opens the menu of what the keyboard is at, its first entry highlighted;
+        // a desktop action runs from it.
+        key(Qt::Key_Down);
+        key(Qt::Key_Right);
+        QTest::keyClick(popover, Qt::Key_Menu);
+        if (!QTest::qWaitFor([&] {
+                return inPopover(appMenu) && shown("startMenu:action:touch") &&
+                       item("startMenu:open")->property("highlighted").toBool();
+            }))
+            return fail("the menu key did not open the menu of the tile the keyboard was at");
+        QFile::remove(actionMarker);
+        if (!choose("startMenu:action:touch") || !QTest::qWaitFor([&] { return QFile::exists(actionMarker); }) ||
+            !QTest::qWaitFor([&] { return !launcherOpen(); }))
+            return fail("a desktop action from the start menu did not run, or the menu stayed");
+        if (!openStart())
+            return fail("the start menu did not open after a desktop action");
+        // Dragging a tile onto another's place moves it there, the press launching nothing.
+        {
+            auto *dragged = item("startTile:shaodesk-test-other.desktop");
+            auto *first = item("startTile:shaodesk-test-app.desktop");
+            if (!dragged || !first || !QTest::qWaitFor([&] { return dragged->isVisible() && first->isVisible(); }))
+                return fail("the tiles to drag are not shown");
+            const QPoint from = centre(dragged), to = centre(first);
+            QTest::mousePress(popover, Qt::LeftButton, Qt::NoModifier, from);
+            for (int step = 1; step <= 10; ++step) {
+                QTest::mouseMove(popover, from + (to - from) * step / 10);
+                QTest::qWait(10);
+            }
+            QTest::mouseRelease(popover, Qt::LeftButton, Qt::NoModifier, to);
+            if (!QTest::qWaitFor([&] {
+                    return startPins() == "shaodesk-test-other.desktop\nshaodesk-test-app.desktop\n"
+                                          "shaodesk-test-actions.desktop\n";
+                }) ||
+                !launcherOpen() || start->recent()[0].toMap()["appId"] == "shaodesk-test-other.desktop")
+                return fail(("dragging a tile did not move it: " + startPins().toStdString()).c_str());
+        }
+        // A search groups what it finds: the best match first, then applications, windows and
+        // actions; the keyboard moves through them all and Enter runs the one it is at.
+        editTasks("model.append({ taskId: 42, title: 'Quarterly report', appId: 'shaodesk-test-other', "
+                  "active: false, minimized: false, urgent: false })");
+        type("quarterly");
+        if (!QTest::qWaitFor([&] { return shown("startBestMatch"); }) ||
+            item("startBestMatch")->property("result").toMap()["title"] != "Quarterly report" ||
+            item("startBestOpen")->property("text") != "Switch to")
+            return fail("searching for a window's title did not find it as the best match");
+        search->setProperty("text", "");
+        type("zqxw");
+        if (!QTest::qWaitFor([&] { return shown("startNothing"); }) || shown("startBestMatch"))
+            return fail("a search that finds nothing does not say so");
+        search->setProperty("text", "");
+        type("action");
+        if (!QTest::qWaitFor([&] { return shown("startBestMatch") && shown("startBestAction:touch"); }) ||
+            item("startBestMatch")->property("result").toMap()["title"] != "Action app")
+            return fail("an application found as the best match does not offer its desktop actions");
+        search->setProperty("text", "");
+        type("app");
+        // Every application's name has it (and "Applications menu", an action): the model says
+        // which is best.
+        const auto apps = start->search("app", controller.palette()->entries(fakeModel));
+        const auto best = apps.value(0).toMap()["title"].toString(), next = apps.value(1).toMap()["title"].toString();
+        if (apps.size() < 4 || apps[1].toMap()["group"] != "apps" ||
+            !QTest::qWaitFor([&] { return shown("startBestMatch") && shown("startResult:" + next); }) ||
+            item("startBestMatch")->property("result").toMap()["title"] != best)
+            return fail("searching for applications did not list them under the best match");
+        key(Qt::Key_Down);
+        if (!QTest::qWaitFor([&] { return item("startResult:" + next)->property("current").toBool(); }) ||
+            item("startBestMatch")->property("current").toBool())
+            return fail("Down did not move from the best match to the next result");
+        key(Qt::Key_Up);
+        if (!QTest::qWaitFor([&] { return item("startBestMatch")->property("current").toBool(); }))
+            return fail("Up did not move back to the best match");
+        // Moving the pointer onto a result chooses it. (Results appearing under the pointer
+        // where it rests do not: the best match stayed chosen above, and below.)
+        QTest::mouseMove(popover, centre(item("startResult:" + next)) + QPoint(0, 2));
+        QTest::mouseMove(popover, centre(item("startResult:" + next)));
+        if (!QTest::qWaitFor([&] { return item("startResult:" + next)->property("current").toBool(); }))
+            return fail("moving the pointer onto a result did not choose it");
+        // The field's cross clears the search, the keyboard staying there.
+        click(item("startClear"));
+        if (!QTest::qWaitFor([&] { return search->property("text").toString().isEmpty() && !shown("startClear"); }) ||
+            !search->hasActiveFocus() || !launcherOpen())
+            return fail("the search field's cross did not clear it");
+        type("app");
+        // Escape clears the search, then closes the menu.
+        key(Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] {
+                return search->property("text").toString().isEmpty() && shown("startTile:shaodesk-test-app.desktop");
+            }) ||
+            !launcherOpen())
+            return fail("Escape did not clear the search first");
+        key(Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !launcherOpen(); }))
+            return fail("Escape did not close the start menu once the search was clear");
+        // An action found runs as from the palette.
+        requests.clear();
+        if (!openStart())
+            return fail("the start menu did not open again");
+        type("toggle tiling");
+        if (!QTest::qWaitFor([&] {
+                return shown("startBestMatch") &&
+                       item("startBestMatch")->property("result").toMap()["title"] == "Toggle tiling";
+            }))
+            return fail("the start menu's search did not find an action");
+        key(Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return requests == QStringList{"toggle_tiling"} && !launcherOpen(); }))
+            return fail("Enter did not run the action the start menu found");
+        requests.clear();
+        // More pins than a page holds go on pages, which the wheel, the dots beside them and the
+        // keyboard moving past the last row turn.
+        {
+            QStringList extra;
+            for (int i = 0; i < 20; ++i) {
+                extra << QString("shaodesk-test-page%1.desktop").arg(i);
+                QFile entry(screens.filePath("data/applications/" + extra.last()));
+                if (!entry.open(QIODevice::WriteOnly) ||
+                    entry.write(QString("[Desktop Entry]\nType=Application\nName=Page app %1\nExec=true\n")
+                                    .arg(i, 2, 10, QChar('0'))
+                                    .toUtf8()) < 0)
+                    return fail("could not write an application to pin");
+            }
+            auto installed = [&](const QString &id) {
+                const auto apps = controller.apps();
+                return std::any_of(apps.begin(), apps.end(),
+                                   [&](const QVariant &app) { return app.toMap()["appId"] == id; });
+            };
+            if (!QTest::qWaitFor([&] { return installed(extra.last()); }, 10000))
+                return fail("the applications to pin were not found");
+            for (const auto &id : extra)
+                start->pin(id);
+            auto *home = item("startHome");
+            if (!openStart() || !QTest::qWaitFor([&] { return shown("startPage1"); }) ||
+                home->property("page").toInt() != 0)
+                return fail("more pins than a page holds did not go on pages");
+            auto *pinned = item("startPinned");
+            const QPoint over = centre(pinned);
+            QWheelEvent wheel(over, popover->mapToGlobal(over), QPoint(), QPoint(0, -120), Qt::NoButton,
+                              Qt::NoModifier, Qt::NoScrollPhase, false);
+            QCoreApplication::sendEvent(popover, &wheel);
+            if (!QTest::qWaitFor([&] { return home->property("page").toInt() == 1; }))
+                return fail("the wheel did not turn the pins' page");
+            click(item("startPage0"));
+            if (!QTest::qWaitFor([&] { return home->property("page").toInt() == 0; }))
+                return fail("a page's dot did not show its page");
+            for (int row = 0; row < 4; ++row)
+                key(Qt::Key_Down);
+            if (!QTest::qWaitFor([&] { return home->property("page").toInt() == 1; }) ||
+                home->property("current").toInt() != 3 * home->property("columns").toInt())
+                return fail("Down past the last row did not go on to the next page");
+            view.rootObject()->setProperty("launcherOpen", false);
+            for (const auto &id : extra) {
+                start->unpin(id);
+                QFile::remove(screens.filePath("data/applications/" + id));
+            }
+            if (!QTest::qWaitFor([&] { return !installed(extra.last()); }, 10000))
+                return fail("the pinned applications were not removed again");
+        }
+        // Along its bottom, the user's name and picture.
+        start->setUser("Robin Lee", QUrl::fromLocalFile(walls + "/a/one.png"));
+        if (!openStart() || !QTest::qWaitFor([&] { return shown("userPicture"); }) ||
+            item("userName")->property("text") != "Robin Lee")
+            return fail("the start menu does not show the user's name and picture");
+        view.rootObject()->setProperty("launcherOpen", false);
+        editTasks("model.remove(model.count - 1)");
     }
     // The power menu, from the power button in the launcher's bottom-right corner, lists what
     // the compositor says may run, and runs it.

@@ -162,6 +162,22 @@ PreviewData::PreviewData(ShellController &controller)
 
     controller.power()->setAvailable("lock,suspend,hibernate,reboot,poweroff,logout");
 
+    // The start menu as on a desktop in use: two pages of pins, applications launched lately and
+    // someone logged in; those of tools/shell_gallery.py that are installed show.
+    const auto now = QDateTime::currentDateTimeUtc();
+    QStringList pins;
+    for (const auto *id : {"firefox", "org.kde.dolphin", "foot", "thunderbird", "code", "libreoffice-writer",
+                           "gimp", "spotify", "steam", "org.gnome.Calculator", "obsidian", "systemsettings",
+                           "discord", "mpv", "inkscape", "org.kde.kate", "keepassxc", "obs", "blender", "krita"})
+        pins << QString(id) + ".desktop";
+    controller.startMenu()->preview(pins, {{"code.desktop", 14, now.addSecs(-2 * 60)},
+                                           {"firefox.desktop", 40, now.addSecs(-25 * 60)},
+                                           {"gimp.desktop", 3, now.addSecs(-3 * 3600)},
+                                           {"thunderbird.desktop", 9, now.addDays(-1)},
+                                           {"steam.desktop", 2, now.addDays(-3)},
+                                           {"org.kde.kate.desktop", 5, now.addDays(-12)}});
+    controller.startMenu()->setUser("Robin Lee", QUrl());
+
     // The windows, as the tests' stand-in model: a ListModel with the roles TaskModel has.
     QQmlComponent component(controller.engine());
     component.setData(R"(import QtQml.Models

@@ -9,9 +9,10 @@ namespace fuzzy {
 // subsequence of the text): higher is better, negative when a word does not match. Runs of
 // consecutive letters and letters starting a word score most.
 double score(const QString &query, const QString &text);
-// The entries ({kind, title, subtitle, ...}) matching `query`, best first. A leading > @ # or %
-// keeps only actions, windows, workspaces, or sessions. With no words, all of them in their
-// given order (windows, sessions, workspaces, actions, applications on a tie).
+// The entries ({kind, title, subtitle, ...}) matching `query`, best first, each with its `score`
+// added. A leading > @ # or % keeps only actions, windows, workspaces, or sessions. With no
+// words, all of them in their given order (windows, sessions, workspaces, actions, applications
+// on a tie).
 QVariantList rank(const QVariantList &entries, const QString &query, int limit = 60);
 // Whether `name` can name a saved session.
 bool validSessionName(const QString &name);

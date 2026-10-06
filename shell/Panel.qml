@@ -154,6 +154,12 @@ Item {
         case "launcher":
             launcherOpen = true
             return true
+        case "launcher-all":
+        case "launcher-search":
+        case "launcher-menu":
+            // The start menu's other views, as Launcher.preview names them.
+            launcherOpen = true
+            return launcherLoader.item.preview(name)
         case "power":
             togglePowerMenu()
             return powerOpen
