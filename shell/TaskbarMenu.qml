@@ -8,7 +8,9 @@ import "WindowMenu.js" as WindowMenu
 // it. It opens where the bar was pressed. A window's begins with its application's icon and name
 // over its title, then offers what the application starts, what can be done to the window (by its
 // state, and where it is), pinning and closing it; a stacked button's acts on all its windows. A
-// pinned application's offers what it starts, and unpinning it.
+// pinned application's offers what it starts, and unpinning it. On the dock of the macOS style it
+// opens above the icon pressed, and an application's is macOS's: its windows to bring up, what it
+// starts, keeping it in the dock, hiding and quitting it.
 PopupMenu {
     id: contextMenu
     required property var panel
@@ -17,9 +19,9 @@ PopupMenu {
     objectName: "contextMenu"
     entryName: "contextMenuItem"
     open: panel.taskMenuId >= 0 || panel.pinMenuApp !== null || panel.barMenuOpen
-    anchorRect: panel.barAnchor(panel.contextMenuX, 0)
-    side: panel.popupSide
-    alignment: Qt.AlignLeft
+    anchorRect: panel.dockAnchor(panel.contextMenuX, 0)
+    side: panel.dockSide
+    alignment: panel.macos ? Qt.AlignHCenter : Qt.AlignLeft
     bounds: panel.popupArea
     // Closing only this menu: an entry may have opened the launcher.
     onDismissed: { panel.taskMenuId = -1; panel.pinMenuApp = null; panel.barMenuOpen = false }
@@ -35,16 +37,6 @@ PopupMenu {
         app: group ? group.slot : ""
         windowApp: group ? group.windowApp : ""
         taskId: group ? -1 : contextMenu.panel.taskMenuId
-    }
-    // The application a window belongs to, as shell.apps lists it: the one whose pinned slot it
-    // takes (a configured launcher too), else the installed one; null when there is none.
-    function appRecord(windowAppId) {
-        var id = shell.pinnedAppFor(windowAppId) || shell.appFor(windowAppId)
-        var apps = id !== "" ? shell.apps : []
-        for (var i = 0; i < apps.length; ++i)
-            if (apps[i].appId === id)
-                return apps[i]
-        return null
     }
     // The menu's title: the application's icon and name (the window's app id when it has no
     // entry), with `line` under it; without either, `line` alone.
@@ -67,7 +59,7 @@ PopupMenu {
         var newWindow = actions.some(function(action) {
             return action.action === "new-window" || action.name.toLowerCase() === "new window"
         })
-        return open === "New window" && newWindow ? entries
+        return open.toLowerCase() === "new window" && newWindow ? entries
             : entries.concat([{ text: open, icon: open === "Open" ? "app-window" : "plus",
                                 run: function() { shell.launch(record.appId) } }])
     }
@@ -77,7 +69,7 @@ PopupMenu {
         var windows = menuWindows.windows
         var lead = windows.filter(function(w) { return w.taskId === task })[0] || windows[0] ||
                    { taskId: task, appId: "", title: "" }
-        var record = appRecord(lead.appId)
+        var record = panel.appRecord(lead.appId)
         var stacked = windows.length > 1
         var close = stacked
             ? { text: "Close all " + windows.length + " windows", icon: "x", danger: true,
@@ -89,6 +81,28 @@ PopupMenu {
                          launchEntries(record, "New window"),
                          stacked ? stackEntries(windows, tasks) : windowEntries(lead, tasks),
                          (panel.taskMenuApp ? [panel.pinAction(panel.taskMenuApp)] : []).concat([close])])
+    }
+    // An application's menu on the dock: its windows, the focused one marked, then what it starts,
+    // keeping it there, and hiding or quitting it, which minimizes or closes every window.
+    function dockEntries(task, tasks) {
+        var windows = menuWindows.windows
+        var lead = windows.filter(function(w) { return w.taskId === task })[0] || windows[0] ||
+                   { taskId: task, appId: "", title: "" }
+        var record = panel.appRecord(lead.appId)
+        var listed = windows.map(function(w) {
+            return { text: w.title || (record ? record.name : w.appId), toggle: "check", checked: w.active === true,
+                     objectName: "contextMenuWindow", run: function() { tasks.activate(w.taskId) } }
+        })
+        return sections([listed, bare(launchEntries(record, "New Window")),
+                         panel.taskMenuApp ? [panel.pinAction(panel.taskMenuApp)] : [],
+                         [{ text: "Hide", objectName: "contextMenuHide",
+                            run: function() { windows.forEach(function(w) { if (!w.minimized) tasks.minimize(w.taskId) }) } },
+                          { text: "Quit", objectName: "contextMenuClose",
+                            run: function() { windows.forEach(function(w) { tasks.close(w.taskId) }) } }]])
+    }
+    // Entries without their icons, as macOS's menus have them.
+    function bare(entries) {
+        return entries.map(function(entry) { return { text: entry.text, objectName: entry.objectName, run: entry.run } })
     }
     // What can be done to every window of a stack at once.
     function stackEntries(windows, tasks) {
@@ -140,12 +154,13 @@ PopupMenu {
     // with one that notes what it is asked.
     entries: {
         if (panel.taskMenuId >= 0)
-            return taskEntries(panel.taskMenuId, panel.taskSource)
-        // A pinned application without windows.
+            return panel.macos ? dockEntries(panel.taskMenuId, panel.taskSource) : taskEntries(panel.taskMenuId, panel.taskSource)
+        // A pinned application without windows; on the dock without a title, as macOS's.
         var app = panel.pinMenuApp
         if (app !== null)
-            return sections([[titleEntry(app, app.appId, "")], launchEntries(app, "Open"),
-                             app.configured ? [] : [panel.pinAction(app.appId)]])
+            return panel.macos ? sections([bare(launchEntries(app, "Open")), app.configured ? [] : [panel.pinAction(app.appId)]])
+                               : sections([[titleEntry(app, app.appId, "")], launchEntries(app, "Open"),
+                                           app.configured ? [] : [panel.pinAction(app.appId)]])
         // Icons of what each entry leads to: floating windows or tiles, as the tiling button shows.
         return [{ text: panel.tiling ? "Turn tiling off" : "Turn tiling on",
                   icon: panel.tiling ? "copy" : "layout-panel-left", enabled: shell.tilingAvailable,

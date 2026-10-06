@@ -43,8 +43,12 @@ Item {
     property real trayMenuX: 0
     // Bumped when the open menu's item changes its entries, so they are read again.
     property int trayMenuRevision: 0
+    // The menu bar's own menus in the macOS style: "system", "app" or "window" while one is open,
+    // below the item whose left edge is at menuBarMenuX.
+    property string menuBarMenu: ""
+    property real menuBarMenuX: 0
     property bool menuOpen: launcherOpen || taskMenuId >= 0 || pinMenuApp !== null || barMenuOpen || audioPopup !== "" ||
-                            trayMenuKey !== ""
+                            trayMenuKey !== "" || menuBarMenu !== ""
     // Hovering an application's stacked button lists its windows above it: those of the pinned
     // application groupSlot, or with the app id groupWindowApp outside the pinned slots.
     property bool groupOpen: false
@@ -58,40 +62,80 @@ Item {
     // opens under a window being typed in.
     readonly property bool expanded: menuOpen || groupOpen
     onMenuOpenChanged: if (menuOpen) groupOpen = false
-    // The bars the style has: the taskbar (Taskbar.qml).
+    // The bars the style has: the taskbar (Taskbar.qml), or in the macOS style the dock
+    // (Dock.qml) in the panel's surface and the menu bar (TopMenuBar.qml) in a surface of its own
+    // along the output's top edge.
+    readonly property bool macos: Theme.macos
     readonly property Item taskbar: taskbarLoader.item
+    readonly property Item dock: dockLoader.item
+    readonly property Item menuBar: menuBarLoader.item
+    readonly property MenuBarWindow menuBarWindow: menuBarWindow
     // The bar along the panel's edge, which its popups open by; the panel itself while it is
     // being made.
-    readonly property Item bar: taskbar ? taskbar.barItem : root
+    readonly property Item bar: taskbar ? taskbar.barItem : dock ? dock.barItem : root
     // The bar with the status widgets (the clock, Quick Settings, the tray, ...), whose popups
     // open by it, and the part that holds them and names the buttons they open by.
-    readonly property Item statusBar: bar
-    readonly property Item statusArea: taskbar
+    readonly property Item statusBar: macos ? menuBar || root : bar
+    readonly property Item statusArea: macos ? menuBar : taskbar
     // The surface the popups are drawn in, and the bar's top edge in its coordinates: the bar's
-    // surface lies along its top or bottom edge, across its width.
+    // surface lies along its top or bottom edge, across its width, where it begins at surfaceTop.
     readonly property Item popupLayer: popupLayer
     // What Quick Settings opens the wallpaper picker by.
     readonly property Item quickSettingsButton: statusArea ? statusArea.quickSettings : null
-    readonly property real barTop: (onTop ? 0 : popover.height - height) + bar.y
+    readonly property real surfaceTop: onTop ? 0 : popover.height - height
+    readonly property real barTop: surfaceTop + bar.y
+    // The menu bar's strip along the output's top edge, none without one.
+    readonly property real menuBarHeight: macos ? Theme.menuBarHeight : 0
     // A popup of the bar opens away from the screen edge the bar is on (PopupCard's side), beside
-    // the rectangle barAnchor gives: from `x`, `width` wide, and across the bar.
-    readonly property int popupSide: onTop ? Qt.BottomEdge : Qt.TopEdge
-    function barAnchor(x, width) { return Qt.rect(x, barTop, width, bar.height) }
-    // The output but the bar's strip, where popups stay (PopupCard's bounds).
-    readonly property rect popupArea: Qt.rect(0, onTop ? height : 0, popover.width, popover.height - height)
+    // the rectangle barAnchor gives: from `x`, `width` wide, and across the bar. In the macOS
+    // style the bar with the widgets is the menu bar, and the dock's popups (an application's
+    // menu, the windows of one) open above the dock by dockAnchor, which on the taskbar is the
+    // bar's.
+    readonly property int popupSide: onTop || macos ? Qt.BottomEdge : Qt.TopEdge
+    function barAnchor(x, width) { return macos ? Qt.rect(x, 0, width, menuBarHeight) : dockAnchor(x, width) }
+    readonly property int dockSide: macos ? Qt.TopEdge : popupSide
+    function dockAnchor(x, width) { return Qt.rect(x, barTop, width, bar.height) }
+    // The output but the bar's strip, where popups stay (PopupCard's bounds); between the menu
+    // bar and the dock's strip in the macOS style.
+    readonly property rect popupArea: macos
+        ? Qt.rect(0, menuBarHeight, popover.width, popover.height - menuBarHeight - shell.panelExtent)
+        : Qt.rect(0, onTop ? height : 0, popover.width, popover.height - height)
     // Where a list shown on hover takes the pointer: over it and down to the bar, so that the
     // pointer crossing from its button never lands on a window between (which, with focus
     // following the pointer, would take the keyboard).
     function hoverArea(item) {
         var top = onTop ? popupArea.y : item.y
-        var bottom = onTop ? item.y + item.height : popupArea.y + popupArea.height
+        var bottom = onTop ? item.y + item.height : macos ? barTop : popupArea.y + popupArea.height
         return Qt.rect(item.x, top, item.width, bottom - top)
     }
+    // Where the popover takes the pointer while a popup is open: all but the bars, so that a
+    // press on either switches popups in one press. In the macOS style that is the output but the
+    // menu bar's strip and the dock's rectangle, as the four rectangles around the dock.
+    readonly property var popoverInput: {
+        if (!macos)
+            return [popupArea]
+        var top = menuBarHeight, w = popover.width, h = popover.height
+        var left = bar.x, right = bar.x + bar.width, dockBottom = barTop + bar.height
+        return [Qt.rect(0, top, w, barTop - top), Qt.rect(0, dockBottom, w, h - dockBottom),
+                Qt.rect(0, barTop, left, bar.height), Qt.rect(right, barTop, w - right, bar.height)]
+    }
+    // An application's record in shell.apps for a window's app id: the application whose pinned
+    // slot it takes (a configured launcher too), else the installed one; null when there is none.
+    function appRecord(windowAppId) {
+        var id = shell.pinnedAppFor(windowAppId) || shell.appFor(windowAppId)
+        var apps = id !== "" ? shell.apps : []
+        for (var i = 0; i < apps.length; ++i)
+            if (apps[i].appId === id)
+                return apps[i]
+        return null
+    }
     onLauncherOpenChanged: {
-        if (launcherOpen) { taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; trayMenuKey = "" }
+        if (launcherOpen) { taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; trayMenuKey = ""; menuBarMenu = "" }
         else powerOpen = false
     }
-    function closeMenus() { launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false; trayMenuKey = "" }
+    function closeMenus() { launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false; trayMenuKey = ""; menuBarMenu = "" }
+    // A change of style lays the panel out anew: what was open belonged to bars that are gone.
+    onMacosChanged: closeMenus()
     // A stacked button hovered for a moment, or at once while another's list is open, shows its
     // windows; leaving both it and the list hides them again.
     function hoverGroup(button, hovered) {
@@ -135,18 +179,38 @@ Item {
         if (taskId >= 0) { taskMenuId = taskId; taskMenuApp = shell.appFor(app || ""); pinMenuApp = null; barMenuOpen = false }
         else if (app) { pinMenuApp = app; taskMenuId = -1; barMenuOpen = false }
         else { barMenuOpen = true; taskMenuId = -1; pinMenuApp = null }
-        launcherOpen = false; audioPopup = ""; trayMenuKey = ""
+        launcherOpen = false; audioPopup = ""; trayMenuKey = ""; menuBarMenu = ""
     }
     // Opens (or, when it is already open, closes) one of the volume control's popups.
     function toggleAudioPopup(kind, item) {
         if (audioPopup === kind) { audioPopup = ""; return }
         audioPopupX = item.mapToItem(root, item.width / 2, 0).x
         audioPopup = kind
-        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; trayMenuKey = ""
+        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; trayMenuKey = ""; menuBarMenu = ""
+    }
+    // Opens (or, when it is already open, closes) one of the menu bar's own menus below `item`.
+    function toggleMenuBarMenu(kind, item) {
+        if (menuBarMenu === kind) { menuBarMenu = ""; return }
+        menuBarMenuX = item.mapToItem(root, 0, 0).x
+        menuBarMenu = kind
+        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; trayMenuKey = ""
+    }
+    // While one of them is open, the pointer moving onto another's title opens that one instead.
+    function hoverMenuBarMenu(kind, item) {
+        if (menuBarMenu !== "" && menuBarMenu !== kind)
+            toggleMenuBarMenu(kind, item)
     }
     // The power menu, from the power_menu action: the launcher opens with it, and closes with it
     // when asked again.
     function togglePowerMenu() {
+        // The macOS style's system menu has them.
+        if (macos) {
+            if (menuBarMenu === "system")
+                closeMenus()
+            else if (menuBar && shell.power.entries.length > 0)
+                toggleMenuBarMenu("system", menuBar.systemButton)
+            return
+        }
         if (powerOpen) {
             closeMenus()
         } else if (shell.power.entries.length > 0) {
@@ -158,10 +222,17 @@ Item {
     // the way its button would. "bar" opens none. Returns false for a name it does not know, or
     // when what the popup belongs to is not on the bar.
     function previewPopup(name) {
-        var taskList = taskbar.tasks, pinnedSlots = taskbar.pins, tray = taskbar.trayRow
-        var clockButton = statusArea.clock, audioWidget = statusArea.volume, quickButton = statusArea.quickSettings
+        if (macos) {
+            var shown = previewMacos(name)
+            if (shown !== undefined)
+                return shown
+        }
+        var taskList = taskbar ? taskbar.tasks : null, pinnedSlots = taskbar ? taskbar.pins : null
+        var tray = statusArea.trayRow, clockButton = statusArea.clock, audioWidget = statusArea.volume
+        var quickButton = statusArea.quickSettings
         var profilesButton = statusArea.profiles, wallpapersButton = statusArea.wallpapers
-        taskList.forceLayout()
+        if (taskList)
+            taskList.forceLayout()
         var i
         switch (name) {
         case "bar":
@@ -274,6 +345,55 @@ Item {
         }
         return false
     }
+    // The popups previewPopup opens otherwise in the macOS style: those of the dock's icons and
+    // the menu bar's menus (system-menu, app-menu, window-menu, window-submenu); undefined for
+    // the others, which open as on the taskbar.
+    function previewMacos(name) {
+        var icons = [], i
+        for (i = 0; i < dock.pins.count; ++i)
+            icons.push(dock.pins.itemAt(i))
+        for (i = 0; i < dock.running.count; ++i)
+            icons.push(dock.running.itemAt(i))
+        // The first icon with windows, with several, or without any.
+        function find(test) { return icons.filter(function(icon) { return icon && test(icon) })[0] || null }
+        var icon
+        switch (name) {
+        case "power":
+        case "system-menu":
+            toggleMenuBarMenu("system", menuBar.systemButton)
+            return true
+        case "app-menu":
+            toggleMenuBarMenu("app", menuBar.appButton)
+            return true
+        case "window-menu":
+        case "window-submenu":
+            toggleMenuBarMenu("window", menuBar.windowButton)
+            if (name === "window-submenu") {
+                previewSubmenu.menu = menuBarMenuLoader
+                previewSubmenu.start()
+            }
+            return true
+        case "task-menu":
+            icon = find(function(icon) { return icon.running })
+            if (icon)
+                dock.openMenu(icon, icon.modelData || null, "")
+            return icon !== null
+        case "pin-menu":
+            icon = find(function(icon) { return !icon.running && icon.modelData && !icon.modelData.configured })
+            if (icon)
+                dock.openMenu(icon, icon.modelData, icon.modelData.appId)
+            return icon !== null
+        case "stack-menu":
+        case "group":
+            icon = find(function(icon) { return icon.stacked })
+            if (icon && name === "group")
+                openGroup(icon)
+            else if (icon)
+                dock.openMenu(icon, icon.modelData || null, "")
+            return icon !== null
+        }
+        return undefined
+    }
     // For a preview: opens the first submenu of a menu just opened, once its rows are laid out.
     Timer {
         id: previewSubmenu
@@ -289,11 +409,12 @@ Item {
         }
     }
     // Where a tray item's icon is on the screen, which some applications place a window by: the
-    // panel spans its output's width, at its top or bottom edge.
+    // panel spans its output's width, at its top or bottom edge, and the menu bar along its top.
     function trayPoint(item) {
         var p = item.mapToItem(root, item.width / 2, item.height / 2)
+        var inMenuBar = item.Window.window === menuBarWindow
         return Qt.point(Math.round(Screen.virtualX + p.x),
-                        Math.round(Screen.virtualY + (onTop ? p.y : Screen.height - height + p.y)))
+                        Math.round(Screen.virtualY + (inMenuBar || onTop ? p.y : Screen.height - height + p.y)))
     }
     // An item that is only a menu opens it; one that cannot be activated opens it after all.
     property Item trayActivating: null
@@ -328,7 +449,7 @@ Item {
         }
         trayMenuX = button.mapToItem(root, button.width / 2, 0).x
         trayMenuKey = button.key
-        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false
+        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false; menuBarMenu = ""
     }
     // The entries of item `key`'s menu entry `parent` (0 for the top), as a PopupMenu lists them:
     // an entry with children opens them beside it, read as it opens; any other is the
@@ -400,8 +521,11 @@ Item {
         // Reading shell.pinned re-evaluates the menu when pins change. Pinning waits until
         // the click is handled: the change rebuilds the menu, destroying the clicked item.
         var pinned = shell.pinned.some(function(app) { return app.appId === appId })
-        return pinned ? { text: "Unpin from taskbar", icon: "pin-off", run: function() { Qt.callLater(function() { shell.unpin(appId) }) } }
-                      : { text: "Pin to taskbar", icon: "pin", run: function() { Qt.callLater(function() { shell.pin(appId) }) } }
+        var toggle = function() { Qt.callLater(function() { if (pinned) shell.unpin(appId); else shell.pin(appId) }) }
+        if (macos)
+            return { text: "Keep in Dock", toggle: "check", checked: pinned, objectName: "contextMenuKeep", run: toggle }
+        return pinned ? { text: "Unpin from taskbar", icon: "pin-off", run: toggle }
+                      : { text: "Pin to taskbar", icon: "pin", run: toggle }
     }
     // Popups open away from the screen edge the bar sits on.
     // Tiling is per monitor: this panel shows and toggles its own.
@@ -409,7 +533,8 @@ Item {
         var state = shell.workspaces[outputName]
         return state && state.tiling !== undefined ? state.tiling : shell.tiling
     }
-    readonly property bool onTop: shell.panelTop
+    // The dock is at the bottom whatever shell.panel_position says.
+    readonly property bool onTop: shell.panelTop && !macos
 
     // A click on the bar's empty space closes what is open.
     MouseArea {
@@ -427,7 +552,7 @@ Item {
         panel: root.shellView
         keyboard: root.menuOpen
         inputRects: root.menuOpen
-            ? [root.popupArea]
+            ? root.popoverInput
             : root.groupOpen && groupListLoader.item ? [root.hoverArea(groupListLoader.item)] : []
         onDismissed: root.closeMenus()
         Timer { id: closing; interval: Theme.durationNormal; onTriggered: if (!root.expanded) popover.open = false }
@@ -559,13 +684,54 @@ Item {
                 onLoaded: used = true
                 sourceComponent: Component { QuickSettings { panel: root; barItem: root.statusBar } }
             }
+
+            // The menu bar's own menus in the macOS style: the system menu, the focused
+            // application's and the Window menu.
+            Loader {
+                id: menuBarMenuLoader
+                asynchronous: root.menuBarMenu === ""
+                active: root.macos && (root.menuBarMenu !== "" || root.warm || used)
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { MenuBarMenu { panel: root; barItem: root.statusBar } }
+            }
         }
     }
 
-    // The taskbar along the panel's edge.
+    // The taskbar along the panel's edge, or the dock, as the style has it.
     Loader {
         id: taskbarLoader
         anchors.fill: parent
+        active: !root.macos
         sourceComponent: Component { Taskbar { panel: root } }
+    }
+    Loader {
+        id: dockLoader
+        anchors.fill: parent
+        active: root.macos
+        sourceComponent: Component { Dock { panel: root } }
+    }
+    // The panel's surface takes the pointer only over the dock (ShellView's inputRects): the
+    // desktop beside it, and the room above it for an icon to bounce in, stay reachable.
+    Binding {
+        target: root.shellView
+        property: "inputRects"
+        value: root.dock ? [root.dock.area] : []
+    }
+
+    // The menu bar of the macOS style, along the output's top edge in a surface of its own
+    // (MenuBarWindow in view.hpp), there while the style is macOS.
+    MenuBarWindow {
+        id: menuBarWindow
+        panel: root.shellView
+        shown: root.macos
+        barHeight: Theme.menuBarHeight
+        Loader {
+            id: menuBarLoader
+            anchors.fill: parent
+            active: root.macos
+            sourceComponent: Component { TopMenuBar { panel: root } }
+        }
     }
 }

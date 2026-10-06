@@ -13,7 +13,10 @@ ToolTip {
     visible: owner.hovered && !owner.pressed && text.length > 0 && !panel.menuOpen
     delay: 500
     width: Math.min(implicitWidth, 420)
-    y: panel.onTop ? owner.height + Theme.spacingM : -implicitHeight - Theme.spacingM
+    // Below what is on a bar along the top: the taskbar there, or the menu bar, which is in a
+    // surface of its own.
+    readonly property bool below: panel.onTop || (panel.menuBarWindow !== null && owner.Window.window === panel.menuBarWindow)
+    y: below ? owner.height + Theme.spacingM : -implicitHeight - Theme.spacingM
     enter: Transition {
         NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durationFast; easing.type: Theme.easing }
     }

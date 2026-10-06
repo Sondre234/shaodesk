@@ -39,6 +39,9 @@ POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switch
 # The start menu's other views and its menus.
 POPUPS += ["launcher-all", "launcher-search", "launcher-empty", "launcher-menu"]
 POPUPS += ["quick-settings", "quick-settings-mixer", "bar-all"]
+# The menus of the macOS style's menu bar, which only its themes picture.
+MACOS_POPUPS = ["system-menu", "app-menu", "window-menu", "window-submenu"]
+POPUPS += MACOS_POPUPS
 
 # Pictures taken with settings of their own, put in the shell table: name -> (popup, settings).
 # The volume's and the profiles' popups belong to buttons Quick Settings holds by default.
@@ -127,6 +130,11 @@ DETAILS = {
 
 # A line of the shell's output that is a QML warning or error.
 QML_WARNING = re.compile(r"\.qml:\d+|ReferenceError|TypeError|Binding loop|QQmlComponent")
+
+
+def shows(theme_name, popup):
+    """Whether a theme's style has the popup."""
+    return popup not in MACOS_POPUPS or 'style = "macos"' in THEMES[theme_name].get("shell", "")
 
 
 def png(path, width, height, pixel):
@@ -348,7 +356,7 @@ def main():
                 env["QT_SCALE_FACTOR"] = args.scale
             for renderer in renderers:
                 jobs = [(popup, out / f"{theme}-{popup}{'-gpu' if renderer == 'gpu' else ''}.png")
-                        for popup in args.popup or POPUPS]
+                        for popup in args.popup or POPUPS if shows(theme, popup)]
                 if renderer == "software":
                     failures.update(run_all(shell, dict(env, QT_QPA_PLATFORM="offscreen",
                                                         QT_QUICK_BACKEND="software"),

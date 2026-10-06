@@ -152,10 +152,13 @@ int main(int argc, char **argv) {
             QImage shot = views.front()->grabWindow();
             if (preview && !parser.isSet("preview-desktop")) {
                 auto *popover = views.front()->popover();
+                auto *menuBar = views.front()->menuBar();
                 shot = previewOnDesktop(shot,
                                         popover && popover->isVisible() ? popover->grabWindow()
                                                                         : QImage(),
-                                        controller.panelTop(), controller);
+                                        menuBar && menuBar->isVisible() ? menuBar->grabWindow()
+                                                                        : QImage(),
+                                        controller.panelSurfaceTop(), controller);
                 if (previewData)
                     shot = previewData->withSurface(shot);
             }

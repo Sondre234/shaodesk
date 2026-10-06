@@ -21,8 +21,8 @@ PopupCard {
     initialFocus: null
     implicitWidth: 280
     implicitHeight: 2 * padding + groupWindows.count * rowHeight + Math.max(0, groupWindows.count - 1) * rows.spacing
-    anchorRect: panel.barAnchor(panel.groupX, 0)
-    side: panel.popupSide
+    anchorRect: panel.dockAnchor(panel.groupX, 0)
+    side: panel.dockSide
     HoverHandler {
         id: groupHover
         onHoveredChanged: groupList.panel.hoverGroupList(hovered)

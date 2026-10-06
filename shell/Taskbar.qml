@@ -12,7 +12,7 @@ Item {
     id: taskbar
     required property var panel
     // What the panel reaches: the bar itself, which the popups open by, and the buttons that open
-    // them, as MenuBar.qml names its own.
+    // them, as TopMenuBar.qml names its own.
     readonly property Item barItem: bar
     readonly property Item tasks: taskList
     readonly property Item pins: pinnedSlots

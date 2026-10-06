@@ -74,6 +74,10 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     WallpapersButton.qml
     ProfilesButton.qml
     TilingButton.qml
+    Dock.qml
+    DockIcon.qml
+    TopMenuBar.qml
+    MenuBarMenu.qml
     QuickSettings.qml
     QuickTile.qml)
 add_executable(shaodesk-shell main.cpp ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp task_model.cpp task_model.hpp

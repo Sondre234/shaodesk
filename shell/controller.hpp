@@ -166,6 +166,12 @@ class ShellController : public QObject {
     int panelMarginLeft() const { return config_.shell.panel_margin[3]; }
     // The strip the panel reserves: the bar and the margins above and below it.
     int panelExtent() const { return panelHeight() + panelMarginTop() + panelMarginBottom(); }
+    // Whether the panel's surface lies along the output's top edge: as shell.panel_position says,
+    // but for the macOS style's dock, which is at the bottom.
+    bool panelSurfaceTop() const { return panelTop() && !config_.shell.macos_style; }
+    // The room the panel's surface has above the strip it reserves: the dock's, for an icon to
+    // bounce in; none for the taskbar.
+    int panelHeadroom() const { return config_.shell.macos_style ? panelHeight() / 2 : 0; }
     int panelRadius() const { return config_.shell.panel_radius; }
     QString fontFamily() const { return QString::fromStdString(config_.shell.font); }
     int fontSize() const { return config_.shell.font_size; }

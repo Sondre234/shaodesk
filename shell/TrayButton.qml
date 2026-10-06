@@ -27,7 +27,8 @@ FlatButton {
     contentItem: Item {
         Image {
             objectName: "trayIcon"
-            readonly property int size: Math.max(Theme.spacingL, Math.min(Theme.iconSize, Theme.barButtonHeight - 2 * Theme.spacingM))
+            readonly property int size: Theme.macos ? Theme.menuBarIconSize
+                                        : Math.max(Theme.spacingL, Math.min(Theme.iconSize, Theme.barButtonHeight - 2 * Theme.spacingM))
             anchors.centerIn: parent
             width: size; height: size
             source: trayButton.image; sourceSize: Qt.size(size, size)
