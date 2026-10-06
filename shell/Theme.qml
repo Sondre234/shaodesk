@@ -42,7 +42,8 @@ QtObject {
     readonly property color accent: shell.accent
     // Text and icons on an accent fill: whichever of the surface and text colours stands out
     // more against it.
-    readonly property color textOnAccent: contrast(accent, surface) >= contrast(accent, text) ? surface : text
+    readonly property color textOnAccent: contrast(accent, surface) >= contrast(accent, text)
+                                          ? surface : text
     readonly property color accentHover: mix(accent, textOnAccent, 0.15)
     // A selected row or tab that is not filled with the accent.
     readonly property color accentSubtle: alpha(accent, 0.22)
@@ -61,7 +62,8 @@ QtObject {
     // Type, from shell.font and shell.font_size: body text, then smaller for secondary text and
     // captions, larger for list entries and popup headings, a title for a dialog or an overlay's
     // input, and the launcher's heading.
-    readonly property string fontFamily: shell.fontFamily.length > 0 ? shell.fontFamily : Qt.application.font.family
+    readonly property string fontFamily: shell.fontFamily.length > 0 ? shell.fontFamily
+                                                                   : Qt.application.font.family
     readonly property int fontSize: shell.fontSize
     readonly property int fontSizeSmall: Math.max(6, fontSize - 1)
     readonly property int fontSizeCaption: Math.max(6, fontSize - 2)
@@ -112,7 +114,9 @@ QtObject {
     }
     // WCAG's relative luminance and contrast ratio.
     function luminance(color) {
-        function channel(c) { return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4) }
+        function channel(c) {
+            return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+        }
         return 0.2126 * channel(color.r) + 0.7152 * channel(color.g) + 0.0722 * channel(color.b)
     }
     function contrast(a, b) {
