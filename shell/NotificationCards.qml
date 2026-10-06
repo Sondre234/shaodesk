@@ -10,7 +10,6 @@ Item {
     required property string outputName
     readonly property var center: shell.notifications
     readonly property int margin: 12
-    readonly property string uiFont: shell.fontFamily.length > 0 ? shell.fontFamily : Qt.application.font.family
     // The output the cards are on; the surface stays while the last ones slide away.
     readonly property bool targeted: shell.cardsOutput === outputName
     property int settled: 0
@@ -44,17 +43,17 @@ Item {
         model: cards.active ? center.cards : null
         add: Transition {
             ParallelAnimation {
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 160 }
-                NumberAnimation { property: "x"; from: center.left ? -center.cardWidth : center.cardWidth; duration: 220; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.duration(160) }
+                NumberAnimation { property: "x"; from: center.left ? -center.cardWidth : center.cardWidth; duration: Theme.duration(220); easing.type: Theme.easing }
             }
         }
         remove: Transition {
             ParallelAnimation {
-                NumberAnimation { property: "opacity"; to: 0; duration: 160 }
-                NumberAnimation { property: "x"; to: center.left ? -center.cardWidth : center.cardWidth; duration: 200; easing.type: Easing.InCubic }
+                NumberAnimation { property: "opacity"; to: 0; duration: Theme.duration(160) }
+                NumberAnimation { property: "x"; to: center.left ? -center.cardWidth : center.cardWidth; duration: Theme.duration(200); easing.type: Theme.easingExit }
             }
         }
-        displaced: Transition { NumberAnimation { properties: "y"; duration: 180; easing.type: Easing.OutCubic } }
+        displaced: Transition { NumberAnimation { properties: "y"; duration: Theme.duration(180); easing.type: Theme.easing } }
         delegate: Item {
             id: entry
             required property int index
@@ -85,9 +84,9 @@ Item {
                 objectName: "notificationCard"
                 width: parent.width
                 height: content.implicitHeight + 24
-                radius: 12
-                color: shell.panelColor
-                border.color: entry.critical ? "#ff6b6b" : Qt.lighter(shell.panelColor, 1.6)
+                radius: Theme.radiusLarge
+                color: Theme.surface
+                border.color: entry.critical ? Theme.danger : Theme.border
                 border.width: entry.critical ? 2 : 1
                 MouseArea {
                     id: hover
@@ -118,14 +117,14 @@ Item {
                             Text {
                                 Layout.fillWidth: true
                                 text: entry.app
-                                color: shell.textColor; opacity: 0.6
-                                font.pixelSize: Math.max(6, shell.fontSize - 2); font.family: cards.uiFont
+                                color: Theme.textMuted
+                                font.pixelSize: Theme.fontSizeCaption; font.family: Theme.fontFamily
                                 textFormat: Text.PlainText; elide: Text.ElideRight
                             }
                             Text {
                                 objectName: "notificationClose"
                                 text: "×"
-                                color: shell.textColor; opacity: closeArea.containsMouse ? 1 : 0.55
+                                color: closeArea.containsMouse ? Theme.text : Theme.textMuted
                                 font.pixelSize: 18
                                 MouseArea {
                                     id: closeArea
@@ -139,8 +138,8 @@ Item {
                             Layout.fillWidth: true
                             visible: text.length > 0
                             text: entry.summary
-                            color: shell.textColor
-                            font.pixelSize: shell.fontSize + 1; font.bold: true; font.family: cards.uiFont
+                            color: Theme.text
+                            font.pixelSize: Theme.fontSize + 1; font.bold: true; font.family: Theme.fontFamily
                             textFormat: Text.PlainText
                             wrapMode: Text.Wrap; maximumLineCount: 2; elide: Text.ElideRight
                         }
@@ -148,18 +147,18 @@ Item {
                             Layout.fillWidth: true
                             visible: text.length > 0
                             text: entry.body
-                            color: shell.textColor; opacity: 0.85
-                            font.pixelSize: shell.fontSize; font.family: cards.uiFont
+                            color: Theme.text; opacity: 0.85
+                            font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
                             textFormat: Text.StyledText
-                            linkColor: shell.accent
+                            linkColor: Theme.accent
                             wrapMode: Text.Wrap; maximumLineCount: 5; elide: Text.ElideRight
                             onLinkActivated: (link) => cards.center.openLink(link)
                         }
                         Rectangle {
                             visible: entry.progress >= 0
                             Layout.fillWidth: true; Layout.preferredHeight: 6; Layout.topMargin: 3
-                            radius: 3; color: Qt.lighter(shell.panelColor, 1.8)
-                            Rectangle { width: parent.width * Math.max(0, entry.progress) / 100; height: parent.height; radius: 3; color: shell.accent }
+                            radius: 3; color: Theme.selected
+                            Rectangle { width: parent.width * Math.max(0, entry.progress) / 100; height: parent.height; radius: 3; color: Theme.accent }
                         }
                         Flow {
                             visible: entry.actions.length > 0
@@ -174,10 +173,10 @@ Item {
                                     text: modelData.label
                                     padding: 6; leftPadding: 12; rightPadding: 12
                                     onClicked: cards.center.invoke(entry.notificationId, modelData.key)
-                                    background: Rectangle { radius: 6; color: action.hovered ? Qt.lighter(shell.panelColor, 1.9) : Qt.lighter(shell.panelColor, 1.5) }
+                                    background: Rectangle { radius: Theme.radiusSmall; color: action.pressed ? Theme.pressed : action.hovered ? Theme.selected : Theme.hover }
                                     contentItem: Text {
-                                        text: action.text; color: shell.textColor
-                                        font.pixelSize: shell.fontSize; font.family: cards.uiFont
+                                        text: action.text; color: Theme.text
+                                        font.pixelSize: Theme.fontSize; font.family: Theme.fontFamily
                                         horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
                                     }
                                 }
