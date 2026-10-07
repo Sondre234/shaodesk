@@ -415,9 +415,8 @@ void refresh_frame(struct sh_toplevel *toplevel) {
     sh_tween_track(server->animator, &toplevel->fade, SH_ANIM_FOCUS,
                    mapped && toplevel->shown && toplevel_visible(toplevel), target, fading,
                    fade_update, toplevel);
-    // Peeking scales the opacity, fullscreen windows included.
-    opacity = fading[0] * (float)(1 - sh_fade_value(&server->peek_fade, now_ms()) *
-                                          (1 - settings->effects.peek_opacity));
+    // Peeking scales the opacity, fullscreen windows included, but for a window peeked at.
+    opacity = fading[0] * peek_scale(toplevel, now_ms());
     color = fading + 1;
     float pulsing[4];
     if (urgent) {

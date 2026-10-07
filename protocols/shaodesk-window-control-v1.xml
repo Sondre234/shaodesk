@@ -22,9 +22,14 @@
     From version 3 it also says which process made each window, for the taskbar to find the
     sound a window plays among the sound server's streams. A client outside a sandbox can list
     the user's processes already; what this adds is which window is whose.
+
+    From version 4 the taskbar can peek at a window while the pointer rests on its picture, as
+    Windows does: the other windows fade to show that one alone, wherever it is. This shows a
+    window on the screen for a moment, as the picture shows it already, and changes nothing
+    about it.
   </description>
 
-  <interface name="shaodesk_window_control_v1" version="3">
+  <interface name="shaodesk_window_control_v1" version="4">
     <description summary="controls windows named by their taskbar handles">
       A global for getting the shaodesk_window_v1 of a window, from the
       zwlr_foreign_toplevel_handle_v1 the client holds for it.
@@ -48,7 +53,7 @@
     </request>
   </interface>
 
-  <interface name="shaodesk_window_v1" version="3">
+  <interface name="shaodesk_window_v1" version="4">
     <description summary="one window's workspace, output and tiling">
       Where a window is and how it is placed, and requests that move it. It becomes inert when
       the window's taskbar handle is sent closed; the client then destroys it.
@@ -206,5 +211,31 @@
       </description>
       <arg name="pid" type="uint"/>
     </event>
+
+    <request name="set_peek" since="4">
+      <description summary="show the window alone over the desktop">
+        Peeks at the window, as a taskbar does while the pointer rests on its picture: every
+        other window fades as the peek action fades them, to show the desktop, and this one
+        shows in its place on its output over all of them, at its own opacity, below the
+        panels. A minimized window shows where it was, and one on a workspace its output does
+        not show shows over the workspace that it does. Nothing about the window changes: it is
+        not focused, raised in the stacking order, restored or moved to the workspace shown, and
+        a window shown only for the peek takes no input.
+
+        One window is peeked at a time. Peeking at another, through this client or another,
+        moves the peek over to it while the other windows stay faded; peeking at the window
+        peeked at already does nothing. The peek ends, with a fade, with unset_peek, or when
+        this object is destroyed (as it is when its client disconnects), the window closes or
+        is focused, the session locks, or the peek action starts.
+      </description>
+    </request>
+
+    <request name="unset_peek" since="4">
+      <description summary="end the peek at the window">
+        Ends the peek set_peek started through this object: the other windows fade back, and
+        the window goes back to how it was, fading out again if it was not shown. Does nothing
+        when that peek has ended, or moved to another window, already.
+      </description>
+    </request>
   </interface>
 </protocol>

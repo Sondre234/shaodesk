@@ -460,6 +460,48 @@ static void get_pictures(struct sh_server *server, int fd, const char *arguments
     }
 }
 
+/* Where a window is stacked among the windows, from 0 at the bottom: counting the windows in the
+ * trees they are drawn in from the lowest, the one peeked at over the others; -1 for none. */
+static int stacked_at(struct sh_server *server, struct sh_toplevel *toplevel) {
+    struct wlr_scene_tree *trees[] = {server->windows, server->fullscreen, server->peek_layer,
+                                      server->fullscreen_cover};
+    int index = 0;
+    for (size_t i = 0; i < sizeof(trees) / sizeof(*trees); ++i) {
+        struct wlr_scene_node *node;
+        wl_list_for_each(node, &trees[i]->children, link) {
+            // Closing copies and the node keeping the place of the window peeked at are no
+            // window's.
+            struct sh_node *owner = node->data;
+            if (!owner || owner->kind != SH_NODE_TOPLEVEL)
+                continue;
+            if (owner->owner == toplevel)
+                return index;
+            ++index;
+        }
+    }
+    return -1;
+}
+
+static void get_window_peek(struct sh_server *server, int fd, const char *arguments) {
+    // Per window, in the order of `get windows`: whether it is the one peeked at, whether it is
+    // drawn (its node shown), where it is stacked (stacked_at), how far it shows through a peek
+    // and the opacity its buffers have (both in thousandths), and its title.
+    control_reply(fd, "ok\n");
+    int64_t now = now_ms();
+    struct sh_toplevel *toplevel;
+    wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
+        char title[512], line[640];
+        snprintf(title, sizeof(title), "%s", toplevel_title(toplevel) ? toplevel_title(toplevel) : "");
+        one_field(title);
+        snprintf(line, sizeof(line), "%d\t%d\t%d\t%ld\t%ld\t%s\n", server->peek_window == toplevel,
+                 toplevel->scene_tree && toplevel->scene_tree->node.enabled,
+                 stacked_at(server, toplevel),
+                 lround(1000 * sh_fade_value(&toplevel->peek_shown, now)),
+                 lround(1000 * toplevel->opacity), title);
+        control_reply(fd, line);
+    }
+}
+
 /* The queries, "get NAME" (or "get NAME ARGUMENTS" for one that takes them), which answer
  * even while the session is locked. A handler gets NULL for no arguments. */
 static const struct {
@@ -482,6 +524,7 @@ static const struct {
     {"frame_times", get_frame_times, false},
     {"dim", get_dim, false},
     {"peek", get_peek, false},
+    {"window_peek", get_window_peek, false},
     {"opacities", get_opacities, false},
     {"frames", get_frames, false},
     {"zoom", get_zoom, false},

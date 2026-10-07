@@ -446,6 +446,8 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 }
 
 void unmap_toplevel(struct sh_toplevel *toplevel) {
+    // Back in its place first, should it be peeked at, so that it closes there.
+    forget_window_peek(toplevel);
     // The client's buffers go with this commit; the closing animation draws a copy of them.
     struct sh_server *server = toplevel->server;
     if (toplevel->shown && server->running && toplevel_visible(toplevel)) {
