@@ -385,7 +385,10 @@ Item {
         dragTile = tile
         if (tile) dragRest.restart(); else dragRest.stop()
     }
+    // A menu opened meanwhile (by a key) has the keyboard, and keeps it.
     function springDrag() {
+        if (menuOpen)
+            return
         if (dragTile) {
             bringForward(dragTile)
             return
@@ -393,7 +396,7 @@ Item {
         var windows = dragButton ? dragButton.dragWindows() : []
         if (windows.length === 1)
             bringForward(windows[0])
-        else if (windows.length > 1 && !menuOpen)
+        else if (windows.length > 1)
             openGroup(dragButton)
         warmGroup = null
     }
