@@ -23,15 +23,19 @@
 // events the owner dispatches.
 //
 // While a window is watched it is captured into a shared-memory buffer: once, or again each time
-// it redraws, at most every `interval` milliseconds. Each frame is scaled down if it needs to be,
-// on a pool of threads, and kept, small, until the window closes; the session and its buffer
-// last only while the window is watched. Windows are named by the owner's numbers for them.
+// it redraws, at most every `interval` milliseconds (`fullSizeInterval` at the window's size).
+// Each frame is scaled down if it needs to be, on a pool of threads, and kept, small, until the
+// window closes; the session and its buffer last only while the window is watched. Windows are
+// named by the owner's numbers for them.
 class WindowPictures : public QObject {
     Q_OBJECT
   public:
-    // How often a live picture may follow its window, so that copying a large window never
-    // runs at the monitor's rate.
-    static constexpr int interval = 100;
+    // How often a live picture may follow its window, never at the monitor's rate. At the
+    // picture's size a frame is a few hundred kilobytes to copy and next to nothing to scale, so
+    // 30 times a second, where a video moves; a large window at its own size is tens of megabytes
+    // and a smooth scaling of all of them, so ten times.
+    static constexpr int interval = 33;
+    static constexpr int fullSizeInterval = 100;
     // `flush` sends what was asked on the owner's connection.
     explicit WindowPictures(std::function<void()> flush);
     ~WindowPictures() override;

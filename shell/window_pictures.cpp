@@ -59,9 +59,11 @@ struct WindowPictures::Capture {
     // Frames that failed in a row for no stated reason.
     int failures = 0;
     QElapsedTimer started;
-    // The next frame of a live picture, `interval` after the last one started.
+    // The next frame of a live picture, the interval after the last one started.
     QTimer next;
     quint64 serial = 0;
+    // How long a live picture waits between frames.
+    int interval() const { return box.isEmpty() ? fullSizeInterval : WindowPictures::interval; }
 };
 
 WindowPictures::WindowPictures(std::function<void()> flush) : flush_(std::move(flush)) {
@@ -246,7 +248,7 @@ void WindowPictures::published(int id, int session, const QImage &picture) {
     else if (!capture->live)
         end(*capture);
     else
-        capture->next.start(std::max(0, interval - int(capture->started.elapsed())));
+        capture->next.start(std::max(0, capture->interval() - int(capture->started.elapsed())));
     flush_();
 }
 
@@ -385,7 +387,7 @@ void WindowPictures::failed(void *data, ext_image_copy_capture_frame_v1 *frame, 
     default:
         // The compositor says it may be tried again, but not forever.
         if (++capture.failures < 3)
-            capture.next.start(interval);
+            capture.next.start(capture.interval());
         else
             owner.end(capture);
     }
