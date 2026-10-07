@@ -126,11 +126,12 @@ is muted, to unmute it. The sound is that of the sound server's streams (PulseAu
 PipeWire's) played by the process that made the window, or by one it started that has no window
 of its own: a browser playing from a child process shows it, and so does a terminal running a
 player, unless the player has a window. Windows of one process cannot be told apart, so all of a
-browser's windows show the speaker when one of its tabs plays, and muting one mutes them all. A
-stream counts while it is open and not paused: an application that keeps one open while it plays
-nothing, as some games and voice-chat applications do, shows the speaker until it closes it. An
-application in a sandbox with a process namespace of its own (Flatpak) names its processes by
-numbers that mean nothing outside it, so its windows show no speaker.
+browser's windows show the speaker when one of its tabs plays, as do all of a terminal's that
+serves every window from one process (foot's server, GNOME Terminal), and muting one mutes them
+all. A stream counts while it is open and not paused: an application that keeps one open while it
+plays nothing, as some games and voice-chat applications do, shows the speaker until it closes
+it. An application in a sandbox with a process namespace of its own (Flatpak) names its processes
+by numbers that mean nothing outside it, so its windows show no speaker.
 
 ```lua
 shell = {
