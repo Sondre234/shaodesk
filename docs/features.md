@@ -1286,7 +1286,9 @@ from 0), and `switcher-close`. The state ends with `power ACTIONS`, the power ac
 run (`lock,suspend,reboot,poweroff,logout`, in the order menus list them, or `-`), a power
 action that fails or is cancelled after it was accepted sends `power-error MESSAGE`, a program
 that `spawn` or `terminal` could not start sends `spawn-error MESSAGE` (the panel shows either
-across itself for eight seconds), and `power_menu` sends `power-menu OUTPUT`. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
+across itself for eight seconds), `power_menu` sends `power-menu OUTPUT`, and `taskbar_focus`
+sends `taskbar OUTPUT` for the focused monitor, whose panel takes the keyboard to walk its
+buttons, or gives it back. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
 refused while the session is locked.
 
 ## Screen locking and idle

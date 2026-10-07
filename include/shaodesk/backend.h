@@ -165,6 +165,9 @@ enum sh_action {
     SH_LOCK, /* starts power.lock_command */
     /* Asks the shell for its power menu on the output under the pointer. */
     SH_POWER_MENU,
+    /* Asks the shell to give the keyboard to the taskbar (or the dock) on the focused output, to
+     * walk its buttons and their windows with the arrows, as Windows' Win+T; again, to leave. */
+    SH_TASKBAR_FOCUS,
 };
 
 enum sh_screenshot_mode {

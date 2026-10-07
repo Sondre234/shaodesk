@@ -516,11 +516,9 @@ void send_event(struct sh_server *server, const char *text, size_t length) {
     }
 }
 
-/* Asks the shell to open something (`what`: "launcher", "palette", "notifications" or
- * "power-menu") on the output under the pointer. */
-void request_shell(struct sh_server *server, const char *what) {
-    struct wlr_output *output =
-        wlr_output_layout_output_at(server->output_layout, server->cursor->x, server->cursor->y);
+/* Sends the shell "WHAT OUTPUT". */
+static void request_shell_on(struct sh_server *server, const char *what,
+                             struct wlr_output *output) {
     if (!output)
         return;
     char line[128];
@@ -528,6 +526,14 @@ void request_shell(struct sh_server *server, const char *what) {
     if (length < 0 || (size_t)length >= sizeof(line))
         return;
     send_event(server, line, (size_t)length);
+}
+
+/* Asks the shell to open something (`what`: "launcher", "palette", "notifications" or
+ * "power-menu") on the output under the pointer. */
+void request_shell(struct sh_server *server, const char *what) {
+    struct wlr_cursor *cursor = server->cursor;
+    request_shell_on(server, what,
+                     wlr_output_layout_output_at(server->output_layout, cursor->x, cursor->y));
 }
 
 void send_shell_line(struct sh_server *server, const char *line) {
@@ -558,6 +564,12 @@ void request_launcher(struct sh_server *server) {
 
 void request_palette(struct sh_server *server) {
     request_shell(server, "palette");
+}
+
+/* "taskbar OUTPUT": the panel on the focused output, the one the keyboard was typing on, takes
+ * the keyboard to walk its buttons, or gives it back when it has it. */
+void request_taskbar(struct sh_server *server) {
+    request_shell_on(server, "taskbar", focused_output(server));
 }
 
 static int control_client_readable(int fd, uint32_t mask, void *data) {
