@@ -178,9 +178,10 @@ While a menu or popup is open it holds the keyboard and takes every press but th
 strip, where `inputRects` leaves a hole: a press on another bar button still switches popups in
 one press, and a press beside the popups closes them. The windows of a button shown on hover (the
 card of their pictures, or a stack's list) take only the pointer over the card and down to the bar
-(`hoverArea`), and leave the keyboard where it is. Losing the keyboard while it holds it (`dismissed`)
-closes the popups. Without layer shell (`--preview-popup`, `shell_ui_test`) it is an ordinary
-window as large as `ShellView::previewSize()`, and a preview's screenshot draws it over the bar.
+(`hoverArea`), where a drag reaches them too, and leave the keyboard where it is. Losing the
+keyboard while it holds it (`dismissed`) closes the popups. Without layer shell (`--preview-popup`,
+`shell_ui_test`) it is an ordinary window as large as `ShellView::previewSize()`, and a preview's
+screenshot draws it over the bar.
 
 `Panel.qml` loads the bars of `shell.style`. The taskbar (`Taskbar.qml`) fills the panel's surface.
 The macOS style has two: the dock (`Dock.qml`) in the panel's surface, which is then at the bottom
@@ -261,6 +262,23 @@ window the tiles take over from the panel as the card opens is neither let go no
 again, which would start its capture anew, or without `live` take its one picture twice. A
 stand-in model (the preview's, the tests') has no `watchPicture`, which the panel then does not
 call, and names pictures of its own (`image://preview-windows/ID`, painted by `preview.cpp`).
+
+A drag from an application never reaches the hover handlers: Wayland sends its events
+(`wl_data_device`'s enter, motion and leave) to the surface under the pointer instead, and the
+pointer stays with none while it lasts. `Panel.qml` follows it with a `DropArea` over the panel's
+surface and one over the popover's (`dragOverBar`, `dragOverPopover`), which find the button under
+it (an item with `dragWindows()`: a `TaskButton` or a `DockIcon`) or the tile or row of a window
+on the open card or list (an item with `taskId`, `active` and `minimized`). After `dragDelay` a
+button's one window is activated (`taskSource.activate`, unless it is in front already, which that
+would minimize), a stack's windows shown (`openGroup`), or a tile's window activated. What is
+open stays while `dragHolds`, which `groupHide` reads beside the hover state. Each `DropArea`
+refuses every move (`drag.accepted = false`), and Qt answers the drag's source with the move's
+answer, so the shell never takes a drop and the source sees it cancelled. Each fills its surface,
+so that a drag enters it only as it comes onto the surface, when Qt follows the enter with a move
+at once; an item entered by a later move would answer that move with its enter, which takes the
+drag. `shell_ui_test` hands the windows drag events as Qt's Wayland platform does. A drag holds the keyboard in the compositor, and wlroots
+lets no focus change through it: `drag_ended` (`input.c`) gives the keyboard to the window
+focused meanwhile once the drag ends, and the pointer to the surface under it.
 
 The speaker on a picture's tile is a `WindowSound` (`audio.cpp`), which the tile makes with the
 panel's `audioSource` and `taskSource` and its window's `pid` (`TaskModel`'s role, from the window
@@ -491,7 +509,10 @@ them in `shell/controller.cpp`.
   107 bytes, and a Gentoo package build runs the tests in a `TMPDIR` of 43 characters or more.
   Under `--headless`, `shaodesk msg headless_output` and `headless_keyboard` plug in outputs and
   keyboards (`headless_keyboard key NAME CODE press` types on one; see `keymap_smoke.py`), and
-  `wayland_probe --keymap` prints the keymap an application gets.
+  `wayland_probe --keymap` prints the keymap an application gets. A `wayland_probe` window with
+  `SHAODESK_PROBE_DRAG=source` drags a line of text on a button press of `pointer_probe`'s, and
+  one with `=target` takes it, each printing what it hears; `get seat` says where the drag is
+  (see `drag_focus_smoke.py`).
 
 ## A fast loop
 

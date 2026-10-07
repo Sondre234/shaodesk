@@ -86,6 +86,12 @@ shadows.
   moves at once to the next picture and ends with a fade as the pointer leaves the pictures, and
   clicking the picture focuses the window where it shows. `shaodesk-window-control-v1` version 4
   peeks with `set_peek` and `unset_peek`, and `shaodesk msg get window_peek` shows what it does.
+- Something dragged from an application (a file, text, a link) brings windows forward as on
+  Windows: resting it half a second on a window's taskbar button brings that window to the front,
+  restored and its workspace shown, to carry the drag on and drop it there; on a stack's button
+  it opens the card of their pictures, or their list, where resting on one brings it forward. A
+  drag only crossing the bar does nothing, and the bar takes no drop, so the application sees it
+  cancelled. The macOS style's dock does the same.
 - A window's taskbar menu is headed by its application's icon and name over the window's title,
   and offers the application's desktop actions and a new window, then minimize or restore,
   maximize or restore, fullscreen, moving the window to another workspace or monitor, keeping it
@@ -186,6 +192,8 @@ shadows.
 - The compositor tells the shell whether night light is on and whether the schedule decides
   (`night-light ACTIVE MODE` on the control socket's state stream).
 - `shaodesk msg get layers` says which layer surface holds the keyboard, in a fifth column.
+- `shaodesk msg get seat` says what has the keyboard, what the pointer is on, and what a drag is
+  over.
 
 ### Working on the shell
 
@@ -200,6 +208,10 @@ shadows.
 - A program capturing one window (ext-foreign-toplevel-image-capture-source-v1, as a portal's
   window sharing does) is no longer disconnected for asking while the session is locked: it gets
   a source whose capture stops at once, as for a window that is gone.
+- A window brought forward while something is dragged (from the taskbar, or by an application
+  asking for it) has the keyboard once the drag ends, instead of the window the drag came from,
+  and a click right after a drop, without moving, reaches the window under the pointer. A drag
+  over the top edge of a window shaodesk decorates goes to the window rather than nowhere.
 
 ## 0.1.1 (2026-10-05)
 

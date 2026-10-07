@@ -27,6 +27,10 @@ Button {
     readonly property bool urgent: windows !== null && windows.urgent
     property string groupSlot: ""
     property string groupWindowApp: ""
+    // The windows a drag resting on it brings forward, as a taskbar button's; its name shows
+    // while the drag is over it, as under the pointer.
+    function dragWindows() { return windows ? windows.windows : [] }
+    readonly property bool dragOver: panel.dragButton === dockIcon
     // How far it has come in, from 0 to 1, and how far up it is in a bounce.
     property real grow: 1
     property real lift: 0
@@ -83,7 +87,8 @@ Button {
         panel: dockIcon.panel; owner: dockIcon
         text: dockIcon.name
         delay: 0
-        visible: dockIcon.hovered && !dockIcon.pressed && text.length > 0 && !dockIcon.panel.expanded
+        visible: (dockIcon.hovered || dockIcon.dragOver) && !dockIcon.pressed && text.length > 0 &&
+                 !dockIcon.panel.expanded
     }
     background: null
     contentItem: Item {

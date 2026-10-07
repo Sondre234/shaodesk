@@ -5,6 +5,7 @@
 #include "view.hpp"
 #include <QAbstractItemModel>
 #include <QDir>
+#include <QDragEnterEvent>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QGuiApplication>
@@ -12,6 +13,7 @@
 #include <QJSValue>
 #include <QLocalServer>
 #include <QLocalSocket>
+#include <QMimeData>
 #include <QPointer>
 #include <QQmlComponent>
 #include <QQmlEngine>
@@ -2441,11 +2443,157 @@ ListModel {
         std::cerr << "leaving a stacked task did not hide its windows\n";
         return 1;
     }
+    // Drags from an application, as Qt's Wayland platform hands them to the window under them:
+    // coming into a window, an enter and at once a move, then a move each time they move, and a
+    // leave as they go or end. A move the window takes is its answer to the application, taken
+    // already when the last one was, as Qt has it; dragTo says whether the window took it.
+    QMimeData dragged;
+    dragged.setText("dragged text");
+    const Qt::DropActions dragActions = Qt::CopyAction | Qt::MoveAction;
+    QPointer<QWindow> dragWindow;
+    Qt::DropAction dragTaken = Qt::IgnoreAction;
+    auto dragGone = [&] {
+        if (dragWindow) {
+            QDragLeaveEvent leave;
+            QCoreApplication::sendEvent(dragWindow, &leave);
+        }
+        dragWindow = nullptr;
+    };
+    auto dragTo = [&](QWindow *window, QPoint at) {
+        if (window != dragWindow) {
+            dragGone();
+            dragWindow = window;
+            QDragEnterEvent enter(at, dragActions, &dragged, Qt::LeftButton, Qt::NoModifier);
+            QCoreApplication::sendEvent(window, &enter);
+            dragTaken = enter.isAccepted() ? enter.dropAction() : Qt::IgnoreAction;
+        }
+        QDragMoveEvent move(at, dragActions, &dragged, Qt::LeftButton, Qt::NoModifier);
+        if (dragTaken != Qt::IgnoreAction) {
+            move.setDropAction(dragTaken);
+            move.accept();
+        }
+        QCoreApplication::sendEvent(window, &move);
+        dragTaken = move.isAccepted() ? move.dropAction() : Qt::IgnoreAction;
+        return move.isAccepted();
+    };
+    // Whether `holds` goes on holding for `ms`, for what must not happen.
+    auto stays = [&](const std::function<bool()> &holds, int ms = 800) {
+        QElapsedTimer waited;
+        waited.start();
+        while (waited.elapsed() < ms) {
+            if (!holds())
+                return false;
+            QTest::qWait(20);
+        }
+        return holds();
+    };
+    // The visible item called `name` under `item` whose window is `id`.
+    std::function<QQuickItem *(QQuickItem *, const QString &, int)> windowItem =
+        [&](QQuickItem *item, const QString &name, int id) -> QQuickItem * {
+        for (auto *child : item->childItems()) {
+            if (child->objectName() == name && child->isVisible() && child->property("taskId").toInt() == id)
+                return child;
+            if (auto *found = windowItem(child, name, id))
+                return found;
+        }
+        return nullptr;
+    };
+    // A drag resting on a stacked button lists its windows after half a second, the list staying
+    // while the drag crosses over to it, and resting on one there brings that window forward;
+    // gone from both, the list closes. Neither the bar nor the list takes the drag. (With
+    // pictures, further down.)
+    {
+        QEvent leaveBar(QEvent::Leave);
+        QCoreApplication::sendEvent(&view, &leaveBar);
+        if (!QTest::qWaitFor([&] { return (stack = listedTask(3)) && stack->property("stacked").toBool(); }))
+            return fail("the stacked button is not on the bar");
+        taskRequests();
+        QElapsedTimer resting;
+        resting.start();
+        if (dragTo(&view, centre(stack)))
+            return fail("the bar took a drag");
+        if (!QTest::qWaitFor([&] { return inPopover(groupList) && groupRows() == 2; }) || resting.elapsed() < 450)
+            return fail("a drag resting on a stacked button did not list its windows after half a second");
+        auto *row = windowItem(groupList, "groupWindow", 10);
+        if (!row || dragTo(popover, centre(row)))
+            return fail("the list of a stack's windows took a drag");
+        resting.start();
+        if (!QTest::qWaitFor([&] { return taskRequests() == "activate 10"; }) || resting.elapsed() < 450 ||
+            !groupList->isVisible())
+            return fail("a drag resting on a window in a stack's list did not bring it forward");
+        dragGone();
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the list a drag opened stayed once the drag had gone");
+    }
     if (!rewrite(lua))
         return fail("could not restore the configuration");
     controller.reload();
     if (!QTest::qWaitFor([&] { return controller.thumbnails(); }))
         return fail("the taskbar's window pictures did not come back on");
+    // With pictures, a drag resting on a window's button brings it forward after half a second,
+    // the button lit meanwhile, where the pointer would show its picture; one only crossing it
+    // does nothing, and one resting on the focused window's button leaves it, which activating
+    // would minimize. A stack's card of pictures opens, and resting on a picture there brings its
+    // window forward. The card stays while the drag is over it or its button.
+    {
+        auto *root = view.rootObject();
+        auto *card = find(root, "windowThumbnails");
+        auto rowOf = [&](int id) {
+            for (int row = 0; row < fakeModel->property("count").toInt(); ++row)
+                if (taskIdAt(row) == id)
+                    return row;
+            return -1;
+        };
+        QQuickItem *single = nullptr;
+        if (!card || !QTest::qWaitFor([&] {
+                stack = listedTask(3);
+                for (int i = 0; i < tasks->property("count").toInt(); ++i)
+                    if (auto *button = listedTask(i); button && button->property("taskId").toInt() == 7)
+                        single = button;
+                return single && stack && stack->property("stacked").toBool();
+            }))
+            return fail("the window's button and the stacked one are not on the bar");
+        const QPoint bare = stack->mapToScene(QPointF(stack->width() + 40, stack->height() / 2)).toPoint();
+        taskRequests();
+        dragTo(&view, centre(single));
+        dragTo(&view, bare);
+        if (!stays([&] { return taskRequests().isEmpty() && !root->property("groupOpen").toBool(); }))
+            return fail("a drag crossing a window's button brought it forward");
+        QElapsedTimer resting;
+        resting.start();
+        if (dragTo(&view, centre(single)) || !single->property("dragOver").toBool())
+            return fail("a window's button took a drag, or is not lit under it");
+        if (!QTest::qWaitFor([&] { return taskRequests() == "activate 7"; }) || resting.elapsed() < 450 ||
+            root->property("groupOpen").toBool())
+            return fail("a drag resting on a window's button did not bring it forward after half a second");
+        editTasks(QString("model.setProperty(%1, 'active', true)").arg(rowOf(7)));
+        dragTo(&view, bare);
+        if (single->property("dragOver").toBool())
+            return fail("a window's button stayed lit once the drag left it");
+        dragTo(&view, centre(single));
+        if (!stays([&] { return taskRequests().isEmpty(); }))
+            return fail("a drag resting on the focused window's button activated it again");
+        editTasks(QString("model.setProperty(%1, 'active', false)").arg(rowOf(7)));
+        dragTo(&view, centre(stack));
+        if (!QTest::qWaitFor([&] {
+                return inPopover(card) && windowItem(card, "windowThumbnail", 10) &&
+                       windowItem(card, "windowThumbnail", 11);
+            }))
+            return fail("a drag resting on a stacked button did not show its windows' pictures");
+        if (dragTo(popover, centre(windowItem(card, "windowThumbnail", 10))))
+            return fail("the card of window pictures took a drag");
+        if (!QTest::qWaitFor([&] { return taskRequests() == "activate 10"; }) || !card->isVisible())
+            return fail("a drag resting on a window's picture did not bring it forward");
+        dragTo(popover, centre(windowItem(card, "windowThumbnail", 11)));
+        if (!stays([&] { return taskRequests().isEmpty() && card->isVisible(); }))
+            return fail("a drag resting on the focused window's picture activated it again, or the card closed");
+        dragTo(&view, centre(stack));
+        if (!stays([&] { return card->isVisible() && taskRequests().isEmpty(); }, 500))
+            return fail("the card closed with the drag back on its button");
+        dragGone();
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }) || !taskRequests().isEmpty())
+            return fail("the card a drag opened stayed once the drag had gone");
+    }
     // Dragging the stack moves all its windows together.
     {
         const QPoint from = centre(stack), to = centre(listedTask(0)) - QPoint(8, 0);
@@ -4634,6 +4782,28 @@ ListModel {
         QTest::mouseMove(&view, QPoint(10, 10));
         if (!QTest::qWaitFor([&] { return !root->property("groupOpen").toBool(); }))
             return fail("the windows listed on the dock did not go with the pointer");
+        // A drag resting on an application's icon brings its window forward, or lists its windows
+        // when it has several, where resting on one brings it forward; on one without windows it
+        // does nothing, and the dock takes no drop.
+        {
+            taskRequests();
+            if (dragTo(&view, centre(icon("dockApp:shaodesk-test-actions"))) ||
+                !QTest::qWaitFor([&] { return taskRequests() == "activate 32"; }) ||
+                root->property("groupOpen").toBool())
+                return fail("a drag resting on an application with one window on the dock did not bring it forward");
+            dragTo(&view, centre(icon("dockApp:pinned:0")));
+            if (!stays([&] { return taskRequests().isEmpty() && !root->property("groupOpen").toBool(); }))
+                return fail("a drag resting on an application without windows on the dock did something");
+            dragTo(&view, centre(icon("dockApp:fake")));
+            if (!QTest::qWaitFor([&] { return groupList->isVisible() && windowItem(groupList, "groupWindow", 33); }))
+                return fail("a drag resting on an application with two windows on the dock did not list them");
+            if (dragTo(popover, centre(windowItem(groupList, "groupWindow", 33))) ||
+                !QTest::qWaitFor([&] { return taskRequests() == "activate 33"; }))
+                return fail("a drag resting on a window listed on the dock did not bring it forward");
+            dragGone();
+            if (!QTest::qWaitFor([&] { return !root->property("groupOpen").toBool(); }))
+                return fail("the windows a drag listed on the dock stayed once it had gone");
+        }
         // Its menu opens above it: its windows, then keeping it in the dock, hiding and quitting.
         auto *contextMenu = find(root, "contextMenu");
         auto contextEntry = [&](const QString &name) -> QQuickItem * {

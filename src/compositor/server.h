@@ -404,6 +404,7 @@ struct sh_server {
     struct wl_listener pointer_focus_change;
     struct wl_listener request_set_selection, request_set_primary_selection;
     struct wl_listener request_start_drag, start_drag;
+    struct wl_listener drag_end; // on the drag under way, which there is one of at most
     struct wlr_scene_tree *drag_icons; // follows the cursor during drag-and-drop
     struct wl_listener request_activate;
     struct wlr_relative_pointer_manager_v1 *relative_pointer;

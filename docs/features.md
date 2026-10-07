@@ -41,7 +41,9 @@ the dock.
   application and its name shows above it on hover. A click starts an application, its icon
   bouncing until a window opens, or brings its windows forward; one asking for attention bounces
   three times. A right click lists its windows and actions, Keep in Dock or Remove from Dock, Hide
-  and Quit. `panel_height` sets its height (the icons are 16 pixels smaller), `panel_radius` its
+  and Quit. Something dragged from an application and resting on an icon brings its window
+  forward, or lists its windows to rest on one, as on the [taskbar](#taskbar), its name showing
+  meanwhile. `panel_height` sets its height (the icons are 16 pixels smaller), `panel_radius` its
   corners and `panel_margin.bottom` how far it floats above the edge; it is always at the bottom
   and as wide as its icons, and the desktop beside it takes clicks.
 - **Launchpad** (Super + R, the `launcher` action, or the dock's first button): every application
@@ -90,6 +92,17 @@ from their button's menu; those pins are kept in `$XDG_STATE_HOME/shaodesk/pinne
 application's windows take its button's place, keeping its icon, and dragging the button moves the
 pin.
 
+Something dragged from an application (a file, text, a link) brings windows forward as on Windows:
+resting the drag on a window's button for half a second brings that window to the front, restored
+if it was minimized and its workspace shown, so that the drag goes on onto it and drops there.
+Resting on a stack's button shows its windows, as the pointer resting there does, and resting on
+one of them brings it forward; they stay while the drag is over them or the button, and go once it
+has left both or ended. The button, picture or title under the drag is lit as under the pointer.
+A drag only crossing the bar brings nothing forward, and nothing can be dropped on the bar or on
+the windows it shows: the application sees the drop cancelled, so a file moved that way is not
+lost, and a pinned application's button without windows does nothing with it. Once the drag ends,
+the window brought forward has the keyboard.
+
 The workspace indicator lists the monitor's workspaces, the current one on a pill, with a dot
 under those with windows: click one to switch to it, or scroll anywhere on the bar to page through
 them. A right click on the bar's empty space opens its menu: tiling on or off, the start menu,
@@ -119,7 +132,9 @@ over the one under the pointer closes it, and a right click opens its [menu](#ta
 focused window's picture is marked as its button is. The pointer can cross from the button onto
 the card, which closes a moment after it has left both, or at once when a button is pressed or a
 menu opens; moving onto another button shows that one's windows at once, the card gliding over
-to it and easing to their width, as it eases to a new width when a window opens or closes. The
+to it and easing to their width, as it eases to a new width when a window opens or closes. A
+drag resting on a stack's button opens the card too, and resting on a picture brings its window
+forward ([above](#taskbar)). The
 pictures get narrower when more windows than fit across the monitor share a button, down to 60 %
 of their width, and past that the stack lists its windows by title instead. The macOS style's
 dock lists a stack's windows by title, pictures or not.
@@ -323,7 +338,8 @@ fullscreen, and close, from left to right) and appears when the pointer nears th
 it never covers text. With `windows.controls = "traffic_lights"` they are macOS's red, yellow and
 green circles (close, minimize, fullscreen) at the top-left instead, grey while the window has
 no focus and showing their symbols while the pointer is on one. Dragging the window's top edge (its top 6 pixels, as a title bar would;
-`windows.drag_strip` changes how many) moves the window. Other windows, and windows that ask to draw their own frame, decorate
+`windows.drag_strip` changes how many) moves the window; a file or text dragged from another
+window over it goes to the window. Other windows, and windows that ask to draw their own frame, decorate
 themselves.
 
 Dropping a dragged window with the pointer at the top edge of the screen, or on a panel along
@@ -1253,7 +1269,11 @@ picture a window at a size, as the taskbar does: the size asked for, the frame's
 sessions capture it, and the window's title, also mainly for tests. `shaodesk msg get
 window_peek` prints one line per window for the taskbar's peek at a window: whether it is the
 one peeked at, whether it is drawn, where it is stacked among the windows (0 at the bottom), how
-far it shows through the peek and its opacity (both in thousandths), and its title. A client
+far it shows through the peek and its opacity (both in thousandths), and its title. `shaodesk
+msg get seat` prints what has the keyboard, what the pointer is on and, while something is
+dragged, what the drag is over: a line each, `keyboard`, `pointer` or `drag`, followed by
+`window` and its title, `layer` and its namespace, `other` (a popup, the lock screen) and `-`,
+or `-` twice for nothing; during a drag the pointer is on nothing. A client
 that sends `subscribe` keeps its connection and receives `tiling on|off` and
 `workspace N` (the focused monitor's), one `output NAME N USED TILING` line per monitor
 (as in `get workspaces`), and `keyboard-layout N COUNT SHORT NAME` (the active

@@ -331,6 +331,28 @@ void seat_request_start_drag(struct wl_listener *listener, void *data) {
         wlr_data_source_destroy(event->drag->source);
 }
 
+/* A drag holds the keyboard while it lasts, and wlroots lets no focus change through it: a
+ * window focused meanwhile (from the taskbar, which brings a window forward under a drag resting
+ * on its button, by xdg-activation or from the switcher) is activated and raised, but the
+ * keyboard stays with the window the drag began in. Once it ends, the keyboard goes where focus
+ * is, and the pointer, which wlroots took from every surface as the drag began, to the surface
+ * under it, so that a click without moving first reaches it. */
+static void drag_ended(struct wl_listener *listener, void *data) {
+    struct sh_server *server = wl_container_of(listener, server, drag_end);
+    wl_list_remove(&server->drag_end.link);
+    if (!server->running)
+        return; // clients going away at shutdown
+    struct wlr_seat *seat = server->seat;
+    struct wlr_surface *focus = NULL;
+    if (server->focused_toplevel && toplevel_accepts_keyboard(server->focused_toplevel))
+        focus = toplevel_surface(server->focused_toplevel);
+    else if (server->focused_layer)
+        focus = server->focused_layer->surface->surface;
+    if (!server->locked && focus && focus != seat->keyboard_state.focused_surface)
+        keyboard_enter(seat, focus);
+    process_cursor_motion(server, (uint32_t)now_ms());
+}
+
 void seat_start_drag(struct wl_listener *listener, void *data) {
     struct sh_server *server = wl_container_of(listener, server, start_drag);
     struct wlr_drag *drag = data;
@@ -338,6 +360,7 @@ void seat_start_drag(struct wl_listener *listener, void *data) {
     // The scene helper removes the icon's node when the icon goes away.
     if (drag->icon)
         wlr_scene_drag_icon_create(server->drag_icons, drag->icon);
+    add_listener(&drag->events.destroy, &server->drag_end, drag_ended);
 }
 
 /* Pointer constraints (games, remote desktops, pointer lock in browsers) apply to the
