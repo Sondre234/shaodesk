@@ -2832,6 +2832,317 @@ ListModel {
         if (!QTest::qWaitFor([&] { return !popover->isVisible(); }) || !taskRequests().isEmpty())
             return fail("the card a drag opened stayed once the drag had gone");
     }
+    // The keyboard on the bar, which the taskbar_focus action asks for with "taskbar OUTPUT": it
+    // starts at the focused window's button, its windows shown at once; the arrows move between
+    // the buttons, the card gliding along, and into the card, where the picture selected peeks at
+    // its window after a moment; Enter does what a click does, the window that had the keyboard
+    // counting as the focused one; Delete closes a window; the Menu key and Shift+F10 open menus
+    // whose closing comes back to it; Escape and the action again give the keyboard back; the
+    // pointer moving over the bar, or a press, hands the bar back to the pointer. Then without
+    // pictures, where a stack lists its windows, and with the bar along the top.
+    {
+        auto *root = view.rootObject();
+        auto *keys = root->property("barKeys").value<QQuickItem *>();
+        auto *card = find(root, "windowThumbnails");
+        auto *list = find(root, "groupList");
+        if (!keys || !card || !list)
+            return fail("the panel has no keyboard on the bar, or no card or list of windows");
+        auto ask = [&] { subscriber->write(("taskbar " + output + "\n").toUtf8()); };
+        auto on = [&] { return keys->property("active").toBool(); };
+        auto selected = [&] { return keys->property("button").value<QQuickItem *>(); };
+        auto window = [&] { return keys->property("window").toInt(); };
+        auto press = [&](Qt::Key key, Qt::KeyboardModifiers modifiers = Qt::NoModifier) {
+            QTest::keyClick(popover, key, modifiers);
+        };
+        // What a screen reader calls the selection: the attached Accessible object's name.
+        auto spoken = [&] {
+            for (auto *child : keys->children())
+                if (child->inherits("QQuickAccessibleAttached"))
+                    return child->property("name").toString();
+            return QString();
+        };
+        auto ringed = [&](QQuickItem *item, const char *ring) {
+            auto *found = item ? find(item, ring) : nullptr;
+            return found && found->isVisible();
+        };
+        auto tile = [&](int id) { return windowItem(card, "windowThumbnail", id); };
+        auto row = [&](int id) { return windowItem(list, "groupWindow", id); };
+        auto rowOf = [&](int id) {
+            for (int row = 0; row < fakeModel->property("count").toInt(); ++row)
+                if (taskIdAt(row) == id)
+                    return row;
+            return -1;
+        };
+        auto buttonFor = [&](int id) -> QQuickItem * {
+            for (int i = 0; i < tasks->property("count").toInt(); ++i)
+                if (auto *button = listedTask(i); button && button->property("taskId").toInt() == id)
+                    return button;
+            return nullptr;
+        };
+        auto peeks = [&] {
+            const auto noted = fakeModel->property("peeks").value<QJSValue>().toVariant().toStringList();
+            fakeModel->setProperty("peeks", QVariant::fromValue(view.engine()->newArray()));
+            return noted.join("|");
+        };
+        // The keyboard back where it was: off the bar, the popover holding none and gone.
+        auto given = [&] {
+            return QTest::qWaitFor([&] { return !on() && !popover->keyboard() && !popover->isVisible(); });
+        };
+        auto highlighted = [&] {
+            std::function<bool(QQuickItem *)> walk = [&](QQuickItem *item) {
+                for (auto *child : item->childItems())
+                    if ((child->objectName().startsWith("contextMenu") && child->isVisible() &&
+                         child->property("highlighted").toBool()) ||
+                        walk(child))
+                        return true;
+                return false;
+            };
+            return walk(menu);
+        };
+        QQuickItem *single = nullptr;
+        auto onBar = [&] {
+            return QTest::qWaitFor([&] {
+                stack = listedTask(3);
+                single = buttonFor(7);
+                return stack && single && stack->property("stacked").toBool() && !popover->isVisible();
+            });
+        };
+        if (!onBar())
+            return fail("the stacked button and the window's own are not on the bar");
+        taskRequests();
+        peeks();
+        // The pointer elsewhere, so that what opens does not open under it.
+        {
+            QEvent leaveBar(QEvent::Leave), leavePopover(QEvent::Leave);
+            QCoreApplication::sendEvent(&view, &leaveBar);
+            QCoreApplication::sendEvent(popover, &leavePopover);
+        }
+        // Window 11, of the stack, has the keyboard.
+        ask();
+        if (!QTest::qWaitFor([&] { return on() && popover->keyboard() && popover->isVisible(); }) ||
+            selected() != stack || !root->property("groupOpen").toBool() ||
+            root->property("groupWindowApp").toString() != "grouped" || !ringed(stack, "taskFocusRing") ||
+            spoken() != "Group one and 1 more" || !QTest::qWaitFor([&] { return keys->hasActiveFocus(); }))
+            return fail("taskbar_focus did not give the keyboard to the focused window's button, its card open at once");
+        if (!QTest::qWaitFor([&] { return inPopover(card) && tile(10) && tile(11); }))
+            return fail("the card of the selected button's windows did not show");
+        // Left: the window's own button, the card gliding over to its picture, open all the way.
+        press(Qt::Key_Left);
+        if (selected() != single || root->property("groupWindowApp").toString() != "fake" ||
+            ringed(stack, "taskFocusRing") || !ringed(single, "taskFocusRing") || spoken() != "Fake" ||
+            !card->isVisible() || card->property("progress").toReal() != 1 ||
+            card->width() <= card->property("placedWidth").toReal() + 1)
+            return fail("Left did not move to the window's own button, the card gliding to its picture");
+        if (!QTest::qWaitFor([&] {
+                return card->width() == card->property("placedWidth").toReal() && tile(7) &&
+                       card->property("progress").toReal() == 1;
+            }))
+            return fail("the card did not come to rest over the next button's window");
+        press(Qt::Key_Right);
+        if (selected() != stack || !QTest::qWaitFor([&] { return tile(10) && tile(11) && !tile(7); }))
+            return fail("Right did not move back to the stack and its pictures");
+        // Up: into the card, on its first picture. The picture selected peeks at its window after
+        // a moment, and the next one takes the peek over at once.
+        press(Qt::Key_Up);
+        if (window() != 0 || !ringed(tile(10), "windowThumbnailFocusRing") ||
+            ringed(tile(11), "windowThumbnailFocusRing") || ringed(stack, "taskFocusRing") || spoken() != "Group one")
+            return fail("Up did not move into the card, onto its first picture");
+        {
+            QElapsedTimer resting;
+            press(Qt::Key_Right);
+            resting.start();
+            if (window() != 1 || !ringed(tile(11), "windowThumbnailFocusRing") || spoken() != "Group two" ||
+                !QTest::qWaitFor([&] { return peeks() == "peek 11"; }) || resting.elapsed() < 450)
+                return fail("the picture selected did not peek at its window after a moment");
+            press(Qt::Key_Left);
+            resting.restart();
+            if (!QTest::qWaitFor([&] { return peeks() == "peek 10"; }) || resting.elapsed() > 300)
+                return fail("the next picture selected did not take the peek over at once");
+            auto *cross = find(tile(10), "windowThumbnailClose");
+            if (!cross || !QTest::qWaitFor([&] { return cross->opacity() == 1 && cross->isEnabled(); }))
+                return fail("the picture selected does not show the cross Delete stands for");
+        }
+        // The Menu key: its window's menu in the card's place, its first entry highlighted;
+        // Escape comes back to the picture.
+        press(Qt::Key_Menu);
+        if (!QTest::qWaitFor([&] {
+                return root->property("taskMenuId").toInt() == 10 && menuShown() && !card->isVisible();
+            }) ||
+            !highlighted() || !on())
+            return fail("the Menu key did not open the selected window's menu in the card's place");
+        press(Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !root->property("menuOpen").toBool() && inPopover(card) && tile(10); }) ||
+            !on() || window() != 0 || !ringed(tile(10), "windowThumbnailFocusRing") || !popover->keyboard() ||
+            !QTest::qWaitFor([&] { return keys->hasActiveFocus(); }))
+            return fail("closing the window's menu did not come back to its picture on the card");
+        // Delete closes the window selected, as its cross does, and the card stays.
+        press(Qt::Key_Delete);
+        if (!QTest::qWaitFor([&] { return taskRequests() == "close 10"; }) || !on() || !card->isVisible())
+            return fail("Delete did not close the selected window");
+        // Down: back to the button, whose menu Shift+F10 opens, about all its windows.
+        press(Qt::Key_Down);
+        if (window() != -1 || selected() != stack || !ringed(stack, "taskFocusRing") || spoken() != "Group one and 1 more")
+            return fail("Down did not go back from the card to its button");
+        press(Qt::Key_F10, Qt::ShiftModifier);
+        if (!QTest::qWaitFor([&] {
+                return root->property("taskMenuId").toInt() == 10 && menuShown() &&
+                       !root->property("taskMenuGroup").isNull();
+            }))
+            return fail("Shift+F10 did not open the stacked button's menu");
+        press(Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !root->property("menuOpen").toBool() && inPopover(card); }) ||
+            selected() != stack || !on())
+            return fail("closing the button's menu did not come back to the button");
+        // Enter on the stack brings up its window after the one that had the keyboard, and gives
+        // the keyboard back.
+        press(Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return taskRequests() == "activate 10"; }) || !given() || card->isVisible())
+            return fail("Enter on a stacked button did not bring up its next window and give the keyboard back");
+        // Enter on the button of the window that had the keyboard minimizes it, as a click does.
+        editTasks(QString("model.setProperty(%1, 'active', false); model.setProperty(%2, 'active', true)")
+                      .arg(rowOf(11))
+                      .arg(rowOf(7)));
+        ask();
+        if (!QTest::qWaitFor([&] { return on() && selected() == single; }))
+            return fail("the keyboard on the bar did not start at the focused window's button");
+        press(Qt::Key_Enter);
+        if (!QTest::qWaitFor([&] { return taskRequests() == "minimize 7"; }) || !given())
+            return fail("Enter on the focused window's button did not minimize it");
+        editTasks(QString("model.setProperty(%1, 'active', false); model.setProperty(%2, 'active', true)")
+                      .arg(rowOf(7))
+                      .arg(rowOf(11)));
+        // Escape, and the action again, give the keyboard back, changing nothing.
+        ask();
+        if (!QTest::qWaitFor(on))
+            return fail("the keyboard on the bar did not come back");
+        press(Qt::Key_Escape);
+        if (!given() || !taskRequests().isEmpty())
+            return fail("Escape did not give the keyboard back without changing anything");
+        ask();
+        if (!QTest::qWaitFor(on))
+            return fail("the keyboard on the bar did not come back");
+        ask();
+        if (!given() || !taskRequests().isEmpty())
+            return fail("taskbar_focus again did not give the keyboard back");
+        // End: the last button. Home: the first, the configured launcher's, which shows no
+        // windows and starts its program on Enter.
+        ask();
+        if (!QTest::qWaitFor(on))
+            return fail("the keyboard on the bar did not come back");
+        press(Qt::Key_End);
+        if (selected() != stack)
+            return fail("End did not move to the last button");
+        press(Qt::Key_Home);
+        if (!selected() || selected()->objectName() != "pinned:pinned:0" || !ringed(selected(), "pinnedFocusRing") ||
+            root->property("groupOpen").toBool() || spoken() != "Test app")
+            return fail("Home did not move to the configured launcher's button");
+        QFile::remove(marker);
+        press(Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return QFile::exists(marker); }) || !given())
+            return fail("Enter on a pinned application's button did not start it and give the keyboard back");
+        // The pointer moving over the bar hands it back to the pointer, as the card goes; resting
+        // there does not.
+        const QPoint bare = stack->mapToScene(QPointF(stack->width() + 40, stack->height() / 2)).toPoint();
+        QTest::mouseMove(&view, bare);
+        ask();
+        if (!QTest::qWaitFor([&] { return on() && inPopover(card); }))
+            return fail("the keyboard on the bar did not come back with its card");
+        QTest::mouseMove(&view, bare);
+        if (!stays([&] { return on() && card->isVisible(); }, 300))
+            return fail("the pointer resting on the bar took it from the keyboard");
+        QTest::mouseMove(&view, bare + QPoint(20, 0));
+        QTest::mouseMove(&view, bare + QPoint(40, 0));
+        if (!given() || root->property("groupOpen").toBool() || !taskRequests().isEmpty())
+            return fail("the pointer moving over the bar did not hand it back to the pointer");
+        // A press hands it back too, and goes on to what is under it.
+        ask();
+        if (!QTest::qWaitFor([&] { return on() && inPopover(card); }))
+            return fail("the keyboard on the bar did not come back with its card");
+        QTest::mousePress(&view, Qt::LeftButton, Qt::NoModifier, bare + QPoint(40, 0));
+        if (!given() || root->property("groupOpen").toBool())
+            return fail("a press on the bar did not hand it back to the pointer");
+        QTest::mouseRelease(&view, Qt::LeftButton, Qt::NoModifier, bare + QPoint(40, 0));
+        // The pointer moving onto the card hands the bar back to it, and the card stays under it
+        // for a click on a picture.
+        ask();
+        if (!QTest::qWaitFor([&] { return on() && inPopover(card) && tile(11); }))
+            return fail("the keyboard on the bar did not come back with its card");
+        press(Qt::Key_Up);
+        QEvent leaveBar(QEvent::Leave);
+        QCoreApplication::sendEvent(&view, &leaveBar);
+        QTest::mouseMove(popover, centre(tile(11)));
+        QTest::mouseMove(popover, centre(tile(11)) + QPoint(10, 0));
+        if (!QTest::qWaitFor([&] { return !on(); }) || !stays([&] { return card->isVisible(); }, 400))
+            return fail("the pointer moving onto the card did not hand the bar back to it, the card staying");
+        QTest::mouseClick(popover, Qt::LeftButton, Qt::NoModifier, centre(tile(11)));
+        if (!QTest::qWaitFor([&] { return taskRequests() == "activate 11"; }) || !given())
+            return fail("a click on a picture after the keyboard did not focus its window");
+        QEvent leavePopover(QEvent::Leave);
+        QCoreApplication::sendEvent(popover, &leavePopover);
+        peeks();
+
+        // Without pictures, a stack lists its windows, from the row nearest the bar up, and a
+        // window's own button shows nothing.
+        if (!rewrite(QString(lua).replace("shell={", "shell={thumbnails={enabled=false},")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return !controller.thumbnails(); }) || !onBar())
+            return fail("the buttons were not on the bar without pictures");
+        ask();
+        if (!QTest::qWaitFor([&] { return on() && selected() == stack && inPopover(list) && row(10) && row(11); }))
+            return fail("the keyboard on the bar did not list the stack's windows at once");
+        press(Qt::Key_Up);
+        if (window() != 1 || !ringed(row(11), "groupWindowFocusRing") || ringed(row(10), "groupWindowFocusRing") ||
+            spoken() != "Group two")
+            return fail("Up did not move into the list, onto the row nearest the bar");
+        press(Qt::Key_Up);
+        press(Qt::Key_Up);
+        if (window() != 0 || !ringed(row(10), "groupWindowFocusRing"))
+            return fail("Up did not move up the list, and stop at its top");
+        press(Qt::Key_Down);
+        press(Qt::Key_Down);
+        if (window() != -1 || selected() != stack)
+            return fail("Down did not move down the list and back to its button");
+        press(Qt::Key_Left);
+        if (selected() != single || root->property("groupOpen").toBool())
+            return fail("a window's own button showed something without pictures");
+        press(Qt::Key_Right);
+        if (selected() != stack || !QTest::qWaitFor([&] { return inPopover(list); }))
+            return fail("the stack's list did not come back");
+        press(Qt::Key_Up);
+        press(Qt::Key_Up);
+        press(Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return taskRequests() == "activate 10"; }) || !given())
+            return fail("Enter on a window in a stack's list did not bring it up");
+
+        // Along the top, Down goes into the card below the bar, and Up comes back.
+        if (!rewrite(QString(lua).replace("shell={", "shell={panel_position='top',")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return controller.thumbnails() && controller.panelTop(); }) || !onBar())
+            return fail("the buttons were not on a bar along the top");
+        ask();
+        if (!QTest::qWaitFor([&] { return on() && card->isVisible() && tile(10) && tile(11); }))
+            return fail("the keyboard on a bar along the top did not show the stack's card");
+        press(Qt::Key_Up);
+        if (window() != -1)
+            return fail("Up went into the card below a bar along the top");
+        press(Qt::Key_Down);
+        if (window() != 0 || !ringed(tile(10), "windowThumbnailFocusRing"))
+            return fail("Down did not go into the card below a bar along the top");
+        press(Qt::Key_Up);
+        if (window() != -1 || selected() != stack)
+            return fail("Up did not come back to the button from the card below a bar along the top");
+        press(Qt::Key_Escape);
+        if (!given() || !taskRequests().isEmpty())
+            return fail("Escape did not give the keyboard back from a bar along the top");
+        if (!rewrite(lua))
+            return fail("could not restore the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return controller.thumbnails() && !controller.panelTop(); }) || !onBar())
+            return fail("the bar did not come back along the bottom");
+        peeks();
+    }
     // Dragging the stack moves all its windows together.
     {
         const QPoint from = centre(stack), to = centre(listedTask(0)) - QPoint(8, 0);
@@ -5102,6 +5413,54 @@ ListModel {
         if (!QTest::qWaitFor([&] { return icon("dockTrash")->property("iconName") == "user-trash"; }, 10000))
             return fail("the dock's Trash did not empty as the trash did");
 
+        // The keyboard on the dock, as Control-F3 gives macOS's: it starts at the focused window's
+        // application, its windows listed at once, ringed and named on its tag where there is no
+        // list; Up goes into the list from the row nearest the dock, Enter brings a window up.
+        {
+            auto *keys = root->property("barKeys").value<QQuickItem *>();
+            auto ask = [&] { subscriber->write(("taskbar " + output + "\n").toUtf8()); };
+            auto on = [&] { return keys->property("active").toBool(); };
+            auto selected = [&] { return keys->property("button").value<QQuickItem *>(); };
+            auto ringed = [&](QQuickItem *item) {
+                auto *ring = item ? find(item, "dockFocusRing") : nullptr;
+                return ring && ring->isVisible();
+            };
+            auto tagged = [](QQuickItem *item) {
+                for (auto *child : item->children())
+                    if (child->inherits("QQuickToolTip") && child->property("visible").toBool())
+                        return true;
+                return false;
+            };
+            QEvent leaveDock(QEvent::Leave), leavePopover(QEvent::Leave);
+            QCoreApplication::sendEvent(&view, &leaveDock);
+            QCoreApplication::sendEvent(popover, &leavePopover);
+            taskRequests();
+            auto *fake = icon("dockApp:shaodesk-test-app.desktop");
+            ask();
+            if (!QTest::qWaitFor([&] { return on() && popover->keyboard(); }) || selected() != fake ||
+                !ringed(fake) || !QTest::qWaitFor([&] { return inPopover(groupList) && windowItem(groupList, "groupWindow", 33); }))
+                return fail("taskbar_focus did not give the keyboard to the dock at the focused application, its windows listed");
+            QTest::keyClick(popover, Qt::Key_Up);
+            auto *row = windowItem(groupList, "groupWindow", 33);
+            if (keys->property("window").toInt() != 1 || !row || !find(row, "groupWindowFocusRing")->isVisible() ||
+                ringed(fake))
+                return fail("Up did not go into the list of the application's windows on the dock");
+            QTest::keyClick(popover, Qt::Key_Down);
+            QTest::keyClick(popover, Qt::Key_Right);
+            auto *other = icon("dockApp:shaodesk-test-other.desktop");
+            if (selected() != other || !ringed(other) || root->property("groupOpen").toBool() ||
+                !QTest::qWaitFor([&] { return tagged(other); }))
+                return fail("Right did not go on to the next application on the dock, named on its tag");
+            QTest::keyClick(popover, Qt::Key_Left);
+            QTest::keyClick(popover, Qt::Key_Up);
+            QTest::keyClick(popover, Qt::Key_Return);
+            if (!QTest::qWaitFor([&] { return taskRequests() == "activate 33"; }) ||
+                !QTest::qWaitFor([&] { return !on() && !popover->keyboard(); }))
+                return fail("Enter on a window listed on the dock did not bring it up and give the keyboard back");
+            if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+                return fail("the popover stayed once the keyboard left the dock");
+        }
+
         // Back to a taskbar profile: the menu bar goes, and the taskbar is as it was.
         controller.pickProfile("dark");
         if (!QTest::qWaitFor([&] { return !menuBar->isVisible() && find(root, "bar") && !find(root, "dock"); }) ||
@@ -5114,7 +5473,8 @@ ListModel {
     std::cout << "Hover/click, launcher keyboard focus, search, command launch, tiling toggle, and "
                  "workspace indicator, task and bar context menus, pinning into a window's slot, "
                  "reordering pins, "
-                 "task reordering, grouped windows, the volume control, the command palette, and the "
+                 "task reordering, grouped windows, the keyboard on the bar, the volume control, the "
+                 "command palette, and the "
                  "notification bell, cards and history, the tray, the design tokens, and the macOS style's "
                  "menu bar and dock passed\n";
 }

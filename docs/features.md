@@ -45,7 +45,10 @@ the dock.
   forward, or lists its windows to rest on one, as on the [taskbar](#taskbar), its name showing
   meanwhile. `panel_height` sets its height (the icons are 16 pixels smaller), `panel_radius` its
   corners and `panel_margin.bottom` how far it floats above the edge; it is always at the bottom
-  and as wide as its icons, and the desktop beside it takes clicks.
+  and as wide as its icons, and the desktop beside it takes clicks. Super + B (`taskbar_focus`,
+  Control + F3 on macOS) walks its icons from the keyboard as on the [taskbar](#taskbar), the
+  Launchpad button and the Trash among them: the icon selected is ringed and named on its tag,
+  Enter clicks it, the Menu key opens its menu, and Up goes into a stack's list of windows.
 - **Launchpad** (Super + R, the `launcher` action, or the dock's first button): every application
   on pages of a 7 × 5 grid over the whole screen. Type to search, use the arrows, Page Up and
   Page Down, the wheel, dragging or the dots to page, Enter to launch, and right-click for an
@@ -103,6 +106,26 @@ the windows it shows: the application sees the drop cancelled, so a file moved t
 lost, and a pinned application's button without windows does nothing with it. Once the drag ends,
 the window brought forward has the keyboard.
 
+The bar works from the keyboard too, as Windows' Win + T has it: Super + B (the `taskbar_focus`
+action, or `shaodesk msg taskbar_focus`; Super + T arranges windows here) gives the keyboard to
+the bar on the focused monitor, with the button of the window that had it selected, else the
+first. A ring in the accent colour marks the selection. Left and Right, Home and End move along
+the buttons of windows and of pinned applications (the start button and the widgets are left out),
+and a button with windows shows them at once, as resting the pointer on it does, the card gliding
+from one button to the next; a pinned application's button shows its name. Enter or Space
+does what a click does and gives the keyboard back: it brings the window up (restored, its
+workspace shown), brings up a stack's next window, starts a pinned application, or minimizes the
+window that had the keyboard, which counts as the focused one. Up (Down on a bar along the top)
+goes into the card of [pictures](#window-pictures) or a stack's list, and Down (Up) back to the
+button. The Menu key or Shift + F10 opens the button's [menu](#taskbar-menus), or the menu of the
+window selected on the card, with its first entry highlighted, and closing it comes back to the
+bar. Escape, or Super + B again, gives the keyboard back to the window that had it and changes
+nothing. Moving the pointer over the bar or the card, or a press anywhere, hands the bar back to
+the pointer: what it is on shows as on hover, a click on the bar or the card goes on to what it
+lands on, and one elsewhere only gives the keyboard back, as beside a menu. While the bar has the
+keyboard no window has it, so no button is marked as focused. A screen reader names the selected
+button or window as the selection moves.
+
 The workspace indicator lists the monitor's workspaces, the current one on a pill, with a dot
 under those with windows: click one to switch to it, or scroll anywhere on the bar to page through
 them. A right click on the bar's empty space opens its menu: tiling on or off, the start menu,
@@ -135,9 +158,11 @@ the card, which closes a moment after it has left both, or at once when a button
 menu opens; moving onto another button shows that one's windows at once, the card gliding over
 to it and easing to their width, as it eases to a new width when a window opens or closes. A
 drag resting on a stack's button opens the card too, and resting on a picture brings its window
-forward ([above](#taskbar)). The
-pictures get narrower when more windows than fit across the monitor share a button, down to 60 %
-of their width, and past that the stack lists its windows by title instead. The macOS style's
+forward ([above](#taskbar)). From the keyboard on the bar ([above](#taskbar)), Left and Right
+move between the pictures, the selected one ringed and showing its cross; Delete closes its
+window, as the cross does, and Enter brings it up. The pictures get narrower when more windows
+than fit across the monitor share a button, down to 60 % of their width, and past that the stack
+lists its windows by title instead. The macOS style's
 dock lists a stack's windows by title, pictures or not.
 
 While a window's process plays sound, a speaker shows beside its title on the card, as on a
@@ -160,8 +185,9 @@ was and one on another workspace over the workspace shown. The bar and the card 
 Nothing about the window changes: it is not focused, raised, restored or moved to the workspace
 shown, and while it shows only for the peek, clicks go through it. Moving onto another picture
 takes the peek over at once, without the others coming back in between; leaving the pictures, or
-the card closing, ends it with a fade. Clicking the picture focuses the window where the peek
-shows it. The peek also ends as the window closes or is focused another way, as the session
+the card closing, ends it with a fade. A picture the keyboard on the bar selects peeks the same
+way, half a second after the selection comes to it, and at once while another is peeked at.
+Clicking the picture focuses the window where the peek shows it. The peek also ends as the window closes or is focused another way, as the session
 locks, or as the desktop peek starts. The macOS style's dock and a stack's list of titles have no
 pictures, and do not peek.
 
@@ -1304,7 +1330,9 @@ share a title. The state ends with `power ACTIONS`, the power actions that may
 run (`lock,suspend,reboot,poweroff,logout`, in the order menus list them, or `-`), a power
 action that fails or is cancelled after it was accepted sends `power-error MESSAGE`, a program
 that `spawn` or `terminal` could not start sends `spawn-error MESSAGE` (the panel shows either
-across itself for eight seconds), and `power_menu` sends `power-menu OUTPUT`. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
+across itself for eight seconds), `power_menu` sends `power-menu OUTPUT`, and `taskbar_focus`
+sends `taskbar OUTPUT` for the focused monitor, whose panel takes the keyboard to walk its
+buttons, or gives it back. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
 refused while the session is locked.
 
 ## Screen locking and idle

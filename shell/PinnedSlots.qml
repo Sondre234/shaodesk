@@ -105,7 +105,20 @@ Repeater {
             topPadding: Theme.spacingXS; bottomPadding: Theme.spacingS + Theme.spacingXS
             onClicked: { if (shell.launch(pinnedSlot.modelData.appId)) pinnedSlots.panel.closeMenus() }
             Accessible.name: pinnedSlot.modelData.name
-            BarTip { panel: pinnedSlots.panel; owner: pinnedButton; text: pinnedSlot.modelData.name }
+            // The keyboard on the bar (the panel's barKeys) rings it and names it, and the Menu key
+            // there opens its menu.
+            readonly property bool keySelected: pinnedSlots.panel.barKeys.button === pinnedButton
+            function keyMenu() { pinnedSlots.panel.openContextMenu(pinnedButton, 0, -1, pinnedSlot.modelData) }
+            FocusRing {
+                objectName: "pinnedFocusRing"
+                visible: pinnedButton.keySelected
+                radius: pinnedButton.radius
+            }
+            BarTip {
+                panel: pinnedSlots.panel; owner: pinnedButton; text: pinnedSlot.modelData.name
+                visible: (pinnedButton.hovered || pinnedButton.keySelected) && !pinnedButton.pressed &&
+                         text.length > 0 && !pinnedSlots.panel.menuOpen
+            }
             contentItem: Item {
                 BarAppIcon {
                     anchors.centerIn: parent

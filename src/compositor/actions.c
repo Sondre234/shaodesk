@@ -171,6 +171,9 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
     case SH_PALETTE:
         request_palette(server);
         break;
+    case SH_TASKBAR_FOCUS:
+        request_taskbar(server);
+        break;
     case SH_FOCUS_LEFT:
     case SH_FOCUS_RIGHT:
     case SH_FOCUS_UP:

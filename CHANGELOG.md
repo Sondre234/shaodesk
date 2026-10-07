@@ -92,6 +92,14 @@ shadows.
   it opens the card of their pictures, or their list, where resting on one brings it forward. A
   drag only crossing the bar does nothing, and the bar takes no drop, so the application sees it
   cancelled. The macOS style's dock does the same.
+- The taskbar works from the keyboard, as Windows' Win + T: Super + B (`taskbar_focus`) gives
+  the bar on the focused monitor the keyboard at the focused window's button, ringed in the accent
+  colour. Left and Right move along the buttons, each showing its windows at once, the card gliding
+  along; Up goes into the card or a stack's list, where the picture selected peeks at its window
+  after a moment and Delete closes it; Enter does what a click does; the Menu key or Shift + F10
+  opens a menu; Escape gives the keyboard back to the window that had it. The pointer moving over
+  the bar, or a press, hands the bar back to it. The macOS style's dock works the same way, as
+  Control + F3 does on macOS.
 - Alt + Tab shows each window as a card with its picture, as Windows 11 does: the application's
   icon and the window's title over the picture, the pictures at one height and each as wide as
   its window's proportions, in rows that wrap and shrink when there are many windows. The pictures

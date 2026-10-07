@@ -61,6 +61,15 @@ ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop,
         if (!desktop_ && rootObject() && outputScreen_->name() == output)
             QMetaObject::invokeMethod(rootObject(), "togglePowerMenu");
     });
+    connect(&controller, &ShellController::taskbarRequested, this, [this](const QString &output) {
+        if (desktop_ || !rootObject() || outputScreen_->name() != output)
+            return;
+        QMetaObject::invokeMethod(rootObject(), "toggleBarKeyboard");
+        const auto *keys = rootObject()->property("barKeys").value<QObject *>();
+        const bool on = keys && keys->property("active").toBool();
+        std::cerr << "shaodesk taskbar keyboard " << (on ? "on" : "off") << " on "
+                  << output.toStdString() << '\n';
+    });
     connect(screen, &QScreen::geometryChanged, this, [this] { resizeForContent(); });
     // A surface made anew as the view shows takes the region again.
     connect(this, &QWindow::visibleChanged, this, [this](bool visible) {

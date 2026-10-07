@@ -706,6 +706,7 @@ void send_shell_line(struct sh_server *server, const char *line);
 void report_failure(struct sh_server *server, const char *event, const char *text);
 void request_launcher(struct sh_server *server);
 void request_palette(struct sh_server *server);
+void request_taskbar(struct sh_server *server);
 void open_control_socket(struct sh_server *server, const char *wayland_socket);
 void close_control_socket(struct sh_server *server);
 

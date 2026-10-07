@@ -181,14 +181,14 @@ The taskbar's popups are drawn in a surface of their own, a `PopoverWindow` (`vi
 `Panel.qml` declares, so they stay in the panel's QML tree and state while the bar's surface
 keeps its size. It is an overlay layer surface covering the output (exclusive zone -1, so its
 coordinates are the output's), above fullscreen windows too, and hidden while nothing is open.
-While a menu or popup is open it holds the keyboard and takes every press but those on the bar's
-strip, where `inputRects` leaves a hole: a press on another bar button still switches popups in
-one press, and a press beside the popups closes them. The windows of a button shown on hover (the
-card of their pictures, or a stack's list) take only the pointer over the card and down to the bar
-(`hoverArea`), where a drag reaches them too, and leave the keyboard where it is. Losing the
-keyboard while it holds it (`dismissed`) closes the popups. Without layer shell (`--preview-popup`,
-`shell_ui_test`) it is an ordinary window as large as `ShellView::previewSize()`, and a preview's
-screenshot draws it over the bar.
+While a menu or popup is open, or the bar has the keyboard (below), it holds the keyboard and
+takes every press but those on the bar's strip, where `inputRects` leaves a hole: a press on
+another bar button still switches popups in one press, and a press beside the popups closes them.
+The windows of a button shown on hover (the card of their pictures, or a stack's list) take only
+the pointer over the card and down to the bar (`hoverArea`), where a drag reaches them too, and
+leave the keyboard where it is. Losing the keyboard while it holds it (`dismissed`) closes the
+popups. Without layer shell (`--preview-popup`, `shell_ui_test`) it is an ordinary window as large
+as `ShellView::previewSize()`, and a preview's screenshot draws it over the bar.
 
 `Panel.qml` loads the bars of `shell.style`. The taskbar (`Taskbar.qml`) fills the panel's surface.
 The macOS style has two: the dock (`Dock.qml`) in the panel's surface, which is then at the bottom
@@ -220,6 +220,7 @@ what was there.
 | `Panel.qml` | The panel on one output: which popup is open and where, the bars of the style (a loader for each), and the popover with a loader for each popup. Every part below takes the panel as `panel` (and a popup the bar as `barItem`) and reaches its state and functions through it; a popup is placed in `panel.popupLayer`, beside the part of the bar it belongs to (`panel.barAnchor(x, width)`). |
 | `Taskbar.qml` | The taskbar: the bar along the panel's edge with the start button, the pinned applications, the windows, the widgets and the clock, and its smaller buttons. |
 | `TopMenuBar.qml`, `Dock.qml`, `DockIcon.qml` | The bars of the macOS style (`shell.style`): the menu bar along the top in a `MenuBarWindow` of its own, with the system, application and Window menus, the widgets, search, Quick Settings and the clock; and the dock in the panel's surface, an icon for each application, pinned or running, with the applications button and the Trash. |
+| `BarKeyboard.qml` | The keyboard on the bar (`taskbar_focus`): held in the popover, it walks the taskbar's buttons or the dock's icons and the windows they show. |
 | `PinnedSlots.qml`, `TaskList.qml`, `TaskButton.qml`, `TrayButton.qml`, `WorkspaceIndicator.qml`, `VolumeButton.qml`, `ClockButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `QuickSettingsButton.qml`, `WallpapersButton.qml`, `ProfilesButton.qml`, `TilingButton.qml`, `BarAppIcon.qml`, `Badge.qml`, `BarTip.qml` | Parts of the bar: widgets, an application's icon on it, a count on a pill, and the tooltip for things on it. |
 | `ClockFlyout.qml`, `QuickSettings.qml`, `AudioMixer.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml`, `WindowThumbnails.qml`, `MenuBarMenu.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
 | `CalendarPopup.qml`, `NotificationHistory.qml` | The clock flyout's cards: the month calendar, and the notifications grouped by application. |
@@ -227,6 +228,7 @@ what was there.
 | `Icon.qml`, `FadingIcon.qml`, `SpeakerIcon.qml`, `BatteryIcon.qml` | Line icons (Lucide), drawn as vectors in any colour; one that crossfades as the state it shows changes, the loudspeaker for a volume, and a battery filled to its charge. |
 | `FlatButton.qml`, `ButtonFill.qml` | The frameless button of the bar and of menus, and its background, which fades between the hover, pressed and active states. |
 | `PushButton.qml` | A framed button with text: raised, or filled for what a click mostly does or for a destructive action, with a ring for the keyboard; a dialog's, a notification's, the start menu's. |
+| `FocusRing.qml` | The ring that says the keyboard is at something, as `PushButton`'s: around a button on the bar, a picture or a row the keyboard on the bar selects. |
 | `TextButton.qml` | A button that is only its text in the accent colour, as Today and Clear all over a card's list. |
 | `CloseButton.qml` | The round cross that closes a card, a notification or a window in a stack's list, or clears the search. |
 | `SearchInput.qml` | The start menu's and the command palette's search field. |
@@ -343,6 +345,29 @@ the way to the cross, the speaker or another tile does not fade every window on 
 itself too, as the window is focused (a click on the picture), which the model does not hear, so
 `peekedTask` names the last window it peeked at until `endPeek`. A stand-in without `peek` peeks
 at nothing, and the macOS style's dock and the stack's list of titles do not peek.
+
+The keyboard on the bar (`BarKeyboard.qml`, the panel's `barKeys`) is held in the popover. The
+`taskbar_focus` action sends the shell `taskbar OUTPUT` for the focused output (`request_taskbar`,
+`control.c`); the controller emits `taskbarRequested`, and that output's `ShellView` calls the
+panel's `toggleBarKeyboard()` and logs `shaodesk taskbar keyboard on|off on OUTPUT`. While
+`barKeys.active` the popover is open and holds the keyboard as for a menu, and `BarKeyboard`, which
+has the active focus there, takes the keys. Its stops are found anew as they are needed
+(`stops()`): the pinned slots' visible buttons that have a `keyMenu()`, then the task list's rows
+by number, since the list makes the buttons outside its view only as they scroll in
+(`positionViewAtIndex` brings the selected one into view), or the dock's icons. The selected
+`button` shows its windows with the panel's own `openGroup`, so the card glides as on hover, and
+`window` indexes the card's tiles or the list's rows (`windowAt(index)`). A button, tile or row
+reads `keySelected` from it to draw a `FocusRing` and, on a tile, to stand in for the pointer in
+the peek's `resting`. The window that had the keyboard is noted as `from` before the popover takes
+it (the compositor deactivates the window as a layer surface takes the keyboard, so the task
+source then shows none as active), and Enter minimizes it where a click on the focused window's
+button would. Its menus (`keyMenu()`, with `menuOpened` set) close back to it (`resume()`), and
+any other menu that opens ends it. While it is active `hoverGroup`, `hoverGroupList` and
+`groupHide` leave the card alone; a `HoverHandler` on the bar and on the popover (over the card
+only) and a `MouseArea` over each that lets presses through hand the bar back to the pointer
+(`handOver`, `pointerTakesOver`) once the pointer moves more than two pixels from where it was
+first seen, or is pressed. Losing the keyboard (`dismissed`) and `closeMenus()` end it.
+`tests/taskbar_keyboard_smoke.py` follows the keyboard with `get seat` in a session.
 
 The start menu (`Launcher.qml` and its `Start*.qml` parts) reads `shell.startMenu`, a `StartMenu`
 (`start_menu.cpp`): its own pins, seeded from the taskbar's; the applications launched lately

@@ -267,6 +267,9 @@ return {
         { mods = { mod, "Shift" }, key = "p", action = "toggle_sticky" }, -- show on every workspace
         -- The command palette: one search over windows, apps, workspaces, actions and sessions.
         { mods = { mod }, key = "p", action = "palette" },
+        -- The taskbar (or the dock) from the keyboard, as Windows' Win+T: the arrows walk its
+        -- buttons and the windows they show, Enter picks, Escape gives the keyboard back.
+        { mods = { mod }, key = "b", action = "taskbar_focus" },
         { mods = { mod }, key = "u", action = "focus_urgent" }, -- the window asking for attention
         { mods = { mod }, key = "n", action = "notification_history" }, -- the bell's list
         { mods = { mod, "Shift" }, key = "n", action = "dnd_toggle" }, -- do not disturb

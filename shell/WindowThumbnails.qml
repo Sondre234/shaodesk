@@ -48,6 +48,8 @@ PopupCard {
         onHoveredChanged: thumbnails.panel.hoverGroupList(hovered)
     }
     readonly property bool hovered: hover.hovered
+    // The tile of the window at `index`, for the keyboard on the bar (the panel's barKeys).
+    function windowAt(index) { return tiles.itemAt(index) }
     // The last of its windows closing closes it.
     Connections {
         target: thumbnails.windows
@@ -68,9 +70,11 @@ PopupCard {
         anchors.centerIn: parent
         spacing: thumbnails.tileGap
         Repeater {
+            id: tiles
             model: thumbnails.visible ? thumbnails.windows : null
             delegate: Button {
                 id: tile
+                required property int index
                 required property int taskId
                 required property string title
                 required property string appId
@@ -99,11 +103,23 @@ PopupCard {
                 }
                 Component.onDestruction: if (owner) owner.wantPicture(watched, false)
                 readonly property bool marked: active || urgent
+                // The keyboard on the bar is at it, which rings it, peeks at its window as the
+                // pointer resting on its picture does, and shows its cross for Delete; the Menu
+                // key there opens its window's menu.
+                readonly property bool keySelected: thumbnails.panel.barKeys.active &&
+                                                    thumbnails.panel.barKeys.window === index
+                function keyMenu() { thumbnails.panel.openContextMenu(tile, 0, tile.taskId, tile.appId) }
                 background: ButtonFill {
                     // Lit under a drag too, which brings its window forward (the panel's dragDelay).
                     hovered: tile.hovered || thumbnails.panel.dragTile === tile
                     pressed: tile.pressed
                     active: tile.active
+                    // On its edge, which the card clips at.
+                    FocusRing {
+                        objectName: "windowThumbnailFocusRing"
+                        visible: tile.keySelected
+                        radius: parent.radius
+                    }
                     Rectangle {
                         objectName: "windowThumbnailLine"
                         visible: tile.marked
@@ -165,7 +181,7 @@ PopupCard {
                         CloseButton {
                             id: closeButton
                             objectName: "windowThumbnailClose"
-                            readonly property bool shown: tile.hovered || hovered
+                            readonly property bool shown: tile.hovered || hovered || tile.keySelected
                             opacity: shown ? 1 : 0
                             enabled: shown
                             danger: true
@@ -253,11 +269,15 @@ PopupCard {
                         // source's peek, which a stand-in may not have). With one peeked at,
                         // another picture takes the peek over at once; leaving the pictures, or
                         // the card closing, ends it a moment later, time to cross to the next.
+                        // With the keyboard on the bar, the picture it selects rests in the
+                        // pointer's place.
                         HoverHandler { id: pictureHover }
                         Timer {
                             id: peekDelay
                             interval: 500
-                            readonly property bool resting: pictureHover.hovered && thumbnails.open
+                            readonly property bool resting: (thumbnails.panel.barKeys.active ? tile.keySelected
+                                                                                            : pictureHover.hovered) &&
+                                                            thumbnails.open
                             readonly property var source: thumbnails.panel.taskSource
                             // The model this tile peeked through and the window, until it ends
                             // the peek, should either change meanwhile.

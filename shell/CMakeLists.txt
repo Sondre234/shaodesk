@@ -72,6 +72,8 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     TrayMenu.qml
     GroupList.qml
     WindowThumbnails.qml
+    BarKeyboard.qml
+    FocusRing.qml
 
     PowerDialog.qml
     ClockFlyout.qml
@@ -353,6 +355,10 @@ if(BUILD_TESTING)
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>
             $<TARGET_FILE:pointer_probe>)
         set_tests_properties(taskbar_drag_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME taskbar_keyboard_smoke COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/taskbar_keyboard_smoke.py $<TARGET_FILE:shaodesk>
+            $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>)
+        set_tests_properties(taskbar_keyboard_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME switcher_pictures_smoke COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/switcher_pictures_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>

@@ -298,12 +298,19 @@ Item {
                 d3 = side(pointerAt, other, pointerFrom)
             return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))
         }
-        // What changed under an open menu (an application's own) may have moved its rows.
+        // What changed under an open menu (an application's own) may have moved its rows. The
+        // first level's entries may also come only after it opened, read from what settles as it
+        // does (a taskbar menu's windows): one opened with a highlight (initialIndex) has it
+        // there.
         onEntriesChanged: {
             if (current >= entries.length || (current >= 0 && !selectable(current)))
                 current = -1
             if (openIndex >= 0 && !hasSubmenu(openIndex))
                 closeChild()
+            if (!parentLevel && open && current < 0 && menu.initialIndex >= 0) {
+                current = menu.initialIndex - 1
+                move(1)
+            }
         }
         HoverHandler {
             onHoveredChanged: {
