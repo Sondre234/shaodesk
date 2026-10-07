@@ -23,12 +23,13 @@ with harness.Compositor(compositor, CONFIG) as desktop:
     env, msg = desktop.env, desktop.msg
 
     def windows():
-        """{title: (workspace, focused, minimized, visible, centre)} of every window."""
+        """{title: (workspace, focused, minimized, visible, centre, top middle)} of every
+        window."""
         found = {}
         for row in desktop.rows("windows"):
             x, y, w, h = (int(n) for n in row[4:8])
             found[row[9]] = (int(row[0]), row[1] == "1", row[2] == "1", row[11] == "1",
-                             (x + w // 2, y + h // 2))
+                             (x + w // 2, y + h // 2), (x + w // 2, y + 2))
         return found
 
     def seat():
@@ -39,10 +40,12 @@ with harness.Compositor(compositor, CONFIG) as desktop:
         return (desktop.root / f"{name}.log").read_text()
 
     desktop.detail = lambda: f"windows: {windows()}, seat: {seat()}\n{log('source')}{log('target')}"
-    for title, role in (("Source", "source"), ("Target", "target"), ("Away", "")):
+    # Target leaves its frame to the compositor, which moves it by the strip along its top.
+    for title, role, frame in (("Source", "source", {}), ("Target", "target", {"SHAODESK_PROBE_SSD": "1"}),
+                               ("Away", "", {})):
         desktop.spawn([probe, "--window-only"], log=f"{title.lower()}.log",
                       env={"SHAODESK_PROBE_TITLE": title, "SHAODESK_PROBE_APP_ID": title.lower(),
-                           "SHAODESK_PROBE_DRAG": role})
+                           "SHAODESK_PROBE_DRAG": role, **frame})
         desktop.wait_for(lambda: title in windows(), f"{title} mapped")
     for request in (["Target", "minimize"], ["Away", "workspace", "2"]):
         subprocess.run([window_probe, *request], env=env, check=True, timeout=30,
@@ -70,7 +73,10 @@ with harness.Compositor(compositor, CONFIG) as desktop:
     activate("target")
     desktop.wait_for(lambda: windows()["Target"][1] and not windows()["Target"][2] and
                      msg("get", "workspace").strip() == "1", "Target restored mid-drag")
-    # The drag goes on onto it, and it takes the text as it is dropped.
+    # The drag goes on onto it, its top too, where a press would move it, and it takes the
+    # text as it is dropped.
+    pointer("move", *map(str, windows()["Target"][5]))
+    desktop.wait_for(lambda: seat().get("drag") == ("window", "Target"), "the drag over Target's top")
     pointer("move", *map(str, windows()["Target"][4]))
     desktop.wait_for(lambda: seat().get("drag") == ("window", "Target"), "the drag over Target")
     desktop.wait_for(lambda: "drag target text/plain" in log("source"), "Target taking the drag")

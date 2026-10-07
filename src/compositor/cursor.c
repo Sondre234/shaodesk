@@ -396,7 +396,8 @@ static void process_pointer_target(struct sh_server *server, uint32_t time) {
              !panel_at(server, server->cursor->x, server->cursor->y))
         focus_desktop(server, wlr_output_layout_output_at(server->output_layout,
                                                           server->cursor->x, server->cursor->y));
-    if (drag_strip_at(toplevel, surface, server->cursor->y)) {
+    // A drag's text or file goes to the window there: the strip is for a press that moves it.
+    if (!seat->drag && drag_strip_at(toplevel, surface, server->cursor->y)) {
         set_default_cursor(server);
         wlr_seat_pointer_clear_focus(seat);
         return;
