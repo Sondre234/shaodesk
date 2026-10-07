@@ -4,10 +4,17 @@
 #include <cerrno>
 #include <cstring>
 
-TaskModel::TaskModel(QObject *parent) : QAbstractListModel(parent) {}
+TaskModel::TaskModel(QObject *parent) : QAbstractListModel(parent) {
+    connect(&pictures_, &WindowPictures::changed, this, [this](int id) {
+        for (int i = 0; i < rowCount(); ++i)
+            if (tasks_[i]->id == id)
+                Q_EMIT dataChanged(index(i), index(i), {Picture});
+    });
+}
 TaskModel::~TaskModel() {
     read_.reset();
     write_.reset();
+    pictures_.stop();
     for (auto &task : tasks_) {
         if (task->window)
             shaodesk_window_v1_destroy(task->window);
@@ -15,6 +22,10 @@ TaskModel::~TaskModel() {
     }
     if (control_)
         shaodesk_window_control_v1_destroy(control_);
+    if (captureManager_)
+        ext_image_copy_capture_manager_v1_destroy(captureManager_);
+    if (shm_)
+        wl_shm_destroy(shm_);
     if (manager_)
         zwlr_foreign_toplevel_manager_v1_destroy(manager_);
     if (seat_)
@@ -42,6 +53,7 @@ bool TaskModel::connectDisplay() {
         if (wl_display_dispatch(display_) < 0) {
             read_->setEnabled(false);
             write_->setEnabled(false);
+            pictures_.stop();
             Q_EMIT disconnected();
         } else
             flush();
@@ -94,6 +106,8 @@ QVariant TaskModel::data(const QModelIndex &index, int role) const {
         return state.floating;
     case Tiling:
         return state.tiling;
+    case Picture:
+        return pictures_.url(task.id);
     default:
         return {};
     }
@@ -103,7 +117,7 @@ QHash<int, QByteArray> TaskModel::roleNames() const {
             {Active, "active"},        {Minimized, "minimized"}, {Maximized, "maximized"},
             {Urgent, "urgent"},        {Fullscreen, "fullscreen"}, {Output, "output"},
             {Workspace, "workspace"},  {Sticky, "sticky"},         {Floating, "floating"},
-            {Tiling, "tiling"}};
+            {Tiling, "tiling"},        {Picture, "picture"}};
 }
 TaskModel::Task *TaskModel::find(int id) {
     for (auto &task : tasks_)
@@ -189,6 +203,12 @@ void TaskModel::showDesktop() {
         zwlr_foreign_toplevel_handle_v1_set_minimized(task->handle);
     flush();
 }
+void TaskModel::watchPicture(int taskId, int pixelWidth, bool live) {
+    if (auto *task = find(taskId))
+        pictures_.watch(taskId, task->window, pixelWidth, live);
+}
+void TaskModel::unwatchPicture(int taskId) { pictures_.unwatch(taskId); }
+QImage TaskModel::picture(int taskId) const { return pictures_.picture(taskId); }
 void TaskModel::move(int from, int to, int count) {
     int rows = rowCount();
     if (count < 1 || from < 0 || to < 0 || from + count > rows || to + count > rows || from == to)
@@ -267,6 +287,7 @@ void TaskModel::removed(Task *task) {
     for (int i = 0; i < rowCount(); ++i)
         if (tasks_[i].get() == task) {
             beginRemoveRows({}, i, i);
+            pictures_.forget(task->id);
             if (task->window)
                 shaodesk_window_v1_destroy(task->window);
             zwlr_foreign_toplevel_handle_v1_destroy(task->handle);
@@ -287,10 +308,19 @@ void TaskModel::global(void *data, wl_registry *registry, uint32_t name, const c
         self.seat_ =
             static_cast<wl_seat *>(wl_registry_bind(registry, name, &wl_seat_interface, 1));
     } else if (!std::strcmp(interface, shaodesk_window_control_v1_interface.name) && !self.control_) {
-        self.control_ = static_cast<shaodesk_window_control_v1 *>(
-            wl_registry_bind(registry, name, &shaodesk_window_control_v1_interface, 1));
+        // Version 2 gives the windows' capture sources, for their pictures.
+        self.control_ = static_cast<shaodesk_window_control_v1 *>(wl_registry_bind(
+            registry, name, &shaodesk_window_control_v1_interface, std::min(version, 2u)));
         for (auto &task : self.tasks_)
             self.watch(task.get());
+    } else if (!std::strcmp(interface, "wl_shm") && !self.shm_) {
+        self.shm_ = static_cast<wl_shm *>(wl_registry_bind(registry, name, &wl_shm_interface, 1));
+        self.pictures_.setGlobals(self.shm_, self.captureManager_);
+    } else if (!std::strcmp(interface, ext_image_copy_capture_manager_v1_interface.name) &&
+               !self.captureManager_) {
+        self.captureManager_ = static_cast<ext_image_copy_capture_manager_v1 *>(
+            wl_registry_bind(registry, name, &ext_image_copy_capture_manager_v1_interface, 1));
+        self.pictures_.setGlobals(self.shm_, self.captureManager_);
     }
 }
 void TaskModel::watch(Task *task) {

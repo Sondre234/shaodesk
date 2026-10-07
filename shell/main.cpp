@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
                       "Preview the taskbar with one popup open, on stand-in windows, sound, "
                       "tray items and notifications: bar (none), launcher, launcher-all, "
                       "launcher-search, launcher-empty, launcher-menu, power, bar-menu, bar-submenu, "
-                      "task-menu, stack-menu, pin-menu, group, tray-menu, tray-submenu, calendar, clock-empty, "
+                      "task-menu, stack-menu, pin-menu, group, thumbnails, tray-menu, tray-submenu, calendar, clock-empty, "
                       "calendar-years, mixer, outputs, profiles, wallpapers, notifications, "
                       "quick-settings or quick-settings-mixer; in the macOS style system-menu, "
                       "app-menu, window-menu or window-submenu too; or an overlay over the bar: "

@@ -7,18 +7,20 @@
     them.
   </copyright>
 
-  <description summary="workspaces, outputs and tiling of a taskbar's windows">
+  <description summary="workspaces, outputs, tiling and pictures of a taskbar's windows">
     The window menu of shaodesk's taskbar moves a window to another workspace or output, keeps
-    it on every workspace, or takes it out of the tiling. The taskbar knows its windows as
+    it on every workspace, or takes it out of the tiling, and the taskbar shows a small picture
+    of a window while the pointer rests on its button. The taskbar knows its windows as
     zwlr_foreign_toplevel_handle_v1 objects, which have no requests for that and no name a
     compositor could be asked about elsewhere; this protocol names a window by such a handle.
 
     It gives a client nothing a foreign-toplevel client cannot already do to the window (close
-    it, minimize it, make it fullscreen), and the compositor offers it as it offers
-    zwlr_foreign_toplevel_manager_v1.
+    it, minimize it, make it fullscreen) or an ext-foreign-toplevel-list client cannot already
+    see of it (capture it through ext-foreign-toplevel-image-capture-source-v1), and the
+    compositor offers it as it offers zwlr_foreign_toplevel_manager_v1.
   </description>
 
-  <interface name="shaodesk_window_control_v1" version="1">
+  <interface name="shaodesk_window_control_v1" version="2">
     <description summary="controls windows named by their taskbar handles">
       A global for getting the shaodesk_window_v1 of a window, from the
       zwlr_foreign_toplevel_handle_v1 the client holds for it.
@@ -42,7 +44,7 @@
     </request>
   </interface>
 
-  <interface name="shaodesk_window_v1" version="1">
+  <interface name="shaodesk_window_v1" version="2">
     <description summary="one window's workspace, output and tiling">
       Where a window is and how it is placed, and requests that move it. It becomes inert when
       the window's taskbar handle is sent closed; the client then destroys it.
@@ -113,6 +115,23 @@
         The window joins the tiling of its workspace when that tiles; a sticky one stops being
         sticky to do so.
       </description>
+    </request>
+
+    <request name="get_capture_source" since="2">
+      <description summary="a capture source for the window">
+        Creates an ext_image_capture_source_v1 for the window, the one
+        ext_foreign_toplevel_image_capture_source_manager_v1.create_source gives for its
+        ext_foreign_toplevel_handle_v1: the window's own surfaces at its logical size, without
+        the compositor's frame or shadow and without what overlaps it, also while it is
+        minimized or on a workspace not shown. The client captures it with
+        ext-image-copy-capture-v1.
+
+        The source is inert (a session made from it is stopped at once) when the window is gone
+        or the session is locked, and a session stops when the window closes. Unlike the other
+        requests, this one is not ignored on an inert shaodesk_window_v1: it gives an inert
+        source.
+      </description>
+      <arg name="id" type="new_id" interface="ext_image_capture_source_v1"/>
     </request>
 
     <event name="output">

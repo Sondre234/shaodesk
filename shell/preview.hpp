@@ -15,11 +15,11 @@ class ShellController;
 class SystemStatus;
 
 // What the panel shows in `--preview-popup`, which runs without a compositor, a sound server or
-// a session bus: windows (one application's two of them stacked, one minimized, one asking for
-// attention), sound outputs and applications playing, a battery and Wi-Fi, a backlight, tray
-// items (one with a menu), a few notifications, every power action, and night light on. The controller's own models take the
-// tray, the notifications and the power actions; the panel's sources, which the tests swap the
-// same way, take the rest.
+// a session bus: windows (one application's three of them stacked, with stand-in pictures, one
+// minimized, one asking for attention), sound outputs and applications playing, a battery and
+// Wi-Fi, a backlight, tray items (one with a menu), a few notifications, every power action, and
+// night light on. The controller's own models take the tray, the notifications and the power
+// actions; the panel's sources, which the tests swap the same way, take the rest.
 class PreviewData : public QObject {
     Q_OBJECT
   public:

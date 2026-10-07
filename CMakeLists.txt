@@ -151,6 +151,29 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-protocol.c)
     endforeach()
+    # A window's capture source, which shaodesk-window-control-v1 hands out and the shell's window
+    # pictures copy, is ext-image-capture-source-v1's, and that protocol names ext-foreign-toplevel
+    # handles. wlroots implements them but keeps their interfaces to itself, so every program
+    # speaking shaodesk-window-control-v1 compiles these in.
+    foreach(PROTOCOL staging/ext-foreign-toplevel-list/ext-foreign-toplevel-list-v1
+            staging/ext-image-capture-source/ext-image-capture-source-v1
+            staging/ext-image-copy-capture/ext-image-copy-capture-v1)
+        get_filename_component(NAME ${PROTOCOL} NAME)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${NAME}-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header ${PROTOCOL_DIR}/${PROTOCOL}.xml
+            ${CMAKE_CURRENT_BINARY_DIR}/${NAME}-client-protocol.h
+            DEPENDS ${PROTOCOL_DIR}/${PROTOCOL}.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${NAME}-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code ${PROTOCOL_DIR}/${PROTOCOL}.xml
+            ${CMAKE_CURRENT_BINARY_DIR}/${NAME}-protocol.c
+            DEPENDS ${PROTOCOL_DIR}/${PROTOCOL}.xml)
+        list(APPEND WLR_CLIENT_PROTOCOL_SOURCES
+            ${CMAKE_CURRENT_BINARY_DIR}/${NAME}-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/${NAME}-protocol.c)
+    endforeach()
+    set(CAPTURE_SOURCE_PROTOCOL_SOURCES
+        ${CMAKE_CURRENT_BINARY_DIR}/ext-image-capture-source-v1-protocol.c
+        ${CMAKE_CURRENT_BINARY_DIR}/ext-foreign-toplevel-list-v1-protocol.c)
     # A custom command's rule is only generated for targets in this directory, but shaodesk-shell
     # (in shell/) uses the client files too. Without the tests, no target here uses them, so
     # this target carries the rule and shaodesk-shell depends on it.
@@ -196,7 +219,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
     # The compositor's own protocol names a taskbar handle, whose interface wlroots keeps to
     # itself: both interfaces are compiled in here.
     target_sources(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c
-        ${CMAKE_CURRENT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c)
+        ${CMAKE_CURRENT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
+        ${CAPTURE_SOURCE_PROTOCOL_SOURCES})
     target_sources(shaodesk PRIVATE src/overview_scene.c)
     target_include_directories(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_compile_definitions(shaodesk PRIVATE WLR_USE_UNSTABLE)
@@ -356,12 +380,18 @@ if(SHAODESK_BUILD_COMPOSITOR)
         target_include_directories(output_management_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
         target_link_libraries(output_management_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
         target_compile_options(output_management_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
-        # A taskbar's window menu through shaodesk-window-control-v1, for window_control_smoke.
+        # A taskbar's window menu through shaodesk-window-control-v1, for window_control_smoke,
+        # and its capture of a window, for window_capture_smoke.
         add_executable(window_probe tests/window_probe.c
             ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c
             ${CMAKE_CURRENT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-client-protocol.h
-            ${CMAKE_CURRENT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c)
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
+            ${CMAKE_CURRENT_BINARY_DIR}/ext-foreign-toplevel-list-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/ext-image-capture-source-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/ext-image-copy-capture-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/ext-image-copy-capture-v1-protocol.c
+            ${CAPTURE_SOURCE_PROTOCOL_SOURCES})
         target_include_directories(window_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
         target_link_libraries(window_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
         target_compile_options(window_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
@@ -707,6 +737,11 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:lock_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(session_lock PROPERTIES TIMEOUT 60)
+        add_test(NAME window_capture_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_capture_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>
+            $<TARGET_FILE:lock_probe>)
+        set_tests_properties(window_capture_smoke PROPERTIES TIMEOUT 60)
         if(SDBUS_FOUND)
             # A stand-in for logind on a private bus, so that no power test reaches the real one.
             add_executable(fake_login1 tests/fake_login1.c)

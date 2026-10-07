@@ -44,6 +44,7 @@
 #include <wlr/backend/headless.h>
 #include <wlr/backend/multi.h>
 #include <wlr/backend/wayland.h>
+#include <wlr/interfaces/wlr_ext_image_capture_source_v1.h>
 #include <wlr/interfaces/wlr_keyboard.h>
 #include <wlr/config.h>
 #if WLR_HAS_LIBINPUT_BACKEND
@@ -740,6 +741,7 @@ void request_activate(struct wl_listener *listener, void *data);
 /* foreign_toplevel.c */
 void toplevel_title_changed(struct wl_listener *listener, void *data);
 void toplevel_app_id_changed(struct wl_listener *listener, void *data);
+struct wlr_ext_image_capture_source_v1 *toplevel_capture_source(struct sh_toplevel *toplevel);
 void server_new_capture_request(struct wl_listener *listener, void *data);
 void publish_toplevel(struct sh_toplevel *toplevel);
 void unpublish_toplevel(struct sh_toplevel *toplevel);

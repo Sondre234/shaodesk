@@ -69,8 +69,8 @@ profile re-lays the shell out at once.
 Along the bar, from the left: the start button, the pinned applications and a button for each
 open window, the workspace indicator, the widgets placed on the bar, the tray, the Quick Settings
 button, the clock, and a sliver at the end that shows the desktop. A button shows a tooltip when
-the pointer rests on it, but for a stacked one, which lists its windows instead, and a window's
-whose title it shows already. Lua configures the panel's height, top or bottom placement
+the pointer rests on it, but for a window's, which shows pictures of its windows instead
+([below](#window-pictures)). Lua configures the panel's height, top or bottom placement
 (`panel_position`), margins that make it float (`panel_margin`, one number or
 `{ top, right, bottom, left }`), corner radius, font and text size, colors (`#RRGGBB`, or
 `#RRGGBBAA` for a translucent panel), wallpaper, and pinned commands, which run from your home
@@ -80,8 +80,8 @@ Clicking a window's button focuses it, or minimizes it when it is focused alread
 from any monitor's bar; a middle click closes the window, a right click opens its
 [menu](#taskbar-menus), and dragging the button moves it along the bar. An application's windows
 share one button, stacked with a count when there are several: clicking it cycles through them,
-and hovering lists them to pick one, close it with its cross or a middle click, or open its menu
-(`group_windows = false` gives every window its own button). A line under a button marks its
+and resting on it shows them to pick one, close it with its cross or a middle click, or open its
+menu (`group_windows = false` gives every window its own button). A line under a button marks its
 window: long in the accent colour for the focused one, short for the others, dimmed while
 minimized; a window asking for attention tints its button in the urgent colour. Installed
 applications can be pinned to the taskbar from a window's menu or the start menu, and unpinned
@@ -102,6 +102,34 @@ while the others slide over, an application just pinned grows into a slot that o
 line under a button eases to its new length and colour, the workspace pill slides to the workspace
 shown, a count grows in and pops as it goes up, and an icon that follows a state (the network, the
 volume, do-not-disturb, tiling) crossfades as the state changes.
+
+### Window pictures
+
+Resting the pointer on a window's button, or a stack's, opens a card above it (below a bar along
+the top) as on Windows 11: a small picture of each window side by side, under the application's
+icon and the window's title. The pictures follow the windows as they redraw while the card is
+open (ten times a second at most), show the window alone, without its frame or what covers it,
+and show a minimized window or one on another workspace too; until one has come, the
+application's icon stands in. Clicking a picture
+focuses its window, or minimizes it when it is focused already; a middle click or the cross shown
+over the one under the pointer closes it, and a right click opens its [menu](#taskbar-menus). The
+focused window's picture is marked as its button is. The pointer can cross from the button onto
+the card, which closes a moment after it has left both, or at once when a button is pressed or a
+menu opens; moving onto another button shows that one's windows at once. The pictures get narrower
+when more windows than fit across the monitor share a button, down to 60 % of their width, and
+past that the stack lists its windows by title instead. The macOS style's dock lists a stack's
+windows by title, pictures or not.
+
+```lua
+shell = {
+    thumbnails = {
+        enabled = true, -- false: a tooltip with the title, and a stack's list of titles
+        delay = 400,    -- milliseconds the pointer rests on the button first (0 to 2000)
+        size = 240,     -- width of one picture in pixels (120 to 480), 5/8 of it tall
+        live = true,    -- false takes one picture of each window as the card opens
+    },
+}
+```
 
 ### Clock and calendar
 
@@ -1287,7 +1315,8 @@ Screenshots and screen sharing use wlr-screencopy, export-dmabuf, and
 ext-image-copy-capture, so `grim` works directly and Discord, OBS, or a browser share a
 monitor or a single window through xdg-desktop-portal-wlr. A shared window is drawn on
 its own, without whatever overlaps it, and keeps streaming while minimized or on another
-workspace.
+workspace; the taskbar's pictures of windows are taken the same way. While the screen is
+locked no capture of a window can start: a program asking is told its capture stopped.
 
 ## Application compatibility
 

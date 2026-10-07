@@ -58,7 +58,7 @@ all. In short:
 | `lock.c` | Session lock and idle/sleep inhibitors. |
 | `power.c` | The power actions: suspend, hibernate, reboot and power off through logind (`src/login1.c`), locking first, closing windows first, log out. |
 | `foreign_toplevel.c` | Window lists for taskbars and single-window capture. |
-| `window_control.c` | The shell's window menu: shaodesk-window-control-v1, which names a window by its taskbar handle. |
+| `window_control.c` | The shell's window menu and window pictures: shaodesk-window-control-v1, which names a window by its taskbar handle. |
 
 A function used by one file is `static`; one used by several is declared in `server.h` under
 the file that defines it. The build warns (`-Wmissing-prototypes`) about one that is neither.
@@ -74,7 +74,9 @@ already holds, on the same Wayland connection. `shaodesk_window_control_v1.get_w
 gives a `shaodesk_window_v1` that sends the window's `output` (connector name), `workspace` (from
 1) and `state` (sticky, floating, tiled, and whether its workspace tiles), then `done`, at once and
 again after each change, and takes `move_to_workspace`, `move_to_output`, `set_sticky` /
-`unset_sticky` and `set_floating` / `unset_floating`.
+`unset_sticky` and `set_floating` / `unset_floating`. Since version 2 its `get_capture_source`
+gives the window's `ext_image_capture_source_v1`, which the shell copies with
+ext-image-copy-capture for the taskbar's pictures of windows.
 
 `window_control.c` finds the window by looking for the handle among the resources of each
 window's `wlr_foreign_toplevel_handle_v1`, so a handle that is gone names nothing and its object
@@ -85,8 +87,20 @@ and do nothing while the session is locked. A change reaches the objects through
 `window_objects_changed`, which `notify_subscribers` and the tiling call: it sends what changed
 from an idle callback, once the change is over. Like the foreign-toplevel manager, the global is
 offered to every client; it lets a client do nothing to a window a taskbar cannot already do.
-`tests/window_probe.c` is a client of it for `window_control_smoke`, and `TaskModel` the
-shell's.
+`tests/window_probe.c` is a client of it for `window_control_smoke` and `window_capture_smoke`,
+and `TaskModel` the shell's.
+
+A window's capture source is the one screen sharing gets for its ext-foreign-toplevel-list
+handle, from `toplevel_capture_source` (`foreign_toplevel.c`): made from a private scene that
+holds only the window's surfaces (`capture_scene`, which `publish_toplevel` builds), when first
+asked for, and shared by every client; it renders the window at its logical size without its
+frame, also while it is minimized or on a workspace not shown, and its sessions stop as the
+window's handles close. While the session is locked, or once the window is gone, both ways give
+an inert source, whose sessions stop at once, rather than none: a client's next request would
+then name an object that does not exist, a protocol error that disconnects it. wlroots renders
+the source again only where the window changed since it last did, and for every session at
+once: a session started while another runs on the same window gets its first frame only when
+the window next draws, so a client keeps one session per window.
 
 ## The shell (`shell/`)
 
@@ -105,9 +119,9 @@ keeps its size. It is an overlay layer surface covering the output (exclusive zo
 coordinates are the output's), above fullscreen windows too, and hidden while nothing is open.
 While a menu or popup is open it holds the keyboard and takes every press but those on the bar's
 strip, where `inputRects` leaves a hole: a press on another bar button still switches popups in
-one press, and a press beside the popups closes them. The windows of a stacked button, shown on
-hover, take only the pointer over their list and down to the bar (`hoverArea`), and leave the
-keyboard where it is. Losing the keyboard while it holds it (`dismissed`)
+one press, and a press beside the popups closes them. The windows of a button shown on hover (the
+card of their pictures, or a stack's list) take only the pointer over the card and down to the bar
+(`hoverArea`), and leave the keyboard where it is. Losing the keyboard while it holds it (`dismissed`)
 closes the popups. Without layer shell (`--preview-popup`, `shell_ui_test`) it is an ordinary
 window as large as `ShellView::previewSize()`, and a preview's screenshot draws it over the bar.
 
@@ -142,7 +156,7 @@ what was there.
 | `Taskbar.qml` | The taskbar: the bar along the panel's edge with the start button, the pinned applications, the windows, the widgets and the clock, and its smaller buttons. |
 | `TopMenuBar.qml`, `Dock.qml`, `DockIcon.qml` | The bars of the macOS style (`shell.style`): the menu bar along the top in a `MenuBarWindow` of its own, with the system, application and Window menus, the widgets, search, Quick Settings and the clock; and the dock in the panel's surface, an icon for each application, pinned or running, with the applications button and the Trash. |
 | `PinnedSlots.qml`, `TaskList.qml`, `TaskButton.qml`, `TrayButton.qml`, `WorkspaceIndicator.qml`, `VolumeButton.qml`, `ClockButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `QuickSettingsButton.qml`, `WallpapersButton.qml`, `ProfilesButton.qml`, `TilingButton.qml`, `BarAppIcon.qml`, `Badge.qml`, `BarTip.qml` | Parts of the bar: widgets, an application's icon on it, a count on a pill, and the tooltip for things on it. |
-| `ClockFlyout.qml`, `QuickSettings.qml`, `AudioMixer.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml`, `MenuBarMenu.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
+| `ClockFlyout.qml`, `QuickSettings.qml`, `AudioMixer.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml`, `WindowThumbnails.qml`, `MenuBarMenu.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
 | `CalendarPopup.qml`, `NotificationHistory.qml` | The clock flyout's cards: the month calendar, and the notifications grouped by application. |
 | `QuickTile.qml` | A tile of Quick Settings: a toggle, a list it opens, or a state. |
 | `Icon.qml`, `FadingIcon.qml`, `SpeakerIcon.qml`, `BatteryIcon.qml` | Line icons (Lucide), drawn as vectors in any colour; one that crossfades as the state it shows changes, the loudspeaker for a volume, and a battery filled to its charge. |
@@ -167,6 +181,20 @@ The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `t
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
 `power.cpp`, `palette.cpp`. `preview.cpp` has stand-ins for all of them for
 `--preview-popup`.
+
+The pictures of the windows on the taskbar's card (`WindowThumbnails.qml`, with
+`shell.thumbnails`) are `TaskModel`'s: its `picture` role is `image://windows/<taskId>/<serial>`
+once a window has one, `""` until then, the serial new with every picture so that an `Image`
+with `cache: false` loads it again, and the `windows` image provider serves them by task id. The
+model takes pictures of a window only while something watches it: `watchPicture(taskId,
+pixelWidth, live)`, counted, which a tile calls as it appears and `unwatchPicture(taskId)` as it
+goes. It asks the window control for the window's capture source (`get_capture_source`, version
+2), captures it with ext-image-copy-capture into shared memory, scales the picture down off the
+GUI thread to fit `pixelWidth` by 5/8 of it, and, when `live`, takes the next as the window
+redraws, every 100 ms at most. The last picture stays until the window closes, so the card opens
+with it. A stand-in model (the preview's, the tests') has no `watchPicture`, which the card then
+does not call, and names pictures of its own (`image://preview-windows/ID`, painted by
+`preview.cpp`).
 
 The start menu (`Launcher.qml` and its `Start*.qml` parts) reads `shell.startMenu`, a `StartMenu`
 (`start_menu.cpp`): its own pins, seeded from the taskbar's; the applications launched lately
