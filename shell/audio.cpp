@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "audio.hpp"
+#include <QFile>
 #include <algorithm>
 
 int AudioStreams::rowCount(const QModelIndex &parent) const {
@@ -49,7 +50,8 @@ void AudioStreams::update(std::vector<Stream> streams) {
             streams_.push_back(std::move(stream));
             endInsertRows();
         } else if (existing->name != stream.name || existing->icon != stream.icon ||
-                   existing->volume != stream.volume || existing->muted != stream.muted) {
+                   existing->volume != stream.volume || existing->muted != stream.muted ||
+                   existing->corked != stream.corked || existing->processes != stream.processes) {
             *existing = std::move(stream);
             changed(existing->id);
         }
@@ -132,12 +134,139 @@ void Audio::setStreamVolume(int id, int percent) {
     sendStreamVolume(stream->id, percent);
     streams_.changed(stream->id);
 }
+void Audio::setStreamMuted(int id, bool muted) {
+    auto *stream = streams_.find(uint32_t(id));
+    if (!stream || stream->muted == muted)
+        return;
+    stream->muted = muted;
+    sendStreamMute(stream->id, muted);
+    streams_.changed(stream->id);
+}
 void Audio::toggleStreamMute(int id) {
-    if (auto *stream = streams_.find(uint32_t(id))) {
-        stream->muted = !stream->muted;
-        sendStreamMute(stream->id, stream->muted);
-        streams_.changed(stream->id);
+    if (auto *stream = streams_.find(uint32_t(id)))
+        setStreamMuted(id, !stream->muted);
+}
+
+QList<int> processAncestry(int pid, const QString &proc, int depth) {
+    QList<int> processes;
+    // A loop in a made-up procfs ends too.
+    while (pid > 1 && processes.size() < depth && !processes.contains(pid)) {
+        processes.push_back(pid);
+        QFile stat(proc + '/' + QString::number(pid) + "/stat");
+        if (!stat.open(QIODevice::ReadOnly))
+            break;
+        // "pid (name) state ppid ...": the name may hold spaces and parentheses.
+        const QByteArray text = stat.read(512);
+        const qsizetype end = text.lastIndexOf(')');
+        const QList<QByteArray> fields = text.mid(end + 1).simplified().split(' ');
+        bool read = false;
+        if (end >= 0 && fields.size() >= 2)
+            pid = fields[1].toInt(&read);
+        if (!read)
+            break;
     }
+    return processes;
+}
+int soundOwner(const QList<int> &processes, const QSet<int> &windows) {
+    for (int pid : processes)
+        if (windows.contains(pid))
+            return pid;
+    return 0;
+}
+
+void WindowSound::setAudio(QObject *object) {
+    auto *audio = qobject_cast<Audio *>(object);
+    if (audio == audio_)
+        return;
+    for (const auto &connection : std::as_const(audioConnections_))
+        disconnect(connection);
+    audioConnections_.clear();
+    audio_ = audio;
+    if (audio) {
+        auto *streams = audio->streams();
+        audioConnections_ = {
+            connect(streams, &QAbstractItemModel::rowsInserted, this, &WindowSound::update),
+            connect(streams, &QAbstractItemModel::rowsRemoved, this, &WindowSound::update),
+            connect(streams, &QAbstractItemModel::modelReset, this, &WindowSound::update),
+            connect(streams, &QAbstractItemModel::dataChanged, this, &WindowSound::update)};
+    }
+    Q_EMIT audioChanged();
+    update();
+}
+void WindowSound::setWindows(QObject *object) {
+    auto *windows = qobject_cast<QAbstractItemModel *>(object);
+    if (windows == windows_)
+        return;
+    for (const auto &connection : std::as_const(windowConnections_))
+        disconnect(connection);
+    windowConnections_.clear();
+    windows_ = windows;
+    if (windows) {
+        // Which processes have windows changes as they come and go, or as one learns its
+        // process; a new picture of one, many times a second, changes nothing here.
+        auto pidChanged = [this](const QModelIndex &, const QModelIndex &,
+                                 const QList<int> &roles) {
+            if (roles.isEmpty() ||
+                (windows_ && roles.contains(windows_->roleNames().key("pid", -1))))
+                update();
+        };
+        windowConnections_ = {
+            connect(windows, &QAbstractItemModel::rowsInserted, this, &WindowSound::update),
+            connect(windows, &QAbstractItemModel::rowsRemoved, this, &WindowSound::update),
+            connect(windows, &QAbstractItemModel::modelReset, this, &WindowSound::update),
+            connect(windows, &QAbstractItemModel::dataChanged, this, pidChanged)};
+    }
+    Q_EMIT windowsChanged();
+    update();
+}
+void WindowSound::setPid(int pid) {
+    if (pid == pid_)
+        return;
+    pid_ = pid;
+    Q_EMIT pidChanged();
+    update();
+}
+void WindowSound::update() {
+    bool playing = false, muted = false;
+    int volume = 0;
+    std::vector<uint32_t> streams;
+    if (audio_ && pid_ > 1) {
+        QSet<int> owners{pid_};
+        if (windows_) {
+            const int role = windows_->roleNames().key("pid", -1);
+            for (int row = 0; role >= 0 && row < windows_->rowCount(); ++row)
+                if (const int pid = windows_->data(windows_->index(row, 0), role).toInt(); pid > 1)
+                    owners.insert(pid);
+        }
+        for (const auto &stream : audio_->streams()->all()) {
+            if (soundOwner(stream.processes, owners) != pid_)
+                continue;
+            streams.push_back(stream.id);
+            muted |= stream.muted;
+            if (!stream.muted && !stream.corked) {
+                playing = true;
+                volume = std::max(volume, stream.volume);
+            }
+        }
+        muted = muted && !playing;
+    }
+    streams_ = std::move(streams);
+    if (playing == playing_ && muted == muted_ && volume == volume_)
+        return;
+    playing_ = playing;
+    muted_ = muted;
+    volume_ = volume;
+    Q_EMIT changed();
+}
+void WindowSound::toggleMute() {
+    if (!audio_ || (!playing_ && !muted_))
+        return;
+    // Each change comes back through the streams' model and works this out anew.
+    const bool mute = playing_;
+    const auto streams = streams_;
+    for (auto id : streams)
+        if (audio_)
+            audio_->setStreamMuted(int(id), mute);
 }
 
 #if !SHAODESK_PULSE

@@ -285,6 +285,16 @@ if(BUILD_TESTING)
     target_link_libraries(system_status_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME shell_system_status COMMAND system_status_test)
     set_tests_properties(shell_system_status PROPERTIES TIMEOUT 90)
+    # Which window's process plays a stream of the sound server, on a made-up procfs and the real
+    # one.
+    add_executable(window_sound_test ${PROJECT_SOURCE_DIR}/tests/window_sound_test.cpp
+        audio.cpp audio.hpp)
+    set_target_properties(window_sound_test PROPERTIES AUTOMOC ON)
+    target_include_directories(window_sound_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(window_sound_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(window_sound_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(window_sound_test PRIVATE Qt6::Gui Qt6::Test)
+    add_test(NAME shell_window_sound COMMAND window_sound_test)
     add_test(NAME shell_preview COMMAND ${Python3_EXECUTABLE}
         ${PROJECT_SOURCE_DIR}/tests/shell_preview.py $<TARGET_FILE:shaodesk-shell>
         ${EXAMPLE_CONFIG})
