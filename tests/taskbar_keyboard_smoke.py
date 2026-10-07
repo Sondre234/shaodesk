@@ -6,6 +6,7 @@ selected window up with the keyboard, or minimizes the one that had it, the keyb
 the next. The pointer moving over the bar hands the bar back to it, and the keyboard back to the
 window."""
 from pathlib import Path
+import re
 import sys
 
 import harness
@@ -46,23 +47,29 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
             msg("headless_keyboard", "key", "keys", str(KEYS[name]), state)
 
     def toggles():
-        """What the panel said of each taskbar_focus it heard: "on" or "off"."""
-        return [line.split()[3] for line in log().splitlines()
-                if line.startswith("shaodesk taskbar keyboard ")]
+        """What the panel said of each taskbar_focus it heard: "on" or "off". The shell may be
+        writing the last line still."""
+        return re.findall(r"^shaodesk taskbar keyboard (on|off) on \S+\n", log(), re.MULTILINE)
 
     def focus_bar():
         """taskbar_focus, until the panel has heard it, and the keyboard on the bar."""
         heard = len(toggles())
         # The shell subscribes asynchronously: ask until it has heard.
-        for _ in range(20):
+        for _ in range(10):
             msg("taskbar_focus")
             try:
                 desktop.wait_for(lambda: len(toggles()) > heard, "the panel hearing taskbar_focus",
-                                 timeout=1)
+                                 timeout=3)
                 break
             except harness.Timeout:
                 pass
-        assert toggles()[heard:] == ["on"], toggles()
+        # Heard twice, the second time asked for when the first was slow to come, it gave the
+        # keyboard back: once more.
+        if toggles()[-1] == "off":
+            heard = len(toggles())
+            msg("taskbar_focus")
+            desktop.wait_for(lambda: len(toggles()) > heard, "the panel hearing taskbar_focus again")
+        assert toggles()[-1] == "on", toggles()
         desktop.wait_for(lambda: keyboard() == POPOVER, "the popover with the keyboard")
 
     desktop.start()
