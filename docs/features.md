@@ -40,8 +40,8 @@ the dock.
   ones that are not pinned, and the Trash (which opens `trash:///`). A dot sits under each running
   application and its name shows above it on hover. A click starts an application, its icon
   bouncing until a window opens, or brings its windows forward; one asking for attention bounces
-  three times. A right click lists its windows and actions, Keep in Dock or Remove from Dock, Hide
-  and Quit. Something dragged from an application and resting on an icon brings its window
+  three times. A right click lists its windows and actions, Keep in Dock or Remove from Dock, Hide,
+  Quit and Force Quit, which kills its processes as the taskbar's Kill process does. Something dragged from an application and resting on an icon brings its window
   forward, or lists its windows to rest on one, as on the [taskbar](#taskbar), its name showing
   meanwhile. `panel_height` sets its height (the icons are 16 pixels smaller), `panel_radius` its
   corners and `panel_margin.bottom` how far it floats above the edge; it is always at the bottom
@@ -305,8 +305,10 @@ its desktop entry; the window's app id without one) over the window's title. The
   more monitors, from left to right; **Keep on all workspaces**, making it
   [sticky](#sticky-windows) (not with `features = { sticky = false }`); and where its workspace
   tiles, **Float**, checked while it is kept out of the tiling;
-- **Pin to taskbar** or **Unpin from taskbar** for an installed application, and **Close window**
-  in the danger colour.
+- **Pin to taskbar** or **Unpin from taskbar** for an installed application, **Close window**
+  in the danger colour, and last **Kill process**, which ends the process that made the window
+  with `SIGKILL`, for one that does not close (only once its process is known; never the shell's
+  or the compositor's).
 
 None of these focuses the window or raises it: a focused window moved off the workspace on screen
 passes the focus on, as `move_to_workspace` does. The window menu names the window itself, never
@@ -314,7 +316,8 @@ by its title, so it acts on the right one when several share a title.
 
 A stacked button's menu is about all its windows: its title counts them, and it offers
 **Minimize all** (or **Restore all**), moving them all to a workspace or monitor (their own
-marked when they share it), and **Close all 2 windows**. Right-clicking a window in its hover
+marked when they share it), **Close all 2 windows**, and **Kill process** (or **Kill 2
+processes** when they come from more than one). Right-clicking a window in its hover
 list opens that window's own menu. A pinned application's button without windows offers its
 desktop actions, **Open** and **Unpin from taskbar**; the bar's own menu has icons too.
 

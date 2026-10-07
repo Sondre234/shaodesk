@@ -118,6 +118,9 @@ shadows.
   all its windows, and a pinned application's offers its actions too. The shell names the window
   to the compositor through `shaodesk-window-control-v1`, a protocol of shaodesk's own, so the
   menu acts on the window right-clicked even when several share a title, and without focusing it.
+- A window's menu ends with Kill process (Kill 2 processes on a stack of windows from more than
+  one), which ends the process that made it with SIGKILL, for an application that does not
+  close; the dock's has macOS's Force Quit.
 - Menus share one look and the keyboard: Up, Down, Home and End move, Enter or Space chooses, and
   Escape closes. Submenus open beside their entries instead of in their place (the bar menu's
   appearance profiles, a tray item's submenus, whose application hears of each level as it opens
