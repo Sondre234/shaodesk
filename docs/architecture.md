@@ -226,7 +226,10 @@ fills it. It places itself beside `anchorRect` (in its parent's coordinates) on 
 `alignment` (`Qt.AlignHCenter`, `Qt.AlignLeft`, `Qt.AlignRight`, or the vertical ones beside the
 anchor); it flips to the other side when that one has more room (`placedSide` says where it went),
 and stays `margin` inside `bounds`. Its size is its `implicitWidth` and `implicitHeight`, cut to
-`availableWidth` and `availableHeight`. `opened()` is emitted once each time it opens and shows,
+`availableWidth` and `availableHeight`. With `glides` (the card of window pictures), a card that
+is shown eases to another place or size (`placedX`, `placedY`, `placedWidth`, `placedHeight`)
+rather than jumping, and one that is not shown takes it at once, so that opening and closing keep
+their own motion. `opened()` is emitted once each time it opens and shows,
 when its content resets, and `initialFocus` (the card, unless set; `null` for none) then takes the
 keyboard. Presses on it stay with it until it starts closing. With `anchored: false` it is only
 the card, for a surface that places it itself.

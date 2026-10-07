@@ -116,10 +116,11 @@ focuses its window, or minimizes it when it is focused already; a middle click o
 over the one under the pointer closes it, and a right click opens its [menu](#taskbar-menus). The
 focused window's picture is marked as its button is. The pointer can cross from the button onto
 the card, which closes a moment after it has left both, or at once when a button is pressed or a
-menu opens; moving onto another button shows that one's windows at once. The pictures get narrower
-when more windows than fit across the monitor share a button, down to 60 % of their width, and
-past that the stack lists its windows by title instead. The macOS style's dock lists a stack's
-windows by title, pictures or not.
+menu opens; moving onto another button shows that one's windows at once, the card gliding over
+to it and easing to their width, as it eases to a new width when a window opens or closes. The
+pictures get narrower when more windows than fit across the monitor share a button, down to 60 %
+of their width, and past that the stack lists its windows by title instead. The macOS style's
+dock lists a stack's windows by title, pictures or not.
 
 ```lua
 shell = {

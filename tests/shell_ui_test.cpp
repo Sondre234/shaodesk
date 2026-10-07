@@ -2044,6 +2044,55 @@ ListModel {
         QTest::qWait(600);
         if (root->property("groupOpen").toBool())
             return fail("the card of a pressed button's windows came back while the pointer stayed");
+        // Open, the card glides to another button's windows and eases to their width, rather than
+        // jumping there; opening, it is in its place from the start. Slowed down, so that it is
+        // seen on its way.
+        {
+            if (!slowMotion(true))
+                return fail("the animations were not slowed down");
+            QTest::mouseMove(&view, barSpace);
+            if (!QTest::qWaitFor([&] {
+                    single = buttonFor(7);
+                    stack = listedTask(3);
+                    return !popover->isVisible() && single && stack && stack->property("stacked").toBool();
+                }))
+                return fail("the buttons were not back on the bar in slow motion");
+            QTest::mouseMove(&view, centre(single));
+            if (!QTest::qWaitFor([&] { return inPopover(card) && titles() == "Fake"; }))
+                return fail("resting on a window's button in slow motion did not show its picture");
+            const QRectF from(card->x(), card->y(), card->width(), card->height());
+            QTest::mouseMove(&view, centre(stack));
+            const qreal width = card->property("placedWidth").toReal();
+            if (card->x() != from.x() || card->width() != from.width() || width <= from.width()) {
+                std::cerr << "the card did not start from where it was for another button's windows: "
+                          << card->x() << "," << card->width() << " from " << from.x() << ","
+                          << from.width() << " to " << width << " " << titles().toStdString() << '\n';
+                return 1;
+            }
+            if (!QTest::qWaitFor([&] {
+                    return card->width() > from.width() && card->width() < width && card->x() != from.x() &&
+                           qAbs(card->y() + card->height() - from.bottom()) < 0.5;
+                }))
+                return fail("the card did not ease to another button's windows, its edge by the bar staying");
+            // Its place and width ease together, and come to rest together.
+            if (!QTest::qWaitFor([&] { return card->width() == width && titles() == "Group one|Group two"; }))
+                return fail("the card did not come to rest over another button's windows");
+            {
+                const QRectF area = card->mapRectToScene(QRectF(0, 0, card->width(), card->height()));
+                if (qAbs(area.center().x() - centre(stack).x()) > 1 && area.left() != 8)
+                    return fail("the card did not glide to the stacked button");
+            }
+            QTest::mouseMove(&view, barSpace);
+            if (!QTest::qWaitFor([&] { return !card->isVisible(); }))
+                return fail("leaving the stacked button did not close its card in slow motion");
+            QTest::mouseMove(&view, centre(single));
+            if (!QTest::qWaitFor([&] { return card->isVisible(); }) || card->x() != from.x() ||
+                card->width() != from.width())
+                return fail("opening over another button than it last showed, the card glided from there");
+            QTest::mouseMove(&view, barSpace);
+            if (!QTest::qWaitFor([&] { return !popover->isVisible(); }) || !slowMotion(false))
+                return fail("the card did not close, or the animations did not get their speed back");
+        }
         // As many windows as fit across the output at 60 % of their pictures' size get narrower
         // pictures; with more, the stack lists them instead.
         for (int id = 12; id <= 15; ++id)
