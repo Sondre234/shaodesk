@@ -887,7 +887,7 @@ ListModel {
     function setFloating(id, on) { note("floating " + id + " " + on) }
     ListElement { taskId: 7; title: 'Fake'; appId: 'fake'; active: false; minimized: false; urgent: false
                   maximized: false; fullscreen: false; output: 'TEST-1'; workspace: 2; sticky: false
-                  floating: false; tiling: false; picture: '' }
+                  floating: false; tiling: false; picture: ''; pid: 0 }
 })",
                       QUrl());
     QObject *fakeModel = fakeTasks.create();
@@ -1909,6 +1909,93 @@ ListModel {
         editTasks(QString("model.setProperty(%1, 'picture', 'image://test-windows/320x100')").arg(rowOf(10)));
         if (!QTest::qWaitFor([&] { return shows(10); }))
             return fail("a window's picture did not come back");
+        // A window whose process plays sound has a speaker before the cross, which mutes that
+        // process's streams and stays, crossed out, while they are muted. A stream belongs to the
+        // nearest process up from its own with a window: here the second window's process
+        // started the first's, which started the player.
+        {
+            const QVariant audioBefore = root->property("audioSource");
+            root->setProperty("audioSource", QVariant::fromValue<QObject *>(&audio));
+            editTasks(QString("model.setProperty(%1, 'pid', 4010)").arg(rowOf(10)));
+            editTasks(QString("model.setProperty(%1, 'pid', 4011)").arg(rowOf(11)));
+            auto speaker = [&](int id) { return find(tileFor(id), "windowThumbnailSound"); };
+            auto speaking = [&](int id) {
+                auto *button = speaker(id);
+                return button && button->isVisible() && button->opacity() == 1 && button->isEnabled();
+            };
+            auto silent = [&](int id) { return speaker(id) && !speaker(id)->isVisible(); };
+            // What a screen reader calls it: its Accessible.name, the attached object's.
+            auto spoken = [](QQuickItem *item) {
+                for (auto *child : item->children())
+                    if (child->inherits("QQuickAccessibleAttached"))
+                        return child->property("name").toString();
+                return QString();
+            };
+            auto *title = find(tileFor(10), "windowThumbnailTitle");
+            auto *cross = find(tileFor(10), "windowThumbnailClose");
+            if (!title || !cross || !silent(10) || !silent(11))
+                return fail("a window that plays nothing has a speaker on its picture");
+            auto x = [](QQuickItem *item) { return item->mapToScene(QPointF(0, 0)).x(); };
+            const qreal titleX = x(title), titleWidth = title->width(), crossX = x(cross);
+            auto player = [](bool muted, bool corked, QList<int> processes) {
+                return AudioStreams::Stream{51, "Player", "audio-x-generic", 80, muted, corked, processes};
+            };
+            const AudioStreams::Stream paused{52, "Paused", "audio-x-generic", 80, false, true, {4011}};
+            audio.update({"speakers", {{"speakers", "Speakers", 50, false}},
+                          {player(false, false, {4110, 4010, 4011}), paused}});
+            if (!QTest::qWaitFor([&] { return speaking(10); }) || !silent(11) ||
+                speaker(10)->property("muted").toBool() ||
+                spoken(speaker(10)) != "Mute Group one") {
+                std::cerr << "the window playing sound has no speaker to mute it, or the other has one\n";
+                return 1;
+            }
+            // Its room comes from the title's end: the title starts where it did, the cross
+            // keeps its place, and the cross stays while the pointer is on the speaker.
+            if (x(title) != titleX || title->width() >= titleWidth || x(cross) != crossX)
+                return fail("the speaker moved the title or the cross as it came");
+            QTest::mouseMove(popover, centre(speaker(10)));
+            if (!QTest::qWaitFor([&] { return cross->isEnabled() && cross->opacity() == 1; }))
+                return fail("the cross went while the pointer was on the speaker beside it");
+            // A click mutes the window's sound alone, and neither focuses it nor closes the card.
+            audio.requests.clear();
+            taskRequests();
+            click(speaker(10));
+            if (!QTest::qWaitFor([&] { return speaker(10)->property("muted").toBool(); }) ||
+                audio.requests != QStringList{"stream-mute 51 1"} || !speaking(10) ||
+                spoken(speaker(10)) != "Unmute Group one") {
+                std::cerr << "clicking the speaker did not mute the window's sound: "
+                          << audio.requests.join(", ").toStdString() << '\n';
+                return 1;
+            }
+            QTest::qWait(100);
+            if (!inPopover(card) || !taskRequests().isEmpty())
+                return fail("clicking a window's speaker also clicked its picture");
+            // Muted, paused or not, it stays to be unmuted; unmuted while paused, it goes.
+            audio.update({"speakers", {{"speakers", "Speakers", 50, false}},
+                          {player(true, true, {4110, 4010, 4011}), paused}});
+            if (!speaking(10) || !speaker(10)->property("muted").toBool())
+                return fail("a muted window's speaker went as its sound paused");
+            audio.requests.clear();
+            click(speaker(10));
+            if (!QTest::qWaitFor([&] { return silent(10) && title->width() == titleWidth; }) ||
+                audio.requests != QStringList{"stream-mute 51 0"}) {
+                std::cerr << "unmuting a paused window did not take its speaker away: "
+                          << audio.requests.join(", ").toStdString() << '\n';
+                return 1;
+            }
+            // Windows of one process share its sound, and both say so.
+            editTasks(QString("model.setProperty(%1, 'pid', 4010)").arg(rowOf(11)));
+            audio.update({"speakers", {{"speakers", "Speakers", 50, false}},
+                          {player(false, false, {4110, 4010})}});
+            if (!QTest::qWaitFor([&] { return speaking(10) && speaking(11); }))
+                return fail("two windows of the process playing sound do not both show it");
+            // The sound ending takes the speakers away, the title getting its room back.
+            audio.update({"speakers", {{"speakers", "Speakers", 50, false}}, {}});
+            if (!QTest::qWaitFor([&] { return silent(10) && silent(11) && title->width() == titleWidth; }))
+                return fail("the speakers stayed once the sound had ended");
+            root->setProperty("audioSource", audioBefore);
+            audio.requests.clear();
+        }
         // The pointer can cross from the button to the card without it closing, and a click on
         // a tile focuses its window and closes the card.
         const QPoint into = centre(tileFor(10));
