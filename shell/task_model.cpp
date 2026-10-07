@@ -2,6 +2,7 @@
 #include "task_model.hpp"
 #include <algorithm>
 #include <cerrno>
+#include <climits>
 #include <cstring>
 
 TaskModel::TaskModel(QObject *parent) : QAbstractListModel(parent) {
@@ -108,6 +109,8 @@ QVariant TaskModel::data(const QModelIndex &index, int role) const {
         return state.tiling;
     case Picture:
         return pictures_.url(task.id);
+    case Pid:
+        return state.pid;
     default:
         return {};
     }
@@ -117,7 +120,7 @@ QHash<int, QByteArray> TaskModel::roleNames() const {
             {Active, "active"},        {Minimized, "minimized"}, {Maximized, "maximized"},
             {Urgent, "urgent"},        {Fullscreen, "fullscreen"}, {Output, "output"},
             {Workspace, "workspace"},  {Sticky, "sticky"},         {Floating, "floating"},
-            {Tiling, "tiling"},        {Picture, "picture"}};
+            {Tiling, "tiling"},        {Picture, "picture"},     {Pid, "pid"}};
 }
 TaskModel::Task *TaskModel::find(int id) {
     for (auto &task : tasks_)
@@ -276,6 +279,7 @@ void TaskModel::changed(Task *task) {
             compare(&State::sticky, Sticky);
             compare(&State::floating, Floating);
             compare(&State::tiling, Tiling);
+            compare(&State::pid, Pid);
             if (roles.isEmpty())
                 return;
             task->shown = task->state;
@@ -308,9 +312,10 @@ void TaskModel::global(void *data, wl_registry *registry, uint32_t name, const c
         self.seat_ =
             static_cast<wl_seat *>(wl_registry_bind(registry, name, &wl_seat_interface, 1));
     } else if (!std::strcmp(interface, shaodesk_window_control_v1_interface.name) && !self.control_) {
-        // Version 2 gives the windows' capture sources, for their pictures.
+        // Version 2 gives the windows' capture sources, for their pictures, and 3 their
+        // processes, for the sound they play.
         self.control_ = static_cast<shaodesk_window_control_v1 *>(wl_registry_bind(
-            registry, name, &shaodesk_window_control_v1_interface, std::min(version, 2u)));
+            registry, name, &shaodesk_window_control_v1_interface, std::min(version, 3u)));
         for (auto &task : self.tasks_)
             self.watch(task.get());
     } else if (!std::strcmp(interface, "wl_shm") && !self.shm_) {
@@ -328,7 +333,7 @@ void TaskModel::watch(Task *task) {
         return;
     task->window = shaodesk_window_control_v1_get_window(control_, task->handle);
     static const shaodesk_window_v1_listener listener{windowOutput, windowWorkspace, windowState,
-                                                      windowDone};
+                                                      windowDone, windowPid};
     shaodesk_window_v1_add_listener(task->window, &listener, task);
 }
 void TaskModel::globalRemoved(void *, wl_registry *, uint32_t) {}
@@ -392,4 +397,7 @@ void TaskModel::windowState(void *data, shaodesk_window_v1 *, uint32_t flags) {
 void TaskModel::windowDone(void *data, shaodesk_window_v1 *) {
     auto *task = static_cast<Task *>(data);
     task->model->changed(task);
+}
+void TaskModel::windowPid(void *data, shaodesk_window_v1 *, uint32_t pid) {
+    static_cast<Task *>(data)->state.pid = pid <= INT_MAX ? static_cast<int>(pid) : 0;
 }
