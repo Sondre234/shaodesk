@@ -54,7 +54,7 @@ all. In short:
 | `output.c`, `output_moves.c` | Monitors and their configuration; windows and workspaces moving between outputs. |
 | `layer_shell.c` | Panels and other layer surfaces. |
 | `group.c`, `scratchpad.c`, `swallow.c`, `switcher.c`, `overview.c`, `session.c` | One feature each. |
-| `effects.c` | Dimming, peek, night light, magnifier, hot corners. |
+| `effects.c` | Dimming, peeking at the desktop or at one window, night light, magnifier, hot corners. |
 | `lock.c` | Session lock and idle/sleep inhibitors. |
 | `power.c` | The power actions: suspend, hibernate, reboot and power off through logind (`src/login1.c`), locking first, closing windows first, log out. |
 | `foreign_toplevel.c` | Window lists for taskbars and single-window capture. |
@@ -90,8 +90,8 @@ and do nothing while the session is locked. A change reaches the objects through
 `window_objects_changed`, which `notify_subscribers` and the tiling call: it sends what changed
 from an idle callback, once the change is over. Like the foreign-toplevel manager, the global is
 offered to every client; it lets a client do nothing to a window a taskbar cannot already do.
-`tests/window_probe.c` is a client of it for `window_control_smoke` and `window_capture_smoke`,
-and `TaskModel` the shell's.
+`tests/window_probe.c` is a client of it for `window_control_smoke`, `window_capture_smoke` and
+`window_peek_smoke`, and `TaskModel` the shell's.
 
 A window's capture source is the one screen sharing gets for its ext-foreign-toplevel-list
 handle, from `toplevel_capture_source` (`foreign_toplevel.c`): made from a private scene that
@@ -139,6 +139,25 @@ Since version 3 a `shaodesk_window_v1` also sends the window's `pid` with its st
 `done`: `toplevel_pid` (`toplevel.c`), the Wayland client's peer credentials or the process XRes
 names for an X11 window, 0 when unknown, for the shell to match the window with the sound
 server's streams.
+
+Since version 4 `set_peek` peeks at the window and `unset_peek` ends the peek (`effects.c`), for
+the taskbar's card while the pointer rests on a picture. The other windows fade with
+`peek_fade`, the desktop peek's, while the window's own `peek_shown` fade, which `peek_scale`
+(the opacity `refresh_frame` gives its buffers) weighs against it, keeps it in full. It is drawn
+over them from `peek_layer`, a tree between the fullscreen windows and the top layer, so that the
+bar and the card stay over it, while an empty tree keeps its place among the windows; one
+fullscreen over the panels stays where it is, over the others already. A hidden window
+(minimized, or on a workspace its output does not show) has its node shown for the peek where it
+is (`peek_lent`), fades in and out, and is hidden again once it has faded out (`tick_effects`);
+`scene_node_at` passes over it, so it takes no input. Moving the peek to another window keeps the
+others faded and crossfades the two; ending it fades the others back, a window shown anyway
+staying in full until they are, and puts the window back in its place unless it was moved on
+purpose meanwhile, as focusing raises it. Nothing else about the window changes. The peek ends
+as the object that asked is destroyed (its client too), as the window closes
+(`forget_window_peek` in `unmap_toplevel`) or leaves the taskbar (`window_objects_forget`), is
+focused (`focus_toplevel_raise`, which a click on its picture does), as the session locks (at
+once), and as the desktop peek starts. `shaodesk msg get window_peek` lists what it does to each
+window, and `tests/window_peek_smoke.py` tests it.
 
 ## The shell (`shell/`)
 
@@ -248,6 +267,18 @@ started in a terminal in the terminal's, unless the player has a window. `playin
 the window's that is open and not paused (corked) or muted, `muted` one that is muted while none
 plays, and `toggleMute()` mutes or unmutes all of them through `Audio::setStreamMuted`. The
 preview's and the tests' stand-ins give the `pid` roles, and the streams' `processes`, themselves.
+
+A tile peeks at its window while the pointer rests on its picture: a `HoverHandler` on the
+picture's box and a timer call the task source's `peek(taskId)` after 500 ms, or at once while
+its `peekedTask` names a window already, so that the peek moves straight to the next picture, and
+`endPeek(taskId)` 150 ms after the pointer leaves the picture or the card closes, time to cross to
+the next one, whose peek takes over first (`endPeek` ends only the peek at that window). Half a
+second is about Windows' wait, a little longer than the card's own, so that crossing a picture on
+the way to the cross, the speaker or another tile does not fade every window on the screen.
+`TaskModel` sends `set_peek` and `unset_peek` (version 4) for them; the compositor ends a peek by
+itself too, as the window is focused (a click on the picture), which the model does not hear, so
+`peekedTask` names the last window it peeked at until `endPeek`. A stand-in without `peek` peeks
+at nothing, and the macOS style's dock and the stack's list of titles do not peek.
 
 The start menu (`Launcher.qml` and its `Start*.qml` parts) reads `shell.startMenu`, a `StartMenu`
 (`start_menu.cpp`): its own pins, seeded from the taskbar's; the applications launched lately

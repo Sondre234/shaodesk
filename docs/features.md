@@ -134,6 +134,18 @@ plays nothing, as some games and voice-chat applications do, shows the speaker u
 it. An application in a sandbox with a process namespace of its own (Flatpak) names its processes
 by numbers that mean nothing outside it, so its windows show no speaker.
 
+Resting the pointer on a picture for half a second peeks at its window, as Windows' Aero Peek
+does: every other window fades as for the desktop [peek](#effects), to `peek.opacity` over
+`peek.duration`, and the window shows over them in full where it is, a minimized one where it
+was and one on another workspace over the workspace shown. The bar and the card stay as they are.
+Nothing about the window changes: it is not focused, raised, restored or moved to the workspace
+shown, and while it shows only for the peek, clicks go through it. Moving onto another picture
+takes the peek over at once, without the others coming back in between; leaving the pictures, or
+the card closing, ends it with a fade. Clicking the picture focuses the window where the peek
+shows it. The peek also ends as the window closes or is focused another way, as the session
+locks, or as the desktop peek starts. The macOS style's dock and a stack's list of titles have no
+pictures, and do not peek.
+
 ```lua
 shell = {
     thumbnails = {
@@ -889,7 +901,9 @@ through the black to the window.
 **Peek.** Bind `peek` to a key and every window fades to `peek.opacity` (0.12 by default; 0 hides
 them) for as long as the key is held, showing the desktop behind them; borders, the panel and
 dimming go with it. `peek_toggle` (and `shaodesk msg peek_toggle`) switches it on and off instead.
-The fade takes `peek.duration` milliseconds.
+The fade takes `peek.duration` milliseconds. Resting on a window's picture on the taskbar's card
+peeks at that window the same way, the others fading while it shows over them (see
+[Window pictures](#window-pictures)); the desktop peek takes over from it.
 
 **Night light.** `night_light = { enabled = true, night_temperature = 3400 }` turns the screen
 warm in the evening and neutral again in the morning, easing over `transition` minutes around
@@ -1233,7 +1247,10 @@ the keyboard.
 the scene (closing windows count until their animation ends), and of focus fades, mainly
 for tests. `shaodesk msg get pictures` prints one line per capture source a client asked for to
 picture a window at a size, as the taskbar does: the size asked for, the frame's size, how many
-sessions capture it, and the window's title, also mainly for tests. A client
+sessions capture it, and the window's title, also mainly for tests. `shaodesk msg get
+window_peek` prints one line per window for the taskbar's peek at a window: whether it is the
+one peeked at, whether it is drawn, where it is stacked among the windows (0 at the bottom), how
+far it shows through the peek and its opacity (both in thousandths), and its title. A client
 that sends `subscribe` keeps its connection and receives `tiling on|off` and
 `workspace N` (the focused monitor's), one `output NAME N USED TILING` line per monitor
 (as in `get workspaces`), and `keyboard-layout N COUNT SHORT NAME` (the active
