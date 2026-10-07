@@ -174,14 +174,14 @@ The taskbar's popups are drawn in a surface of their own, a `PopoverWindow` (`vi
 `Panel.qml` declares, so they stay in the panel's QML tree and state while the bar's surface
 keeps its size. It is an overlay layer surface covering the output (exclusive zone -1, so its
 coordinates are the output's), above fullscreen windows too, and hidden while nothing is open.
-While a menu or popup is open it holds the keyboard and takes every press but those on the bar's
-strip, where `inputRects` leaves a hole: a press on another bar button still switches popups in
-one press, and a press beside the popups closes them. The windows of a button shown on hover (the
-card of their pictures, or a stack's list) take only the pointer over the card and down to the bar
-(`hoverArea`), where a drag reaches them too, and leave the keyboard where it is. Losing the
-keyboard while it holds it (`dismissed`) closes the popups. Without layer shell (`--preview-popup`,
-`shell_ui_test`) it is an ordinary window as large as `ShellView::previewSize()`, and a preview's
-screenshot draws it over the bar.
+While a menu or popup is open, or the bar has the keyboard (below), it holds the keyboard and
+takes every press but those on the bar's strip, where `inputRects` leaves a hole: a press on
+another bar button still switches popups in one press, and a press beside the popups closes them.
+The windows of a button shown on hover (the card of their pictures, or a stack's list) take only
+the pointer over the card and down to the bar (`hoverArea`), where a drag reaches them too, and
+leave the keyboard where it is. Losing the keyboard while it holds it (`dismissed`) closes the
+popups. Without layer shell (`--preview-popup`, `shell_ui_test`) it is an ordinary window as large
+as `ShellView::previewSize()`, and a preview's screenshot draws it over the bar.
 
 `Panel.qml` loads the bars of `shell.style`. The taskbar (`Taskbar.qml`) fills the panel's surface.
 The macOS style has two: the dock (`Dock.qml`) in the panel's surface, which is then at the bottom
@@ -306,6 +306,29 @@ the way to the cross, the speaker or another tile does not fade every window on 
 itself too, as the window is focused (a click on the picture), which the model does not hear, so
 `peekedTask` names the last window it peeked at until `endPeek`. A stand-in without `peek` peeks
 at nothing, and the macOS style's dock and the stack's list of titles do not peek.
+
+The keyboard on the bar (`BarKeyboard.qml`, the panel's `barKeys`) is held in the popover. The
+`taskbar_focus` action sends the shell `taskbar OUTPUT` for the focused output (`request_taskbar`,
+`control.c`); the controller emits `taskbarRequested`, and that output's `ShellView` calls the
+panel's `toggleBarKeyboard()` and logs `shaodesk taskbar keyboard on|off on OUTPUT`. While
+`barKeys.active` the popover is open and holds the keyboard as for a menu, and `BarKeyboard`, which
+has the active focus there, takes the keys. Its stops are found anew as they are needed
+(`stops()`): the pinned slots' visible buttons that have a `keyMenu()`, then the task list's rows
+by number, since the list makes the buttons outside its view only as they scroll in
+(`positionViewAtIndex` brings the selected one into view), or the dock's icons. The selected
+`button` shows its windows with the panel's own `openGroup`, so the card glides as on hover, and
+`window` indexes the card's tiles or the list's rows (`windowAt(index)`). A button, tile or row
+reads `keySelected` from it to draw a `FocusRing` and, on a tile, to stand in for the pointer in
+the peek's `resting`. The window that had the keyboard is noted as `from` before the popover takes
+it (the compositor deactivates the window as a layer surface takes the keyboard, so the task
+source then shows none as active), and Enter minimizes it where a click on the focused window's
+button would. Its menus (`keyMenu()`, with `menuOpened` set) close back to it (`resume()`), and
+any other menu that opens ends it. While it is active `hoverGroup`, `hoverGroupList` and
+`groupHide` leave the card alone; a `HoverHandler` on the bar and on the popover (over the card
+only) and a `MouseArea` over each that lets presses through hand the bar back to the pointer
+(`handOver`, `pointerTakesOver`) once the pointer moves more than two pixels from where it was
+first seen, or is pressed. Losing the keyboard (`dismissed`) and `closeMenus()` end it.
+`tests/taskbar_keyboard_smoke.py` follows the keyboard with `get seat` in a session.
 
 The start menu (`Launcher.qml` and its `Start*.qml` parts) reads `shell.startMenu`, a `StartMenu`
 (`start_menu.cpp`): its own pins, seeded from the taskbar's; the applications launched lately
