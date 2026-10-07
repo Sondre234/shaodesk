@@ -79,11 +79,14 @@ class PulseAudio : public Audio {
         ~Locked() { pa_threaded_mainloop_unlock(loop); }
     };
     // What the server thread has read so far; icons are looked up in the Qt thread, and so are
-    // the streams' processes from the ids the clients give.
+    // the streams' processes from the ids the clients give: a stream's own, or else its
+    // client's, as a PipeWire application's stream has none of its own.
     struct Snapshot {
         State state;
         std::vector<QStringList> iconCandidates;
         std::vector<int> processIds;
+        std::vector<uint32_t> streamClients;
+        std::map<uint32_t, int> clientProcesses;
         std::map<std::string, pa_cvolume> sinkVolumes;
         std::map<uint32_t, pa_cvolume> streamVolumes;
     };
@@ -170,10 +173,11 @@ class PulseAudio : public Audio {
             return;
         }
         pending_ = {};
-        outstanding_ = 3;
+        outstanding_ = 4;
         run(pa_context_get_server_info(context_, &PulseAudio::onServer, this));
         run(pa_context_get_sink_info_list(context_, &PulseAudio::onSink, this));
         run(pa_context_get_sink_input_info_list(context_, &PulseAudio::onStream, this));
+        run(pa_context_get_client_info_list(context_, &PulseAudio::onClient, this));
     }
     static void onServer(pa_context *, const pa_server_info *info, void *data) {
         auto *self = static_cast<PulseAudio *>(data);
@@ -211,6 +215,16 @@ class PulseAudio : public Audio {
         self->pending_.streamVolumes[info->index] = info->volume;
         self->pending_.processIds.push_back(
             propertyOf(info->proplist, PA_PROP_APPLICATION_PROCESS_ID).toInt());
+        self->pending_.streamClients.push_back(info->client);
+    }
+    static void onClient(pa_context *, const pa_client_info *info, int end, void *data) {
+        auto *self = static_cast<PulseAudio *>(data);
+        if (end) {
+            self->finish();
+            return;
+        }
+        self->pending_.clientProcesses[info->index] =
+            propertyOf(info->proplist, PA_PROP_APPLICATION_PROCESS_ID).toInt();
     }
     void finish() {
         if (--outstanding_ > 0)
@@ -223,7 +237,10 @@ class PulseAudio : public Audio {
                 std::map<uint32_t, std::pair<int, QList<int>>> processes;
                 for (size_t i = 0; i < snapshot.state.streams.size(); ++i) {
                     auto &stream = snapshot.state.streams[i];
-                    const int pid = snapshot.processIds[i];
+                    int pid = snapshot.processIds[i];
+                    if (auto client = snapshot.clientProcesses.find(snapshot.streamClients[i]);
+                        pid <= 0 && client != snapshot.clientProcesses.end())
+                        pid = client->second;
                     auto known = processes_.find(stream.id);
                     stream.processes = known != processes_.end() && known->second.first == pid
                                            ? known->second.second
