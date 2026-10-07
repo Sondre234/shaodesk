@@ -76,8 +76,10 @@ gives a `shaodesk_window_v1` that sends the window's `output` (connector name), 
 1) and `state` (sticky, floating, tiled, and whether its workspace tiles), then `done`, at once and
 again after each change, and takes `move_to_workspace`, `move_to_output`, `set_sticky` /
 `unset_sticky` and `set_floating` / `unset_floating`. Since version 2 its `get_capture_source`
-gives the window's `ext_image_capture_source_v1`, which the shell copies with
-ext-image-copy-capture for the taskbar's pictures of windows.
+gives the window's `ext_image_capture_source_v1`, and since version 3
+`get_scaled_capture_source(width, height)` gives one whose frames the compositor scales down to
+fit that many buffer pixels; the shell copies them with ext-image-copy-capture for the taskbar's
+pictures of windows.
 
 `window_control.c` finds the window by looking for the handle among the resources of each
 window's `wlr_foreign_toplevel_handle_v1`, so a handle that is gone names nothing and its object
@@ -102,6 +104,36 @@ then name an object that does not exist, a protocol error that disconnects it. w
 the source again only where the window changed since it last did, and for every session at
 once: a session started while another runs on the same window gets its first frame only when
 the window next draws, so a client keeps one session per window.
+
+A scaled capture source (`scaled_capture.c`, adapted from wlroots' source for a scene node)
+renders the same capture scene through an output of its own, a `wlr_output` on an empty backend
+that no client is offered, at a scale below 1. Each request makes one, so no two clients'
+sessions share it. It goes once its client has destroyed the resource and no session
+captures it, from an idle callback since wlroots stops a source from inside a session's
+teardown, or with the capture scene as the window closes, which stops its sessions. A capture
+scene takes 16 outputs at most (wlroots' scene asserts below 64); a request past that gets an
+inert source. The renderer samples bilinearly without mipmaps, so one pass from a large window
+to a picture a tenth its size would leave out most of its pixels, and text would shimmer as it
+changes. Instead the scene renders at no less than half the density of the window's buffers,
+then steps halve that on the renderer, each pixel the average of two by two
+(`wlr_render_pass_add_texture` into a swapchain of each step's own), until it is within twice
+the frame's size, and a last bilinear pass makes the frame. A frame's pixels thus stand for all
+those they cover, so the shell asks for the size it shows and scales nothing. The steps' buffers
+last while a session captures; a buffer the size of the output, such as a window's own at its
+logical size, is taken as it is (direct scan-out). A frame is rendered when a session asks for
+one and the window changed since, so a window that stops drawing costs nothing, and at most once
+for each frame asked for, which paces a window shown nowhere else. A session owed what changed
+since its last frame, one started while another runs or one that let frames go by, gets the frame
+as it stands at once (the last one kept for it) rather than waiting for the window to draw.
+`shaodesk msg get pictures` lists these sources.
+
+Measured on a headless compositor with the pixman renderer, a window of 3840 by 2108 pixels that
+redraws whenever it may, minimized, with the card of its 240-pixel picture open: a frame was
+32.4 MB at the window's size and is 127 KB scaled. The shell took 9 to 11 % of a core for ten
+full-size frames a second, 0.7 % for ten scaled ones and 2.3 to 2.5 % for thirty, most of it
+Qt Quick drawing the card in software. The compositor took 12 to 13 % for ten full-size frames,
+10 % for ten scaled and 26 to 31 % for thirty, pixman rendering the steps on the CPU; a GPU
+renderer does that on the GPU, and copies 127 KB back where it copied 32 MB.
 
 ## The shell (`shell/`)
 
@@ -189,13 +221,15 @@ once a window has one, `""` until then, the serial new with every picture so tha
 with `cache: false` loads it again, and the `windows` image provider serves them by task id. The
 model takes pictures of a window only while something watches it: `watchPicture(taskId,
 pixelWidth, live)`, counted, which a tile calls as it appears and `unwatchPicture(taskId)` as it
-goes. It asks the window control for the window's capture source (`get_capture_source`, version
-2), captures it with ext-image-copy-capture into shared memory, scales the picture down off the
-GUI thread to fit `pixelWidth` by 5/8 of it, and, when `live`, takes the next as the window
-redraws, every 100 ms at most. The last picture stays until the window closes, so the card opens
-with it. A stand-in model (the preview's, the tests') has no `watchPicture`, which the card then
-does not call, and names pictures of its own (`image://preview-windows/ID`, painted by
-`preview.cpp`).
+goes. It asks the window control for the window's capture source scaled down to fit
+`pixelWidth` by 5/8 of it (`get_scaled_capture_source`, version 3; a new width asks again), or
+with version 2 for it at the window's size (`get_capture_source`), captures it with
+ext-image-copy-capture into shared memory, scales the picture down off the GUI thread where the
+frame is larger than that (only ever a copy with version 3), and, when `live`, takes the next as
+the window redraws, every 33 ms at most (100 ms at the window's size). The last picture stays
+until the window closes, so the card opens with it. A stand-in model (the preview's, the
+tests') has no `watchPicture`, which the card then does not call, and names pictures of its own
+(`image://preview-windows/ID`, painted by `preview.cpp`).
 
 The start menu (`Launcher.qml` and its `Start*.qml` parts) reads `shell.startMenu`, a `StartMenu`
 (`start_menu.cpp`): its own pins, seeded from the taskbar's; the applications launched lately

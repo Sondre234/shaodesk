@@ -327,7 +327,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.thumbnails.enabled` | boolean | true | - | Show the pictures; `false` gives a window's button its title as a tooltip again, and a stack the list of its windows' titles. |
 | `shell.thumbnails.delay` | integer | 400 | 0 to 2000 | Milliseconds the pointer rests on the button before the card opens. |
 | `shell.thumbnails.size` | integer | 240 | 120 to 480 | Width of one picture in pixels, which is 5/8 as tall. With more windows than fit across the monitor they get narrower, down to 60 % of it, and past that the card lists the windows by title instead. |
-| `shell.thumbnails.live` | boolean | true | - | The pictures follow their windows while the card is open, at most about ten times a second; `false` takes one of each window as the card opens. |
+| `shell.thumbnails.live` | boolean | true | - | The pictures follow their windows while the card is open, at most 30 times a second; `false` takes one of each window as the card opens. |
 | `shell.workspaces_shown` | integer | 0 | 0 to 10 | How many of the monitor's workspaces the workspace indicator shows, the current one in the middle: `3` shows it with the one before and the one after, or the first or last three at either end. 0 shows them all. Scrolling still reaches every workspace. |
 | `shell.accent` | color | "#7da8ff" | - | Accent color, `#RRGGBB` or `#RRGGBBAA`. |
 | `shell.panel_color` | color | "#151e2c" | - | Panel color; `#RRGGBBAA` makes it translucent. |

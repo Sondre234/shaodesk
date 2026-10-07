@@ -108,7 +108,8 @@ volume, do-not-disturb, tiling) crossfades as the state changes.
 Resting the pointer on a window's button, or a stack's, opens a card above it (below a bar along
 the top) as on Windows 11: a small picture of each window side by side, under the application's
 icon and the window's title. The pictures follow the windows as they redraw while the card is
-open (ten times a second at most), show the window alone, without its frame or what covers it,
+open (30 times a second at most, so a video moves), show the window alone, without its frame or
+what covers it,
 and show a minimized window or one on another workspace too; until one has come, the
 application's icon stands in. Clicking a picture
 focuses its window, or minimizes it when it is focused already; a middle click or the cross shown
