@@ -111,7 +111,8 @@ icon and the window's title. The pictures follow the windows as they redraw whil
 open (30 times a second at most, so a video moves), show the window alone, without its frame or
 what covers it,
 and show a minimized window or one on another workspace too; until one has come, the
-application's icon stands in. Clicking a picture
+application's icon stands in. Alt + Tab shows the same pictures, a card for each window in the
+[window switcher](#window-switcher). Clicking a picture
 focuses its window, or minimizes it when it is focused already; a middle click or the cross shown
 over the one under the pointer closes it, and a right click opens its [menu](#taskbar-menus). The
 focused window's picture is marked as its button is. The pointer can cross from the button onto
@@ -529,6 +530,20 @@ list), `switcher_cancel`, Return, or Escape. A minimized window's icon is faded 
 dash, and the caption under the grid gives the selected window's full title, its workspace (by
 name too) and monitor, and whether it is minimized or asking for attention. `cycle` is the older action that raises the
 least recently focused window on the spot.
+
+With [window pictures](#window-pictures) (`shell.thumbnails`, on by default) the taskbar style
+shows each window as a card instead, as Windows 11 does: the application's icon and the window's
+title over a picture of the window. The pictures are as tall as the taskbar's
+(`shell.thumbnails.size`, 5/8 of it) and each as wide as its window's proportions make it, from
+3:4 to 2:1, in rows that wrap and are centred; with many windows they get smaller, down to 60 % of
+that height, and past that the rows scroll to the selection. The selected card is framed in the
+accent colour, one asking for attention is tinted with a dot on its picture, and a minimized
+window's picture is faded and marked with a dash. The pictures follow their windows as they
+redraw (`shell.thumbnails.live`), minimized ones and those on other workspaces and monitors too;
+the shell asks for them as the switcher opens, before it shows, so that they are there by then,
+and until one has come the application's icon stands in. The caption, the keys, the mouse and the
+moment it shows are as with the grid. The macOS style keeps its large icons, as macOS switches
+applications.
 
 ## Overview
 

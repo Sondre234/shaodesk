@@ -76,6 +76,16 @@ shadows.
   audio process, a player run in a terminal) unless that process has a window of its own, and
   all windows of one process show it. The compositor names each window's process to the shell
   through `shaodesk-window-control-v1` version 3.
+- Alt + Tab shows each window as a card with its picture, as Windows 11 does: the application's
+  icon and the window's title over the picture, the pictures at one height and each as wide as
+  its window's proportions, in rows that wrap and shrink when there are many windows. The pictures
+  follow the windows while the switcher is open, minimized ones and those on other workspaces
+  too, and are asked for as it opens, so that they are there by the time it shows; the icon
+  stands in until one has come. They follow `shell.thumbnails` (without it the switcher shows its
+  grid of icons), and the macOS style keeps its icons. The compositor gives every window a number
+  of its own, which `shaodesk-window-control-v1` version 4's `id` event sends and each
+  `switcher-window` line on the control socket now ends with, so that the shell finds a listed
+  window's picture also when two windows share a title.
 - A window's taskbar menu is headed by its application's icon and name over the window's title,
   and offers the application's desktop actions and a new window, then minimize or restore,
   maximize or restore, fullscreen, moving the window to another workspace or monitor, keeping it
@@ -182,7 +192,8 @@ shadows.
 - `shaodesk-shell --preview-popup NAME` shows one of the taskbar's popups or overlays on stand-in
   data, and `tools/shell_gallery.py` saves a picture of every one, in a light and a dark theme,
   drawn in software and through the GPU: the overlays as `osd-volume`, `osd-text`, `cards`,
-  `power-dialog`, `palette`, `palette-empty`, `switcher` and `overview`, and a search finding
+  `power-dialog`, `palette`, `palette-empty`, `switcher` (with pictures of the windows in the
+  taskbar style, and its grid of icons as `switcher-icons`) and `overview`, and a search finding
   nothing as `launcher-empty`.
 
 ### Fixes

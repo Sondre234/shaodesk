@@ -244,6 +244,37 @@ until the window closes, so the card opens with it. A stand-in model (the previe
 tests') has no `watchPicture`, which the card then does not call, and names pictures of its own
 (`image://preview-windows/ID`, painted by `preview.cpp`).
 
+The window switcher's cards (`SwitcherCards.qml`, which `Switcher.qml` loads in place of its grid
+with `shell.thumbnails` outside the macOS style) show the same pictures. The switcher's lines
+name a window by its app id and title, which two windows may share, and by its number (the window
+control's `id`, `TaskModel`'s `windowId` role); each card finds its task with a `TaskFilter`
+whose `windowId` keeps that window alone, filtering again when the number comes after the window.
+While the switcher is open on the view's output (`open`, `outputName`) a card watches its
+picture as the taskbar's tiles do, and unwatches it at `switcher-close`, though the cards stay
+while the switcher fades. The cards are made as the list arrives, 120 ms before `SwitcherView`
+shows the switcher, so the pictures are asked for early: with 20 windows on a headless compositor
+with pixman at 2560 by 1440 and a scale of 1.25, every one had a frame about 75 ms after the
+switcher opened. They are asked for twice as wide as the pictures' common height,
+`shell.thumbnailSize` × 5/8, times the device pixel ratio, a box that holds any card's picture
+(3:4 to 2:1) without scaling it up. A card is as wide as its picture's proportions, which it notes
+in `aspects` once the picture shows (16:10 until then), and `arrange` lays the cards out in rows
+at the largest scale, from 1 down to 0.6 in steps of 0.05, at which they fit in the room the
+switcher has; past that a `Flickable` scrolls to keep the selected card in sight. As the cards
+may widen once the surface shows, `SwitcherView` keeps the surface as large as its root whatever
+size the compositor last configured, as `PaletteView` does.
+
+Every listed window's picture is live with `shell.liveThumbnails`, as on Windows 11: a window
+that does not redraw costs nothing, as the compositor makes a frame only once it has changed.
+Measured on a headless compositor with pixman at 2560 by 1440, scale 1, with 20 windows on four
+workspaces and the shell drawing in software, while the switcher was open: with none of the
+windows redrawing, neither took any time; each window redrawing as fast as it may (1600 by 900
+pixels) added about 7 % of a core to the compositor, pixman scaling it on the CPU, and 3 % to the
+shell (one: 4 to 12 % and 2 to 6 %; five: 36 to 39 % and 16 to 17 %); without live pictures the
+five cost nothing past the first frames. At a scale of 1.25 Qt's software renderer takes 8 to 10
+ms for each frame of the switcher, against under one at a scale of 1 or 2, so that one window
+redrawing costs the shell 35 to 37 % and five 42 to 55 % (the compositor 29 to 32 % and 43 to
+49 %); drawn through the GPU, the shell and the compositor do that on the GPU.
+
 The speaker on a picture's tile is a `WindowSound` (`audio.cpp`), which the tile makes with the
 panel's `audioSource` and `taskSource` and its window's `pid` (`TaskModel`'s role, from the window
 control's version 3). The sound server's backend gives each stream the process that plays it
