@@ -1840,7 +1840,7 @@ ListModel {
         // opens lets them go.
         QTest::mouseMove(&view, centre(single));
         QTest::mouseMove(&view, barSpace);
-        QTest::qWait(400);
+        QTest::qWait(300);
         if (!pictureRequests().isEmpty() || root->property("groupOpen").toBool())
             return fail("the pointer crossing a window's button asked for its picture");
         QElapsedTimer resting;
@@ -1857,7 +1857,7 @@ ListModel {
         if (!QTest::qWaitFor([&] { return !pictureRequests().isEmpty(); }) ||
             pictures != QStringList{"watch 7 240 true", "unwatch 7"} || root->property("groupOpen").toBool())
             return fail("leaving a window's button before its card opened did not let its picture go");
-        QTest::qWait(400);
+        QTest::qWait(300);
         if (root->property("groupOpen").toBool() || !pictureRequests().isEmpty())
             return fail("the card of a window's button the pointer left opened all the same");
         pictures.clear();
