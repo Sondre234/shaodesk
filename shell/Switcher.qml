@@ -4,14 +4,25 @@ import QtQuick.Effects
 
 // The window switcher: every window's icon and title in a grid, most recently focused first,
 // with the selected one's full title and place below, on a card with room around it for its
-// shadow. A click picks a window. In the macOS style the icons are large, without their titles,
-// on a rounded translucent card, as macOS switches applications.
+// shadow. A click picks a window. With shell.thumbnails each window is a card with its picture
+// instead, as on Windows 11 (SwitcherCards.qml). In the macOS style the icons are large, without
+// their titles, on a rounded translucent card, as macOS switches applications.
 Item {
     id: switcher
     required property size screenSize
-    // The compositor's switcher, unless set (as a preview sets them).
-    property var windows: shell.switcherWindows
+    // The output it is on, whose switcher it shows; "" for any.
+    property string outputName: ""
+    // The compositor's switcher, unless set (as a preview sets them), and the task model the
+    // windows' pictures come from.
+    property var windows: outputName === "" || shell.switcherOutput === outputName ? shell.switcherWindows : []
     property int selected: shell.switcherSelected
+    property var taskSource: shell.tasks
+    // Whether the windows are cards with their pictures: with shell.thumbnails, but for the macOS
+    // style, which switches applications by their icons as macOS does.
+    readonly property bool pictured: shell.thumbnails && !Theme.macos
+    // Whether the switcher is open here, while its windows' pictures are wanted: from the moment
+    // the compositor lists them, before it shows, so that they are there by then.
+    readonly property bool open: windows.length > 0
     // What it lists, held as it was while it goes: the compositor forgets the windows as the
     // switcher closes, before the view hears that it should go, so an empty list is not taken.
     property var listed: []
@@ -23,10 +34,15 @@ Item {
     readonly property int cell: Theme.macos ? Theme.switcherIconSize + 3 * Theme.spacingL
                                             : Theme.appIconSizeDisplay + 10 * Theme.spacingM
     readonly property int padding: Theme.spacingXL
-    // As many columns as fit in most of the output's width, and rows up to most of its height;
-    // the grid scrolls to the selection past that.
-    readonly property int columns: Math.max(1, Math.min(listed.length, Math.floor((screenSize.width * 0.9 - 2 * padding) / cell)))
-    readonly property int rows: Math.max(1, Math.min(Math.ceil(listed.length / columns), Math.floor((screenSize.height * 0.8 - 2 * padding - 48) / cell)))
+    // Most of the output's width, and most of its height but for the caption: as many columns
+    // as fit across, and rows up to that height; the grid scrolls to the selection past that.
+    readonly property real roomWidth: screenSize.width * 0.9 - 2 * padding
+    readonly property real roomHeight: screenSize.height * 0.8 - 2 * padding - 48
+    readonly property int columns: Math.max(1, Math.min(listed.length, Math.floor(roomWidth / cell)))
+    readonly property int rows: Math.max(1, Math.min(Math.ceil(listed.length / columns), Math.floor(roomHeight / cell)))
+    // What the grid, or the cards, take of the card.
+    readonly property real contentWidth: pictured ? (cards.item ? cards.item.implicitWidth : 0) : columns * cell
+    readonly property real contentHeight: pictured ? (cards.item ? cards.item.implicitHeight : 0) : rows * cell
     readonly property var current: listed[listedSelected] || ({})
     width: card.width + 2 * Theme.shadowMargin
     height: card.height + 2 * Theme.shadowMargin
@@ -57,8 +73,8 @@ Item {
         x: Theme.shadowMargin; y: Theme.shadowMargin
         opacity: switcher.progress
         scale: 0.94 + 0.06 * switcher.progress
-        width: switcher.columns * switcher.cell + 2 * switcher.padding
-        height: switcher.rows * switcher.cell + 2 * switcher.padding + caption.height + caption.anchors.topMargin
+        width: switcher.contentWidth + 2 * switcher.padding
+        height: switcher.contentHeight + 2 * switcher.padding + caption.height + Theme.spacingM
         Loader {
             anchors.fill: parent
             active: Theme.effects
@@ -78,12 +94,13 @@ Item {
         GridView {
             id: grid
             objectName: "switcherGrid"
+            visible: !switcher.pictured
             x: switcher.padding; y: switcher.padding
             width: switcher.columns * switcher.cell; height: switcher.rows * switcher.cell
             cellWidth: switcher.cell; cellHeight: switcher.cell
             interactive: false
             clip: true
-            model: switcher.listed
+            model: switcher.pictured ? [] : switcher.listed
             currentIndex: switcher.listedSelected
             // The selection glides from window to window, once the switcher has come in.
             highlightMoveDuration: switcher.progress >= 1 ? Theme.durationNormal : 0
@@ -164,6 +181,20 @@ Item {
                 }
             }
         }
+        Loader {
+            id: cards
+            x: switcher.padding; y: switcher.padding
+            active: switcher.pictured
+            sourceComponent: SwitcherCards {
+                windows: switcher.listed
+                selected: switcher.listedSelected
+                taskSource: switcher.taskSource
+                watching: switcher.open
+                maxWidth: switcher.roomWidth
+                maxHeight: switcher.roomHeight
+                animate: switcher.progress >= 1
+            }
+        }
         // A label on a small pill, for what the caption says of a window's state.
         component Tag: Rectangle {
             property alias text: label.text
@@ -182,7 +213,7 @@ Item {
         // has one, and its output; then whether it is minimized or asking for attention.
         Column {
             id: caption
-            anchors.top: grid.bottom; anchors.topMargin: Theme.spacingM
+            y: switcher.padding + switcher.contentHeight + Theme.spacingM
             x: switcher.padding; width: card.width - 2 * switcher.padding
             spacing: Theme.spacingS
             Text {

@@ -454,17 +454,34 @@ SwitcherView::SwitcherView(ShellController &controller, QScreen *screen)
     : OverlayView(controller, screen, "switcher", false), delay_(new QTimer(this)) {
     setTitle("shaodesk switcher");
     setResizeMode(QQuickView::SizeViewToRootObject);
-    setInitialProperties({{"screenSize", screen->geometry().size()}});
+    // Only the switcher on its own output lists the windows and watches their pictures.
+    setInitialProperties(
+        {{"screenSize", screen->geometry().size()}, {"outputName", screen->name()}});
 #if SHAODESK_LAYER_SHELL
     using W = LayerShellQt::Window;
     layer_->setScope("shaodesk-switcher");
     layer_->setAnchors(W::Anchors());
     layer_->setExclusiveZone(0);
-    auto fit = [this] { layer_->setDesiredSize(size()); };
-    connect(this, &QWindow::widthChanged, this, fit);
-    connect(this, &QWindow::heightChanged, this, fit);
 #endif
     load("Switcher.qml");
+    // The surface is as big as the switcher wants, whatever size the compositor last configured:
+    // its cards take their widths from their windows' pictures, which may come once it shows,
+    // and a configure for the size before would otherwise leave it cut off.
+    if (auto *root = rootObject()) {
+        auto fit = [this, root] {
+            const QSize wanted(qRound(root->width()), qRound(root->height()));
+            if (size() != wanted)
+                resize(wanted);
+#if SHAODESK_LAYER_SHELL
+            layer_->setDesiredSize(wanted);
+#endif
+        };
+        connect(root, &QQuickItem::widthChanged, this, fit);
+        connect(root, &QQuickItem::heightChanged, this, fit);
+        connect(this, &QWindow::widthChanged, this, fit);
+        connect(this, &QWindow::heightChanged, this, fit);
+        fit();
+    }
     connect(screen, &QScreen::geometryChanged, this, [this] {
         if (rootObject())
             rootObject()->setProperty("screenSize", outputScreen_->geometry().size());

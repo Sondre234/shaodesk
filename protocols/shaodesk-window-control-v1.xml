@@ -26,7 +26,8 @@
     From version 4 the taskbar can peek at a window while the pointer rests on its picture, as
     Windows does: the other windows fade to show that one alone, wherever it is. This shows a
     window on the screen for a moment, as the picture shows it already, and changes nothing
-    about it.
+    about it. Version 4 also gives each window's number, by which shaodesk's control socket names
+    windows, so that the shell finds the window its window switcher lists.
   </description>
 
   <interface name="shaodesk_window_control_v1" version="4">
@@ -44,8 +45,8 @@
     <request name="get_window">
       <description summary="the window a taskbar handle stands for">
         Creates a shaodesk_window_v1 for the window `handle` stands for, which sends the
-        window's state at once (output, workspace, state, from version 3 pid, then done) and
-        again whenever it changes. A handle whose window is gone (one the client was sent closed for) gives an
+        window's state at once (output, workspace, state, from version 3 pid, from version 4
+        id, then done) and again whenever it changes. A handle whose window is gone (one the client was sent closed for) gives an
         inert object, which sends nothing and whose requests do nothing.
       </description>
       <arg name="id" type="new_id" interface="shaodesk_window_v1"/>
@@ -156,8 +157,9 @@
 
     <event name="done">
       <description summary="the state is complete">
-        Sent after the output, workspace, state and pid events that describe one state of the
-        window, so that the client applies them together. Only what changed is sent before it.
+        Sent after the output, workspace, state, pid and id events that describe one state of
+        the window, so that the client applies them together. Only what changed is sent before
+        it.
       </description>
     </event>
 
@@ -237,5 +239,16 @@
         when that peek has ended, or moved to another window, already.
       </description>
     </request>
+
+    <event name="id" since="4">
+      <description summary="the window's number">
+        A number the compositor gives the window as it first appears, and gives no other window
+        while it runs; it is never 0. shaodesk's control socket names windows by it where a
+        handle cannot name them, as the window switcher's lines do.
+
+        Sent once, with the window's first state before done.
+      </description>
+      <arg name="id" type="uint"/>
+    </event>
   </interface>
 </protocol>

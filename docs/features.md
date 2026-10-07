@@ -126,7 +126,8 @@ what covers it,
 and show a minimized window or one on another workspace too; until one has come, the
 application's icon stands in, and the first fades in over it. They are taken from halfway into
 the delay, so that the card opens on them, and none is taken for a button the pointer only
-crosses on its way. Clicking a picture
+crosses on its way. Alt + Tab shows the same pictures, a card for each window in the
+[window switcher](#window-switcher). Clicking a picture
 focuses its window, or minimizes it when it is focused already; a middle click or the cross shown
 over the one under the pointer closes it, and a right click opens its [menu](#taskbar-menus). The
 focused window's picture is marked as its button is. The pointer can cross from the button onto
@@ -560,6 +561,20 @@ list), `switcher_cancel`, Return, or Escape. A minimized window's icon is faded 
 dash, and the caption under the grid gives the selected window's full title, its workspace (by
 name too) and monitor, and whether it is minimized or asking for attention. `cycle` is the older action that raises the
 least recently focused window on the spot.
+
+With [window pictures](#window-pictures) (`shell.thumbnails`, on by default) the taskbar style
+shows each window as a card instead, as Windows 11 does: the application's icon and the window's
+title over a picture of the window. The pictures are as tall as the taskbar's
+(`shell.thumbnails.size`, 5/8 of it) and each as wide as its window's proportions make it, from
+3:4 to 2:1, in rows that wrap and are centred; with many windows they get smaller, down to 60 % of
+that height, and past that the rows scroll to the selection. The selected card is framed in the
+accent colour, one asking for attention is tinted with a dot on its picture, and a minimized
+window's picture is faded and marked with a dash. The pictures follow their windows as they
+redraw (`shell.thumbnails.live`), minimized ones and those on other workspaces and monitors too;
+the shell asks for them as the switcher opens, before it shows, so that they are there by then,
+and until one has come the application's icon stands in, the first fading in over it. The
+caption, the keys, the mouse and the moment it shows are as with the grid. The macOS style keeps its large icons, as macOS switches
+applications.
 
 ## Overview
 
@@ -1280,9 +1295,12 @@ that sends `subscribe` keeps its connection and receives `tiling on|off` and
 [keyboard layout](#keyboard-layouts), from 1, of how many, as in `get keyboard`) after every
 change, plus `launcher OUTPUT` when the `launcher` action
 (Super + R) asks the panel on that monitor to open or close its start menu; the panel uses this. The window switcher sends `switcher OUTPUT SELECTED COUNT` followed by
-COUNT lines `switcher-window APP_ID TITLE OUTPUT WORKSPACE MINIMIZED URGENT` (tab-separated) when it
+COUNT lines `switcher-window APP_ID TITLE OUTPUT WORKSPACE MINIMIZED URGENT ID` (tab-separated) when it
 opens or a listed window closes, `switcher-select N` as the selection moves (both counting
-from 0), and `switcher-close`. The state ends with `power ACTIONS`, the power actions that may
+from 0), and `switcher-close`. ID is the window's number, which the compositor gives each window as
+it appears and never gives another; a taskbar gets the same number for its handle of the window
+from `shaodesk-window-control-v1` (version 4), and so finds the window the line means where two
+share a title. The state ends with `power ACTIONS`, the power actions that may
 run (`lock,suspend,reboot,poweroff,logout`, in the order menus list them, or `-`), a power
 action that fails or is cancelled after it was accepted sends `power-error MESSAGE`, a program
 that `spawn` or `terminal` could not start sends `spawn-error MESSAGE` (the panel shows either

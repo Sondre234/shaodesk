@@ -349,6 +349,7 @@ struct sh_server {
     struct sh_layer *focused_layer;
     struct sh_toplevel *focused_toplevel;
     struct wlr_foreign_toplevel_manager_v1 *foreign_manager;
+    uint32_t last_window_id; // the number the last window published was given
     struct wlr_ext_foreign_toplevel_list_v1 *toplevel_list; // windows offered for screen sharing
     /* shaodesk-window-control-v1 (window_control.c): its global, the shaodesk_window_v1 objects
      * clients hold, and the idle callback that tells them what changed. */
@@ -519,6 +520,10 @@ struct sh_toplevel {
     int home_workspace;
     bool home_tiled;
     struct wlr_foreign_toplevel_handle_v1 *foreign;
+    /* The window's number, given as it is first published and to no other window while the
+     * compositor runs: the window control's id event and the switcher's lines name it by this,
+     * for the shell to match the two. 0 until then. */
+    uint32_t id;
     /* Window capture: a private scene holding only this window's surfaces, so sharing one
      * window never shows what overlaps it. */
     struct wlr_ext_foreign_toplevel_handle_v1 *listed;

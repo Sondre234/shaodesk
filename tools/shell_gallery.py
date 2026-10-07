@@ -45,12 +45,18 @@ MACOS_POPUPS = ["system-menu", "app-menu", "window-menu", "window-submenu"]
 POPUPS += MACOS_POPUPS
 # The desktop alone, without the wallpaper made for the gallery: the style's own background.
 POPUPS += ["desktop"]
+# The switcher's icon grid, which the taskbar style shows without pictures of the windows; the
+# macOS style always does, as its "switcher".
+TASKBAR_POPUPS = ["switcher-icons"]
+POPUPS += TASKBAR_POPUPS
 
 # Pictures taken with settings of their own, put in the shell table: name -> (popup, settings).
 # The volume's and the profiles' popups belong to buttons Quick Settings holds by default, and a
-# stack's list shows on the taskbar only without pictures of its windows.
+# stack's list, like the switcher's grid of icons, shows on the taskbar only without pictures of
+# its windows.
 VARIANTS = {
     "group": ("group", "thumbnails = { enabled = false },"),
+    "switcher-icons": ("switcher", "thumbnails = { enabled = false },"),
     "mixer": ("mixer", 'widgets = { volume = "bar" },'),
     "outputs": ("outputs", 'widgets = { volume = "bar" },'),
     "profiles": ("profiles", 'widgets = { profiles = "bar" },'),
@@ -152,7 +158,8 @@ QML_WARNING = re.compile(r"\.qml:\d+|ReferenceError|TypeError|Binding loop|QQmlC
 
 def shows(theme_name, popup):
     """Whether a theme's style has the popup."""
-    return popup not in MACOS_POPUPS or 'style = "macos"' in THEMES[theme_name].get("shell", "")
+    macos = 'style = "macos"' in THEMES[theme_name].get("shell", "")
+    return (popup not in MACOS_POPUPS or macos) and (popup not in TASKBAR_POPUPS or not macos)
 
 
 def png(path, width, height, pixel):

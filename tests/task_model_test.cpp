@@ -66,6 +66,10 @@ int main(int argc, char **argv) {
         if (value(TaskModel::Pid).toLongLong() != client.processId() ||
             model.roleNames().value(TaskModel::Pid) != "pid")
             throw std::runtime_error("the window's process is not the probe's");
+        // And its number, the first window's in this compositor.
+        if (value(TaskModel::WindowId).toInt() != 1 ||
+            model.roleNames().value(TaskModel::WindowId) != "windowId")
+            throw std::runtime_error("the window's number is not the compositor's first");
         // The window menu's requests come back as the window's new place.
         model.moveToWorkspace(id, 3);
         wait([&] { return value(TaskModel::Workspace).toInt() == 3; }, "moving to a workspace failed");
