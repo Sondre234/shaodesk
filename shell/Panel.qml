@@ -77,13 +77,86 @@ Item {
     onThumbnailsChanged: closeGroup()
     readonly property int thumbnailGap: Theme.spacingS
     readonly property int thumbnailPadding: Theme.spacingM
-    readonly property real thumbnailWidth: {
-        var count = Math.max(1, groupWindows.count)
+    readonly property real thumbnailWidth: thumbnailWidthFor(groupWindows.count)
+    function thumbnailWidthFor(count) {
+        count = Math.max(1, count)
         var room = popupArea.width - 2 * Theme.spacingM - (count + 1) * thumbnailGap
         return Math.min(shell.thumbnailSize, Math.floor(room / count) - 2 * thumbnailPadding)
     }
-    readonly property bool thumbnailsOpen: groupOpen && thumbnails &&
-                                           (groupWindows.count < 2 || thumbnailWidth >= 0.6 * shell.thumbnailSize)
+    // Whether `count` windows' pictures fit on the card, else their list shows.
+    function picturesFit(count) { return count < 2 || thumbnailWidthFor(count) >= 0.6 * shell.thumbnailSize }
+    readonly property bool thumbnailsOpen: groupOpen && thumbnails && picturesFit(groupWindows.count)
+    // The pictures of windows are the task source's, taken while something here wants them
+    // (wantPicture; a stand-in source has no watchPicture, and none are taken). The card's tiles
+    // want their windows', and the panel those of the button the pointer has rested on for half
+    // of shell.thumbnailDelay (warmGroup), so that its card opens on them rather than on the
+    // icons standing in until they come: a pointer only crossing a button on its way elsewhere
+    // has left it by then, and the other half leaves a picture time to come. Wants are counted by
+    // task id and asked of the source once a change is over (syncPictures), so that as the card
+    // opens its tiles take over the panel's wants without the windows being let go and asked for
+    // again: their captures go on, and without shell.liveThumbnails no window's one picture is
+    // taken twice.
+    property var pictureWants: ({})
+    // The windows asked for, as {taskId: true}, and the source they were asked of.
+    property var pictureWatches: ({})
+    property var pictureSource: null
+    function wantPicture(taskId, wanted) {
+        var count = (pictureWants[taskId] || 0) + (wanted ? 1 : -1)
+        if (count > 0) pictureWants[taskId] = count
+        else delete pictureWants[taskId]
+        Qt.callLater(syncPictures)
+    }
+    function syncPictures() {
+        var source = taskSource, id
+        if (pictureSource !== source) {
+            if (pictureSource && typeof pictureSource.unwatchPicture === "function")
+                for (id in pictureWatches) pictureSource.unwatchPicture(Number(id))
+            pictureWatches = {}
+            pictureSource = source
+        }
+        for (id in pictureWatches)
+            if (!pictureWants[id]) {
+                source.unwatchPicture(Number(id))
+                delete pictureWatches[id]
+            }
+        if (!source || typeof source.watchPicture !== "function")
+            return
+        for (id in pictureWants)
+            if (!pictureWatches[id]) {
+                source.watchPicture(Number(id), Math.round(shell.thumbnailSize * Screen.devicePixelRatio),
+                                    shell.liveThumbnails)
+                pictureWatches[id] = true
+            }
+    }
+    // The windows of the button the pointer rests on, warmed up for its card, as windowsOf gives
+    // them; null while none are.
+    property var warmGroup: null
+    readonly property TaskFilter warmWindows: TaskFilter {
+        controller: shell; sourceModel: root.warmGroup ? root.taskSource : null
+        app: root.warmGroup ? root.warmGroup.slot : ""
+        windowApp: root.warmGroup ? root.warmGroup.windowApp : ""
+        taskId: root.warmGroup ? root.warmGroup.task : -1
+    }
+    Instantiator {
+        model: root.warmWindows
+        delegate: QtObject {
+            required property int taskId
+            // The window it wanted, should the row change before it goes.
+            property int wanted: -1
+            Component.onCompleted: { wanted = taskId; root.wantPicture(wanted, true) }
+            Component.onDestruction: root.wantPicture(wanted, false)
+        }
+    }
+    function warmPictures() {
+        var button = groupPending
+        if (!groupShow.running || groupOpen || !button || !button.hovered || !thumbnails)
+            return
+        warmGroup = windowsOf(button)
+        // Too many to show as pictures, they are listed instead.
+        if (!picturesFit(warmWindows.count))
+            warmGroup = null
+    }
+    Timer { id: pictureWarmup; interval: shell.thumbnailDelay / 2; onTriggered: root.warmPictures() }
     readonly property bool groupListOpen: groupOpen && !thumbnailsOpen
     // What shows the windows: the card of pictures or the list, and whether the pointer is on it.
     readonly property Item groupPopup: thumbnailsOpen ? thumbnailsLoader.item : groupListLoader.item
@@ -91,7 +164,7 @@ Item {
     // Something is open in the popover. The list shown on hover does not take the keyboard: it
     // opens under a window being typed in.
     readonly property bool expanded: menuOpen || groupOpen
-    onMenuOpenChanged: if (menuOpen) { groupShow.stop(); groupOpen = false }
+    onMenuOpenChanged: if (menuOpen) { stopWaiting(); groupOpen = false }
     // The bars the style has: the taskbar (Taskbar.qml), or in the macOS style the dock
     // (Dock.qml) in the panel's surface and the menu bar (TopMenuBar.qml) in a surface of its own
     // along the output's top edge.
@@ -178,27 +251,46 @@ Item {
         if (hovered && showsWindows(button) && !menuOpen && !button.pressed) {
             groupPending = button
             groupHide.stop()
-            if (groupOpen) showGroup(); else groupShow.restart()
+            if (groupOpen) {
+                showGroup()
+            } else {
+                warmGroup = null
+                groupShow.restart()
+                if (thumbnails) pictureWarmup.restart()
+            }
         } else if (!hovered && button === groupPending) {
             // Entering the next button can come before leaving this one.
-            groupShow.stop()
+            stopWaiting()
             if (groupOpen) groupHide.restart()
         }
     }
-    function closeGroup() {
+    // The pointer is no longer waiting for a button's windows to show.
+    function stopWaiting() {
         groupShow.stop()
+        pictureWarmup.stop()
+        warmGroup = null
+    }
+    function closeGroup() {
+        stopWaiting()
         groupOpen = false
     }
     function showGroup() {
         var button = groupPending
         if (button && button.hovered && !button.pressed && showsWindows(button) && !menuOpen)
             openGroup(button)
+        warmGroup = null
+    }
+    // The windows a button shows, as {slot, windowApp, task} for the filters' app, windowApp and
+    // taskId: a taskbar button without a group stands for its own window; a dock icon has none.
+    function windowsOf(button) {
+        return { slot: button.groupSlot, windowApp: button.groupWindowApp,
+                 task: button.group === null ? button.taskId : -1 }
     }
     function openGroup(button) {
-        // A taskbar button without a group stands for its own window; a dock icon has none.
-        groupTask = button.group === null ? button.taskId : -1
-        groupSlot = button.groupSlot
-        groupWindowApp = button.groupWindowApp
+        var windows = windowsOf(button)
+        groupTask = windows.task
+        groupSlot = windows.slot
+        groupWindowApp = windows.windowApp
         groupIcon = button.iconName
         groupX = button.mapToItem(root, button.width / 2, 0).x
         groupOpen = true

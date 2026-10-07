@@ -76,6 +76,10 @@ shadows.
   audio process, a player run in a terminal) unless that process has a window of its own, and
   all windows of one process show it. The compositor names each window's process to the shell
   through `shaodesk-window-control-v1` version 3.
+- The card of window pictures opens on the pictures rather than on icons standing in for them:
+  they are taken from halfway into the delay, and none for a button the pointer only crosses. It
+  glides from one button to the next and eases to the width of their windows, as on Windows 11,
+  and a picture that comes while it is open fades in over the icon standing in for it.
 - A window's taskbar menu is headed by its application's icon and name over the window's title,
   and offers the application's desktop actions and a new window, then minimize or restore,
   maximize or restore, fullscreen, moving the window to another workspace or monitor, keeping it

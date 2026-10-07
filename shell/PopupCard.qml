@@ -19,9 +19,11 @@ import QtQuick.Effects
 // Qt.AlignTop starts it at the anchor's left or top edge, Qt.AlignRight or Qt.AlignBottom ends it
 // at the other. Its size is its implicit size, cut down to the room there is (availableWidth and
 // availableHeight), so set implicitWidth and implicitHeight rather than width and height. With
-// `anchored` false it leaves its place to whoever uses it. With `framed` false it draws no card
-// of its own, for what it holds to draw its own cards (the macOS style's Notification Center); a
-// press between them then goes to what is under it.
+// `glides`, a card that is shown and given another place or size (its anchor moved, what it holds
+// grew) eases there, rather than jumping; one that is not shown takes it at once, so that opening
+// and closing keep their own motion. With `anchored` false it leaves its place to whoever uses
+// it. With `framed` false it draws no card of its own, for what it holds to draw its own cards
+// (the macOS style's Notification Center); a press between them then goes to what is under it.
 Item {
     id: card
     property bool open: false
@@ -32,6 +34,7 @@ Item {
     property real margin: Theme.spacingM
     property bool anchored: true
     property bool framed: true
+    property bool glides: false
     property color color: Theme.popupSurface
     property real radius: Theme.radiusMedium
     property Item initialFocus: card
@@ -62,8 +65,20 @@ Item {
     }
     readonly property real availableWidth: vertical ? bounds.width - 2 * margin : room(placedSide)
     readonly property real availableHeight: vertical ? room(placedSide) : bounds.height - 2 * margin
-    width: Math.max(0, Math.min(implicitWidth, availableWidth))
-    height: Math.max(0, Math.min(implicitHeight, availableHeight))
+    // Its place and size, which it has once done gliding: its place follows from this size, so
+    // that it heads straight for where it ends.
+    readonly property real placedWidth: Math.max(0, Math.min(implicitWidth, availableWidth))
+    readonly property real placedHeight: Math.max(0, Math.min(implicitHeight, availableHeight))
+    readonly property real placedX: vertical
+        ? along(anchorRect.x, anchorRect.width, placedWidth, bounds.x, bounds.x + bounds.width)
+        : placedSide === Qt.LeftEdge ? anchorRect.x - gap - placedWidth
+        : anchorRect.x + anchorRect.width + gap
+    readonly property real placedY: !vertical
+        ? along(anchorRect.y, anchorRect.height, placedHeight, bounds.y, bounds.y + bounds.height)
+        : placedSide === Qt.TopEdge ? anchorRect.y - gap - placedHeight
+        : anchorRect.y + anchorRect.height + gap
+    width: placedWidth
+    height: placedHeight
 
     // Where alignment puts it along the anchor, from `start` (the anchor's start) and `length`
     // (its length) and the card's own `size`, kept inside the bounds from `low` to `high`.
@@ -73,18 +88,30 @@ Item {
                : start + length / 2 - size / 2
         return Math.max(low + margin, Math.min(at, high - margin - size))
     }
+    // Its place on the way there, which a Behavior can ease (what Binding writes, none can).
+    property real glideX: placedX
+    property real glideY: placedY
     Binding {
         when: card.anchored
-        card.x: card.vertical
-            ? card.along(card.anchorRect.x, card.anchorRect.width, card.width, card.bounds.x,
-                         card.bounds.x + card.bounds.width)
-            : card.placedSide === Qt.LeftEdge ? card.anchorRect.x - card.gap - card.width
-            : card.anchorRect.x + card.anchorRect.width + card.gap
-        card.y: !card.vertical
-            ? card.along(card.anchorRect.y, card.anchorRect.height, card.height, card.bounds.y,
-                         card.bounds.y + card.bounds.height)
-            : card.placedSide === Qt.TopEdge ? card.anchorRect.y - card.gap - card.height
-            : card.anchorRect.y + card.anchorRect.height + card.gap
+        card.x: card.glideX
+        card.y: card.glideY
+    }
+    // Place and size ease together, so that an edge that stays (the one by the anchor) stays.
+    Behavior on glideX {
+        enabled: card.glides && card.visible
+        NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing }
+    }
+    Behavior on glideY {
+        enabled: card.glides && card.visible
+        NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing }
+    }
+    Behavior on width {
+        enabled: card.glides && card.visible
+        NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing }
+    }
+    Behavior on height {
+        enabled: card.glides && card.visible
+        NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing }
     }
 
     visible: open || progress > 0

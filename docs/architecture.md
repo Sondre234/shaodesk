@@ -220,21 +220,28 @@ The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `t
 `power.cpp`, `palette.cpp`. `preview.cpp` has stand-ins for all of them for
 `--preview-popup`.
 
-The pictures of the windows on the taskbar's card (`WindowThumbnails.qml`, with
-`shell.thumbnails`) are `TaskModel`'s: its `picture` role is `image://windows/<taskId>/<serial>`
-once a window has one, `""` until then, the serial new with every picture so that an `Image`
-with `cache: false` loads it again, and the `windows` image provider serves them by task id. The
-model takes pictures of a window only while something watches it: `watchPicture(taskId,
-pixelWidth, live)`, counted, which a tile calls as it appears and `unwatchPicture(taskId)` as it
-goes. It asks the window control for the window's capture source scaled down to fit
-`pixelWidth` by 5/8 of it (`get_scaled_capture_source`, version 3; a new width asks again), or
+The pictures of the windows on the taskbar's card (`WindowThumbnails.qml`, with `shell.thumbnails`)
+are `TaskModel`'s: its `picture` role is `image://windows/<taskId>/<serial>` once a window has one,
+`""` until then, the serial new with every picture so that an `Image` with `cache: false` loads it
+again, and the `windows` image provider serves them by task id. The model takes pictures of a
+window only while something watches it: `watchPicture(taskId, pixelWidth, live)`, counted, until
+`unwatchPicture(taskId)`. It asks the window control for the window's capture source scaled down to
+fit `pixelWidth` by 5/8 of it (`get_scaled_capture_source`, version 3; a new width asks again), or
 with version 2 for it at the window's size (`get_capture_source`), captures it with
 ext-image-copy-capture into shared memory, scales the picture down off the GUI thread where the
 frame is larger than that (only ever a copy with version 3), and, when `live`, takes the next as
-the window redraws, every 33 ms at most (100 ms at the window's size). The last picture stays
-until the window closes, so the card opens with it. A stand-in model (the preview's, the
-tests') has no `watchPicture`, which the card then does not call, and names pictures of its own
-(`image://preview-windows/ID`, painted by `preview.cpp`).
+the window redraws, every 33 ms at most (100 ms at the window's size). The last picture stays until
+the window closes, so the card opens with it.
+
+`Panel.qml` alone calls them, for what tells it that it wants a window's picture with
+`wantPicture(taskId, wanted)`: a tile of the card as it appears and as it goes, and the panel
+itself for the windows of the button the pointer has rested on for half of `shell.thumbnailDelay`
+(`warmGroup`, until the card opens or the pointer leaves), so that the card opens on their
+pictures. It counts the wants and asks the model once a change is over (`syncPictures`), so that a
+window the tiles take over from the panel as the card opens is neither let go nor asked for
+again, which would start its capture anew, or without `live` take its one picture twice. A
+stand-in model (the preview's, the tests') has no `watchPicture`, which the panel then does not
+call, and names pictures of its own (`image://preview-windows/ID`, painted by `preview.cpp`).
 
 The speaker on a picture's tile is a `WindowSound` (`audio.cpp`), which the tile makes with the
 panel's `audioSource` and `taskSource` and its window's `pid` (`TaskModel`'s role, from the window
@@ -272,7 +279,10 @@ fills it. It places itself beside `anchorRect` (in its parent's coordinates) on 
 `alignment` (`Qt.AlignHCenter`, `Qt.AlignLeft`, `Qt.AlignRight`, or the vertical ones beside the
 anchor); it flips to the other side when that one has more room (`placedSide` says where it went),
 and stays `margin` inside `bounds`. Its size is its `implicitWidth` and `implicitHeight`, cut to
-`availableWidth` and `availableHeight`. `opened()` is emitted once each time it opens and shows,
+`availableWidth` and `availableHeight`. With `glides` (the card of window pictures), a card that
+is shown eases to another place or size (`placedX`, `placedY`, `placedWidth`, `placedHeight`)
+rather than jumping, and one that is not shown takes it at once, so that opening and closing keep
+their own motion. `opened()` is emitted once each time it opens and shows,
 when its content resets, and `initialFocus` (the card, unless set; `null` for none) then takes the
 keyboard. Presses on it stay with it until it starts closing. With `anchored: false` it is only
 the card, for a surface that places it itself.

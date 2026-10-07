@@ -8,15 +8,16 @@ import Shaodesk
 // The windows of the taskbar button the pointer rests on, with shell.thumbnails: a tile for each,
 // side by side in the order the stack's list has them, with the application's icon, the window's
 // title and, while the pointer is on the tile, a cross that closes the window, over a small
-// picture of it. The picture is the task model's (its `picture` role, while the tile has asked
-// for it with watchPicture) and follows the window while shown with shell.liveThumbnails; until
-// one has come, or without one, the application's icon stands in for it. The focused window's
-// tile is marked as the bar marks it: selected, with a line in the accent colour (the urgent one
-// for a window asking for attention) under it. Clicking a tile focuses its window (or minimizes
-// it when focused already), the cross or a middle click closes it, and a right click opens its
-// menu. How wide the pictures are, and whether there is room for them at all rather than the
-// list, is the panel's (thumbnailWidth). While a window's process plays sound, a speaker before
-// the cross says so and mutes it, crossed out while muted (WindowSound).
+// picture of it. The picture is the task model's (its `picture` role, while the tile wants it
+// through the panel's wantPicture) and follows the window while shown with
+// shell.liveThumbnails; until one has come, or without one, the application's icon stands in for
+// it, and the first fades in over the icon. The focused window's tile is marked as the bar marks
+// it: selected, with a line in the accent colour (the urgent one for a window asking for
+// attention) under it. Clicking a tile focuses its window (or minimizes it when focused already),
+// the cross or a middle click closes it, and a right click opens its menu. How wide the pictures
+// are, and whether there is room for them at all rather than the list, is the panel's
+// (thumbnailWidth). While a window's process plays sound, a speaker before the cross says so and
+// mutes it, crossed out while muted (WindowSound).
 PopupCard {
     id: thumbnails
     required property var panel
@@ -40,6 +41,8 @@ PopupCard {
     anchorRect: panel.dockAnchor(panel.groupX, 0)
     side: panel.dockSide
     bounds: panel.popupArea
+    // Open, it glides to another button's windows and eases to their width, as on Windows 11.
+    glides: true
     HoverHandler {
         id: hover
         onHoveredChanged: thumbnails.panel.hoverGroupList(hovered)
@@ -53,8 +56,16 @@ PopupCard {
                 thumbnails.panel.groupOpen = false
         }
     }
-    Row {
+    // Where the row of tiles below goes: they keep their size while the card eases to another,
+    // centred in it and cut to it.
+    Item {
+        id: tileArea
         anchors.fill: parent; anchors.margins: thumbnails.tileGap
+        clip: true
+    }
+    Row {
+        parent: tileArea
+        anchors.centerIn: parent
         spacing: thumbnails.tileGap
         Repeater {
             model: thumbnails.visible ? thumbnails.windows : null
@@ -76,21 +87,17 @@ PopupCard {
                 Accessible.name: title
                 // Closing the card destroys this tile, so it goes last.
                 onClicked: { thumbnails.panel.taskSource.activate(taskId); thumbnails.panel.groupOpen = false }
-                // The tile asks the model for its window's picture while it is there: the model
-                // it asked, should the panel's change in between.
-                property var pictures: null
+                // The tile wants its window's picture while it is there (the panel's
+                // wantPicture), taking over from the panel's own want as the card opens: the
+                // window it wanted, of the panel it asked.
+                property Item owner: null
                 property int watched: -1
                 Component.onCompleted: {
-                    pictures = thumbnails.panel.taskSource
+                    owner = thumbnails.panel
                     watched = taskId
-                    if (typeof pictures.watchPicture === "function")
-                        pictures.watchPicture(watched, Math.round(shell.thumbnailSize * Screen.devicePixelRatio),
-                                              shell.liveThumbnails)
+                    owner.wantPicture(watched, true)
                 }
-                Component.onDestruction: {
-                    if (pictures && typeof pictures.unwatchPicture === "function")
-                        pictures.unwatchPicture(watched)
-                }
+                Component.onDestruction: if (owner) owner.wantPicture(watched, false)
                 readonly property bool marked: active || urgent
                 background: ButtonFill {
                     hovered: tile.hovered
@@ -174,7 +181,9 @@ PopupCard {
                         Rectangle {
                             objectName: "windowThumbnailStandIn"
                             anchors.fill: parent
-                            visible: !picture.visible
+                            // Fading out under the first picture as it fades in.
+                            opacity: picture.visible ? 1 - picture.opacity : 1
+                            visible: opacity > 0
                             radius: Theme.radiusSmall
                             color: Theme.alpha(Theme.text, 0.06)
                             Image {
@@ -199,11 +208,28 @@ PopupCard {
                             retainWhileLoading: true
                             smooth: true; mipmap: true
                             // Whether it has a picture to show: once one has loaded, until there
-                            // is none.
+                            // is none. The first fades in over the icon standing in for it,
+                            // unless it was there as the tile appeared; the next ones take its
+                            // place at once.
                             property bool shown: false
+                            property bool made: false
+                            Component.onCompleted: made = true
                             onStatusChanged: {
-                                if (status === Image.Ready) shown = true
-                                else if (status !== Image.Loading) shown = false
+                                if (status === Image.Ready && !shown) {
+                                    shown = true
+                                    if (made && Theme.durationNormal > 0)
+                                        fadeIn.restart()
+                                } else if (status !== Image.Ready && status !== Image.Loading) {
+                                    shown = false
+                                    fadeIn.stop()
+                                    opacity = 1
+                                }
+                            }
+                            NumberAnimation on opacity {
+                                id: fadeIn
+                                running: false
+                                from: 0; to: 1
+                                duration: Theme.durationNormal; easing.type: Theme.easing
                             }
                             visible: shown || status === Image.Ready
                             layer.enabled: Theme.effects

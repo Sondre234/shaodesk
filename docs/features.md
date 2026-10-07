@@ -111,15 +111,18 @@ icon and the window's title. The pictures follow the windows as they redraw whil
 open (30 times a second at most, so a video moves), show the window alone, without its frame or
 what covers it,
 and show a minimized window or one on another workspace too; until one has come, the
-application's icon stands in. Clicking a picture
+application's icon stands in, and the first fades in over it. They are taken from halfway into
+the delay, so that the card opens on them, and none is taken for a button the pointer only
+crosses on its way. Clicking a picture
 focuses its window, or minimizes it when it is focused already; a middle click or the cross shown
 over the one under the pointer closes it, and a right click opens its [menu](#taskbar-menus). The
 focused window's picture is marked as its button is. The pointer can cross from the button onto
 the card, which closes a moment after it has left both, or at once when a button is pressed or a
-menu opens; moving onto another button shows that one's windows at once. The pictures get narrower
-when more windows than fit across the monitor share a button, down to 60 % of their width, and
-past that the stack lists its windows by title instead. The macOS style's dock lists a stack's
-windows by title, pictures or not.
+menu opens; moving onto another button shows that one's windows at once, the card gliding over
+to it and easing to their width, as it eases to a new width when a window opens or closes. The
+pictures get narrower when more windows than fit across the monitor share a button, down to 60 %
+of their width, and past that the stack lists its windows by title instead. The macOS style's
+dock lists a stack's windows by title, pictures or not.
 
 While a window's process plays sound, a speaker shows beside its title on the card, as on a
 browser's tab; clicking it mutes the window's sound, and the speaker stays, crossed out, while it

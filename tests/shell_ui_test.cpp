@@ -1835,11 +1835,51 @@ ListModel {
         auto *single = buttonFor(7);
         if (!single || single->property("stacked").toBool())
             return fail("the window's own button is not on the bar");
+        // The pointer crossing a button on its way elsewhere asks for no pictures. Resting there
+        // for half the delay asks for its windows', ahead of the card; leaving before the card
+        // opens lets them go.
+        QTest::mouseMove(&view, centre(single));
+        QTest::mouseMove(&view, barSpace);
+        QTest::qWait(300);
+        if (!pictureRequests().isEmpty() || root->property("groupOpen").toBool())
+            return fail("the pointer crossing a window's button asked for its picture");
         QElapsedTimer resting;
+        resting.start();
+        QTest::mouseMove(&view, centre(single));
+        if (!QTest::qWaitFor([&] { return !pictureRequests().isEmpty(); }) ||
+            pictures != QStringList{"watch 7 240 true"} || resting.elapsed() < 150 ||
+            root->property("groupOpen").toBool()) {
+            std::cerr << "halfway into the delay, a window's picture was not asked for ahead of its card: "
+                      << pictures.join("|").toStdString() << " after " << resting.elapsed() << " ms\n";
+            return 1;
+        }
+        QTest::mouseMove(&view, barSpace);
+        if (!QTest::qWaitFor([&] { return !pictureRequests().isEmpty(); }) ||
+            pictures != QStringList{"watch 7 240 true", "unwatch 7"} || root->property("groupOpen").toBool())
+            return fail("leaving a window's button before its card opened did not let its picture go");
+        QTest::qWait(300);
+        if (root->property("groupOpen").toBool() || !pictureRequests().isEmpty())
+            return fail("the card of a window's button the pointer left opened all the same");
+        pictures.clear();
+        // Resting there on: a picture that comes ahead of the card shows on it from the start,
+        // without the icon standing in for it first.
         resting.start();
         QTest::mouseMove(&view, centre(single));
         if (card->isVisible() || root->property("groupOpen").toBool())
             return fail("the card of window pictures opened as soon as the pointer came");
+        if (!QTest::qWaitFor([&] { return !pictureRequests().isEmpty(); }) || card->isVisible())
+            return fail("a window's picture was not asked for ahead of its card");
+        editTasks(QString("model.setProperty(%1, 'picture', 'image://test-windows/320x200')").arg(rowOf(7)));
+        if (!QTest::qWaitFor([&] { return card->isVisible() && tileFor(7); }) ||
+            !find(tileFor(7), "windowThumbnailPicture")->isVisible() ||
+            find(tileFor(7), "windowThumbnailPicture")->opacity() != 1 ||
+            find(tileFor(7), "windowThumbnailStandIn")->isVisible())
+            return fail("a window's picture that came ahead of its card did not show as the card opened");
+        // The next one takes its place at once.
+        editTasks(QString("model.setProperty(%1, 'picture', 'image://test-windows/200x320')").arg(rowOf(7)));
+        if (find(tileFor(7), "windowThumbnailPicture")->opacity() != 1 ||
+            find(tileFor(7), "windowThumbnailStandIn")->isVisible())
+            return fail("the next picture of a window shown as its card opened did not take its place at once");
         if (!QTest::qWaitFor([&] {
                 return inPopover(card) && titles() == "Fake" && !popover->keyboard() &&
                        !root->property("menuOpen").toBool();
@@ -1862,8 +1902,14 @@ ListModel {
                       << QDebug::toString(popover->inputRegion()).toStdString() << '\n';
             return 1;
         }
-        if (pictureRequests() != QStringList{"watch 7 240 true"})
-            return fail("the card did not ask for the window's picture at its width, to follow it");
+        // Asked for once, at the card's width and to follow the window, and taken over by the
+        // card rather than let go and asked for again.
+        if (!pictureRequests().isEmpty() || pictures != QStringList{"watch 7 240 true"}) {
+            std::cerr << "the card did not take over the window's picture asked for ahead of it: "
+                      << pictures.join("|").toStdString() << '\n';
+            return 1;
+        }
+        editTasks(QString("model.setProperty(%1, 'picture', '')").arg(rowOf(7)));
         // Moving onto another button with windows shows its windows at once: a stack's, in its
         // list's order, the focused one marked.
         QTest::mouseMove(&view, centre(stack));
@@ -2089,6 +2135,77 @@ ListModel {
         QTest::qWait(600);
         if (root->property("groupOpen").toBool())
             return fail("the card of a pressed button's windows came back while the pointer stayed");
+        // Open, the card glides to another button's windows and eases to their width, rather than
+        // jumping there; opening, it is in its place from the start. Slowed down, so that it is
+        // seen on its way.
+        {
+            if (!slowMotion(true))
+                return fail("the animations were not slowed down");
+            QTest::mouseMove(&view, barSpace);
+            if (!QTest::qWaitFor([&] {
+                    single = buttonFor(7);
+                    stack = listedTask(3);
+                    return !popover->isVisible() && single && stack && stack->property("stacked").toBool();
+                }))
+                return fail("the buttons were not back on the bar in slow motion");
+            QTest::mouseMove(&view, centre(single));
+            if (!QTest::qWaitFor([&] { return inPopover(card) && titles() == "Fake"; }))
+                return fail("resting on a window's button in slow motion did not show its picture");
+            const QRectF from(card->x(), card->y(), card->width(), card->height());
+            QTest::mouseMove(&view, centre(stack));
+            const qreal width = card->property("placedWidth").toReal();
+            if (card->x() != from.x() || card->width() != from.width() || width <= from.width()) {
+                std::cerr << "the card did not start from where it was for another button's windows: "
+                          << card->x() << "," << card->width() << " from " << from.x() << ","
+                          << from.width() << " to " << width << " " << titles().toStdString() << '\n';
+                return 1;
+            }
+            if (!QTest::qWaitFor([&] {
+                    return card->width() > from.width() && card->width() < width && card->x() != from.x() &&
+                           qAbs(card->y() + card->height() - from.bottom()) < 0.5;
+                }))
+                return fail("the card did not ease to another button's windows, its edge by the bar staying");
+            // Its place and width ease together, and come to rest together.
+            if (!QTest::qWaitFor([&] { return card->width() == width && titles() == "Group one|Group two"; }))
+                return fail("the card did not come to rest over another button's windows");
+            {
+                const QRectF area = card->mapRectToScene(QRectF(0, 0, card->width(), card->height()));
+                if (qAbs(area.center().x() - centre(stack).x()) > 1 && area.left() != 8)
+                    return fail("the card did not glide to the stacked button");
+            }
+            // A window's first picture fades in over the icon standing in for it, and the next one
+            // takes its place at once.
+            {
+                auto *picture = find(tileFor(11), "windowThumbnailPicture");
+                auto *standIn = find(tileFor(11), "windowThumbnailStandIn");
+                if (!picture || !standIn || picture->isVisible() || !standIn->isVisible())
+                    return fail("a window without a picture has no icon standing in for one");
+                editTasks(QString("model.setProperty(%1, 'picture', 'image://test-windows/320x200')").arg(rowOf(11)));
+                if (!QTest::qWaitFor([&] {
+                        return picture->isVisible() && picture->opacity() > 0 && picture->opacity() < 1 &&
+                               standIn->isVisible() && standIn->opacity() > 0 && standIn->opacity() < 1;
+                    }))
+                    return fail("a window's first picture did not fade in over the icon standing in for it");
+                if (!QTest::qWaitFor([&] { return picture->opacity() == 1 && !standIn->isVisible(); }))
+                    return fail("a window's first picture did not finish fading in");
+                editTasks(QString("model.setProperty(%1, 'picture', 'image://test-windows/200x320')").arg(rowOf(11)));
+                if (picture->opacity() != 1 || standIn->isVisible() ||
+                    !QTest::qWaitFor([&] { return picture->implicitWidth() == 200; }) || picture->opacity() != 1 ||
+                    standIn->isVisible())
+                    return fail("a window's next picture did not take the place of the last at once");
+                editTasks(QString("model.setProperty(%1, 'picture', '')").arg(rowOf(11)));
+            }
+            QTest::mouseMove(&view, barSpace);
+            if (!QTest::qWaitFor([&] { return !card->isVisible(); }))
+                return fail("leaving the stacked button did not close its card in slow motion");
+            QTest::mouseMove(&view, centre(single));
+            if (!QTest::qWaitFor([&] { return card->isVisible(); }) || card->x() != from.x() ||
+                card->width() != from.width())
+                return fail("opening over another button than it last showed, the card glided from there");
+            QTest::mouseMove(&view, barSpace);
+            if (!QTest::qWaitFor([&] { return !popover->isVisible(); }) || !slowMotion(false))
+                return fail("the card did not close, or the animations did not get their speed back");
+        }
         // As many windows as fit across the output at 60 % of their pictures' size get narrower
         // pictures; with more, the stack lists them instead.
         for (int id = 12; id <= 15; ++id)
@@ -2113,6 +2230,27 @@ ListModel {
         QTest::mouseMove(&view, barSpace);
         if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
             return fail("leaving the stacked button did not close its windows' list");
+        // shell.thumbnails = { live = false }: the picture asked for ahead of the card is the one
+        // it shows, not followed, and not asked for again as the card opens.
+        if (!rewrite(QString(lua).replace("shell={", "shell={thumbnails={live=false},")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return !controller.liveThumbnails(); }))
+            return fail("shell.thumbnails = { live = false } was not read");
+        pictureRequests();
+        pictures.clear();
+        single = buttonFor(7);
+        QTest::mouseMove(&view, centre(single));
+        if (!QTest::qWaitFor([&] { return inPopover(card) && titles() == "Fake"; }) ||
+            (pictureRequests(), pictures != QStringList{"watch 7 240 false"})) {
+            std::cerr << "without live pictures, the card did not show the one picture asked for ahead of it: "
+                      << pictures.join("|").toStdString() << '\n';
+            return 1;
+        }
+        QTest::mouseMove(&view, barSpace);
+        if (!QTest::qWaitFor([&] { pictureRequests(); return !popover->isVisible() && pictures.size() == 2; }) ||
+            pictures.last() != "unwatch 7")
+            return fail("without live pictures, the window's picture was not let go as its card closed");
         // shell.thumbnails = { enabled = false }: a window's button has its tooltip and no card,
         // and a stack lists its windows as it did.
         if (!rewrite(QString(lua).replace("shell={", "shell={thumbnails={enabled=false},")))
