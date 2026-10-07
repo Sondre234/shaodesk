@@ -36,6 +36,13 @@
  *                                        3), within WIDTH by HEIGHT; twice copies a frame from a
  *                                        second session on the same source too, closed prints
  *                                        the state and asks once the window has closed
+ *   window_probe TITLE peek              peeks at it with set_peek (version 4), then reads lines
+ *                                        "peek OTHER", "unpeek OTHER" and "destroy OTHER" from
+ *                                        its input, each sending set_peek, unset_peek or destroy
+ *                                        on the object of the window titled OTHER (made the
+ *                                        first time, and kept once that window has closed),
+ *                                        and prints "ok" once the compositor has had each; it
+ *                                        exits at the end of its input
  *
  * STATE is the flags joined by commas ("floating,tiling"), or "-" for none; OUTPUT is "-" before
  * the window is on one.
@@ -349,7 +356,7 @@ static void registry_global(void *data, struct wl_registry *registry, uint32_t n
         zwlr_foreign_toplevel_manager_v1_add_listener(probe->manager, &manager_listener, probe);
     } else if (!strcmp(interface, shaodesk_window_control_v1_interface.name)) {
         probe->control = wl_registry_bind(registry, name, &shaodesk_window_control_v1_interface,
-                                          version < 3 ? version : 3);
+                                          version < 4 ? version : 4);
     } else if (!strcmp(interface, ext_foreign_toplevel_list_v1_interface.name)) {
         probe->list = wl_registry_bind(registry, name, &ext_foreign_toplevel_list_v1_interface, 1);
         ext_foreign_toplevel_list_v1_add_listener(probe->list, &list_listener, probe);
@@ -409,11 +416,76 @@ static void capture(struct probe *probe, struct wl_display *display,
     ext_image_capture_source_v1_destroy(source);
 }
 
+/* Peeks at windows as the input says (see the usage above), starting with `*window`, which it
+ * sets to NULL should the input destroy it. The objects of the other windows are its own. */
+static void peek(struct probe *probe, struct wl_display *display, const char *title,
+                 struct shaodesk_window_v1 **window) {
+    struct {
+        char title[128];
+        struct shaodesk_window_v1 *object;
+        bool destroyed;
+    } objects[16] = {{.object = *window}};
+    snprintf(objects[0].title, sizeof(objects[0].title), "%s", title);
+    size_t count = 1;
+    struct probe others = {0}; // what the other objects send, which nothing reads
+    shaodesk_window_v1_set_peek(*window);
+    char line[256];
+    for (;;) {
+        if (wl_display_roundtrip(display) < 0)
+            die("roundtrip failed");
+        puts("ok");
+        fflush(stdout);
+        if (!fgets(line, sizeof(line), stdin))
+            break;
+        line[strcspn(line, "\n")] = '\0';
+        char *name = strchr(line, ' ');
+        if (!name)
+            die("peek takes \"peek TITLE\", \"unpeek TITLE\" or \"destroy TITLE\"");
+        *name++ = '\0';
+        size_t index = 0;
+        while (index < count && strcmp(objects[index].title, name))
+            ++index;
+        if (index == count) {
+            // Hearing of the windows opened since.
+            if (wl_display_roundtrip(display) < 0)
+                die("roundtrip failed");
+            struct handle *found = NULL;
+            for (struct handle *handle = probe->handles; handle; handle = handle->next)
+                if (handle->title && !strcmp(handle->title, name))
+                    found = handle;
+            if (!found || count == sizeof(objects) / sizeof(*objects))
+                die("no window has that title");
+            objects[count].object = shaodesk_window_control_v1_get_window(probe->control,
+                                                                          found->object);
+            shaodesk_window_v1_add_listener(objects[count].object, &window_listener, &others);
+            snprintf(objects[count].title, sizeof(objects[count].title), "%s", name);
+            ++count;
+        }
+        if (objects[index].destroyed)
+            die("that window's object is destroyed");
+        if (!strcmp(line, "peek")) {
+            shaodesk_window_v1_set_peek(objects[index].object);
+        } else if (!strcmp(line, "unpeek")) {
+            shaodesk_window_v1_unset_peek(objects[index].object);
+        } else if (!strcmp(line, "destroy")) {
+            shaodesk_window_v1_destroy(objects[index].object);
+            objects[index].destroyed = true;
+            if (index == 0)
+                *window = NULL;
+        } else {
+            die("peek takes \"peek TITLE\", \"unpeek TITLE\" or \"destroy TITLE\"");
+        }
+    }
+    for (size_t i = 1; i < count; ++i)
+        if (!objects[i].destroyed)
+            shaodesk_window_v1_destroy(objects[i].object);
+}
+
 int main(int argc, char **argv) {
     if (argc < 2 || argc > 6)
         die("usage: window_probe TITLE [watch | workspace N | output NAME | sticky 0|1 | "
             "floating 0|1 | minimize | pid | capture [watch] | capture-listed [watch] | "
-            "capture-scaled WIDTH HEIGHT [watch | twice | closed]]");
+            "capture-scaled WIDTH HEIGHT [watch | twice | closed] | peek]");
     const char *title = argv[1], *command = argc > 2 ? argv[2] : "", *argument = argc > 3 ? argv[3] : "";
     struct probe probe = {.watch = !strcmp(command, "watch")};
     struct wl_display *display = wl_display_connect(NULL);
@@ -497,12 +569,17 @@ int main(int argc, char **argv) {
                     window, (uint32_t)strtoul(argument, NULL, 10),
                     (uint32_t)strtoul(argv[4], NULL, 10)),
                 !strcmp(mode, "watch"), !strcmp(mode, "twice"));
+    } else if (!strcmp(command, "peek")) {
+        if (shaodesk_window_control_v1_get_version(probe.control) < 4)
+            die("the compositor's window control does not peek");
+        peek(&probe, display, title, &window);
     } else {
         die("unknown command");
     }
     if (wl_display_roundtrip(display) < 0)
         die("request failed");
-    shaodesk_window_v1_destroy(window);
+    if (window)
+        shaodesk_window_v1_destroy(window);
     shaodesk_window_control_v1_destroy(probe.control);
     for (struct handle *handle = probe.handles, *next; handle; handle = next) {
         next = handle->next;

@@ -212,6 +212,30 @@ void TaskModel::watchPicture(int taskId, int pixelWidth, bool live) {
 }
 void TaskModel::unwatchPicture(int taskId) { pictures_.unwatch(taskId); }
 QImage TaskModel::picture(int taskId) const { return pictures_.picture(taskId); }
+void TaskModel::peek(int taskId) {
+    auto *task = find(taskId);
+    if (!task || !task->window || peeked_ == taskId ||
+        shaodesk_window_v1_get_version(task->window) < SHAODESK_WINDOW_V1_SET_PEEK_SINCE_VERSION)
+        return;
+    // Over to this window from the one peeked at so far, if any, the others staying faded.
+    shaodesk_window_v1_set_peek(task->window);
+    setPeeked(taskId);
+    flush();
+}
+void TaskModel::endPeek(int taskId) {
+    if (peeked_ < 0 || peeked_ != taskId)
+        return;
+    if (auto *task = find(taskId); task && task->window)
+        shaodesk_window_v1_unset_peek(task->window);
+    setPeeked(-1);
+    flush();
+}
+void TaskModel::setPeeked(int taskId) {
+    if (peeked_ == taskId)
+        return;
+    peeked_ = taskId;
+    Q_EMIT peekedTaskChanged();
+}
 void TaskModel::move(int from, int to, int count) {
     int rows = rowCount();
     if (count < 1 || from < 0 || to < 0 || from + count > rows || to + count > rows || from == to)
@@ -292,11 +316,14 @@ void TaskModel::removed(Task *task) {
         if (tasks_[i].get() == task) {
             beginRemoveRows({}, i, i);
             pictures_.forget(task->id);
+            const bool peeked = peeked_ == task->id;
             if (task->window)
                 shaodesk_window_v1_destroy(task->window);
             zwlr_foreign_toplevel_handle_v1_destroy(task->handle);
             tasks_.erase(tasks_.begin() + i);
             endRemoveRows();
+            if (peeked)
+                setPeeked(-1); // the compositor ended the peek as the window closed
             return;
         }
 }
@@ -312,10 +339,11 @@ void TaskModel::global(void *data, wl_registry *registry, uint32_t name, const c
         self.seat_ =
             static_cast<wl_seat *>(wl_registry_bind(registry, name, &wl_seat_interface, 1));
     } else if (!std::strcmp(interface, shaodesk_window_control_v1_interface.name) && !self.control_) {
-        // Version 2 gives the windows' capture sources, for their pictures, and version 3 ones
-        // scaled down to the pictures' size and the windows' processes, for the sound they play.
+        // Version 2 gives the windows' capture sources, for their pictures, version 3 ones
+        // scaled down to the pictures' size and the windows' processes, for the sound they play,
+        // and version 4 peeks at a window.
         self.control_ = static_cast<shaodesk_window_control_v1 *>(wl_registry_bind(
-            registry, name, &shaodesk_window_control_v1_interface, std::min(version, 3u)));
+            registry, name, &shaodesk_window_control_v1_interface, std::min(version, 4u)));
         for (auto &task : self.tasks_)
             self.watch(task.get());
     } else if (!std::strcmp(interface, "wl_shm") && !self.shm_) {

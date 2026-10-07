@@ -245,6 +245,8 @@ struct sh_power {
     } clients[64];
 };
 
+struct sh_window_object; // a shaodesk_window_v1 (window_control.c)
+
 struct sh_server {
     const struct sh_callbacks *callbacks;
     bool running;
@@ -257,6 +259,7 @@ struct sh_server {
     struct wlr_scene_tree *backgrounds;
     struct wlr_scene_tree *windows;
     struct wlr_scene_tree *fullscreen;
+    struct wlr_scene_tree *peek_layer;       // the window peeked at, over the others
     struct wlr_scene_tree *fullscreen_cover; // above the panels
     struct wlr_scene_tree *unmanaged;
     struct sh_animator *animator;
@@ -437,6 +440,14 @@ struct sh_server {
     double peek_applied; // what the windows were last given
     uint32_t peek_keycode;
     struct sh_keyboard *peek_keyboard;
+    /* A peek at one window, which a shaodesk_window_v1 (`peek_object`) asks for: the others
+     * fade with peek_fade while it shows over them in peek_layer, an empty node keeping its
+     * place among them (`peek_place`). `peek_lent` counts the windows a peek shows although
+     * they are hidden. */
+    struct sh_toplevel *peek_window;
+    struct sh_window_object *peek_object;
+    struct wlr_scene_tree *peek_place;
+    int peek_lent;
     /* Night light: the schedule or an override picks a temperature; `night_transform` is the
      * matrix for it (NULL at neutral), handed to every output commit. */
     struct wl_event_source *night_timer;
@@ -584,6 +595,11 @@ struct sh_toplevel {
     float opacity;                    // last applied to the window's buffers
     struct wlr_scene_buffer *dim;     // black over the window while it is dimmed, else NULL
     struct sh_fade dim_fade;          // how opaque that black is, and where it is heading
+    /* A peek at this window: how far it shows through the peek's fade (1 in full), what it was
+     * last drawn with, and whether the peek showed its node although the window is hidden. */
+    struct sh_fade peek_shown;
+    double peek_shown_applied;
+    bool peek_lent;
     /* The opacity the window rules gave for these inputs: matching regexes on every commit
      * would cost more than the commit, so it is redone only when one of them changes. */
     struct sh_opacity_rule opacity_rule;
@@ -716,6 +732,11 @@ bool output_commit_zoomed(struct sh_output *output, struct wlr_scene_output *sce
                           const struct wlr_scene_output_state_options *options,
                           double level);
 void set_peek(struct sh_server *server, bool on);
+float peek_scale(struct sh_toplevel *toplevel, int64_t now);
+bool shown_for_peek(struct sh_toplevel *toplevel);
+void peek_at_window(struct sh_toplevel *toplevel);
+void end_window_peek(struct sh_server *server, bool fade);
+void forget_window_peek(struct sh_toplevel *toplevel);
 
 /* focus.c */
 void deactivate_toplevel(struct sh_server *server);

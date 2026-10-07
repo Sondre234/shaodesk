@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
-/* Effects: dimming of inactive windows, peeking at the desktop, night light, the magnifier,
- * and hot corners. */
+/* Effects: dimming of inactive windows, peeking at the desktop or at one window, night light,
+ * the magnifier, and hot corners. */
 #include "server.h"
 
 /* Asks every output for a frame, so that fades keep advancing while nothing else changes. */
@@ -34,8 +34,11 @@ static void apply_dim(struct sh_toplevel *toplevel, int64_t now) {
     struct wlr_box g = toplevel_geometry(toplevel);
     wlr_scene_node_set_position(&toplevel->dim->node, 0, 0);
     wlr_scene_buffer_set_dest_size(toplevel->dim, g.width, g.height);
-    // Peeking clears the dimming with everything else.
+    // Peeking clears the dimming with everything else, and a window shown only for a peek at it
+    // is dimmed only as far as it shows.
     value *= 1 - sh_fade_value(&server->peek_fade, now);
+    if (shown_for_peek(toplevel))
+        value *= sh_fade_value(&toplevel->peek_shown, now);
     wlr_scene_buffer_set_opacity(toplevel->dim, (float)value);
     wlr_scene_node_raise_to_top(&toplevel->dim->node);
 }
@@ -59,15 +62,62 @@ void update_dim(struct sh_toplevel *toplevel) {
     apply_dim(toplevel, now);
 }
 
+/* Whether the window is on the screen only for a peek at it: hidden (minimized, or on a
+ * workspace its output does not show), but shown while it is peeked at and as it fades back
+ * out. It takes no input. */
+bool shown_for_peek(struct sh_toplevel *toplevel) {
+    return toplevel->peek_lent && !toplevel_visible(toplevel);
+}
+
+/* What the peeks make of the window's opacity, as a factor: faded toward peek.opacity while one
+ * goes on, and back toward full as far as the window shows through a peek at it. A window shown
+ * only for the peek shows only that far. */
+float peek_scale(struct sh_toplevel *toplevel, int64_t now) {
+    struct sh_server *server = toplevel->server;
+    double faded = shown_for_peek(toplevel)
+                       ? 0
+                       : 1 - sh_fade_value(&server->peek_fade, now) *
+                                 (1 - server_settings(server)->effects.peek_opacity);
+    double shown = sh_fade_value(&toplevel->peek_shown, now);
+    return (float)(faded + (1 - faded) * shown);
+}
+
+/* Hides a window a peek showed again, unless it has been shown for good meanwhile. */
+static void return_node(struct sh_toplevel *toplevel) {
+    if (!toplevel->peek_lent)
+        return;
+    toplevel->peek_lent = false;
+    --toplevel->server->peek_lent;
+    if (toplevel->scene_tree)
+        wlr_scene_node_set_enabled(&toplevel->scene_tree->node, toplevel_visible(toplevel));
+}
+
 /* Advances the fades; true while one is still running. */
 bool tick_effects(struct sh_server *server) {
     int64_t now = now_ms();
     bool running = sh_fade_active(&server->peek_fade, now) || sh_fade_active(&server->zoom_fade, now);
     struct sh_toplevel *toplevel;
     double peek = sh_fade_value(&server->peek_fade, now);
-    if (peek != server->peek_applied) {
-        server->peek_applied = peek;
-        wl_list_for_each(toplevel, &server->toplevels, link) refresh_frame(toplevel);
+    bool faded = peek != server->peek_applied;
+    server->peek_applied = peek;
+    // Once the others are back, a window that showed in full while they came stops showing
+    // through, which changes nothing on the screen; a window shown only for a peek is hidden
+    // again once it has faded out.
+    bool back = peek == 0 && !sh_fade_active(&server->peek_fade, now);
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        bool peeked = toplevel == server->peek_window;
+        if (back && !peeked && toplevel->peek_shown.to > 0)
+            sh_fade_to(&toplevel->peek_shown, 0, now, 0);
+        double shown = sh_fade_value(&toplevel->peek_shown, now);
+        running = running || sh_fade_active(&toplevel->peek_shown, now);
+        bool refresh = faded || shown != toplevel->peek_shown_applied;
+        if (toplevel->peek_lent && !peeked && shown == 0) {
+            return_node(toplevel);
+            refresh = true; // at its own opacity again for when it is shown
+        }
+        toplevel->peek_shown_applied = shown;
+        if (refresh)
+            refresh_frame(toplevel);
     }
     wl_list_for_each(toplevel, &server->toplevels, link) {
         if (!toplevel->dim)
@@ -299,18 +349,130 @@ out:
     return done;
 }
 
-/* Starts or ends peeking. Windows fade over peek.duration, or at once without animations. */
+/* How long the peeks' fades take: peek.duration, or nothing without animations. */
+static int peek_duration(struct sh_server *server) {
+    const struct sh_settings *settings = server_settings(server);
+    return settings->animations ? settings->effects.peek_duration : 0;
+}
+
+/* Points the fades where the peeks now want them, over `duration`: the windows faded while a
+ * peek at the desktop or at a window goes on, and back otherwise. A window no longer peeked at
+ * fades with the others while a peek goes on, and fades out if it was shown only for the peek;
+ * otherwise it stays in full until the others are back (tick_effects), so that it does not dip
+ * as they come. */
+static void aim_peeks(struct sh_server *server, int duration) {
+    bool on = server->peeking || server->peek_window;
+    int64_t now = now_ms();
+    if (server->peek_fade.to != (on ? 1 : 0))
+        sh_fade_to(&server->peek_fade, on ? 1 : 0, now, duration);
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (toplevel != server->peek_window && toplevel->peek_shown.to > 0 &&
+            (on || shown_for_peek(toplevel)))
+            sh_fade_to(&toplevel->peek_shown, 0, now, duration);
+    }
+    tick_effects(server);
+    schedule_frames(server);
+}
+
+/* Starts or ends peeking at the desktop, which ends a peek at a window. Windows fade over
+ * peek.duration, or at once without animations. */
 void set_peek(struct sh_server *server, bool on) {
     if (server->peeking == on)
         return;
-    const struct sh_settings *settings = server_settings(server);
     server->peeking = on;
-    sh_fade_to(&server->peek_fade, on ? 1 : 0, now_ms(),
-               settings->animations ? settings->effects.peek_duration : 0);
+    if (on)
+        end_window_peek(server, true);
     if (!on) {
         server->peek_keycode = 0;
         server->peek_keyboard = NULL;
     }
-    tick_effects(server);
-    schedule_frames(server);
+    aim_peeks(server, peek_duration(server));
+}
+
+/* Peeking at one window, as the taskbar does while the pointer rests on its picture. The other
+ * windows fade with peek_fade, as they do to show the desktop, and the window shows over them in
+ * peek_layer, an empty node keeping its place among them until it goes back there; one
+ * fullscreen over the panels stays where it is, over the others already. A hidden window
+ * (minimized, or on a workspace its output does not show) is lent its node for the peek, where
+ * it was, and fades in and out with its peek_shown; tick_effects hides it again once it has
+ * faded out. Nothing else about the window changes. */
+
+/* Shows a hidden window for a peek at it. */
+static void lend_node(struct sh_toplevel *toplevel) {
+    if (toplevel->peek_lent || toplevel_visible(toplevel) || !toplevel->scene_tree)
+        return;
+    toplevel->peek_lent = true;
+    ++toplevel->server->peek_lent;
+    wlr_scene_node_set_enabled(&toplevel->scene_tree->node, true);
+}
+
+/* Lifts the window peeked at over the others, leaving an empty node in its place. */
+static void lift_for_peek(struct sh_toplevel *toplevel) {
+    struct sh_server *server = toplevel->server;
+    struct wlr_scene_node *node = toplevel->scene_tree ? &toplevel->scene_tree->node : NULL;
+    if (!node || (node->parent != server->windows && node->parent != server->fullscreen))
+        return;
+    server->peek_place = wlr_scene_tree_create(node->parent);
+    if (!server->peek_place)
+        return;
+    wlr_scene_node_place_above(&server->peek_place->node, node);
+    wlr_scene_node_reparent(node, server->peek_layer);
+}
+
+/* Puts the window peeked at back in its place among the others, unless it was moved there on
+ * purpose meanwhile: raised as it was focused, or put among them as it left fullscreen. */
+static void drop_after_peek(struct sh_toplevel *toplevel) {
+    struct sh_server *server = toplevel->server;
+    struct wlr_scene_tree *place = server->peek_place;
+    server->peek_place = NULL;
+    if (!place)
+        return;
+    struct wlr_scene_node *node = toplevel->scene_tree ? &toplevel->scene_tree->node : NULL;
+    if (node && node->parent == server->peek_layer) {
+        wlr_scene_node_reparent(node, place->node.parent);
+        wlr_scene_node_place_below(node, &place->node);
+    }
+    wlr_scene_node_destroy(&place->node);
+}
+
+/* Peeks at the window, or moves the peek over to it from the one peeked at so far, which goes
+ * back among the others as they stay faded. */
+void peek_at_window(struct sh_toplevel *toplevel) {
+    struct sh_server *server = toplevel->server;
+    if (server->peek_window == toplevel)
+        return;
+    if (server->peek_window)
+        drop_after_peek(server->peek_window);
+    server->peek_window = toplevel;
+    lend_node(toplevel);
+    lift_for_peek(toplevel);
+    // A window on the screen while nothing is faded shows in full already.
+    int64_t now = now_ms();
+    bool full = !shown_for_peek(toplevel) && sh_fade_value(&server->peek_fade, now) == 0;
+    sh_fade_to(&toplevel->peek_shown, 1, now, full ? 0 : peek_duration(server));
+    aim_peeks(server, peek_duration(server));
+}
+
+/* Ends the peek at a window: the others fade back, or come back at once without `fade`, and the
+ * window goes back to how it was. */
+void end_window_peek(struct sh_server *server, bool fade) {
+    struct sh_toplevel *toplevel = server->peek_window;
+    if (!toplevel)
+        return;
+    server->peek_window = NULL;
+    server->peek_object = NULL;
+    drop_after_peek(toplevel);
+    aim_peeks(server, fade ? peek_duration(server) : 0);
+}
+
+/* The window is closing: it leaves a peek at once, the others fading back if it was the one
+ * peeked at. */
+void forget_window_peek(struct sh_toplevel *toplevel) {
+    struct sh_server *server = toplevel->server;
+    if (server->peek_window == toplevel)
+        end_window_peek(server, true);
+    sh_fade_init(&toplevel->peek_shown, 0);
+    toplevel->peek_shown_applied = 0;
+    return_node(toplevel);
 }

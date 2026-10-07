@@ -40,6 +40,19 @@ static struct wlr_scene_node *scene_node_at(struct sh_server *server, double lx,
     bool animating = sh_animator_running(server->animator) > 0;
     if (animating)
         sh_animator_rest_at(server->animator, lx, ly);
+    // A window on the screen only for a peek at it is not there to point at.
+    struct wlr_scene_node *lent[8];
+    int lent_count = 0;
+    if (server->peek_lent > 0) {
+        struct sh_toplevel *toplevel;
+        wl_list_for_each(toplevel, &server->toplevels, link) {
+            if (lent_count < 8 && shown_for_peek(toplevel) && toplevel->scene_tree &&
+                toplevel->scene_tree->node.enabled) {
+                toplevel->scene_tree->node.enabled = false; // as for the frame's hole below
+                lent[lent_count++] = &toplevel->scene_tree->node;
+            }
+        }
+    }
     struct wlr_scene_node *node = wlr_scene_node_at(&server->scene->tree.node, lx, ly, sx, sy);
     // A rounded border is one hollow rect over the whole window, which hit testing takes as
     // solid: pointing through its hole reaches what is below, the window itself first.
@@ -52,6 +65,8 @@ static struct wlr_scene_node *scene_node_at(struct sh_server *server, double lx,
     }
     while (hidden_count > 0)
         hidden[--hidden_count]->enabled = true;
+    while (lent_count > 0)
+        lent[--lent_count]->enabled = true;
     if (animating)
         sh_animator_resume(server->animator);
     if (server->hit.caching) {

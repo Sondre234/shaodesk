@@ -385,7 +385,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
         target_link_libraries(output_management_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
         target_compile_options(output_management_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
         # A taskbar's window menu through shaodesk-window-control-v1, for window_control_smoke,
-        # and its capture of a window, for window_capture_smoke.
+        # its capture of a window, for window_capture_smoke, and its peek at one, for
+        # window_peek_smoke.
         add_executable(window_probe tests/window_probe.c
             ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c
@@ -746,6 +747,11 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>
             $<TARGET_FILE:lock_probe>)
         set_tests_properties(window_capture_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME window_peek_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_peek_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>
+            $<TARGET_FILE:lock_probe> "${GRIM_ARGUMENT}")
+        set_tests_properties(window_peek_smoke PROPERTIES TIMEOUT 60)
         if(SDBUS_FOUND)
             # A stand-in for logind on a private bus, so that no power test reaches the real one.
             add_executable(fake_login1 tests/fake_login1.c)

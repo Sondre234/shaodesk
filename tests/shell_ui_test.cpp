@@ -867,15 +867,20 @@ int main(int argc, char **argv) {
     // Context menus: a task's, then the bar's. Stand-in tasks replace the Wayland ones.
     auto *tasks = view.rootObject()->findChild<QQuickItem *>("taskList");
     // It notes what the taskbar's menus ask of the windows, as "minimize 7", and apart from
-    // that what the taskbar asks of their pictures, as "watch 7 240 true" and "unwatch 7".
+    // that what the taskbar asks of their pictures, as "watch 7 240 true" and "unwatch 7", and
+    // the peeks it starts and ends as the task model has them, as "peek 7" and "end 7".
     QQmlComponent fakeTasks(view.engine());
     fakeTasks.setData(R"(import QtQml.Models
 ListModel {
     property var requests: []
     property var pictures: []
+    property var peeks: []
+    property int peekedTask: -1
     function note(request) { requests = requests.concat([request]) }
     function watchPicture(id, width, live) { pictures = pictures.concat(["watch " + id + " " + width + " " + live]) }
     function unwatchPicture(id) { pictures = pictures.concat(["unwatch " + id]) }
+    function peek(id) { if (peekedTask !== id) { peekedTask = id; peeks = peeks.concat(["peek " + id]) } }
+    function endPeek(id) { if (peekedTask === id) { peekedTask = -1; peeks = peeks.concat(["end " + id]) } }
     function activate(id) { note("activate " + id) }
     function minimize(id) { note("minimize " + id) }
     function maximize(id) { note("maximize " + id) }
@@ -2082,6 +2087,79 @@ ListModel {
         QTest::keyClick(popover, Qt::Key_Escape);
         if (!QTest::qWaitFor([&] { return !popover->isVisible(); }) || !reopen())
             return fail("the stack's windows did not show again after its window's menu");
+        // Resting on a window's picture peeks at the window after half a second; with one
+        // peeked at, the next picture takes the peek over at once, without ending it in between;
+        // leaving the pictures ends it a moment later, and so does a click on a picture, which
+        // focuses its window and closes the card.
+        {
+            // The peeks the stand-in started and ended since the last call, joined by "|".
+            auto peeks = [&] {
+                const auto noted = fakeModel->property("peeks").value<QJSValue>().toVariant().toStringList();
+                fakeModel->setProperty("peeks", QVariant::fromValue(view.engine()->newArray()));
+                return noted.join("|");
+            };
+            // The middle of a window's picture, where its stand-in is when it has none.
+            auto picture = [&](int id) { return centre(find(tileFor(id), "windowThumbnailStandIn")); };
+            QString noted;
+            auto heard = [&](const QString &expected) {
+                return QTest::qWaitFor([&] {
+                    noted += (noted.isEmpty() ? "" : "|") + peeks();
+                    if (noted.endsWith('|'))
+                        noted.chop(1);
+                    return noted == expected;
+                });
+            };
+            peeks();
+            QEvent offBar(QEvent::Leave);
+            QCoreApplication::sendEvent(&view, &offBar);
+            QElapsedTimer resting;
+            QTest::mouseMove(popover, picture(10));
+            resting.start();
+            if (!heard("peek 10") || resting.elapsed() < 450) {
+                std::cerr << "resting on a window's picture did not peek at it after half a second: "
+                          << noted.toStdString() << " after " << resting.elapsed() << " ms\n";
+                return 1;
+            }
+            // Across the gap between the tiles to the next picture.
+            noted.clear();
+            QTest::mouseMove(popover, (picture(10) + picture(11)) / 2);
+            QTest::qWait(50);
+            QTest::mouseMove(popover, picture(11));
+            resting.restart();
+            if (!heard("peek 11") || resting.elapsed() > 300) {
+                std::cerr << "the next picture did not take the peek over at once: "
+                          << noted.toStdString() << " after " << resting.elapsed() << " ms\n";
+                return 1;
+            }
+            QTest::qWait(300);
+            if (!heard("peek 11"))
+                return fail("the peek ended as it moved over to the next picture");
+            // Off the pictures, onto the tile's title: the peek ends, the card stays.
+            noted.clear();
+            QTest::mouseMove(popover, centre(find(tileFor(11), "windowThumbnailTitle")));
+            if (!heard("end 11") || !inPopover(card))
+                return fail("leaving the pictures did not end the peek");
+            // Resting again waits again, and a click focuses the window and ends the peek.
+            noted.clear();
+            QTest::mouseMove(popover, picture(10));
+            resting.restart();
+            if (!heard("peek 10") || resting.elapsed() < 450)
+                return fail("a peek after one had ended did not wait for the pointer to rest");
+            noted.clear();
+            taskRequests();
+            QString focused;
+            QTest::mouseClick(popover, Qt::LeftButton, Qt::NoModifier, picture(10));
+            if (!heard("end 10") || !QTest::qWaitFor([&] {
+                    focused += taskRequests();
+                    return focused == "activate 10" && !card->isVisible();
+                })) {
+                std::cerr << "clicking the picture peeked at did not focus its window and end the peek: "
+                          << focused.toStdString() << ", " << noted.toStdString() << '\n';
+                return 1;
+            }
+            if (!reopen())
+                return fail("the stack's windows did not show again after a click on one");
+        }
         // A middle click closes a window, and so does the cross on a tile under the pointer; a
         // window that closes leaves the card, and the last one closes it.
         asked.clear();

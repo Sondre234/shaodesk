@@ -80,6 +80,12 @@ shadows.
   they are taken from halfway into the delay, and none for a button the pointer only crosses. It
   glides from one button to the next and eases to the width of their windows, as on Windows 11,
   and a picture that comes while it is open fades in over the icon standing in for it.
+- Resting the pointer on a window's picture for half a second peeks at the window, as Windows'
+  Aero Peek does: the other windows fade as for `peek`, and the window shows over them where it
+  is, minimized or on another workspace too, without being focused, raised or restored. The peek
+  moves at once to the next picture and ends with a fade as the pointer leaves the pictures, and
+  clicking the picture focuses the window where it shows. `shaodesk-window-control-v1` version 4
+  peeks with `set_peek` and `unset_peek`, and `shaodesk msg get window_peek` shows what it does.
 - A window's taskbar menu is headed by its application's icon and name over the window's title,
   and offers the application's desktop actions and a new window, then minimize or restore,
   maximize or restore, fullscreen, moving the window to another workspace or monitor, keeping it

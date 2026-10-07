@@ -247,6 +247,49 @@ PopupCard {
                             layer.enabled: Theme.effects
                             Rectangle { anchors.fill: parent; radius: Theme.radiusSmall }
                         }
+                        // Resting on the picture for half a second peeks at the window, as on
+                        // Windows: the others fade while it shows alone where it is (the task
+                        // source's peek, which a stand-in may not have). With one peeked at,
+                        // another picture takes the peek over at once; leaving the pictures, or
+                        // the card closing, ends it a moment later, time to cross to the next.
+                        HoverHandler { id: pictureHover }
+                        Timer {
+                            id: peekDelay
+                            interval: 500
+                            readonly property bool resting: pictureHover.hovered && thumbnails.open
+                            readonly property var source: thumbnails.panel.taskSource
+                            // The model this tile peeked through and the window, until it ends
+                            // the peek, should either change meanwhile.
+                            property var peeking: null
+                            property int peekedId: -1
+                            function peek() {
+                                peeking = source
+                                peekedId = tile.taskId
+                                peeking.peek(peekedId)
+                            }
+                            function end() {
+                                if (peeking)
+                                    peeking.endPeek(peekedId)
+                                peeking = null
+                            }
+                            onRestingChanged: {
+                                stop()
+                                peekEnd.stop()
+                                if (!source || typeof source.peek !== "function")
+                                    return
+                                if (!resting) {
+                                    if (peeking)
+                                        peekEnd.start()
+                                } else if (source.peekedTask >= 0) {
+                                    peek()
+                                } else {
+                                    start()
+                                }
+                            }
+                            onTriggered: peek()
+                            Component.onDestruction: end()
+                        }
+                        Timer { id: peekEnd; interval: 150; onTriggered: peekDelay.end() }
                     }
                 }
                 MouseArea {

@@ -285,7 +285,8 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     // Stacking order, bottom to top.
     struct wlr_scene_tree **stack[] = {
         &server.backgrounds, &server.layer_trees[0], &server.layer_trees[1],
-        &server.windows,     &server.fullscreen,     &server.layer_trees[2], &server.fullscreen_cover,
+        &server.windows,     &server.fullscreen,     &server.peek_layer,     &server.layer_trees[2],
+        &server.fullscreen_cover,
         &server.unmanaged,   &server.guide_layer,    &server.overview_layer, &server.layer_trees[3], &server.drag_icons,
         &server.lock_tree,
     };
