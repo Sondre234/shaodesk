@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """shaodesk-window-control-v1, as the taskbar's window menu uses it: a window named by its
-taskbar handle hears its output, workspace and placement, and moves to another workspace or
-output, becomes sticky or floats, without taking the focus from the window that has it."""
+taskbar handle hears its output, workspace, placement and process, and moves to another workspace
+or output, becomes sticky or floats, without taking the focus from the window that has it."""
 from pathlib import Path
 import queue
 import subprocess
@@ -48,8 +48,11 @@ with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) a
         return client
 
     a = launch("A")
-    launch("B")
+    b = launch("B")
     assert control("A") == "HEADLESS-1 1 tiled,tiling", control("A")
+    # Each window's process, as its client is the probe started for it.
+    assert control("A", "pid") == str(a.pid), (control("A", "pid"), a.pid)
+    assert control("B", "pid") == str(b.pid), (control("B", "pid"), b.pid)
     assert windows()["B"][1], "the newest window has the focus"
 
     # A window the probe watches hears each change as it ends up, once.

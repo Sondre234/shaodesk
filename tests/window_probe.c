@@ -25,6 +25,7 @@
  *   window_probe TITLE sticky 0|1        set_sticky or unset_sticky
  *   window_probe TITLE floating 0|1      set_floating or unset_floating
  *   window_probe TITLE minimize          minimizes it through its wlr-foreign-toplevel handle
+ *   window_probe TITLE pid               prints the process id the pid event gives (version 3)
  *   window_probe TITLE capture [watch]   captures it through get_capture_source (version 2)
  *   window_probe TITLE capture-listed [watch]
  *                                        captures it through ext-foreign-toplevel-list and
@@ -83,7 +84,7 @@ struct probe {
     struct listed *listed;
     bool closed, watch;
     char output[64];
-    uint32_t workspace, state;
+    uint32_t workspace, state, pid;
 };
 
 static void die(const char *message) {
@@ -158,6 +159,9 @@ static void window_workspace(void *data, struct shaodesk_window_v1 *window, uint
 static void window_state(void *data, struct shaodesk_window_v1 *window, uint32_t state) {
     ((struct probe *)data)->state = state;
 }
+static void window_pid(void *data, struct shaodesk_window_v1 *window, uint32_t pid) {
+    ((struct probe *)data)->pid = pid;
+}
 static void window_done(void *data, struct shaodesk_window_v1 *window) {
     struct probe *probe = data;
     if (probe->watch)
@@ -167,7 +171,8 @@ static const struct shaodesk_window_v1_listener window_listener = {
     .output = window_output,
     .workspace = window_workspace,
     .state = window_state,
-    .done = window_done};
+    .done = window_done,
+    .pid = window_pid};
 
 static void listed_closed(void *data, struct ext_foreign_toplevel_handle_v1 *object) {
     struct listed *listed = data;
@@ -339,7 +344,7 @@ static void registry_global(void *data, struct wl_registry *registry, uint32_t n
         zwlr_foreign_toplevel_manager_v1_add_listener(probe->manager, &manager_listener, probe);
     } else if (!strcmp(interface, shaodesk_window_control_v1_interface.name)) {
         probe->control = wl_registry_bind(registry, name, &shaodesk_window_control_v1_interface,
-                                          version < 2 ? version : 2);
+                                          version < 3 ? version : 3);
     } else if (!strcmp(interface, ext_foreign_toplevel_list_v1_interface.name)) {
         probe->list = wl_registry_bind(registry, name, &ext_foreign_toplevel_list_v1_interface, 1);
         ext_foreign_toplevel_list_v1_add_listener(probe->list, &list_listener, probe);
@@ -385,7 +390,7 @@ static void capture(struct probe *probe, struct wl_display *display,
 int main(int argc, char **argv) {
     if (argc != 2 && argc != 3 && argc != 4)
         die("usage: window_probe TITLE [watch | workspace N | output NAME | sticky 0|1 | "
-            "floating 0|1 | minimize | capture [watch] | capture-listed [watch]]");
+            "floating 0|1 | minimize | pid | capture [watch] | capture-listed [watch]]");
     const char *title = argv[1], *command = argc > 2 ? argv[2] : "", *argument = argc > 3 ? argv[3] : "";
     struct probe probe = {.watch = !strcmp(command, "watch")};
     struct wl_display *display = wl_display_connect(NULL);
@@ -432,6 +437,10 @@ int main(int argc, char **argv) {
             shaodesk_window_v1_unset_floating(window);
     } else if (!strcmp(command, "minimize")) {
         zwlr_foreign_toplevel_handle_v1_set_minimized(found->object);
+    } else if (!strcmp(command, "pid")) {
+        if (shaodesk_window_control_v1_get_version(probe.control) < 3)
+            die("the compositor's window control gives no process ids");
+        printf("%u\n", probe.pid);
     } else if (!strcmp(command, "capture")) {
         if (shaodesk_window_control_v1_get_version(probe.control) < 2 || !probe.copy || !probe.shm)
             die("the compositor offers no window capture");
