@@ -126,6 +126,36 @@
       </description>
     </request>
 
+    <event name="output">
+      <description summary="the output the window is on">
+        The connector name of the output the window belongs to, "" before it is placed on one.
+        The output may be gone: a window keeps its output while it waits for it to return.
+      </description>
+      <arg name="name" type="string"/>
+    </event>
+
+    <event name="workspace">
+      <description summary="the workspace the window is on">
+        The workspace of its output the window is on, from 1. A sticky window's follows the one
+        its output shows.
+      </description>
+      <arg name="number" type="uint"/>
+    </event>
+
+    <event name="state">
+      <description summary="how the window is placed">
+        A bitfield of the state enum.
+      </description>
+      <arg name="state" type="uint" enum="state"/>
+    </event>
+
+    <event name="done">
+      <description summary="the state is complete">
+        Sent after the output, workspace, state and pid events that describe one state of the
+        window, so that the client applies them together. Only what changed is sent before it.
+      </description>
+    </event>
+
     <request name="get_capture_source" since="2">
       <description summary="a capture source for the window">
         Creates an ext_image_capture_source_v1 for the window, the one
@@ -163,36 +193,6 @@
       <arg name="width" type="uint" summary="the widest a frame may be, in buffer pixels"/>
       <arg name="height" type="uint" summary="the tallest a frame may be, in buffer pixels"/>
     </request>
-
-    <event name="output">
-      <description summary="the output the window is on">
-        The connector name of the output the window belongs to, "" before it is placed on one.
-        The output may be gone: a window keeps its output while it waits for it to return.
-      </description>
-      <arg name="name" type="string"/>
-    </event>
-
-    <event name="workspace">
-      <description summary="the workspace the window is on">
-        The workspace of its output the window is on, from 1. A sticky window's follows the one
-        its output shows.
-      </description>
-      <arg name="number" type="uint"/>
-    </event>
-
-    <event name="state">
-      <description summary="how the window is placed">
-        A bitfield of the state enum.
-      </description>
-      <arg name="state" type="uint" enum="state"/>
-    </event>
-
-    <event name="done">
-      <description summary="the state is complete">
-        Sent after the output, workspace, state and pid events that describe one state of the
-        window, so that the client applies them together. Only what changed is sent before it.
-      </description>
-    </event>
 
     <event name="pid" since="3">
       <description summary="the process the window belongs to">
