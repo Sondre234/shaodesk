@@ -121,7 +121,8 @@ class ShellController : public QObject {
     Q_PROPERTY(QStringList profiles READ profiles NOTIFY configChanged)
     Q_PROPERTY(QString profile READ profile NOTIFY configChanged)
     // The compositor's window switcher (Alt+Tab): the output showing it, empty while closed, and
-    // its windows as {appId, title, output, workspace, minimized, urgent}, most recently focused first.
+    // its windows as {appId, title, output, workspace, minimized, urgent, id}, most recently
+    // focused first; `id` is the window's number (TaskModel's windowId), 0 when not given.
     Q_PROPERTY(QString switcherOutput READ switcherOutput NOTIFY switcherChanged)
     Q_PROPERTY(QVariantList switcherWindows READ switcherWindows NOTIFY switcherChanged)
     Q_PROPERTY(int switcherSelected READ switcherSelected NOTIFY switcherSelectedChanged)

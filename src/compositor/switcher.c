@@ -3,10 +3,11 @@
  * from the events sent here. */
 #include "server.h"
 
-/* Subscribers get "switcher OUTPUT SELECTED COUNT" followed by COUNT
- * lines "switcher-window APP_ID\tTITLE\tOUTPUT\tWORKSPACE\tMINIMIZED\tURGENT" as it opens or its list
- * changes, "switcher-select N" as the selection moves (both counting from 0), and
- * "switcher-close" when it closes. */
+/* Subscribers get "switcher OUTPUT SELECTED COUNT" followed by COUNT lines
+ * "switcher-window APP_ID\tTITLE\tOUTPUT\tWORKSPACE\tMINIMIZED\tURGENT\tID" as it opens or its
+ * list changes, "switcher-select N" as the selection moves (both counting from 0), and
+ * "switcher-close" when it closes. ID is the window's number (the window control's id event), by
+ * which the shell finds the window among its taskbar handles for its picture. */
 static void switcher_announce(struct sh_server *server) {
     size_t size = 128 + (size_t)server->switcher.count * 1024, length = 0;
     char *text = malloc(size);
@@ -25,9 +26,9 @@ static void switcher_announce(struct sh_server *server) {
         for (char *c = title; *c; ++c)
             *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
         length +=
-            snprintf(text + length, size - length, "switcher-window %s\t%s\t%s\t%d\t%d\t%d\n",
+            snprintf(text + length, size - length, "switcher-window %s\t%s\t%s\t%d\t%d\t%d\t%u\n",
                      app_id, title, toplevel->output, toplevel->workspace + 1, toplevel->minimized,
-                     toplevel->urgent);
+                     toplevel->urgent, toplevel->id);
     }
     send_event(server, text, length);
     free(text);

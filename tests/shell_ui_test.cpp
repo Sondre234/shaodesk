@@ -567,13 +567,15 @@ int main(int argc, char **argv) {
     if (!QTest::qWaitFor([&] { return workspace(4)->property("current").toBool(); }))
         return fail("could not switch back to the last workspace");
     // The window switcher's list says which windows are asking for attention (an older
-    // five-field line means none). Its overlay shows them, and goes on showing them as it fades
-    // out once the switcher has closed, though the controller has forgotten them by then.
+    // five-field line means none) and each window's number (an older line's is 0; a field past
+    // it, from a newer compositor, is passed over). Its overlay shows them, and goes on showing
+    // them as it fades out once the switcher has closed, though the controller has forgotten
+    // them by then.
     SwitcherView switcherView(controller, app.primaryScreen());
     auto overlayListed = [&] { return switcherView.rootObject()->property("listed").toList().size(); };
     subscriber->write(("switcher " + output + " 0 3\n"
-                       "switcher-window fake\tFake\t" + output + "\t3\t0\t1\n"
-                       "switcher-window \tNo app id\t" + output + "\t1\t1\t0\n"
+                       "switcher-window fake\tFake\t" + output + "\t3\t0\t1\t12\n"
+                       "switcher-window \tNo app id\t" + output + "\t1\t1\t0\t13\tnew\n"
                        "switcher-window old\tOld\t" + output + "\t1\t0\n").toUtf8());
     if (!QTest::qWaitFor([&] { return controller.switcherWindows().size() == 3; })) {
         std::cerr << "the switcher's windows were not parsed\n";
@@ -586,6 +588,9 @@ int main(int argc, char **argv) {
         std::cerr << "the switcher does not say which windows are urgent\n";
         return 1;
     }
+    if (listed[0].toMap()["id"].toInt() != 12 || listed[1].toMap()["id"].toInt() != 13 ||
+        listed[2].toMap()["id"].toInt() != 0)
+        return fail("the switcher's windows' numbers were not parsed");
     if (!QTest::qWaitFor([&] { return switcherView.isVisible() && overlayListed() == 3; }))
         return fail("the switcher's overlay did not show its windows");
     subscriber->write("switcher-close\n");

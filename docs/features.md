@@ -1240,9 +1240,12 @@ that sends `subscribe` keeps its connection and receives `tiling on|off` and
 [keyboard layout](#keyboard-layouts), from 1, of how many, as in `get keyboard`) after every
 change, plus `launcher OUTPUT` when the `launcher` action
 (Super + R) asks the panel on that monitor to open or close its start menu; the panel uses this. The window switcher sends `switcher OUTPUT SELECTED COUNT` followed by
-COUNT lines `switcher-window APP_ID TITLE OUTPUT WORKSPACE MINIMIZED URGENT` (tab-separated) when it
+COUNT lines `switcher-window APP_ID TITLE OUTPUT WORKSPACE MINIMIZED URGENT ID` (tab-separated) when it
 opens or a listed window closes, `switcher-select N` as the selection moves (both counting
-from 0), and `switcher-close`. The state ends with `power ACTIONS`, the power actions that may
+from 0), and `switcher-close`. ID is the window's number, which the compositor gives each window as
+it appears and never gives another; a taskbar gets the same number for its handle of the window
+from `shaodesk-window-control-v1` (version 4), and so finds the window the line means where two
+share a title. The state ends with `power ACTIONS`, the power actions that may
 run (`lock,suspend,reboot,poweroff,logout`, in the order menus list them, or `-`), a power
 action that fails or is cancelled after it was accepted sends `power-error MESSAGE`, a program
 that `spawn` or `terminal` could not start sends `spawn-error MESSAGE` (the panel shows either
