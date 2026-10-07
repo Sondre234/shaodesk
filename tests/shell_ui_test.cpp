@@ -1967,8 +1967,7 @@ ListModel {
                           << audio.requests.join(", ").toStdString() << '\n';
                 return 1;
             }
-            QTest::qWait(100);
-            if (!inPopover(card) || !taskRequests().isEmpty())
+            if (!root->property("groupOpen").toBool() || !taskRequests().isEmpty())
                 return fail("clicking a window's speaker also clicked its picture");
             // Muted, paused or not, it stays to be unmuted; unmuted while paused, it goes.
             audio.update({"speakers", {{"speakers", "Speakers", 50, false}},
