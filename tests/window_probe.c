@@ -30,6 +30,11 @@
  *                                        captures it through ext-foreign-toplevel-list and
  *                                        ext-foreign-toplevel-image-capture-source-v1, as screen
  *                                        sharing does
+ *   window_probe TITLE capture-scaled WIDTH HEIGHT [watch | twice | closed]
+ *                                        captures it through get_scaled_capture_source (version
+ *                                        3), within WIDTH by HEIGHT; twice copies a frame from a
+ *                                        second session on the same source too, closed prints
+ *                                        the state and asks once the window has closed
  *
  * STATE is the flags joined by commas ("floating,tiling"), or "-" for none; OUTPUT is "-" before
  * the window is on one.
@@ -339,7 +344,7 @@ static void registry_global(void *data, struct wl_registry *registry, uint32_t n
         zwlr_foreign_toplevel_manager_v1_add_listener(probe->manager, &manager_listener, probe);
     } else if (!strcmp(interface, shaodesk_window_control_v1_interface.name)) {
         probe->control = wl_registry_bind(registry, name, &shaodesk_window_control_v1_interface,
-                                          version < 2 ? version : 2);
+                                          version < 3 ? version : 3);
     } else if (!strcmp(interface, ext_foreign_toplevel_list_v1_interface.name)) {
         probe->list = wl_registry_bind(registry, name, &ext_foreign_toplevel_list_v1_interface, 1);
         ext_foreign_toplevel_list_v1_add_listener(probe->list, &list_listener, probe);
@@ -358,34 +363,52 @@ static void registry_global_remove(void *data, struct wl_registry *registry, uin
 static const struct wl_registry_listener registry_listener = {
     .global = registry_global, .global_remove = registry_global_remove};
 
-/* Captures the window through `source`: one frame, or with watch every frame until the session
- * stops. */
-static void capture(struct probe *probe, struct wl_display *display,
-                    struct ext_image_capture_source_v1 *source, bool watch) {
-    struct capture capture = {.shm = probe->shm, .format = NO_FORMAT, .watch = watch};
-    capture.session = ext_image_copy_capture_manager_v1_create_session(probe->copy, source, 0);
-    ext_image_copy_capture_session_v1_add_listener(capture.session, &session_listener, &capture);
-    while (!capture.finished && !capture.stopped)
+/* Starts a session on `source` and copies one frame, or with watch every frame until the
+ * session stops. The session stays until end_session. */
+static void run_session(struct probe *probe, struct wl_display *display,
+                        struct ext_image_capture_source_v1 *source, bool watch,
+                        struct capture *capture) {
+    *capture = (struct capture){.shm = probe->shm, .format = NO_FORMAT, .watch = watch};
+    capture->session = ext_image_copy_capture_manager_v1_create_session(probe->copy, source, 0);
+    ext_image_copy_capture_session_v1_add_listener(capture->session, &session_listener, capture);
+    while (!capture->finished && !capture->stopped)
         if (wl_display_dispatch(display) < 0)
             die("dispatch failed");
-    if (capture.stopped) {
+    if (capture->stopped) {
         puts("stopped");
         fflush(stdout);
     }
-    if (capture.frame)
-        ext_image_copy_capture_frame_v1_destroy(capture.frame);
-    ext_image_copy_capture_session_v1_destroy(capture.session);
-    ext_image_capture_source_v1_destroy(source);
-    if (capture.buffer) {
-        wl_buffer_destroy(capture.buffer);
-        munmap(capture.pixels, capture.size);
+}
+static void end_session(struct capture *capture) {
+    if (capture->frame)
+        ext_image_copy_capture_frame_v1_destroy(capture->frame);
+    ext_image_copy_capture_session_v1_destroy(capture->session);
+    if (capture->buffer) {
+        wl_buffer_destroy(capture->buffer);
+        munmap(capture->pixels, capture->size);
     }
 }
 
+/* Captures the window through `source`: one frame, or with watch every frame until the session
+ * stops; with twice, one frame, then one more from a second session on the same source while the
+ * first is still there. */
+static void capture(struct probe *probe, struct wl_display *display,
+                    struct ext_image_capture_source_v1 *source, bool watch, bool twice) {
+    struct capture first, second;
+    run_session(probe, display, source, watch, &first);
+    if (twice) {
+        run_session(probe, display, source, false, &second);
+        end_session(&second);
+    }
+    end_session(&first);
+    ext_image_capture_source_v1_destroy(source);
+}
+
 int main(int argc, char **argv) {
-    if (argc != 2 && argc != 3 && argc != 4)
+    if (argc < 2 || argc > 6)
         die("usage: window_probe TITLE [watch | workspace N | output NAME | sticky 0|1 | "
-            "floating 0|1 | minimize | capture [watch] | capture-listed [watch]]");
+            "floating 0|1 | minimize | capture [watch] | capture-listed [watch] | "
+            "capture-scaled WIDTH HEIGHT [watch | twice | closed]]");
     const char *title = argv[1], *command = argc > 2 ? argv[2] : "", *argument = argc > 3 ? argv[3] : "";
     struct probe probe = {.watch = !strcmp(command, "watch")};
     struct wl_display *display = wl_display_connect(NULL);
@@ -436,7 +459,7 @@ int main(int argc, char **argv) {
         if (shaodesk_window_control_v1_get_version(probe.control) < 2 || !probe.copy || !probe.shm)
             die("the compositor offers no window capture");
         capture(&probe, display, shaodesk_window_v1_get_capture_source(window),
-                !strcmp(argument, "watch"));
+                !strcmp(argument, "watch"), false);
     } else if (!strcmp(command, "capture-listed")) {
         if (!probe.list || !probe.sources || !probe.copy || !probe.shm)
             die("the compositor offers no window capture");
@@ -449,7 +472,22 @@ int main(int argc, char **argv) {
         capture(&probe, display,
                 ext_foreign_toplevel_image_capture_source_manager_v1_create_source(probe.sources,
                                                                                    listed->object),
-                !strcmp(argument, "watch"));
+                !strcmp(argument, "watch"), false);
+    } else if (!strcmp(command, "capture-scaled") && argc >= 5) {
+        if (shaodesk_window_control_v1_get_version(probe.control) < 3 || !probe.copy || !probe.shm)
+            die("the compositor offers no scaled window capture");
+        const char *mode = argc > 5 ? argv[5] : "";
+        if (!strcmp(mode, "closed")) {
+            print_state(&probe); // ready for the window to close
+            while (found->title) // which the handle's closed event clears
+                if (wl_display_dispatch(display) < 0)
+                    die("dispatch failed");
+        }
+        capture(&probe, display,
+                shaodesk_window_v1_get_scaled_capture_source(
+                    window, (uint32_t)strtoul(argument, NULL, 10),
+                    (uint32_t)strtoul(argv[4], NULL, 10)),
+                !strcmp(mode, "watch"), !strcmp(mode, "twice"));
     } else {
         die("unknown command");
     }
