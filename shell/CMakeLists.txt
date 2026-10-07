@@ -348,6 +348,11 @@ if(BUILD_TESTING)
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>
             $<TARGET_FILE:pointer_probe> "${GRIM_ARGUMENT}")
         set_tests_properties(thumbnails_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME switcher_pictures_smoke COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/switcher_pictures_smoke.py $<TARGET_FILE:shaodesk>
+            $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>
+            "${GRIM_ARGUMENT}")
+        set_tests_properties(switcher_pictures_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME macos_shell_smoke COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/macos_shell_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>)
