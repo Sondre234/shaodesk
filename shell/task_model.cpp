@@ -111,16 +111,19 @@ QVariant TaskModel::data(const QModelIndex &index, int role) const {
         return pictures_.url(task.id);
     case Pid:
         return state.pid;
+    case WindowId:
+        return state.windowId;
     default:
         return {};
     }
 }
 QHash<int, QByteArray> TaskModel::roleNames() const {
-    return {{TaskId, "taskId"},        {Title, "title"},         {AppId, "appId"},
-            {Active, "active"},        {Minimized, "minimized"}, {Maximized, "maximized"},
-            {Urgent, "urgent"},        {Fullscreen, "fullscreen"}, {Output, "output"},
-            {Workspace, "workspace"},  {Sticky, "sticky"},         {Floating, "floating"},
-            {Tiling, "tiling"},        {Picture, "picture"},     {Pid, "pid"}};
+    return {{TaskId, "taskId"},       {Title, "title"},           {AppId, "appId"},
+            {Active, "active"},       {Minimized, "minimized"},   {Maximized, "maximized"},
+            {Urgent, "urgent"},       {Fullscreen, "fullscreen"}, {Output, "output"},
+            {Workspace, "workspace"}, {Sticky, "sticky"},         {Floating, "floating"},
+            {Tiling, "tiling"},       {Picture, "picture"},       {Pid, "pid"},
+            {WindowId, "windowId"}};
 }
 TaskModel::Task *TaskModel::find(int id) {
     for (auto &task : tasks_)
@@ -304,6 +307,7 @@ void TaskModel::changed(Task *task) {
             compare(&State::floating, Floating);
             compare(&State::tiling, Tiling);
             compare(&State::pid, Pid);
+            compare(&State::windowId, WindowId);
             if (roles.isEmpty())
                 return;
             task->shown = task->state;
@@ -341,7 +345,8 @@ void TaskModel::global(void *data, wl_registry *registry, uint32_t name, const c
     } else if (!std::strcmp(interface, shaodesk_window_control_v1_interface.name) && !self.control_) {
         // Version 2 gives the windows' capture sources, for their pictures, version 3 ones
         // scaled down to the pictures' size and the windows' processes, for the sound they play,
-        // and version 4 peeks at a window.
+        // and version 4 peeks at a window and gives the windows' numbers, for the window
+        // switcher's pictures.
         self.control_ = static_cast<shaodesk_window_control_v1 *>(wl_registry_bind(
             registry, name, &shaodesk_window_control_v1_interface, std::min(version, 4u)));
         for (auto &task : self.tasks_)
@@ -361,7 +366,7 @@ void TaskModel::watch(Task *task) {
         return;
     task->window = shaodesk_window_control_v1_get_window(control_, task->handle);
     static const shaodesk_window_v1_listener listener{windowOutput, windowWorkspace, windowState,
-                                                      windowDone, windowPid};
+                                                      windowDone,   windowPid,       windowId};
     shaodesk_window_v1_add_listener(task->window, &listener, task);
 }
 void TaskModel::globalRemoved(void *, wl_registry *, uint32_t) {}
@@ -428,4 +433,7 @@ void TaskModel::windowDone(void *data, shaodesk_window_v1 *) {
 }
 void TaskModel::windowPid(void *data, shaodesk_window_v1 *, uint32_t pid) {
     static_cast<Task *>(data)->state.pid = pid <= INT_MAX ? static_cast<int>(pid) : 0;
+}
+void TaskModel::windowId(void *data, shaodesk_window_v1 *, uint32_t id) {
+    static_cast<Task *>(data)->state.windowId = id <= INT_MAX ? static_cast<int>(id) : 0;
 }

@@ -26,7 +26,7 @@ void TaskFilter::setSourceModel(QAbstractItemModel *source) {
         sourceConnections_ = {
             connect(source, &QAbstractItemModel::dataChanged, this,
                     [this](const QModelIndex &, const QModelIndex &, const QList<int> &roles) {
-                        if (roles.isEmpty() || roles.contains(roleId("appId")))
+                        if (decides(roles))
                             forget();
                     }),
             connect(source, &QAbstractItemModel::rowsInserted, this, forgetting),
@@ -50,12 +50,13 @@ void TaskFilter::setSourceModel(QAbstractItemModel *source) {
         if (grouped_)
             refilter();
     };
-    // Only the application id decides where a window belongs, so its other changes (a title
-    // changing is the commonest event of all) leave the rows as they are.
+    // Only the application id (and the window's number, which comes after the window) decides
+    // where a window belongs, so its other changes (a title changing is the commonest event of
+    // all) leave the rows as they are.
     sourceConnections_ += {
         connect(source, &QAbstractItemModel::dataChanged, this,
                 [this](const QModelIndex &, const QModelIndex &, const QList<int> &roles) {
-                    if (roles.isEmpty() || roles.contains(roleId("appId")))
+                    if (decides(roles))
                         refilter();
                 }),
         connect(source, &QAbstractItemModel::rowsInserted, this, regroup),
@@ -113,6 +114,17 @@ void TaskFilter::setTaskId(int taskId) {
     refilter();
     Q_EMIT taskIdChanged();
 }
+void TaskFilter::setWindowId(int windowId) {
+    if (windowId_ == windowId)
+        return;
+    windowId_ = windowId;
+    refilter();
+    Q_EMIT windowIdChanged();
+}
+bool TaskFilter::decides(const QList<int> &roles) const {
+    return roles.isEmpty() || roles.contains(roleId("appId")) ||
+           (windowId_ > 0 && roles.contains(roleId("windowId")));
+}
 int TaskFilter::roleId(const char *role) const {
     auto found = roleIds_.constFind(role);
     if (found != roleIds_.cend())
@@ -125,7 +137,9 @@ int TaskFilter::roleId(const char *role) const {
 }
 QVariant TaskFilter::sourceValue(int row, const char *role) const {
     auto *source = sourceModel();
-    return source->data(source->index(row, 0), roleId(role));
+    // A model may not have the role (yet), which a QML ListModel would not check.
+    const int id = roleId(role);
+    return id < 0 ? QVariant() : source->data(source->index(row, 0), id);
 }
 int TaskFilter::value(int row, const char *role) const {
     return sourceValue(mapToSource(index(row, 0)).row(), role).toInt();
@@ -133,6 +147,8 @@ int TaskFilter::value(int row, const char *role) const {
 bool TaskFilter::belongs(int row) const {
     if (taskId_ >= 0)
         return sourceValue(row, "taskId").toInt() == taskId_;
+    if (windowId_ > 0)
+        return sourceValue(row, "windowId").toInt() == windowId_;
     const auto appId = sourceValue(row, "appId").toString();
     if (!windowApp_.isEmpty() && appId != windowApp_)
         return false;

@@ -26,6 +26,7 @@
  *   window_probe TITLE floating 0|1      set_floating or unset_floating
  *   window_probe TITLE minimize          minimizes it through its wlr-foreign-toplevel handle
  *   window_probe TITLE pid               prints the process id the pid event gives (version 3)
+ *   window_probe TITLE id                prints the number the id event gives (version 4)
  *   window_probe TITLE capture [watch]   captures it through get_capture_source (version 2)
  *   window_probe TITLE capture-listed [watch]
  *                                        captures it through ext-foreign-toplevel-list and
@@ -96,7 +97,8 @@ struct probe {
     struct listed *listed;
     bool closed, watch;
     char output[64];
-    uint32_t workspace, state, pid;
+    uint32_t workspace, state, pid, id;
+    int ids; // how many id events came, which should be one
 };
 
 static void die(const char *message) {
@@ -174,6 +176,22 @@ static void window_state(void *data, struct shaodesk_window_v1 *window, uint32_t
 static void window_pid(void *data, struct shaodesk_window_v1 *window, uint32_t pid) {
     ((struct probe *)data)->pid = pid;
 }
+static void window_id(void *data, struct shaodesk_window_v1 *window, uint32_t id) {
+    struct probe *probe = data;
+    if (!id)
+        die("the id event gave 0");
+    probe->id = id;
+    ++probe->ids;
+}
+/* The window's number came once, with its first state, from version 4. */
+static void check_id(const struct probe *probe) {
+    if (shaodesk_window_control_v1_get_version(probe->control) < 4)
+        return;
+    if (!probe->ids)
+        die("no id event came with the window's state");
+    if (probe->ids > 1)
+        die("the id event came more than once");
+}
 static void window_done(void *data, struct shaodesk_window_v1 *window) {
     struct probe *probe = data;
     if (probe->watch)
@@ -184,7 +202,8 @@ static const struct shaodesk_window_v1_listener window_listener = {
     .workspace = window_workspace,
     .state = window_state,
     .done = window_done,
-    .pid = window_pid};
+    .pid = window_pid,
+    .id = window_id};
 
 static void listed_closed(void *data, struct ext_foreign_toplevel_handle_v1 *object) {
     struct listed *listed = data;
@@ -484,7 +503,7 @@ static void peek(struct probe *probe, struct wl_display *display, const char *ti
 int main(int argc, char **argv) {
     if (argc < 2 || argc > 6)
         die("usage: window_probe TITLE [watch | workspace N | output NAME | sticky 0|1 | "
-            "floating 0|1 | minimize | pid | capture [watch] | capture-listed [watch] | "
+            "floating 0|1 | minimize | pid | id | capture [watch] | capture-listed [watch] | "
             "capture-scaled WIDTH HEIGHT [watch | twice | closed] | peek]");
     const char *title = argv[1], *command = argc > 2 ? argv[2] : "", *argument = argc > 3 ? argv[3] : "";
     struct probe probe = {.watch = !strcmp(command, "watch")};
@@ -516,6 +535,7 @@ int main(int argc, char **argv) {
         while (found->title)
             if (wl_display_dispatch(display) < 0)
                 die("dispatch failed");
+        check_id(&probe);
     } else if (!strcmp(command, "workspace") && argument[0]) {
         shaodesk_window_v1_move_to_workspace(window, (uint32_t)strtoul(argument, NULL, 10));
     } else if (!strcmp(command, "output") && argument[0]) {
@@ -536,6 +556,11 @@ int main(int argc, char **argv) {
         if (shaodesk_window_control_v1_get_version(probe.control) < 3)
             die("the compositor's window control gives no process ids");
         printf("%u\n", probe.pid);
+    } else if (!strcmp(command, "id")) {
+        if (shaodesk_window_control_v1_get_version(probe.control) < 4)
+            die("the compositor's window control gives no window numbers");
+        check_id(&probe);
+        printf("%u\n", probe.id);
     } else if (!strcmp(command, "capture")) {
         if (shaodesk_window_control_v1_get_version(probe.control) < 2 || !probe.copy || !probe.shm)
             die("the compositor offers no window capture");

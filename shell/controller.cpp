@@ -734,16 +734,18 @@ void ShellController::subscribe() {
                     showSwitcher();
                 continue;
             } else if (line.startsWith("switcher-window ") && switcherPending_ > 0) {
-                // APP_ID, TITLE, OUTPUT, WORKSPACE, MINIMIZED, URGENT, separated by tabs. The
-                // line is read untrimmed so an empty app id keeps its place.
+                // APP_ID, TITLE, OUTPUT, WORKSPACE, MINIMIZED, URGENT, ID, separated by tabs, of
+                // which an older compositor leaves the last ones out and a newer one may add
+                // more. The line is read untrimmed so an empty app id keeps its place.
                 const auto fields = raw.sliced(16).chopped(1).split('\t');
-                if (fields.size() == 5 || fields.size() == 6)
+                if (fields.size() >= 5)
                     nextSwitcherWindows_.push_back(QVariantMap{{"appId", fields[0]},
                                                                {"title", fields[1]},
                                                                {"output", fields[2]},
                                                                {"workspace", fields[3].toInt()},
                                                                {"minimized", fields[4] == "1"},
-                                                               {"urgent", fields.size() == 6 && fields[5] == "1"}});
+                                                               {"urgent", fields.size() >= 6 && fields[5] == "1"},
+                                                               {"id", fields.size() >= 7 ? fields[6].toInt() : 0}});
                 if (--switcherPending_ == 0)
                     showSwitcher();
                 continue;

@@ -159,6 +159,13 @@ focused (`focus_toplevel_raise`, which a click on its picture does), as the sess
 once), and as the desktop peek starts. `shaodesk msg get window_peek` lists what it does to each
 window, and `tests/window_peek_smoke.py` tests it.
 
+Version 4 also sends the window's `id` once, with its first state: `sh_toplevel.id`, a number
+`publish_toplevel` gives a window the first time it publishes it (counting up from 1 in
+`sh_server.last_window_id`) and gives no other window while the compositor runs. A window keeps
+it when published again, as a swallowed terminal is. The control socket names windows by it
+where the shell has to find them among its handles: the switcher's `switcher-window` lines end
+with it.
+
 ## The shell (`shell/`)
 
 `ShellController` (`controller.cpp`) loads the configuration, keeps the compositor's state from
@@ -235,6 +242,7 @@ what was there.
 | `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |
 | `DrawnWallpaper.qml` | The wallpaper the macOS style draws while none is set, light or dark, from the background colour and the accent. |
 | `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |
+| `SwitcherCards.qml` | The switcher's windows as cards with their pictures, in rows, with `shell.thumbnails` outside the macOS style. |
 
 The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `task_filter.cpp`
 (the taskbar's slots and groups), `audio.cpp` with `pulse_audio.cpp`, `system_status.cpp`
@@ -255,8 +263,8 @@ frame is larger than that (only ever a copy with version 3), and, when `live`, t
 the window redraws, every 33 ms at most (100 ms at the window's size). The last picture stays until
 the window closes, so the card opens with it.
 
-`Panel.qml` alone calls them, for what tells it that it wants a window's picture with
-`wantPicture(taskId, wanted)`: a tile of the card as it appears and as it goes, and the panel
+On the taskbar `Panel.qml` alone calls them, for what tells it that it wants a window's picture
+with `wantPicture(taskId, wanted)`: a tile of the card as it appears and as it goes, and the panel
 itself for the windows of the button the pointer has rested on for half of `shell.thumbnailDelay`
 (`warmGroup`, until the card opens or the pointer leaves), so that the card opens on their
 pictures. It counts the wants and asks the model once a change is over (`syncPictures`), so that a
@@ -264,6 +272,37 @@ window the tiles take over from the panel as the card opens is neither let go no
 again, which would start its capture anew, or without `live` take its one picture twice. A
 stand-in model (the preview's, the tests') has no `watchPicture`, which the panel then does not
 call, and names pictures of its own (`image://preview-windows/ID`, painted by `preview.cpp`).
+
+The window switcher's cards (`SwitcherCards.qml`, which `Switcher.qml` loads in place of its grid
+with `shell.thumbnails` outside the macOS style) show the same pictures. The switcher's lines
+name a window by its app id and title, which two windows may share, and by its number (the window
+control's `id`, `TaskModel`'s `windowId` role); each card finds its task with a `TaskFilter`
+whose `windowId` keeps that window alone, filtering again when the number comes after the window.
+While the switcher is open on the view's output (`open`, `outputName`) a card watches its
+picture itself with `watchPicture`, unless the model is a stand-in without it, and unwatches it
+at `switcher-close`, though the cards stay while the switcher fades. The cards are made as the
+list arrives, 120 ms before `SwitcherView` shows the switcher, so the pictures are asked for
+early: with 20 windows on a headless compositor with pixman at 2560 by 1440 and a scale of 1.25,
+every one had a frame about 75 ms after the switcher opened. They are asked for twice as wide as the pictures' common height,
+`shell.thumbnailSize` × 5/8, times the device pixel ratio, a box that holds any card's picture
+(3:4 to 2:1) without scaling it up. A card is as wide as its picture's proportions, which it notes
+in `aspects` once the picture shows (16:10 until then), and `arrange` lays the cards out in rows
+at the largest scale, from 1 down to 0.6 in steps of 0.05, at which they fit in the room the
+switcher has; past that a `Flickable` scrolls to keep the selected card in sight. As the cards
+may widen once the surface shows, `SwitcherView` keeps the surface as large as its root whatever
+size the compositor last configured, as `PaletteView` does.
+
+Every listed window's picture is live with `shell.liveThumbnails`, as on Windows 11: a window
+that does not redraw costs nothing, as the compositor makes a frame only once it has changed.
+Measured on a headless compositor with pixman at 2560 by 1440, scale 1, with 20 windows on four
+workspaces and the shell drawing in software, while the switcher was open: with none of the
+windows redrawing, neither took any time; each window redrawing as fast as it may (1600 by 900
+pixels) added about 7 % of a core to the compositor, pixman scaling it on the CPU, and 3 % to the
+shell (one: 4 to 12 % and 2 to 6 %; five: 36 to 39 % and 16 to 17 %); without live pictures the
+five cost nothing past the first frames. At a scale of 1.25 Qt's software renderer takes 8 to 10
+ms for each frame of the switcher, against under one at a scale of 1 or 2, so that one window
+redrawing costs the shell 35 to 37 % and five 42 to 55 % (the compositor 29 to 32 % and 43 to
+49 %); drawn through the GPU, the shell and the compositor do that on the GPU.
 
 A drag from an application never reaches the hover handlers: Wayland sends its events
 (`wl_data_device`'s enter, motion and leave) to the surface under the pointer instead, and the

@@ -297,29 +297,29 @@ PreviewData::PreviewData(ShellController &controller)
 
     // The windows, as the tests' stand-in model: a ListModel with the roles TaskModel has. The
     // terminals' are stacked, with pictures of two and none yet of the third, and the first
-    // playing music.
+    // playing music. The compositor's numbers for them (windowId) are the switcher's.
     controller.engine()->addImageProvider("preview-windows", new PreviewWindows);
     QQmlComponent component(controller.engine());
     component.setData(R"(import QtQml.Models
 ListModel {
     ListElement { taskId: 1; title: "Release notes - Mozilla Firefox"; appId: "firefox"; active: true; minimized: false; urgent: false
                   maximized: false; fullscreen: false; output: ""; workspace: 1; sticky: false; floating: false; tiling: true
-                  pid: 1001; picture: "image://preview-windows/1" }
+                  windowId: 41; pid: 1001; picture: "image://preview-windows/1" }
     ListElement { taskId: 2; title: "~/dev/shaodesk"; appId: "foot"; active: false; minimized: false; urgent: false
                   maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: false; tiling: true
-                  pid: 2002; picture: "image://preview-windows/2" }
+                  windowId: 42; pid: 2002; picture: "image://preview-windows/2" }
     ListElement { taskId: 3; title: "htop"; appId: "foot"; active: false; minimized: false; urgent: false
                   maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: true; tiling: true
-                  pid: 2003; picture: "image://preview-windows/3" }
+                  windowId: 43; pid: 2003; picture: "image://preview-windows/3" }
     ListElement { taskId: 6; title: "man shaodesk"; appId: "foot"; active: false; minimized: false; urgent: false
                   maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: false; tiling: true
-                  pid: 2006; picture: "" }
+                  windowId: 46; pid: 2006; picture: "" }
     ListElement { taskId: 4; title: "Downloads - Dolphin"; appId: "org.kde.dolphin"; active: false; minimized: true; urgent: false
                   maximized: true; fullscreen: false; output: ""; workspace: 3; sticky: false; floating: false; tiling: false
-                  pid: 4004; picture: "" }
+                  windowId: 44; pid: 4004; picture: "" }
     ListElement { taskId: 5; title: "Build finished"; appId: "kitty"; active: false; minimized: false; urgent: true
                   maximized: false; fullscreen: false; output: ""; workspace: 1; sticky: true; floating: true; tiling: true
-                  pid: 5005; picture: "" }
+                  windowId: 45; pid: 5005; picture: "" }
 })",
                       QUrl());
     tasks_ = component.create();
@@ -430,22 +430,28 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
     } else if (name == "switcher") {
         file = "Switcher.qml";
         // The taskbar's stand-in windows, most recently focused first, the one before the
-        // focused one selected as Alt+Tab selects it.
-        auto window = [&output](const QString &appId, const QString &title, int workspace,
+        // focused one selected as Alt+Tab selects it, with their pictures where they have them
+        // (shell.thumbnails) and the icons standing in for the others'.
+        auto window = [&output](const QString &appId, const QString &title, int workspace, int id,
                                 bool minimized = false, bool urgent = false) {
-            return QVariantMap{{"appId", appId},         {"title", title},
-                               {"output", output},       {"workspace", workspace},
-                               {"minimized", minimized}, {"urgent", urgent}};
+            return QVariantMap{{"appId", appId},
+                               {"title", title},
+                               {"output", output},
+                               {"workspace", workspace},
+                               {"minimized", minimized},
+                               {"urgent", urgent},
+                               {"id", id}};
         };
-        properties = {
-            {"screenSize", ShellView::previewSize()},
-            {"windows", QVariantList{window("firefox", "Release notes - Mozilla Firefox", 1),
-                                     window("foot", "~/dev/shaodesk", 2),
-                                     window("kitty", "Build finished", 2, false, true),
-                                     window("foot", "htop", 2),
-                                     window("org.kde.dolphin", "Downloads - Dolphin", 1, true)}},
-            {"selected", 1},
-            {"shown", true}};
+        properties = {{"screenSize", ShellView::previewSize()},
+                      {"windows",
+                       QVariantList{window("firefox", "Release notes - Mozilla Firefox", 1, 41),
+                                    window("foot", "~/dev/shaodesk", 2, 42),
+                                    window("kitty", "Build finished", 2, 45, false, true),
+                                    window("foot", "htop", 2, 43),
+                                    window("org.kde.dolphin", "Downloads - Dolphin", 1, 44, true)}},
+                      {"selected", 1},
+                      {"taskSource", QVariant::fromValue(tasks_)},
+                      {"shown", true}};
     } else if (name == "overview") {
         file = "Overview.qml";
         const QRect area = usableArea();

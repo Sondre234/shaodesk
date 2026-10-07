@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """shaodesk-window-control-v1, as the taskbar's window menu uses it: a window named by its
-taskbar handle hears its output, workspace, placement and process, and moves to another workspace
-or output, becomes sticky or floats, without taking the focus from the window that has it."""
+taskbar handle hears its output, workspace, placement, process and number, and moves to another
+workspace or output, becomes sticky or floats, without taking the focus from the window that has
+it. A window's number is its own: it stays as the window moves and changes, and no window that
+comes later gets one already given."""
 from pathlib import Path
 import queue
 import subprocess
@@ -54,6 +56,9 @@ with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) a
     assert control("A", "pid") == str(a.pid), (control("A", "pid"), a.pid)
     assert control("B", "pid") == str(b.pid), (control("B", "pid"), b.pid)
     assert windows()["B"][1], "the newest window has the focus"
+    # Each window's number, never 0 (the probe says so), and B's after A's.
+    ids = {title: int(control(title, "id")) for title in ("A", "B")}
+    assert 0 < ids["A"] < ids["B"], ids
 
     # A window the probe watches hears each change as it ends up, once.
     watch = desktop.spawn([window_probe, "A", "watch"], stdout=subprocess.PIPE, text=True)
@@ -121,10 +126,20 @@ with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) a
     control("B", "sticky", "1")
     assert not windows()["B"][5]
 
+    # Through all that, each window kept its number; the watching probe, which heard every
+    # change, would have failed had a number come twice.
+    assert {title: int(control(title, "id")) for title in ("A", "B")} == ids
+
     # Closing the window ends the watch, its object going inert, and nothing else is heard.
     subprocess.run([probe, "--close", "app-A"], env=desktop.env, check=True, timeout=30,
                    stdout=subprocess.DEVNULL)
     assert desktop.reap(a) == 0 and desktop.reap(watch) == 0
     assert "A" not in windows()
     assert lines.empty(), lines.get()
-print("Windows named by their taskbar handles move, float, stick, and report where they are")
+
+    # A window that comes later gets a number of its own, not the one A had.
+    launch("C")
+    assert int(control("C", "id")) > max(ids.values()), (control("C", "id"), ids)
+    assert int(control("B", "id")) == ids["B"]
+print("Windows named by their taskbar handles move, float, stick, and report where they are "
+      "and their numbers")

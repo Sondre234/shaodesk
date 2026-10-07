@@ -9,7 +9,8 @@ class ShellController;
 // `windowApp`, when set, keeps only the windows with that app id. `grouped` keeps one window per
 // application, the first of them: in a pinned slot the whole slot is one application; elsewhere
 // windows with the same app id are, and those without one stand alone. `taskId`, when 0 or more,
-// keeps only the window with that id, wherever it belongs.
+// keeps only the window with that id, wherever it belongs, and `windowId`, when above 0, only the
+// window the compositor gives that number (the source's windowId role), as the switcher lists it.
 class TaskFilter : public QSortFilterProxyModel {
     Q_OBJECT
     Q_PROPERTY(QObject *controller READ controller WRITE setController NOTIFY controllerChanged)
@@ -17,6 +18,7 @@ class TaskFilter : public QSortFilterProxyModel {
     Q_PROPERTY(QString windowApp READ windowApp WRITE setWindowApp NOTIFY windowAppChanged)
     Q_PROPERTY(bool grouped READ grouped WRITE setGrouped NOTIFY groupedChanged)
     Q_PROPERTY(int taskId READ taskId WRITE setTaskId NOTIFY taskIdChanged)
+    Q_PROPERTY(int windowId READ windowId WRITE setWindowId NOTIFY windowIdChanged)
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     // The focused window among these, or -1, and whether every one of them is minimized.
     Q_PROPERTY(int activeTask READ activeTask NOTIFY summaryChanged)
@@ -38,6 +40,8 @@ class TaskFilter : public QSortFilterProxyModel {
     void setGrouped(bool grouped);
     int taskId() const { return taskId_; }
     void setTaskId(int taskId);
+    int windowId() const { return windowId_; }
+    void setWindowId(int windowId);
     int count() const { return rowCount(); }
     void setSourceModel(QAbstractItemModel *source) override;
     int activeTask() const;
@@ -55,6 +59,7 @@ class TaskFilter : public QSortFilterProxyModel {
     void windowAppChanged();
     void groupedChanged();
     void taskIdChanged();
+    void windowIdChanged();
     void countChanged();
     void summaryChanged();
 
@@ -65,7 +70,7 @@ class TaskFilter : public QSortFilterProxyModel {
     QPointer<ShellController> shell_;
     QString app_, windowApp_;
     bool grouped_ = false;
-    int taskId_ = -1;
+    int taskId_ = -1, windowId_ = 0;
     QList<QMetaObject::Connection> sourceConnections_;
     // Which source rows the filter accepts, worked out for all of them at once the first time
     // the proxy asks after a change (a filter that looks at each row's predecessors is
@@ -74,6 +79,8 @@ class TaskFilter : public QSortFilterProxyModel {
     mutable bool acceptedValid_ = false;
     mutable QHash<QByteArray, int> roleIds_;
     int roleId(const char *role) const;
+    // Whether a change of these roles may change which rows belong.
+    bool decides(const QList<int> &roles) const;
     void computeAccepted() const;
     void forget() { acceptedValid_ = false; }
     void refilter();

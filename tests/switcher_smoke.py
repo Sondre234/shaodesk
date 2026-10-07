@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The window switcher lists every window on every output and workspace, most recently focused
 first, on the focused output; it moves its selection, focuses the chosen window (switching its
-output's workspace), cancels, follows windows closing, and tells subscribers each step. With
-wtype installed, Alt+Tab from a virtual keyboard confirms on releasing Alt."""
+output's workspace), cancels, follows windows closing, and tells subscribers each step, naming
+each window by the number the window control gives it too. With wtype installed, Alt+Tab from a
+virtual keyboard confirms on releasing Alt."""
 from pathlib import Path
 import shutil
 import socket
@@ -12,7 +13,7 @@ import time
 
 import harness
 
-compositor, probe = (str(Path(p).resolve()) for p in sys.argv[1:3])
+compositor, probe, window_probe = (str(Path(p).resolve()) for p in sys.argv[1:4])
 
 CONFIG = """return {
     xwayland = false,
@@ -74,6 +75,11 @@ with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) a
             lines, self.lines = self.lines, []
             return lines
 
+    def number(title):
+        """The window's number, as the window control gives it a taskbar."""
+        return subprocess.run([window_probe, title, "id"], env=desktop.env, check=True,
+                              capture_output=True, text=True, timeout=30).stdout.strip()
+
     def opened(lines):
         """The output, selection, and window titles of the last full switcher announcement."""
         for i in range(len(lines) - 1, -1, -1):
@@ -115,6 +121,12 @@ with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) a
     assert selected == 1, selected
     d = entries[2]
     assert d[2] == "HEADLESS-1" and d[3] == "2" and d[4] == "0", d
+    # Each line ends with the window's number, the one the window control gives it: one of its
+    # own, C's the last given as C came last.
+    assert all(len(e) == 7 for e in entries), entries
+    ids = {e[1]: e[6] for e in entries}
+    assert ids == {title: number(title) for title in titles}, ids
+    assert len(set(ids.values())) == 4 and max(ids.values(), key=int) == ids["C"], ids
     msg("switcher")
     events.expect(lambda l: l == ["switcher-select 2"], "next")
     msg("switcher_prev")
@@ -153,8 +165,9 @@ with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) a
     events.expect(lambda l: l == ["switcher-select 2"], "C selected")
     clients["B"].terminate()
     desktop.reap(clients["B"])
-    _, selected, titles, _ = opened(events.expect(opened, "list without B"))
+    _, selected, titles, entries = opened(events.expect(opened, "list without B"))
     assert titles == ["D", "A", "C"] and selected == 2, (titles, selected)
+    assert [e[6] for e in entries] == [ids[t] for t in titles], (entries, ids)
     clients["C"].terminate()
     desktop.reap(clients["C"])
     _, selected, titles, _ = opened(events.expect(opened, "list without C"))
