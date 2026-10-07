@@ -31,6 +31,9 @@ Button {
     // while the drag is over it, as under the pointer.
     function dragWindows() { return windows ? windows.windows : [] }
     readonly property bool dragOver: panel.dragButton === dockIcon
+    // The keyboard on the dock is at it (the panel's barKeys): a ring around its icon, and its name
+    // on the tag while no list of windows is over it.
+    readonly property bool keySelected: panel.barKeys.button === dockIcon && panel.barKeys.window < 0
     // How far it has come in, from 0 to 1, and how far up it is in a bounce.
     property real grow: 1
     property real lift: 0
@@ -87,8 +90,9 @@ Button {
         panel: dockIcon.panel; owner: dockIcon
         text: dockIcon.name
         delay: 0
-        visible: (dockIcon.hovered || dockIcon.dragOver) && !dockIcon.pressed && text.length > 0 &&
-                 !dockIcon.panel.expanded
+        visible: !dockIcon.pressed && text.length > 0 &&
+                 ((dockIcon.hovered || dockIcon.dragOver) && !dockIcon.panel.expanded ||
+                  dockIcon.keySelected && !dockIcon.panel.groupOpen && !dockIcon.panel.menuOpen)
     }
     background: null
     contentItem: Item {
@@ -108,6 +112,17 @@ Button {
             scale: dockIcon.pressed ? Theme.pressScale : 1
             Behavior on scale { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
             transform: Translate { y: -dockIcon.lift * Theme.dockIconSize * Theme.dockBounceHeight }
+        }
+        // Rounded as an application's icon is, a little outside it.
+        Item {
+            anchors.centerIn: parent
+            width: Theme.dockIconSize; height: width
+            visible: dockIcon.keySelected
+            FocusRing {
+                objectName: "dockFocusRing"
+                spread: Theme.focusRingWidth + 1
+                radius: parent.width * 0.225 + spread
+            }
         }
         // Under a running application, in the middle of the padding below its icon.
         Rectangle {

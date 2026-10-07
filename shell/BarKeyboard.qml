@@ -5,8 +5,8 @@ import Shaodesk
 // The keyboard on the bar, as Windows' Win+T has it: the taskbar_focus action asks the panel on
 // the focused monitor for it (`taskbar OUTPUT`), and the popover takes the keyboard for this item,
 // which walks the bar's buttons with it. The stops are the buttons of windows and of pinned
-// applications; the one with the window that had the keyboard is selected first, else the
-// first. Left and Right, Home and End move between them, and
+// applications on the taskbar, and every icon on the dock; the one with the window that had the
+// keyboard is selected first, else the first. Left and Right, Home and End move between them, and
 // the windows of the one selected show at once, as resting the pointer on it shows them, the card
 // gliding along. Up (Down from a bar along the top) goes into the card of pictures or the list,
 // where Left and Right (Up and Down in the list) move between the windows, a picture selected
@@ -45,7 +45,7 @@ Item {
     // its view only as they come into it, the numbers of its rows.
     function stops() {
         var list = [], i, j
-        var taskbar = panel.taskbar
+        var taskbar = panel.taskbar, dock = panel.dock
         if (taskbar) {
             for (i = 0; i < taskbar.pins.count; ++i) {
                 var slot = taskbar.pins.itemAt(i)
@@ -56,6 +56,16 @@ Item {
             }
             for (i = 0; i < taskbar.tasks.count; ++i)
                 list.push(i)
+        } else if (dock) {
+            var icons = [dock.launcherButton]
+            for (i = 0; i < dock.pins.count; ++i)
+                icons.push(dock.pins.itemAt(i))
+            for (i = 0; i < dock.running.count; ++i)
+                icons.push(dock.running.itemAt(i))
+            icons.push(dock.trash)
+            for (i = 0; i < icons.length; ++i)
+                if (icons[i] && icons[i].visible)
+                    list.push(icons[i])
         }
         return list
     }
@@ -229,13 +239,13 @@ Item {
 
     // What a click does: a window's button brings it up, or minimizes it when it had the
     // keyboard; a stack's brings up the window after that one, or its first. A pinned
-    // application's button is clicked.
+    // application's button, and the dock's icons, are clicked.
     function activate() {
         var item = button
         if (!item)
             return
         var windows = typeof item.dragWindows === "function" ? item.dragWindows() : []
-        if (windows.length === 0) {
+        if (windows.length === 0 || panel.dock) {
             item.clicked()
             return
         }

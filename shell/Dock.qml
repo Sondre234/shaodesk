@@ -135,6 +135,7 @@ Item {
                     windows: TaskFilter { controller: shell; app: pinnedIcon.modelData.appId; sourceModel: dock.panel.taskSource }
                     groupSlot: modelData.appId
                     onClicked: dock.activate(pinnedIcon, modelData.appId)
+                    function keyMenu() { dock.openMenu(pinnedIcon, pinnedIcon.modelData, pinnedIcon.modelData.appId) }
                     MouseArea {
                         anchors.fill: parent
                         acceptedButtons: Qt.RightButton
@@ -167,6 +168,7 @@ Item {
                     }
                     groupWindowApp: appId
                     onClicked: dock.activate(runningIcon, "")
+                    function keyMenu() { dock.openMenu(runningIcon, null, "") }
                     MouseArea {
                         anchors.fill: parent
                         acceptedButtons: Qt.RightButton

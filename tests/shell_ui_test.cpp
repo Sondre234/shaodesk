@@ -5175,6 +5175,54 @@ ListModel {
         if (!QTest::qWaitFor([&] { return icon("dockTrash")->property("iconName") == "user-trash"; }, 10000))
             return fail("the dock's Trash did not empty as the trash did");
 
+        // The keyboard on the dock, as Control-F3 gives macOS's: it starts at the focused window's
+        // application, its windows listed at once, ringed and named on its tag where there is no
+        // list; Up goes into the list from the row nearest the dock, Enter brings a window up.
+        {
+            auto *keys = root->property("barKeys").value<QQuickItem *>();
+            auto ask = [&] { subscriber->write(("taskbar " + output + "\n").toUtf8()); };
+            auto on = [&] { return keys->property("active").toBool(); };
+            auto selected = [&] { return keys->property("button").value<QQuickItem *>(); };
+            auto ringed = [&](QQuickItem *item) {
+                auto *ring = item ? find(item, "dockFocusRing") : nullptr;
+                return ring && ring->isVisible();
+            };
+            auto tagged = [](QQuickItem *item) {
+                for (auto *child : item->children())
+                    if (child->inherits("QQuickToolTip") && child->property("visible").toBool())
+                        return true;
+                return false;
+            };
+            QEvent leaveDock(QEvent::Leave), leavePopover(QEvent::Leave);
+            QCoreApplication::sendEvent(&view, &leaveDock);
+            QCoreApplication::sendEvent(popover, &leavePopover);
+            taskRequests();
+            auto *fake = icon("dockApp:shaodesk-test-app.desktop");
+            ask();
+            if (!QTest::qWaitFor([&] { return on() && popover->keyboard(); }) || selected() != fake ||
+                !ringed(fake) || !QTest::qWaitFor([&] { return inPopover(groupList) && windowItem(groupList, "groupWindow", 33); }))
+                return fail("taskbar_focus did not give the keyboard to the dock at the focused application, its windows listed");
+            QTest::keyClick(popover, Qt::Key_Up);
+            auto *row = windowItem(groupList, "groupWindow", 33);
+            if (keys->property("window").toInt() != 1 || !row || !find(row, "groupWindowFocusRing")->isVisible() ||
+                ringed(fake))
+                return fail("Up did not go into the list of the application's windows on the dock");
+            QTest::keyClick(popover, Qt::Key_Down);
+            QTest::keyClick(popover, Qt::Key_Right);
+            auto *other = icon("dockApp:shaodesk-test-other.desktop");
+            if (selected() != other || !ringed(other) || root->property("groupOpen").toBool() ||
+                !QTest::qWaitFor([&] { return tagged(other); }))
+                return fail("Right did not go on to the next application on the dock, named on its tag");
+            QTest::keyClick(popover, Qt::Key_Left);
+            QTest::keyClick(popover, Qt::Key_Up);
+            QTest::keyClick(popover, Qt::Key_Return);
+            if (!QTest::qWaitFor([&] { return taskRequests() == "activate 33"; }) ||
+                !QTest::qWaitFor([&] { return !on() && !popover->keyboard(); }))
+                return fail("Enter on a window listed on the dock did not bring it up and give the keyboard back");
+            if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+                return fail("the popover stayed once the keyboard left the dock");
+        }
+
         // Back to a taskbar profile: the menu bar goes, and the taskbar is as it was.
         controller.pickProfile("dark");
         if (!QTest::qWaitFor([&] { return !menuBar->isVisible() && find(root, "bar") && !find(root, "dock"); }) ||
