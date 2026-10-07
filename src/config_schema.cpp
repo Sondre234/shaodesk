@@ -296,7 +296,8 @@ const Option options[] = {
 
     {"peek", "table", "", "", none, none,
      "Peek: `peek` (hold a key) and `peek_toggle` make every window nearly transparent to show "
-     "the desktop, with borders and the panel left alone."},
+     "the desktop, with borders and the panel left alone. Resting on a window's picture on the "
+     "taskbar's card fades every other window the same way."},
     {"peek.opacity", "number", "0.12", "0.12", 0, 0.9,
      "Opacity windows fade to while peeking; 0 hides them completely."},
     {"peek.duration", "integer", "150", "150", 0, 2000,
