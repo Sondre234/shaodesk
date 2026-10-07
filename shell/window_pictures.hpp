@@ -17,13 +17,15 @@
 #include <wayland-client.h>
 
 // Small pictures of windows for the taskbar's thumbnails, copied by the compositor through
-// ext-image-copy-capture-v1 from the capture source shaodesk-window-control-v1 (version 2) gives
-// for a window. It runs on its owner's Wayland connection, whose events the owner dispatches.
+// ext-image-copy-capture-v1 from the capture source shaodesk-window-control-v1 gives for a
+// window: from version 3 one the compositor scales down to the picture's size itself, smoothly,
+// and from version 2 one at the window's size. It runs on its owner's Wayland connection, whose
+// events the owner dispatches.
 //
 // While a window is watched it is captured into a shared-memory buffer: once, or again each time
-// it redraws, at most every `interval` milliseconds. Each frame is scaled down on a pool of
-// threads and kept, small, until the window closes; the session and its buffer last only while
-// the window is watched. Windows are named by the owner's numbers for them.
+// it redraws, at most every `interval` milliseconds. Each frame is scaled down if it needs to be,
+// on a pool of threads, and kept, small, until the window closes; the session and its buffer
+// last only while the window is watched. Windows are named by the owner's numbers for them.
 class WindowPictures : public QObject {
     Q_OBJECT
   public:
@@ -39,7 +41,8 @@ class WindowPictures : public QObject {
     // picture. `window` is the window's object, which gives a capture source from version 2 on
     // (with an older one, or none, nothing is captured). The picture is scaled to fit
     // `pixelWidth` by `pixelWidth * 0.625`; with `live` it follows the window until unwatched.
-    // The latest watch's width and liveness apply.
+    // The latest watch's width and liveness apply, a scaled source being asked again for a new
+    // width.
     void watch(int id, shaodesk_window_v1 *window, int pixelWidth, bool live);
     void unwatch(int id);
     // The window closed: its capture ends and its picture goes.
@@ -56,8 +59,11 @@ class WindowPictures : public QObject {
     // The QImage format reading a wl_shm buffer of `format` as it lies in memory, Invalid for one
     // this cannot read.
     static QImage::Format imageFormat(uint32_t format);
-    // The size a frame of `frame` is kept at: scaled down, never up, to fit within `pixelWidth`
-    // by round(`pixelWidth` * 0.625), keeping its aspect ratio.
+    // The box a picture fits in: `pixelWidth` (at least 1) by round(`pixelWidth` * 0.625), the
+    // size asked of a scaled capture source.
+    static QSize pictureBox(int pixelWidth);
+    // The size a frame of `frame` is kept at: scaled down, never up, to fit within pictureBox,
+    // keeping its aspect ratio.
     static QSize pictureSize(const QSize &frame, int pixelWidth);
     // `frame` at pictureSize, sharing no memory with it, and opaque when its format has no alpha
     // (whatever the padding holds).

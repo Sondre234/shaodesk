@@ -308,9 +308,10 @@ void TaskModel::global(void *data, wl_registry *registry, uint32_t name, const c
         self.seat_ =
             static_cast<wl_seat *>(wl_registry_bind(registry, name, &wl_seat_interface, 1));
     } else if (!std::strcmp(interface, shaodesk_window_control_v1_interface.name) && !self.control_) {
-        // Version 2 gives the windows' capture sources, for their pictures.
+        // Version 2 gives the windows' capture sources, for their pictures, and version 3 ones
+        // scaled down to the pictures' size.
         self.control_ = static_cast<shaodesk_window_control_v1 *>(wl_registry_bind(
-            registry, name, &shaodesk_window_control_v1_interface, std::min(version, 2u)));
+            registry, name, &shaodesk_window_control_v1_interface, std::min(version, 3u)));
         for (auto &task : self.tasks_)
             self.watch(task.get());
     } else if (!std::strcmp(interface, "wl_shm") && !self.shm_) {

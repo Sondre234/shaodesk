@@ -43,6 +43,8 @@ struct WindowPictures::Capture {
     bool live = false;
     ext_image_copy_capture_session_v1 *session = nullptr;
     ext_image_copy_capture_frame_v1 *frame = nullptr;
+    // The box a scaled source was asked to fit, empty for one at the window's size.
+    QSize box;
     // Counts the sessions, so that a frame of an earlier one is told apart when it is scaled.
     int sessions = 0;
     // The constraints being sent, and those the last done completed: the size of the buffer and
@@ -95,11 +97,18 @@ void WindowPictures::watch(int id, shaodesk_window_v1 *window, int pixelWidth, b
     ++capture.watchers;
     capture.pixelWidth = std::max(1, pixelWidth);
     capture.live = live;
-    if (!capture.session && shm_ && manager_ && window &&
-        shaodesk_window_v1_get_version(window) >= SHAODESK_WINDOW_V1_GET_CAPTURE_SOURCE_SINCE_VERSION) {
+    // A scaled source makes frames for the box it was asked: a new width wants a new one.
+    const bool resized = capture.session && !capture.box.isEmpty() &&
+                         capture.box != pictureBox(capture.pixelWidth);
+    if (resized)
+        end(capture);
+    const bool starting =
+        !capture.session && shm_ && manager_ && window &&
+        shaodesk_window_v1_get_version(window) >= SHAODESK_WINDOW_V1_GET_CAPTURE_SOURCE_SINCE_VERSION;
+    if (starting)
         start(capture, window);
+    if (resized || starting)
         flush_();
-    }
 }
 void WindowPictures::unwatch(int id) {
     auto *capture = find(id);
@@ -133,8 +142,19 @@ QImage WindowPictures::picture(int id) const {
     QMutexLocker lock(&mutex_);
     return pictures_.value(id);
 }
+// From version 3 the compositor scales the window down to the picture's box itself, on the GPU;
+// before, a frame comes at the window's size.
 void WindowPictures::start(Capture &capture, shaodesk_window_v1 *window) {
-    auto *source = shaodesk_window_v1_get_capture_source(window);
+    ext_image_capture_source_v1 *source;
+    if (shaodesk_window_v1_get_version(window) >=
+        SHAODESK_WINDOW_V1_GET_SCALED_CAPTURE_SOURCE_SINCE_VERSION) {
+        capture.box = pictureBox(capture.pixelWidth);
+        source = shaodesk_window_v1_get_scaled_capture_source(
+            window, uint32_t(capture.box.width()), uint32_t(capture.box.height()));
+    } else {
+        capture.box = {};
+        source = shaodesk_window_v1_get_capture_source(window);
+    }
     capture.session = ext_image_copy_capture_manager_v1_create_session(manager_, source, 0);
     // The session holds on to what the source names.
     ext_image_capture_source_v1_destroy(source);
@@ -258,11 +278,15 @@ QImage::Format WindowPictures::imageFormat(uint32_t format) {
         return QImage::Format_Invalid;
     }
 }
+QSize WindowPictures::pictureBox(int pixelWidth) {
+    const int width = std::max(1, pixelWidth);
+    return {width, std::max(1, int(std::lround(width * 0.625)))};
+}
 QSize WindowPictures::pictureSize(const QSize &frame, int pixelWidth) {
     if (frame.isEmpty())
         return {};
-    const int width = std::max(1, pixelWidth);
-    const int height = std::max(1, int(std::lround(width * 0.625)));
+    const QSize box = pictureBox(pixelWidth);
+    const int width = box.width(), height = box.height();
     if (frame.width() <= width && frame.height() <= height)
         return frame;
     const double scale = std::min(double(width) / frame.width(), double(height) / frame.height());
