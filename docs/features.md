@@ -572,8 +572,8 @@ accent colour, one asking for attention is tinted with a dot on its picture, and
 window's picture is faded and marked with a dash. The pictures follow their windows as they
 redraw (`shell.thumbnails.live`), minimized ones and those on other workspaces and monitors too;
 the shell asks for them as the switcher opens, before it shows, so that they are there by then,
-and until one has come the application's icon stands in. The caption, the keys, the mouse and the
-moment it shows are as with the grid. The macOS style keeps its large icons, as macOS switches
+and until one has come the application's icon stands in, the first fading in over it. The
+caption, the keys, the mouse and the moment it shows are as with the grid. The macOS style keeps its large icons, as macOS switches
 applications.
 
 ## Overview

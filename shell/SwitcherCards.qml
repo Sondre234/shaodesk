@@ -12,9 +12,9 @@ import Shaodesk
 //
 // A card finds its window's task in `taskSource` by the number the switcher gives the window
 // (the task model's windowId role) and, while `watching`, asks the model for its picture with
-// watchPicture, as the taskbar's card of window pictures does; until a picture has come, or
-// without one, the application's icon stands in. A model without watchPicture (a preview's)
-// names pictures of its own.
+// watchPicture; until a picture has come, or without one, the application's icon stands in, and
+// the first fades in over it. A model without watchPicture (a preview's) names pictures of its
+// own.
 Item {
     id: cards
     // The switcher's windows ({appId, title, output, workspace, minimized, urgent, id}), the
@@ -249,7 +249,9 @@ Item {
                     Rectangle {
                         objectName: "switcherCardStandIn"
                         anchors.fill: parent
-                        visible: !picture.pictured
+                        // Fading out under the first picture as it fades in.
+                        opacity: picture.pictured ? 1 - picture.reveal : 1
+                        visible: opacity > 0
                         radius: Theme.radiusSmall
                         color: Theme.alpha(Theme.text, 0.06)
                         Image {
@@ -273,20 +275,41 @@ Item {
                         cache: false
                         retainWhileLoading: true
                         smooth: true; mipmap: true
-                        opacity: card.minimized ? 0.5 : 1
+                        opacity: reveal * (card.minimized ? 0.5 : 1)
                         // Whether it has a picture to show: once one has loaded, until there is
-                        // none.
+                        // none. The first fades in over the icon standing in for it, unless it
+                        // was there as the card was made, as the taskbar's tiles have it; the
+                        // next ones take its place at once.
                         property bool shown: false
+                        property bool made: false
+                        property real reveal: 1
                         onStatusChanged: {
-                            if (status === Image.Ready) shown = true
-                            else if (status !== Image.Loading) shown = false
+                            if (status === Image.Ready && !shown) {
+                                shown = true
+                                if (made && Theme.durationNormal > 0)
+                                    fadeIn.restart()
+                            } else if (status !== Image.Ready && status !== Image.Loading) {
+                                shown = false
+                                fadeIn.stop()
+                                reveal = 1
+                            }
+                        }
+                        NumberAnimation on reveal {
+                            id: fadeIn
+                            running: false
+                            from: 0; to: 1
+                            duration: Theme.durationNormal; easing.type: Theme.easing
                         }
                         readonly property bool pictured: shown || status === Image.Ready
                         visible: pictured
                         // Its proportions set its card's width.
                         onAspectChanged: if (pictured) cards.noteAspect(card.windowId, aspect)
                         onPicturedChanged: if (pictured) cards.noteAspect(card.windowId, aspect)
-                        Component.onCompleted: if (pictured) cards.noteAspect(card.windowId, aspect)
+                        Component.onCompleted: {
+                            made = true
+                            if (pictured)
+                                cards.noteAspect(card.windowId, aspect)
+                        }
                         layer.enabled: Theme.effects
                         layer.effect: MultiEffect {
                             maskEnabled: true

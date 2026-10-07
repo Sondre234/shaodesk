@@ -2446,7 +2446,7 @@ ListModel {
             // dash, as the grid of icons marks them.
             if (named(switcherRoot, "switcherUrgent") != QList<QQuickItem *>{find(row[2], "switcherUrgent")} ||
                 named(switcherRoot, "switcherMinimized") != QList<QQuickItem *>{find(row[3], "switcherMinimized")} ||
-                pictureOf(3)->opacity() != 0.5 || pictureOf(0)->opacity() != 1)
+                !QTest::qWaitFor([&] { return pictureOf(3)->opacity() == 0.5 && pictureOf(0)->opacity() == 1; }))
                 return fail("the switcher's cards do not mark urgent and minimized windows");
             // The selection is the second card, and glides to the next.
             auto *selection = find(switcherRoot, "switcherSelection");
@@ -2461,11 +2461,13 @@ ListModel {
             subscriber->write("switcher-select 2\n");
             if (!QTest::qWaitFor([&] { return marks(2); }))
                 return fail("the switcher's selection did not move to the next card");
-            // A picture that comes later replaces the icon and widens its card, and a window
+            // A picture that comes later fades in over the icon and widens its card, and a window
             // whose task comes later, or learns the window's number later, gets its picture then.
             editTasks(QString("model.setProperty(%1, 'picture', 'image://test-windows/200x100')").arg(rowOf(33)));
-            if (!QTest::qWaitFor([&] { return !standIn(2) && boxOf(2)->width() == 300 && marks(2); }))
-                return fail("a picture that came later did not widen its card");
+            if (!QTest::qWaitFor([&] { return pictureOf(2)->isVisible() && pictureOf(2)->opacity() < 1; }) ||
+                !QTest::qWaitFor([&] { return !standIn(2) && boxOf(2)->width() == 300 && marks(2); }) ||
+                pictureOf(2)->opacity() != 1)
+                return fail("a picture that came later did not fade in and widen its card");
             editTasks("model.append({taskId: 35, title: 'Lost', appId: 'lost', windowId: 0, "
                       "minimized: false, picture: 'image://test-windows/100x100'})");
             if (!pictureRequests().isEmpty() || !standIn(4))
