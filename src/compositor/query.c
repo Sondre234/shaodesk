@@ -438,6 +438,28 @@ static void get_power(struct sh_server *server, int fd, const char *arguments) {
     control_reply(fd, line);
 }
 
+static void get_pictures(struct sh_server *server, int fd, const char *arguments) {
+    // Per capture source a client asked for a window's picture (get_scaled_capture_source),
+    // oldest window first: the box asked for, the frame's size (0x0 before the first), how many
+    // sessions capture it, and the window's title.
+    control_reply(fd, "ok\n");
+    struct sh_toplevel *toplevel;
+    wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
+        struct sh_picture_source sources[16];
+        size_t count = list_picture_sources(toplevel, sources, 16);
+        count = count < 16 ? count : 16;
+        char title[256], line[384];
+        snprintf(title, sizeof(title), "%s", toplevel_title(toplevel) ? toplevel_title(toplevel) : "");
+        one_field(title);
+        for (size_t i = 0; i < count; ++i) {
+            snprintf(line, sizeof(line), "%dx%d\t%dx%d\t%zu\t%s\n", sources[i].box_width,
+                     sources[i].box_height, sources[i].width, sources[i].height,
+                     sources[i].sessions, title);
+            control_reply(fd, line);
+        }
+    }
+}
+
 /* The queries, "get NAME" (or "get NAME ARGUMENTS" for one that takes them), which answer
  * even while the session is locked. A handler gets NULL for no arguments. */
 static const struct {
@@ -468,6 +490,7 @@ static const struct {
     {"layers", get_layers, false},
     {"keyboard", get_keyboard, false},
     {"power", get_power, false},
+    {"pictures", get_pictures, false},
 };
 
 /* Answers `request` if it is a query; false if it is not one. */

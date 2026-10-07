@@ -903,6 +903,14 @@ bool run_query(struct sh_server *server, int fd, const char *request);
 void create_scaled_capture_source(struct wl_client *client, uint32_t id,
                                   struct sh_toplevel *toplevel, uint32_t width,
                                   uint32_t height);
+/* A scaled capture source of a window, as `get pictures` describes it. */
+struct sh_picture_source {
+    int box_width, box_height; // asked for
+    int width, height;         // the frame's, 0 before the first
+    size_t sessions;
+};
+size_t list_picture_sources(struct sh_toplevel *toplevel, struct sh_picture_source *sources,
+                            size_t size);
 
 /* scratchpad.c */
 bool scratchpad_enabled(struct sh_server *server);

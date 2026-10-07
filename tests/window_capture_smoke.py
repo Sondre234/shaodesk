@@ -97,6 +97,9 @@ with harness.Compositor(compositor, CONFIG) as desktop:
                             capture_output=True, text=True, timeout=30)
     assert result.returncode != 0, result
 
+    # Each of those sources went once its client let go of it.
+    desktop.wait_for(lambda: not desktop.rows("pictures"), "no scaled source left")
+
     # Minimized, and on a workspace not shown, it is still there to capture.
     run("A", "minimize")
     desktop.wait_for(lambda: windows()["A"][2], "A minimized")
@@ -160,6 +163,8 @@ with harness.Compositor(compositor, CONFIG) as desktop:
                      daemon=True).start()
     heard(picture(*fitted(width, height, 160, 100)), scaled_lines)
     desktop.stays(scaled_lines.empty, "no frame while the window does not draw", duration=.5)
+    assert desktop.rows("pictures") == [["160x100", "x".join(map(str, fitted(width, height, 160,
+                                                                             100))), "1", "A"]]
     desktop.msg("maximize")
     desktop.wait_for(lambda: windows()["A"][:2] != (width, height), "A maximized")
     heard(picture(*fitted(*windows()["A"][:2], 160, 100)), scaled_lines)

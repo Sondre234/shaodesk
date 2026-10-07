@@ -420,6 +420,27 @@ static struct scaled_source *source_create(struct sh_toplevel *toplevel, int max
     return source;
 }
 
+/* Fills `sources` with the window's scaled capture sources, up to `size` of them, and returns
+ * how many it has. */
+size_t list_picture_sources(struct sh_toplevel *toplevel, struct sh_picture_source *sources,
+                            size_t size) {
+    size_t count = 0;
+    struct wlr_scene_output *scene_output;
+    if (!toplevel->capture_scene)
+        return 0;
+    wl_list_for_each(scene_output, &toplevel->capture_scene->outputs, link) {
+        if (scene_output->output->impl != &output_impl)
+            continue; // the full-size source's
+        struct scaled_source *source = wl_container_of(scene_output->output, source, output);
+        if (count < size)
+            sources[count] = (struct sh_picture_source){
+                source->max_width, source->max_height, (int)source->base.width,
+                (int)source->base.height, source->started};
+        ++count;
+    }
+    return count;
+}
+
 /* Gives the client the capture source `id` for a picture of the window within `width` by
  * `height` buffer pixels: a source of its own, which goes once the client neither holds nor
  * captures it, or with the window's capture scene. It is inert when there is no window (NULL),

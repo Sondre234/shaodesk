@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The taskbar's pictures of windows in a session: resting the pointer on a minimized window's
 button shows a card above it, in the popover, with the window's picture, which the shell copied
-from the compositor through the window control's capture source; leaving takes it away. The
-window is minimized, so its colours on the screen can only be the picture's. Without grim the
-pixels are left out."""
+from the compositor through the window control's capture source, scaled down by the compositor
+to the picture's size; leaving takes it away, and the source with it. The window is minimized,
+so its colours on the screen can only be the picture's. Without grim the pixels are left out."""
 from pathlib import Path
 import subprocess
 import sys
@@ -72,10 +72,16 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
     desktop.wait_for(lambda: (pixels := body_pixels()) is None or pixels > 1500,
                      "the window's picture on the card")
     assert windows()[0][2] == "1", windows()
+    # The compositor scales the 320 x 240 window down to the picture's 240 x 150 box itself, and
+    # the shell follows it in one session while the card is open.
+    desktop.wait_for(lambda: desktop.rows("pictures") ==
+                     [["240x150", "200x150", "1", "shaodesk protocol probe"]],
+                     "the picture's source, scaled to its box")
 
     pointer("move", "900", "300")
     desktop.wait_for(lambda: popover not in layers(), "the card gone once the pointer left")
     assert not body_pixels(), "the picture left on the screen"
+    desktop.wait_for(lambda: not desktop.rows("pictures"), "the picture's source gone with the card")
 
     for message in ("ReferenceError", "TypeError", "is not defined", "Cannot read"):
         assert message not in log(), log()
