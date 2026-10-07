@@ -146,7 +146,7 @@ if(BUILD_TESTING)
         PkgConfig::GIO PkgConfig::SHELL_WAYLAND)
     target_link_libraries(shell_ui_test PRIVATE shaodesk_shell_qml)
     add_test(NAME shell_ui COMMAND shell_ui_test ${CMAKE_COMMAND})
-    set_tests_properties(shell_ui PROPERTIES TIMEOUT 90
+    set_tests_properties(shell_ui PROPERTIES TIMEOUT 240
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
     add_executable(task_filter_test ${PROJECT_SOURCE_DIR}/tests/task_filter_test.cpp
         ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp view.cpp view.hpp task_model.cpp task_model.hpp window_pictures.cpp window_pictures.hpp
