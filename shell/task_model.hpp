@@ -15,9 +15,11 @@
 // (of that output, from 1; 0 until it is known), whether it is `sticky` or `floating`, and whether
 // its workspace is `tiling`. From its version 2, a window watched with watchPicture also has a
 // `picture` (WindowPictures), "" until one has arrived; from version 3 each has the `pid` of the
-// process that made it, 0 until it is known.
+// process that made it, 0 until it is known; and from version 4 the model can peek at one.
 class TaskModel : public QAbstractListModel {
     Q_OBJECT
+    // The window the model peeks at, -1 for none.
+    Q_PROPERTY(int peekedTask READ peekedTask NOTIFY peekedTaskChanged)
   public:
     enum Role {
         TaskId = Qt::UserRole + 1,
@@ -61,6 +63,13 @@ class TaskModel : public QAbstractListModel {
     Q_INVOKABLE void unwatchPicture(int taskId);
     // The window's last picture, for the image provider on any thread; null while it has none.
     QImage picture(int taskId) const;
+    // Through the window control's version 4: the other windows fade while this one shows alone
+    // where it is, minimized or on a workspace not shown too, until endPeek or until another is
+    // peeked at; nothing about it changes. endPeek ends the peek only at the window peeked at.
+    // The compositor also ends it by itself, as the window is focused or the session locks.
+    Q_INVOKABLE void peek(int taskId);
+    Q_INVOKABLE void endPeek(int taskId);
+    int peekedTask() const { return peeked_; }
     // The windows the compositor says are asking for attention, as {appId, title} pairs: the
     // foreign-toplevel protocol has no such state, so a task is urgent when a pair matches its
     // app id and title (each pair marks one task, the first not marked already).
@@ -69,6 +78,7 @@ class TaskModel : public QAbstractListModel {
     Q_INVOKABLE void move(int from, int to, int count = 1);
   Q_SIGNALS:
     void disconnected();
+    void peekedTaskChanged();
 
   private:
     // What a window is, as the compositor last said.
@@ -99,6 +109,8 @@ class TaskModel : public QAbstractListModel {
     std::unique_ptr<QSocketNotifier> read_, write_;
     QList<QPair<QString, QString>> urgent_;
     int nextId_ = 1;
+    int peeked_ = -1;
+    void setPeeked(int taskId);
     WindowPictures pictures_{[this] { flush(); }};
     Task *find(int id);
     void flush();

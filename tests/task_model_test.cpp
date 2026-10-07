@@ -108,6 +108,22 @@ int main(int argc, char **argv) {
         wait([&] { return value(TaskModel::Minimized).toBool(); }, "show desktop failed");
         model.activate(id);
         wait([&] { return value(TaskModel::Active).toBool(); }, "second activation failed");
+        // The model peeks at one window at a time, and says which; ending a peek at another
+        // window, or at none, leaves it. What the compositor shows is window_peek_smoke's.
+        int peekSignals = 0;
+        QObject::connect(&model, &TaskModel::peekedTaskChanged, &model, [&] { ++peekSignals; });
+        model.peek(id + 100); // no such window
+        model.endPeek(id);
+        if (model.peekedTask() != -1 || peekSignals != 0)
+            throw std::runtime_error("the model peeks at a window that is not there");
+        model.peek(id);
+        model.peek(id);
+        model.endPeek(id + 100);
+        if (model.peekedTask() != id || peekSignals != 1)
+            throw std::runtime_error("the model does not say which window it peeks at");
+        model.endPeek(id);
+        if (model.peekedTask() != -1 || peekSignals != 2)
+            throw std::runtime_error("ending the peek did not say so");
         // The compositor names urgent windows by app id and title; a match marks the task, and
         // only that announces a change of the role.
         int urgentSignals = 0;
