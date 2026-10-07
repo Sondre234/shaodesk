@@ -705,6 +705,9 @@ void ShellController::subscribe() {
             } else if (line.startsWith("power-menu ")) {
                 Q_EMIT powerMenuRequested(line.sliced(11));
                 continue;
+            } else if (line.startsWith("taskbar ")) {
+                Q_EMIT taskbarRequested(line.sliced(8));
+                continue;
             } else if (line.startsWith("power-error ")) {
                 report(line.sliced(12));
                 continue;

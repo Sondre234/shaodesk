@@ -327,6 +327,9 @@ class ShellController : public QObject {
     void notificationsRequested(const QString &output);
     // The compositor asked for the power menu on `output`.
     void powerMenuRequested(const QString &output);
+    // The compositor asked the taskbar (or the dock) on `output` to take the keyboard, or to give
+    // it back (the taskbar_focus action).
+    void taskbarRequested(const QString &output);
 
   private:
     struct App {

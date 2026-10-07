@@ -23,6 +23,8 @@ PopupMenu {
     side: panel.dockSide
     alignment: panel.macos ? Qt.AlignHCenter : Qt.AlignLeft
     bounds: panel.popupArea
+    // Opened by the keyboard on the bar (the Menu key), its first entry is highlighted.
+    initialIndex: panel.barKeys.menuOpened ? 0 : -1
     // Closing only this menu: an entry may have opened the launcher.
     onDismissed: { panel.taskMenuId = -1; panel.pinMenuApp = null; panel.barMenuOpen = false }
 

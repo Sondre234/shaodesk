@@ -38,6 +38,10 @@ Button {
         return group && group.count > 0 ? group.windows : [{ taskId: taskId, active: active, minimized: minimized }]
     }
     readonly property bool dragOver: panel.dragButton === task
+    // The keyboard on the bar is at it (the panel's barKeys), which rings it; the Menu key there
+    // opens its menu.
+    readonly property bool keySelected: panel.barKeys.button === task && panel.barKeys.window < 0
+    function keyMenu() { panel.openContextMenu(task, 0, taskId, appId) }
     height: Theme.barButtonHeight
     // Hovering a stacked button lists its windows, whatever the platform thinks of hover.
     hoverEnabled: true
@@ -56,8 +60,8 @@ Button {
     // the bar instead.
     BarTip {
         panel: task.panel; owner: task
-        visible: shell.iconsOnly && !task.stacked && !task.panel.thumbnails && task.hovered && !task.panel.expanded &&
-                 !task.pressed
+        visible: shell.iconsOnly && !task.stacked && !task.panel.thumbnails && !task.pressed &&
+                 (task.hovered && !task.panel.expanded || task.keySelected && !task.panel.groupOpen && !task.panel.menuOpen)
         text: task.title
     }
     // How far the activity line has come in, from 0 to 1, drawn out from its middle as the
@@ -91,6 +95,12 @@ Button {
             z: -1; x: 3; y: 2; width: parent.width; height: parent.height - 4; radius: Theme.radiusSmall
             color: "transparent"; border.width: 1
             border.color: task.shownActive ? Theme.alpha(Theme.text, 0.3) : Theme.border
+        }
+        // On its edge, which the task list clips at, under the activity line.
+        FocusRing {
+            objectName: "taskFocusRing"
+            visible: task.keySelected
+            radius: parent.radius
         }
         // The activity line along the bottom: long under the focused window's button, short
         // under the others, split in two for a stack; in the accent colour, the urgent one, or

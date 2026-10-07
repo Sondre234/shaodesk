@@ -29,6 +29,8 @@ PopupCard {
         onHoveredChanged: groupList.panel.hoverGroupList(hovered)
     }
     readonly property bool hovered: groupHover.hovered
+    // The row of the window at `index`, for the keyboard on the bar (the panel's barKeys).
+    function windowAt(index) { return windowRows.itemAt(index) }
     TaskFilter {
         id: groupWindows
         controller: shell; sourceModel: panel.taskSource
@@ -40,9 +42,11 @@ PopupCard {
         id: rows
         anchors.fill: parent; anchors.margins: groupList.padding; spacing: Theme.spacingXS
         Repeater {
+            id: windowRows
             model: groupList.visible ? groupWindows : null
             delegate: Button {
                 id: groupWindow
+                required property int index
                 required property int taskId
                 required property string title
                 required property string appId
@@ -54,11 +58,21 @@ PopupCard {
                 Accessible.name: title
                 // Closing the list destroys this row, so it goes last.
                 onClicked: { shell.tasks.activate(taskId); panel.groupOpen = false }
+                // The keyboard on the bar is at it, which rings it and shows its cross for Delete;
+                // the Menu key there opens its window's menu.
+                readonly property bool keySelected: groupList.panel.barKeys.active &&
+                                                    groupList.panel.barKeys.window === index
+                function keyMenu() { groupList.panel.openContextMenu(groupWindow, 0, taskId, appId) }
                 background: ButtonFill {
                     // Lit under a drag too, which brings its window forward (the panel's dragDelay).
                     hovered: groupWindow.hovered || groupList.panel.dragTile === groupWindow
                     pressed: groupWindow.pressed
                     active: groupWindow.active
+                    FocusRing {
+                        objectName: "groupWindowFocusRing"
+                        visible: groupWindow.keySelected
+                        radius: parent.radius
+                    }
                     Rectangle {
                         objectName: "groupWindowLine"
                         visible: groupWindow.active || groupWindow.urgent
@@ -83,7 +97,7 @@ PopupCard {
                     }
                     CloseButton {
                         objectName: "groupWindowClose"
-                        visible: groupWindow.hovered || hovered
+                        visible: groupWindow.hovered || hovered || groupWindow.keySelected
                         danger: true
                         Layout.preferredWidth: size; Layout.preferredHeight: size
                         Accessible.name: "Close " + groupWindow.title

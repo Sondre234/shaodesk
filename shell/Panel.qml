@@ -161,10 +161,27 @@ Item {
     // What shows the windows: the card of pictures or the list, and whether the pointer is on it.
     readonly property Item groupPopup: thumbnailsOpen ? thumbnailsLoader.item : groupListLoader.item
     readonly property bool groupListHovered: groupPopup ? groupPopup.hovered : false
-    // Something is open in the popover. The list shown on hover does not take the keyboard: it
-    // opens under a window being typed in.
-    readonly property bool expanded: menuOpen || groupOpen
-    onMenuOpenChanged: if (menuOpen) { stopWaiting(); groupOpen = false }
+    // Something is open in the popover, or the bar has the keyboard there. The list shown on
+    // hover does not take the keyboard: it opens under a window being typed in.
+    readonly property bool expanded: menuOpen || groupOpen || barKeys.active
+    onMenuOpenChanged: {
+        if (menuOpen) {
+            stopWaiting()
+            groupOpen = false
+            // One opened otherwise than from the keyboard on the bar takes the keyboard over.
+            if (!barKeys.menuOpened)
+                barKeys.leave()
+        } else {
+            barKeys.resume()
+        }
+    }
+    // The keyboard on the bar (BarKeyboard.qml, the taskbar_focus action), which holds it in the
+    // popover and walks the bar's buttons and the windows they show.
+    readonly property Item barKeys: barKeyboard
+    function toggleBarKeyboard() { barKeyboard.toggle() }
+    // What the keyboard on the bar shows closing by itself (its last window gone, a menu opening
+    // in its place) leaves the keyboard on its button.
+    onGroupOpenChanged: if (!groupOpen && barKeys.active && !barKeys.menuOpened) barKeys.window = -1
     // The bars the style has: the taskbar (Taskbar.qml), or in the macOS style the dock
     // (Dock.qml) in the panel's surface and the menu bar (TopMenuBar.qml) in a surface of its own
     // along the output's top edge.
@@ -239,7 +256,10 @@ Item {
         if (launcherOpen) { taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; trayMenuKey = ""; menuBarMenu = "" }
         else powerOpen = false
     }
-    function closeMenus() { launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false; trayMenuKey = ""; menuBarMenu = "" }
+    function closeMenus() {
+        launcherOpen = false; taskMenuId = -1; pinMenuApp = null; barMenuOpen = false; audioPopup = ""; groupOpen = false; trayMenuKey = ""; menuBarMenu = ""
+        barKeys.leave()
+    }
     // A change of style lays the panel out anew: what was open belonged to bars that are gone.
     onMacosChanged: closeMenus()
     // A stacked button hovered for a moment, or at once while another's list is open, shows its
@@ -248,6 +268,9 @@ Item {
     // back.
     function showsWindows(button) { return button.stacked || thumbnails }
     function hoverGroup(button, hovered) {
+        // The keyboard on the bar holds what it shows until the pointer moves (pointerTakesOver).
+        if (barKeys.active)
+            return
         if (hovered && showsWindows(button) && !menuOpen && !button.pressed) {
             groupPending = button
             groupHide.stop()
@@ -298,11 +321,32 @@ Item {
     Timer { id: groupShow; interval: root.thumbnails ? shell.thumbnailDelay : 350; onTriggered: root.showGroup() }
     Timer {
         id: groupHide; interval: 300
-        onTriggered: if (!root.groupListHovered && !(root.groupPending && root.groupPending.hovered) && !root.dragHolds) root.groupOpen = false
+        onTriggered: if (!root.groupListHovered && !(root.groupPending && root.groupPending.hovered) && !root.dragHolds &&
+                         !root.barKeys.active) root.groupOpen = false
     }
     // The pointer entering the list (or the card) keeps it, and leaving it hides it a moment later.
     function hoverGroupList(hovered) {
+        if (barKeys.active)
+            return
         if (hovered) groupHide.stop(); else groupHide.restart()
+    }
+    // The pointer took the bar back from the keyboard (barKeys), on `button` or on none of the
+    // bar's stops: what it is on goes on as on hover. The card stays while it is on it, glides to
+    // a button with windows it is on, and closes otherwise.
+    function pointerTakesOver(button) {
+        stopWaiting()
+        if (groupListHovered)
+            return
+        var shows = button && typeof button.dragWindows === "function" && button.dragWindows().length > 0 &&
+                    showsWindows(button)
+        if (shows && groupOpen) {
+            groupPending = button
+            openGroup(button)
+            return
+        }
+        groupOpen = false
+        if (shows)
+            hoverGroup(button, true)
     }
     // A drag from an application (a file, text, a link) resting on a button with windows brings
     // them forward, as on Windows: after dragDelay a single window is activated (raised, restored,
@@ -807,14 +851,14 @@ Item {
     }
 
     // The popups' surface, over the whole output (PopoverWindow in view.hpp). While a menu is
-    // open it takes the keyboard and every press but those on the bar, and a press beside the
-    // popups closes them; the list shown on hover takes only the pointer over it and up to the
-    // bar. It stays up while what closed fades out.
+    // open, or the bar has the keyboard, it takes the keyboard and every press but those on the
+    // bar, and a press beside the popups closes them; the list shown on hover takes only the
+    // pointer over it and up to the bar. It stays up while what closed fades out.
     PopoverWindow {
         id: popover
         panel: root.shellView
-        keyboard: root.menuOpen
-        inputRects: root.menuOpen
+        keyboard: root.menuOpen || root.barKeys.active
+        inputRects: root.menuOpen || root.barKeys.active
             ? root.popoverInput
             : root.groupOpen && root.groupPopup ? [root.hoverArea(root.groupPopup)] : []
         onDismissed: root.closeMenus()
@@ -846,6 +890,20 @@ Item {
                     root.dragOverPopover(Qt.point(drag.x, drag.y))
                 }
                 onExited: root.dragOverPopover(null)
+            }
+            // The keyboard on the bar is held here (barKeys).
+            BarKeyboard { id: barKeyboard; panel: root }
+            // The pointer moving over the card, or between it and the bar, hands the bar back to
+            // it from the keyboard; elsewhere over the popover it does not.
+            HoverHandler {
+                enabled: root.barKeys.active
+                onPointChanged: {
+                    var at = point.scenePosition
+                    var area = root.groupOpen && root.groupPopup ? root.hoverArea(root.groupPopup) : null
+                    if (hovered && area && at.x >= area.x && at.x < area.x + area.width && at.y >= area.y &&
+                        at.y < area.y + area.height)
+                        root.barKeys.pointerAt(at.x, at.y)
+                }
             }
 
             // Left-clicking the volume control: the default output's volume, then each application's.
@@ -984,6 +1042,21 @@ Item {
                 onLoaded: used = true
                 sourceComponent: Component { MenuBarMenu { panel: root; barItem: root.statusBar } }
             }
+            // A press anywhere hands the bar back to the pointer from the keyboard, and goes on to
+            // what is under it: a picture is clicked, and beside the card it only closes it.
+            MouseArea {
+                anchors.fill: parent
+                z: 1
+                // Hidden, not only disabled, while the bar does not have the keyboard: a disabled
+                // one still bears on where Qt delivers a press (one beyond the popover's edge, where
+                // Launchpad's next page lies, missed it).
+                visible: root.barKeys.active && !root.menuOpen
+                acceptedButtons: Qt.AllButtons
+                onPressed: (mouse) => {
+                    root.barKeys.handOver()
+                    mouse.accepted = false
+                }
+            }
         }
     }
 
@@ -999,6 +1072,22 @@ Item {
         anchors.fill: parent
         active: root.macos
         sourceComponent: Component { Dock { panel: root } }
+    }
+    // The pointer moving over the bar hands it back from the keyboard (barKeys), as a press on it
+    // does, which goes on to what is under it.
+    HoverHandler {
+        enabled: root.barKeys.active
+        onPointChanged: if (hovered) root.barKeys.pointerAt(point.scenePosition.x, root.surfaceTop + point.scenePosition.y)
+    }
+    MouseArea {
+        anchors.fill: parent
+        z: 1
+        visible: root.barKeys.active
+        acceptedButtons: Qt.AllButtons
+        onPressed: (mouse) => {
+            root.barKeys.handOver()
+            mouse.accepted = false
+        }
     }
     // The panel's surface takes the pointer only over the dock (ShellView's inputRects): the
     // desktop beside it, and the room above it for an icon to bounce in, stay reachable.
