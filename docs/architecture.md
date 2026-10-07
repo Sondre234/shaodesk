@@ -187,14 +187,21 @@ The pictures of the windows on the taskbar's card (`WindowThumbnails.qml`, with
 once a window has one, `""` until then, the serial new with every picture so that an `Image`
 with `cache: false` loads it again, and the `windows` image provider serves them by task id. The
 model takes pictures of a window only while something watches it: `watchPicture(taskId,
-pixelWidth, live)`, counted, which a tile calls as it appears and `unwatchPicture(taskId)` as it
-goes. It asks the window control for the window's capture source (`get_capture_source`, version
-2), captures it with ext-image-copy-capture into shared memory, scales the picture down off the
-GUI thread to fit `pixelWidth` by 5/8 of it, and, when `live`, takes the next as the window
-redraws, every 100 ms at most. The last picture stays until the window closes, so the card opens
-with it. A stand-in model (the preview's, the tests') has no `watchPicture`, which the card then
-does not call, and names pictures of its own (`image://preview-windows/ID`, painted by
-`preview.cpp`).
+pixelWidth, live)`, counted, until `unwatchPicture(taskId)`. It asks the window control for the
+window's capture source (`get_capture_source`, version 2), captures it with ext-image-copy-capture
+into shared memory, scales the picture down off the GUI thread to fit `pixelWidth` by 5/8 of it,
+and, when `live`, takes the next as the window redraws, every 100 ms at most. The last picture
+stays until the window closes, so the card opens with it.
+
+`Panel.qml` alone calls them, for what tells it that it wants a window's picture with
+`wantPicture(taskId, wanted)`: a tile of the card as it appears and as it goes, and the panel
+itself for the windows of the button the pointer has rested on for half of `shell.thumbnailDelay`
+(`warmGroup`, until the card opens or the pointer leaves), so that the card opens on their
+pictures. It counts the wants and asks the model once a change is over (`syncPictures`), so that a
+window the tiles take over from the panel as the card opens is neither let go nor asked for
+again, which would start its capture anew, or without `live` take its one picture twice. A
+stand-in model (the preview's, the tests') has no `watchPicture`, which the panel then does not
+call, and names pictures of its own (`image://preview-windows/ID`, painted by `preview.cpp`).
 
 The start menu (`Launcher.qml` and its `Start*.qml` parts) reads `shell.startMenu`, a `StartMenu`
 (`start_menu.cpp`): its own pins, seeded from the taskbar's; the applications launched lately

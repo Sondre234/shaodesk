@@ -8,14 +8,14 @@ import Shaodesk
 // The windows of the taskbar button the pointer rests on, with shell.thumbnails: a tile for each,
 // side by side in the order the stack's list has them, with the application's icon, the window's
 // title and, while the pointer is on the tile, a cross that closes the window, over a small
-// picture of it. The picture is the task model's (its `picture` role, while the tile has asked
-// for it with watchPicture) and follows the window while shown with shell.liveThumbnails; until
-// one has come, or without one, the application's icon stands in for it. The focused window's
-// tile is marked as the bar marks it: selected, with a line in the accent colour (the urgent one
-// for a window asking for attention) under it. Clicking a tile focuses its window (or minimizes
-// it when focused already), the cross or a middle click closes it, and a right click opens its
-// menu. How wide the pictures are, and whether there is room for them at all rather than the
-// list, is the panel's (thumbnailWidth).
+// picture of it. The picture is the task model's (its `picture` role, while the tile wants it
+// through the panel's wantPicture) and follows the window while shown with
+// shell.liveThumbnails; until one has come, or without one, the application's icon stands in for
+// it. The focused window's tile is marked as the bar marks it: selected, with a line in the
+// accent colour (the urgent one for a window asking for attention) under it. Clicking a tile
+// focuses its window (or minimizes it when focused already), the cross or a middle click closes
+// it, and a right click opens its menu. How wide the pictures are, and whether there is room for
+// them at all rather than the list, is the panel's (thumbnailWidth).
 PopupCard {
     id: thumbnails
     required property var panel
@@ -75,21 +75,17 @@ PopupCard {
                 Accessible.name: title
                 // Closing the card destroys this tile, so it goes last.
                 onClicked: { thumbnails.panel.taskSource.activate(taskId); thumbnails.panel.groupOpen = false }
-                // The tile asks the model for its window's picture while it is there: the model
-                // it asked, should the panel's change in between.
-                property var pictures: null
+                // The tile wants its window's picture while it is there (the panel's
+                // wantPicture), taking over from the panel's own want as the card opens: the
+                // window it wanted, of the panel it asked.
+                property Item owner: null
                 property int watched: -1
                 Component.onCompleted: {
-                    pictures = thumbnails.panel.taskSource
+                    owner = thumbnails.panel
                     watched = taskId
-                    if (typeof pictures.watchPicture === "function")
-                        pictures.watchPicture(watched, Math.round(shell.thumbnailSize * Screen.devicePixelRatio),
-                                              shell.liveThumbnails)
+                    owner.wantPicture(watched, true)
                 }
-                Component.onDestruction: {
-                    if (pictures && typeof pictures.unwatchPicture === "function")
-                        pictures.unwatchPicture(watched)
-                }
+                Component.onDestruction: if (owner) owner.wantPicture(watched, false)
                 readonly property bool marked: active || urgent
                 background: ButtonFill {
                     hovered: tile.hovered

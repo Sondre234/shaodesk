@@ -1,10 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The taskbar's pictures of windows in a session: resting the pointer on a minimized window's
 button shows a card above it, in the popover, with the window's picture, which the shell copied
-from the compositor through the window control's capture source; leaving takes it away. The
-window is minimized, so its colours on the screen can only be the picture's. Without grim the
+from the compositor through the window control's capture source; leaving takes it away. The copy
+starts halfway into the delay and is in before the card opens, so that the card opens on the
+picture: the shell's Wayland requests and events, which WAYLAND_DEBUG prints, say in which order.
+The window is minimized, so its colours on the screen can only be the picture's. Without grim the
 pixels are left out."""
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -19,7 +22,7 @@ CONFIG = """return {
     layout = { tiling = false },
     outputs = { monitors = { ["HEADLESS-1"] = { mode = "1280x720" } } },
     notifications = { enabled = false },
-    shell = { panel_height = 52, thumbnails = { delay = 100 } },
+    shell = { panel_height = 52, thumbnails = { delay = 800 } },
 }"""
 WIDTH, HEIGHT, BAR = 1280, 720, 52
 BODY = (0x41, 0x7b, 0xc4)  # the probe's window below its top band
@@ -32,10 +35,15 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
                QT_FORCE_STDERR_LOGGING="1", XDG_DATA_HOME=str(root), XDG_DATA_DIRS=str(root),
                XDG_STATE_HOME=str(root), DBUS_SESSION_BUS_ADDRESS="disabled:")
     desktop.start()
-    shell_log = root / "shell.log"
+    # Not one of the logs printed should the test fail, which would be mostly the protocol's.
+    shell_log = root / "shell-protocol.log"
 
     def log():
-        return shell_log.read_text()
+        return shell_log.read_text(errors="replace")
+
+    def messages():
+        """What the shell printed but the protocol."""
+        return "\n".join(line for line in log().splitlines() if not line.startswith("["))
 
     def layers():
         return {(row[0], row[1]): row[2:4] for row in desktop.rows("layers")}
@@ -52,8 +60,10 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
         return sum(1 for y in range(top, bottom, 2) for x in range(left, right, 2)
                    if all(abs(a - b) <= 2 for a, b in zip(shot.at(x, y), BODY)))
 
-    desktop.detail = lambda: f"layers: {layers()}, windows: {windows()}\n{log()[-1500:]}"
-    desktop.spawn([shell, "--config", str(desktop.config)], log="shell.log")
+    desktop.detail = lambda: f"layers: {layers()}, windows: {windows()}\n{messages()[-1500:]}"
+    with shell_log.open("w") as output:
+        desktop.spawn([shell, "--config", str(desktop.config)], env={"WAYLAND_DEBUG": "client"},
+                      stdout=output, stderr=subprocess.STDOUT)
     desktop.wait_for(lambda: "shaodesk surface rendered: shaodesk taskbar" in log(), "the panel")
     desktop.spawn([probe, "--window-only"])
     desktop.wait_for(lambda: len(windows()) == 1 and windows()[0][2] == "0", "the window")
@@ -68,6 +78,14 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
     pointer = desktop.virtual_pointer(pointer_probe, WIDTH, HEIGHT)
     pointer("move", "85", str(HEIGHT - BAR // 2))
     desktop.wait_for(lambda: layers().get(popover) == ["3", "1"], "the card in the popover")
+    # The shell asked for the window's capture source and had a frame of it before it made the
+    # popover's surface for the card.
+    protocol = log()
+    asked = protocol.find(".get_capture_source(")
+    copied = re.search(r"ext_image_copy_capture_frame_v1#\d+\.ready\(", protocol)
+    card = re.search(r"get_layer_surface\(.*\"shaodesk-popover\"", protocol)
+    assert card and 0 <= asked < card.start(), "the window's picture not asked for ahead of its card"
+    assert copied and copied.start() < card.start(), "the window's picture not in ahead of its card"
     # Every other pixel of the 133 x 64 body, at least, in a picture shown at its own size.
     desktop.wait_for(lambda: (pixels := body_pixels()) is None or pixels > 1500,
                      "the window's picture on the card")
@@ -78,6 +96,6 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
     assert not body_pixels(), "the picture left on the screen"
 
     for message in ("ReferenceError", "TypeError", "is not defined", "Cannot read"):
-        assert message not in log(), log()
+        assert message not in messages(), messages()
 print("taskbar thumbnails: a minimized window's picture on the card above its button"
       + ("" if grim else " (no grim: no pixels)"))
