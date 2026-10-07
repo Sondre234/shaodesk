@@ -15,7 +15,8 @@ import Shaodesk
 // for a window asking for attention) under it. Clicking a tile focuses its window (or minimizes
 // it when focused already), the cross or a middle click closes it, and a right click opens its
 // menu. How wide the pictures are, and whether there is room for them at all rather than the
-// list, is the panel's (thumbnailWidth).
+// list, is the panel's (thumbnailWidth). While a window's process plays sound, a speaker before
+// the cross says so and mutes it, crossed out while muted (WindowSound).
 PopupCard {
     id: thumbnails
     required property var panel
@@ -116,10 +117,41 @@ PopupCard {
                             sourceSize: Qt.size(Theme.iconSizeSmall, Theme.iconSizeSmall)
                         }
                         Text {
+                            objectName: "windowThumbnailTitle"
                             Layout.fillWidth: true
                             text: tile.title; textFormat: Text.PlainText; elide: Text.ElideRight
                             color: tile.urgent ? Theme.urgent : tile.minimized ? Theme.textMuted : Theme.text
                             font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+                        }
+                        // The sound the window's process plays, as a browser's tab shows it: a
+                        // speaker that mutes it, crossed out while muted, to unmute it. It fades
+                        // in taking its room from the title's end, the title starting where it did
+                        // and the cross keeping its place, and gives the room back once faded out.
+                        // A click on it is its own, not the tile's.
+                        MuteButton {
+                            id: speaker
+                            objectName: "windowThumbnailSound"
+                            WindowSound {
+                                id: sound
+                                audio: thumbnails.panel.audioSource
+                                windows: thumbnails.panel.taskSource
+                                // A stand-in model may not say.
+                                pid: tile.model.pid || 0
+                            }
+                            readonly property bool shown: sound.playing || sound.muted
+                            size: closeButton.size; iconSize: Theme.iconSizeSmall
+                            radius: size / 2
+                            padding: 0
+                            focusPolicy: Qt.NoFocus
+                            // Its waves are the loudest stream's, one at the least while it plays.
+                            level: Math.max(1, sound.volume)
+                            muted: sound.muted
+                            opacity: shown ? 1 : 0
+                            Behavior on opacity { NumberAnimation { duration: Theme.durationNormal; easing.type: Theme.easing } }
+                            visible: opacity > 0
+                            enabled: shown
+                            Accessible.name: (sound.muted ? "Unmute " : "Mute ") + tile.title
+                            onClicked: sound.toggleMute()
                         }
                         // Always in its place, so that the title does not move as it shows.
                         CloseButton {

@@ -18,6 +18,10 @@
     it, minimize it, make it fullscreen) or an ext-foreign-toplevel-list client cannot already
     see of it (capture it through ext-foreign-toplevel-image-capture-source-v1), and the
     compositor offers it as it offers zwlr_foreign_toplevel_manager_v1.
+
+    From version 3 it also says which process made each window, for the taskbar to find the
+    sound a window plays among the sound server's streams. A client outside a sandbox can list
+    the user's processes already; what this adds is which window is whose.
   </description>
 
   <interface name="shaodesk_window_control_v1" version="3">
@@ -35,8 +39,8 @@
     <request name="get_window">
       <description summary="the window a taskbar handle stands for">
         Creates a shaodesk_window_v1 for the window `handle` stands for, which sends the
-        window's state at once (output, workspace, state, then done) and again whenever it
-        changes. A handle whose window is gone (one the client was sent closed for) gives an
+        window's state at once (output, workspace, state, from version 3 pid, then done) and
+        again whenever it changes. A handle whose window is gone (one the client was sent closed for) gives an
         inert object, which sends nothing and whose requests do nothing.
       </description>
       <arg name="id" type="new_id" interface="shaodesk_window_v1"/>
@@ -185,9 +189,22 @@
 
     <event name="done">
       <description summary="the state is complete">
-        Sent after the output, workspace and state events that describe one state of the
+        Sent after the output, workspace, state and pid events that describe one state of the
         window, so that the client applies them together. Only what changed is sent before it.
       </description>
+    </event>
+
+    <event name="pid" since="3">
+      <description summary="the process the window belongs to">
+        The process id of the client that made the window, as the compositor sees it: the
+        Wayland client's peer credentials, or for an X11 window the process its X client
+        reports. 0 when it is not known. A taskbar matches it with what else names processes,
+        such as the sound server's streams; a process inside a sandbox with a process namespace
+        of its own knows itself by another number.
+
+        Sent with the window's state before done, and again should it change.
+      </description>
+      <arg name="pid" type="uint"/>
     </event>
   </interface>
 </protocol>

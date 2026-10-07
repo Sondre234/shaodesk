@@ -78,10 +78,15 @@ class PulseAudio : public Audio {
         explicit Locked(pa_threaded_mainloop *l) : loop(l) { pa_threaded_mainloop_lock(loop); }
         ~Locked() { pa_threaded_mainloop_unlock(loop); }
     };
-    // What the server thread has read so far; icons are looked up in the Qt thread.
+    // What the server thread has read so far; icons are looked up in the Qt thread, and so are
+    // the streams' processes from the ids the clients give: a stream's own, or else its
+    // client's, as a PipeWire application's stream has none of its own.
     struct Snapshot {
         State state;
         std::vector<QStringList> iconCandidates;
+        std::vector<int> processIds;
+        std::vector<uint32_t> streamClients;
+        std::map<uint32_t, int> clientProcesses;
         std::map<std::string, pa_cvolume> sinkVolumes;
         std::map<uint32_t, pa_cvolume> streamVolumes;
     };
@@ -93,6 +98,9 @@ class PulseAudio : public Audio {
     // The volumes last read, so a change keeps each channel's balance.
     std::map<std::string, pa_cvolume> sinkVolumes_;
     std::map<uint32_t, pa_cvolume> streamVolumes_;
+    // Each stream's process id and the processes processAncestry found for it, read once while
+    // the stream lasts. Only the Qt thread uses it.
+    std::map<uint32_t, std::pair<int, QList<int>>> processes_;
 
     bool ready() const { return context_ && pa_context_get_state(context_) == PA_CONTEXT_READY; }
     static void run(pa_operation *operation) {
@@ -165,10 +173,11 @@ class PulseAudio : public Audio {
             return;
         }
         pending_ = {};
-        outstanding_ = 3;
+        outstanding_ = 4;
         run(pa_context_get_server_info(context_, &PulseAudio::onServer, this));
         run(pa_context_get_sink_info_list(context_, &PulseAudio::onSink, this));
         run(pa_context_get_sink_input_info_list(context_, &PulseAudio::onStream, this));
+        run(pa_context_get_client_info_list(context_, &PulseAudio::onClient, this));
     }
     static void onServer(pa_context *, const pa_server_info *info, void *data) {
         auto *self = static_cast<PulseAudio *>(data);
@@ -199,11 +208,23 @@ class PulseAudio : public Audio {
         if (name.isEmpty())
             name = QString::fromUtf8(info->name);
         self->pending_.state.streams.push_back(
-            {info->index, name, {}, percent(info->volume), bool(info->mute)});
+            {info->index, name, {}, percent(info->volume), bool(info->mute), bool(info->corked)});
         self->pending_.iconCandidates.push_back(
             {propertyOf(info->proplist, PA_PROP_APPLICATION_ICON_NAME),
              propertyOf(info->proplist, PA_PROP_APPLICATION_PROCESS_BINARY), name.toLower()});
         self->pending_.streamVolumes[info->index] = info->volume;
+        self->pending_.processIds.push_back(
+            propertyOf(info->proplist, PA_PROP_APPLICATION_PROCESS_ID).toInt());
+        self->pending_.streamClients.push_back(info->client);
+    }
+    static void onClient(pa_context *, const pa_client_info *info, int end, void *data) {
+        auto *self = static_cast<PulseAudio *>(data);
+        if (end) {
+            self->finish();
+            return;
+        }
+        self->pending_.clientProcesses[info->index] =
+            propertyOf(info->proplist, PA_PROP_APPLICATION_PROCESS_ID).toInt();
     }
     void finish() {
         if (--outstanding_ > 0)
@@ -213,8 +234,19 @@ class PulseAudio : public Audio {
         QMetaObject::invokeMethod(
             this,
             [this, snapshot = std::move(pending_)]() mutable {
+                std::map<uint32_t, std::pair<int, QList<int>>> processes;
                 for (size_t i = 0; i < snapshot.state.streams.size(); ++i) {
-                    auto &icon = snapshot.state.streams[i].icon;
+                    auto &stream = snapshot.state.streams[i];
+                    int pid = snapshot.processIds[i];
+                    if (auto client = snapshot.clientProcesses.find(snapshot.streamClients[i]);
+                        pid <= 0 && client != snapshot.clientProcesses.end())
+                        pid = client->second;
+                    auto known = processes_.find(stream.id);
+                    stream.processes = known != processes_.end() && known->second.first == pid
+                                           ? known->second.second
+                                           : processAncestry(pid);
+                    processes[stream.id] = {pid, stream.processes};
+                    auto &icon = stream.icon;
                     for (const auto &candidate : snapshot.iconCandidates[i])
                         if (!candidate.isEmpty() && QIcon::hasThemeIcon(candidate)) {
                             icon = candidate;
@@ -223,6 +255,7 @@ class PulseAudio : public Audio {
                     if (icon.isEmpty())
                         icon = "audio-x-generic";
                 }
+                processes_ = std::move(processes);
                 update(std::move(snapshot.state));
             },
             Qt::QueuedConnection);

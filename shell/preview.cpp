@@ -202,13 +202,15 @@ Notification notification(const QString &app, const QString &icon, const QString
 
 PreviewData::PreviewData(ShellController &controller)
     : QObject(&controller), controller_(controller), audio_(std::make_unique<PreviewAudio>()) {
+    // Firefox plays from a child process of its window's, and the music player from the shell of
+    // the first terminal, which has no window of its own (the processes are the stand-in tasks').
     audio_->update({"speakers",
                     {{"speakers", "Speakers", 64, false},
                      {"headphones", "USB headphones", 40, false},
                      {"hdmi", "HDMI / DisplayPort (monitor)", 100, false}},
-                    {{1, "Firefox", "firefox", 80, false},
-                     {2, "Music player", "audio-x-generic", 55, false},
-                     {3, "Video call", "camera-web", 100, true}}});
+                    {{1, "Firefox", "firefox", 80, false, false, {1105, 1001}},
+                     {2, "Music player", "audio-x-generic", 55, false, false, {2210, 2202, 2002}},
+                     {3, "Video call", "camera-web", 100, true, false, {3301}}}});
     // A battery that is charging and Wi-Fi that is up, in a sysfs of its own.
     auto put = [this](const QString &path, const QByteArray &text) {
         QDir(sysfs_.path()).mkpath(QFileInfo(sysfs_.filePath(path)).path());
@@ -294,29 +296,30 @@ PreviewData::PreviewData(ShellController &controller)
     controller.startMenu()->setUser("Robin Lee", QUrl());
 
     // The windows, as the tests' stand-in model: a ListModel with the roles TaskModel has. The
-    // terminals' are stacked, with pictures of two and none yet of the third.
+    // terminals' are stacked, with pictures of two and none yet of the third, and the first
+    // playing music.
     controller.engine()->addImageProvider("preview-windows", new PreviewWindows);
     QQmlComponent component(controller.engine());
     component.setData(R"(import QtQml.Models
 ListModel {
     ListElement { taskId: 1; title: "Release notes - Mozilla Firefox"; appId: "firefox"; active: true; minimized: false; urgent: false
                   maximized: false; fullscreen: false; output: ""; workspace: 1; sticky: false; floating: false; tiling: true
-                  picture: "image://preview-windows/1" }
+                  pid: 1001; picture: "image://preview-windows/1" }
     ListElement { taskId: 2; title: "~/dev/shaodesk"; appId: "foot"; active: false; minimized: false; urgent: false
                   maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: false; tiling: true
-                  picture: "image://preview-windows/2" }
+                  pid: 2002; picture: "image://preview-windows/2" }
     ListElement { taskId: 3; title: "htop"; appId: "foot"; active: false; minimized: false; urgent: false
                   maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: true; tiling: true
-                  picture: "image://preview-windows/3" }
+                  pid: 2003; picture: "image://preview-windows/3" }
     ListElement { taskId: 6; title: "man shaodesk"; appId: "foot"; active: false; minimized: false; urgent: false
                   maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: false; tiling: true
-                  picture: "" }
+                  pid: 2006; picture: "" }
     ListElement { taskId: 4; title: "Downloads - Dolphin"; appId: "org.kde.dolphin"; active: false; minimized: true; urgent: false
                   maximized: true; fullscreen: false; output: ""; workspace: 3; sticky: false; floating: false; tiling: false
-                  picture: "" }
+                  pid: 4004; picture: "" }
     ListElement { taskId: 5; title: "Build finished"; appId: "kitty"; active: false; minimized: false; urgent: true
                   maximized: false; fullscreen: false; output: ""; workspace: 1; sticky: true; floating: true; tiling: true
-                  picture: "" }
+                  pid: 5005; picture: "" }
 })",
                       QUrl());
     tasks_ = component.create();

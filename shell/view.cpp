@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "view.hpp"
+#include "audio.hpp"
 #include "task_filter.hpp"
 #include <QGuiApplication>
 #include <QQuickItem>
@@ -18,6 +19,7 @@ ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop,
     setResizeMode(QQuickView::SizeRootObjectToView);
     setFlags(Qt::FramelessWindowHint);
     static const int registered = qmlRegisterType<TaskFilter>("Shaodesk", 1, 0, "TaskFilter") +
+                                  qmlRegisterType<WindowSound>("Shaodesk", 1, 0, "WindowSound") +
                                   qmlRegisterType<PopoverWindow>("Shaodesk", 1, 0, "PopoverWindow") +
                                   qmlRegisterType<MenuBarWindow>("Shaodesk", 1, 0, "MenuBarWindow");
     Q_UNUSED(registered);

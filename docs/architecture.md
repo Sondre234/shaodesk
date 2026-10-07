@@ -135,6 +135,11 @@ Qt Quick drawing the card in software. The compositor took 12 to 13 % for ten fu
 10 % for ten scaled and 26 to 31 % for thirty, pixman rendering the steps on the CPU; a GPU
 renderer does that on the GPU, and copies 127 KB back where it copied 32 MB.
 
+Since version 3 a `shaodesk_window_v1` also sends the window's `pid` with its state, before
+`done`: `toplevel_pid` (`toplevel.c`), the Wayland client's peer credentials or the process XRes
+names for an X11 window, 0 when unknown, for the shell to match the window with the sound
+server's streams.
+
 ## The shell (`shell/`)
 
 `ShellController` (`controller.cpp`) loads the configuration, keeps the compositor's state from
@@ -230,6 +235,19 @@ the window redraws, every 33 ms at most (100 ms at the window's size). The last 
 until the window closes, so the card opens with it. A stand-in model (the preview's, the
 tests') has no `watchPicture`, which the card then does not call, and names pictures of its own
 (`image://preview-windows/ID`, painted by `preview.cpp`).
+
+The speaker on a picture's tile is a `WindowSound` (`audio.cpp`), which the tile makes with the
+panel's `audioSource` and `taskSource` and its window's `pid` (`TaskModel`'s role, from the window
+control's version 3). The sound server's backend gives each stream the process that plays it
+(`application.process.id`, or its client's when the stream names none, as a PipeWire
+application's may not) and that process's parents, nearest first, read once per stream from
+`/proc/PID/stat` by `processAncestry`, 64 at most and stopping before pid 1, as `swallow.c`
+walks them. `soundOwner` gives a stream to the nearest of those processes that has a window among
+the task source's `pid` roles, so a browser's audio process plays in its window and a player
+started in a terminal in the terminal's, unless the player has a window. `playing` is a stream of
+the window's that is open and not paused (corked) or muted, `muted` one that is muted while none
+plays, and `toggleMute()` mutes or unmutes all of them through `Audio::setStreamMuted`. The
+preview's and the tests' stand-ins give the `pid` roles, and the streams' `processes`, themselves.
 
 The start menu (`Launcher.qml` and its `Start*.qml` parts) reads `shell.startMenu`, a `StartMenu`
 (`start_menu.cpp`): its own pins, seeded from the taskbar's; the applications launched lately

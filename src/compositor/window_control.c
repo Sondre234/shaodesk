@@ -12,7 +12,7 @@ struct sh_window_object {
     struct wl_list link; // sh_server.window_objects
     bool sent;
     char output[64];
-    uint32_t workspace, state;
+    uint32_t workspace, state, pid;
 };
 
 /* The window a taskbar handle the client holds stands for, or NULL when it is gone: the handles
@@ -60,6 +60,15 @@ static void send_window(struct sh_window_object *object) {
     if (!object->sent || object->state != state) {
         object->state = state;
         shaodesk_window_v1_send_state(object->resource, state);
+        changed = true;
+    }
+    // From version 3, for the taskbar to match the window with the sound its process plays.
+    pid_t process = toplevel_pid(toplevel);
+    uint32_t pid = process > 0 ? (uint32_t)process : 0;
+    if (wl_resource_get_version(object->resource) >= SHAODESK_WINDOW_V1_PID_SINCE_VERSION &&
+        (!object->sent || object->pid != pid)) {
+        object->pid = pid;
+        shaodesk_window_v1_send_pid(object->resource, pid);
         changed = true;
     }
     if (changed)
@@ -243,7 +252,7 @@ static void control_bind(struct wl_client *client, void *data, uint32_t version,
 
 /* Offered to every client, as wlr-foreign-toplevel-management is: it does nothing to a window a
  * taskbar could not already do, and shows nothing of one that ext-foreign-toplevel-list's
- * capture sources do not. */
+ * capture sources do not, but for which process made it. */
 void window_control_init(struct sh_server *server) {
     wl_list_init(&server->window_objects);
     server->window_control = wl_global_create(server->wl_display,

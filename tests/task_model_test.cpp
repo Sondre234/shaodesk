@@ -62,6 +62,10 @@ int main(int argc, char **argv) {
             model.roleNames().value(TaskModel::Workspace) != "workspace" ||
             model.roleNames().value(TaskModel::Tiling) != "tiling")
             throw std::runtime_error("the window's place is not as the compositor has it");
+        // So does the process that made it, the probe.
+        if (value(TaskModel::Pid).toLongLong() != client.processId() ||
+            model.roleNames().value(TaskModel::Pid) != "pid")
+            throw std::runtime_error("the window's process is not the probe's");
         // The window menu's requests come back as the window's new place.
         model.moveToWorkspace(id, 3);
         wait([&] { return value(TaskModel::Workspace).toInt() == 3; }, "moving to a workspace failed");

@@ -2,12 +2,14 @@
 import QtQuick
 import QtQuick.Layouts
 
-// A mute toggle drawn as the speaker it silences.
+// A mute toggle drawn as the speaker it silences, `size` square with a speaker `iconSize` large.
 FlatButton {
     id: mute
     property int level: 0
     property bool muted: false
-    width: 32; height: 32
-    Layout.preferredWidth: 32; Layout.preferredHeight: 32
-    contentItem: Item { SpeakerIcon { anchors.centerIn: parent; level: mute.level; muted: mute.muted; color: mute.muted ? Theme.textMuted : Theme.text } }
+    property real size: 32
+    property real iconSize: Theme.iconSize
+    width: size; height: size
+    Layout.preferredWidth: size; Layout.preferredHeight: size
+    contentItem: Item { SpeakerIcon { anchors.centerIn: parent; size: mute.iconSize; level: mute.level; muted: mute.muted; color: mute.muted ? Theme.textMuted : Theme.text } }
 }
