@@ -1875,6 +1875,11 @@ ListModel {
             find(tileFor(7), "windowThumbnailPicture")->opacity() != 1 ||
             find(tileFor(7), "windowThumbnailStandIn")->isVisible())
             return fail("a window's picture that came ahead of its card did not show as the card opened");
+        // The next one takes its place at once.
+        editTasks(QString("model.setProperty(%1, 'picture', 'image://test-windows/200x320')").arg(rowOf(7)));
+        if (find(tileFor(7), "windowThumbnailPicture")->opacity() != 1 ||
+            find(tileFor(7), "windowThumbnailStandIn")->isVisible())
+            return fail("the next picture of a window shown as its card opened did not take its place at once");
         if (!QTest::qWaitFor([&] {
                 return inPopover(card) && titles() == "Fake" && !popover->keyboard() &&
                        !root->property("menuOpen").toBool();
@@ -2081,6 +2086,28 @@ ListModel {
                 const QRectF area = card->mapRectToScene(QRectF(0, 0, card->width(), card->height()));
                 if (qAbs(area.center().x() - centre(stack).x()) > 1 && area.left() != 8)
                     return fail("the card did not glide to the stacked button");
+            }
+            // A window's first picture fades in over the icon standing in for it, and the next one
+            // takes its place at once.
+            {
+                auto *picture = find(tileFor(11), "windowThumbnailPicture");
+                auto *standIn = find(tileFor(11), "windowThumbnailStandIn");
+                if (!picture || !standIn || picture->isVisible() || !standIn->isVisible())
+                    return fail("a window without a picture has no icon standing in for one");
+                editTasks(QString("model.setProperty(%1, 'picture', 'image://test-windows/320x200')").arg(rowOf(11)));
+                if (!QTest::qWaitFor([&] {
+                        return picture->isVisible() && picture->opacity() > 0 && picture->opacity() < 1 &&
+                               standIn->isVisible() && standIn->opacity() > 0 && standIn->opacity() < 1;
+                    }))
+                    return fail("a window's first picture did not fade in over the icon standing in for it");
+                if (!QTest::qWaitFor([&] { return picture->opacity() == 1 && !standIn->isVisible(); }))
+                    return fail("a window's first picture did not finish fading in");
+                editTasks(QString("model.setProperty(%1, 'picture', 'image://test-windows/200x320')").arg(rowOf(11)));
+                if (picture->opacity() != 1 || standIn->isVisible() ||
+                    !QTest::qWaitFor([&] { return picture->implicitWidth() == 200; }) || picture->opacity() != 1 ||
+                    standIn->isVisible())
+                    return fail("a window's next picture did not take the place of the last at once");
+                editTasks(QString("model.setProperty(%1, 'picture', '')").arg(rowOf(11)));
             }
             QTest::mouseMove(&view, barSpace);
             if (!QTest::qWaitFor([&] { return !card->isVisible(); }))

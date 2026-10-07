@@ -11,11 +11,12 @@ import Shaodesk
 // picture of it. The picture is the task model's (its `picture` role, while the tile wants it
 // through the panel's wantPicture) and follows the window while shown with
 // shell.liveThumbnails; until one has come, or without one, the application's icon stands in for
-// it. The focused window's tile is marked as the bar marks it: selected, with a line in the
-// accent colour (the urgent one for a window asking for attention) under it. Clicking a tile
-// focuses its window (or minimizes it when focused already), the cross or a middle click closes
-// it, and a right click opens its menu. How wide the pictures are, and whether there is room for
-// them at all rather than the list, is the panel's (thumbnailWidth).
+// it, and the first fades in over the icon. The focused window's tile is marked as the bar marks
+// it: selected, with a line in the accent colour (the urgent one for a window asking for
+// attention) under it. Clicking a tile focuses its window (or minimizes it when focused already),
+// the cross or a middle click closes it, and a right click opens its menu. How wide the pictures
+// are, and whether there is room for them at all rather than the list, is the panel's
+// (thumbnailWidth).
 PopupCard {
     id: thumbnails
     required property var panel
@@ -144,7 +145,9 @@ PopupCard {
                             Rectangle {
                                 objectName: "windowThumbnailStandIn"
                                 anchors.fill: parent
-                                visible: !picture.visible
+                                // Fading out under the first picture as it fades in.
+                                opacity: picture.visible ? 1 - picture.opacity : 1
+                                visible: opacity > 0
                                 radius: Theme.radiusSmall
                                 color: Theme.alpha(Theme.text, 0.06)
                                 Image {
@@ -169,11 +172,28 @@ PopupCard {
                                 retainWhileLoading: true
                                 smooth: true; mipmap: true
                                 // Whether it has a picture to show: once one has loaded, until there
-                                // is none.
+                                // is none. The first fades in over the icon standing in for it,
+                                // unless it was there as the tile appeared; the next ones take its
+                                // place at once.
                                 property bool shown: false
+                                property bool made: false
+                                Component.onCompleted: made = true
                                 onStatusChanged: {
-                                    if (status === Image.Ready) shown = true
-                                    else if (status !== Image.Loading) shown = false
+                                    if (status === Image.Ready && !shown) {
+                                        shown = true
+                                        if (made && Theme.durationNormal > 0)
+                                            fadeIn.restart()
+                                    } else if (status !== Image.Ready && status !== Image.Loading) {
+                                        shown = false
+                                        fadeIn.stop()
+                                        opacity = 1
+                                    }
+                                }
+                                NumberAnimation on opacity {
+                                    id: fadeIn
+                                    running: false
+                                    from: 0; to: 1
+                                    duration: Theme.durationNormal; easing.type: Theme.easing
                                 }
                                 visible: shown || status === Image.Ready
                                 layer.enabled: Theme.effects

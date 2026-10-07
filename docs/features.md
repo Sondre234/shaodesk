@@ -110,8 +110,9 @@ the top) as on Windows 11: a small picture of each window side by side, under th
 icon and the window's title. The pictures follow the windows as they redraw while the card is
 open (ten times a second at most), show the window alone, without its frame or what covers it,
 and show a minimized window or one on another workspace too; until one has come, the
-application's icon stands in. They are taken from halfway into the delay, so that the card opens
-on them, and none is taken for a button the pointer only crosses on its way. Clicking a picture
+application's icon stands in, and the first fades in over it. They are taken from halfway into
+the delay, so that the card opens on them, and none is taken for a button the pointer only
+crosses on its way. Clicking a picture
 focuses its window, or minimizes it when it is focused already; a middle click or the cross shown
 over the one under the pointer closes it, and a right click opens its [menu](#taskbar-menus). The
 focused window's picture is marked as its button is. The pointer can cross from the button onto
