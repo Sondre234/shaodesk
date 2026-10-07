@@ -103,6 +103,23 @@ class WindowPicturesTest : public QObject {
                                 uint32_t(WL_SHM_FORMAT_RGB888)})
             QCOMPARE(WindowPictures::imageFormat(format), QImage::Format_Invalid);
     }
+    // The box asked of a scaled capture source: 0.625 as tall as it is wide, rounded, never
+    // empty.
+    void boxes() {
+        QCOMPARE(WindowPictures::pictureBox(240), QSize(240, 150));
+        QCOMPARE(WindowPictures::pictureBox(300), QSize(300, 188));
+        QCOMPARE(WindowPictures::pictureBox(241), QSize(241, 151));
+        QCOMPARE(WindowPictures::pictureBox(1), QSize(1, 1));
+        QCOMPARE(WindowPictures::pictureBox(0), QSize(1, 1));
+        QCOMPARE(WindowPictures::pictureBox(-5), QSize(1, 1));
+    }
+    // A frame a scaled source made to fit the box is kept at its size, so that scaling it is
+    // only a copy; one a pixel too large for it (a compositor rounding otherwise) is scaled.
+    void scaledFrames() {
+        for (const QSize frame : {QSize(300, 169), QSize(300, 188), QSize(133, 188), QSize(1, 1)})
+            QCOMPARE(WindowPictures::pictureSize(frame, 300), frame);
+        QCOMPARE(WindowPictures::pictureSize({301, 169}, 300), QSize(300, 168));
+    }
     // Scaled down, never up, into a box 0.625 as tall as it is wide, keeping the aspect ratio.
     void sizes() {
         QCOMPARE(WindowPictures::pictureSize({3840, 2160}, 240), QSize(240, 135));

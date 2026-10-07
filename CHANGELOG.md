@@ -65,6 +65,11 @@ shadows.
   stack's list, which still shows when the pictures would not fit across the monitor.
   `shell.thumbnails` sets the delay, the pictures' size and whether they follow the windows, and
   `enabled = false` turns them off. The macOS style's dock lists a stack's windows as before.
+- The compositor scales a window's picture down to the card's size itself, on the GPU, and
+  smoothly, so that text in it does not shimmer: the shell copies a few hundred kilobytes a frame
+  instead of the whole window and has nothing left to scale, and a live picture follows its
+  window 30 times a second instead of ten. `shaodesk-window-control-v1` version 3 gives such a
+  source with `get_scaled_capture_source`, and `shaodesk msg get pictures` lists them.
 - A window's taskbar menu is headed by its application's icon and name over the window's title,
   and offers the application's desktop actions and a new window, then minimize or restore,
   maximize or restore, fullscreen, moving the window to another workspace or monitor, keeping it

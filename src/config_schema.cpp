@@ -560,8 +560,8 @@ const Option options[] = {
      "the monitor they get narrower, down to 60 % of it, and past that the card lists the "
      "windows by title instead."},
     {"shell.thumbnails.live", "boolean", "true", "true", none, none,
-     "The pictures follow their windows while the card is open, at most about ten times a "
-     "second; `false` takes one of each window as the card opens."},
+     "The pictures follow their windows while the card is open, at most 30 times a second; "
+     "`false` takes one of each window as the card opens."},
     {"shell.workspaces_shown", "integer", "0", "3", 0, 10,
      "How many of the monitor's workspaces the workspace indicator shows, the current one in "
      "the middle: `3` shows it with the one before and the one after, or the first or last "

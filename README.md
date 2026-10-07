@@ -335,5 +335,6 @@ shaodesk is free software, licensed under the GNU General Public License, versio
 option) any later version. See [LICENSE](LICENSE).
 
 The compositor adapter derives from TinyWL, whose MIT license is kept in
-[vendor/tinywl/LICENSE](vendor/tinywl/LICENSE). The protocol files in `protocols/` keep the
-licenses stated in each file.
+[vendor/tinywl/LICENSE](vendor/tinywl/LICENSE); `src/compositor/scaled_capture.c` adapts
+wlroots' capture source for a scene node under the same license, wlroots' own. The protocol
+files in `protocols/` keep the licenses stated in each file.

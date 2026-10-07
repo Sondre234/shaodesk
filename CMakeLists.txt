@@ -123,6 +123,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
     # The wlroots API is unstable. Target one release series deliberately.
     pkg_check_modules(WLROOTS REQUIRED IMPORTED_TARGET "wlroots-0.20>=0.20.0" "wlroots-0.20<0.21")
     pkg_check_modules(WAYLAND REQUIRED IMPORTED_TARGET wayland-server)
+    # Regions of damage, which wlroots' headers name but its link line leaves out.
+    pkg_check_modules(PIXMAN REQUIRED IMPORTED_TARGET pixman-1)
     pkg_check_modules(PROTOCOLS REQUIRED wayland-protocols)
     pkg_get_variable(PROTOCOL_DIR wayland-protocols pkgdatadir)
     find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
@@ -204,6 +206,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/placement.c
         src/compositor/power.c
         src/compositor/query.c
+        src/compositor/scaled_capture.c
         src/compositor/scratchpad.c
         src/compositor/session.c
         src/compositor/swallow.c
@@ -236,7 +239,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
     # other is static. This flags one that is neither.
     set_source_files_properties(${SHAODESK_COMPOSITOR_SOURCES} PROPERTIES
         COMPILE_OPTIONS -Wmissing-prototypes)
-    target_link_libraries(shaodesk PRIVATE shaodesk_config shaodesk_effects PkgConfig::WLROOTS PkgConfig::WAYLAND m)
+    target_link_libraries(shaodesk PRIVATE shaodesk_config shaodesk_effects PkgConfig::WLROOTS PkgConfig::WAYLAND
+        PkgConfig::PIXMAN m)
     # A standalone session keeps the machine awake through logind while it is on screen.
     pkg_search_module(SDBUS IMPORTED_TARGET libsystemd libelogind basu)
     if(SDBUS_FOUND)

@@ -42,10 +42,12 @@
 #include <wayland-server-core.h>
 #include <wlr/backend.h>
 #include <wlr/backend/headless.h>
+#include <wlr/backend/interface.h>
 #include <wlr/backend/multi.h>
 #include <wlr/backend/wayland.h>
 #include <wlr/interfaces/wlr_ext_image_capture_source_v1.h>
 #include <wlr/interfaces/wlr_keyboard.h>
+#include <wlr/interfaces/wlr_output.h>
 #include <wlr/config.h>
 #if WLR_HAS_LIBINPUT_BACKEND
 #include <libinput.h>
@@ -896,6 +898,19 @@ void power_available(struct sh_server *server, char *list, size_t size);
 
 /* query.c */
 bool run_query(struct sh_server *server, int fd, const char *request);
+
+/* scaled_capture.c */
+void create_scaled_capture_source(struct wl_client *client, uint32_t id,
+                                  struct sh_toplevel *toplevel, uint32_t width,
+                                  uint32_t height);
+/* A scaled capture source of a window, as `get pictures` describes it. */
+struct sh_picture_source {
+    int box_width, box_height; // asked for
+    int width, height;         // the frame's, 0 before the first
+    size_t sessions;
+};
+size_t list_picture_sources(struct sh_toplevel *toplevel, struct sh_picture_source *sources,
+                            size_t size);
 
 /* scratchpad.c */
 bool scratchpad_enabled(struct sh_server *server);

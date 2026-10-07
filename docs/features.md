@@ -108,7 +108,8 @@ volume, do-not-disturb, tiling) crossfades as the state changes.
 Resting the pointer on a window's button, or a stack's, opens a card above it (below a bar along
 the top) as on Windows 11: a small picture of each window side by side, under the application's
 icon and the window's title. The pictures follow the windows as they redraw while the card is
-open (ten times a second at most), show the window alone, without its frame or what covers it,
+open (30 times a second at most, so a video moves), show the window alone, without its frame or
+what covers it,
 and show a minimized window or one on another workspace too; until one has come, the
 application's icon stands in. Clicking a picture
 focuses its window, or minimizes it when it is focused already; a middle click or the cross shown
@@ -1217,7 +1218,9 @@ the keyboard.
 `na`, `unknown` until it has answered, or `unavailable` without logind.
 `shaodesk msg get animations` prints the number of running animations and of window trees in
 the scene (closing windows count until their animation ends), and of focus fades, mainly
-for tests. A client
+for tests. `shaodesk msg get pictures` prints one line per capture source a client asked for to
+picture a window at a size, as the taskbar does: the size asked for, the frame's size, how many
+sessions capture it, and the window's title, also mainly for tests. A client
 that sends `subscribe` keeps its connection and receives `tiling on|off` and
 `workspace N` (the focused monitor's), one `output NAME N USED TILING` line per monitor
 (as in `get workspaces`), and `keyboard-layout N COUNT SHORT NAME` (the active

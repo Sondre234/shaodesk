@@ -177,6 +177,18 @@ int main(int argc, char **argv) {
         model.maximize(id);
         wait([&] { return model.picture(id).size() == QSize(133, 100); },
              "the live picture did not follow the window back");
+        // Watched at another width meanwhile, the picture takes it, smaller and larger again: the
+        // compositor, which scales the window down itself, is asked again each time.
+        model.watchPicture(id, 80, true);
+        wait([&] { return model.picture(id).size() == QSize(67, 50); },
+             "the picture did not shrink to a new width");
+        model.watchPicture(id, 160, true);
+        wait([&] { return model.picture(id).size() == QSize(133, 100); },
+             "the picture did not grow to a new width");
+        if (!isProbe(model.picture(id)))
+            throw std::runtime_error("the picture at a new width is not the probe's window");
+        model.unwatchPicture(id);
+        model.unwatchPicture(id);
         model.unwatchPicture(id);
         // Unwatched, the last picture stays; a minimized window is pictured too.
         if (url().isEmpty() || model.picture(id).isNull())

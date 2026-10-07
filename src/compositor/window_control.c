@@ -168,6 +168,20 @@ static void window_get_capture_source(struct wl_client *client, struct wl_resour
         toplevel ? toplevel_capture_source(toplevel) : NULL, client, id);
 }
 
+/* A capture source of its own for a small picture of the window (scaled_capture.c), inert as
+ * get_capture_source's is. */
+static void window_get_scaled_capture_source(struct wl_client *client,
+                                             struct wl_resource *resource, uint32_t id,
+                                             uint32_t width, uint32_t height) {
+    if (!width || !height) {
+        wl_resource_post_error(resource, SHAODESK_WINDOW_V1_ERROR_INVALID_SIZE,
+                               "a picture of %ux%u pixels", width, height);
+        return;
+    }
+    struct sh_window_object *object = wl_resource_get_user_data(resource);
+    create_scaled_capture_source(client, id, object ? object->toplevel : NULL, width, height);
+}
+
 static const struct shaodesk_window_v1_interface window_implementation = {
     .destroy = window_destroy,
     .move_to_workspace = window_move_to_workspace,
@@ -177,6 +191,7 @@ static const struct shaodesk_window_v1_interface window_implementation = {
     .set_floating = window_set_floating,
     .unset_floating = window_unset_floating,
     .get_capture_source = window_get_capture_source,
+    .get_scaled_capture_source = window_get_scaled_capture_source,
 };
 
 static void window_resource_destroy(struct wl_resource *resource) {
@@ -232,7 +247,7 @@ static void control_bind(struct wl_client *client, void *data, uint32_t version,
 void window_control_init(struct sh_server *server) {
     wl_list_init(&server->window_objects);
     server->window_control = wl_global_create(server->wl_display,
-                                              &shaodesk_window_control_v1_interface, 2, server,
+                                              &shaodesk_window_control_v1_interface, 3, server,
                                               control_bind);
     if (!server->window_control)
         wlr_log(WLR_ERROR, "Cannot offer shaodesk-window-control-v1");
