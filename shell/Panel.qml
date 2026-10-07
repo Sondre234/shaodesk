@@ -590,6 +590,8 @@ Item {
                     return name === "group" || thumbnailsOpen
                 }
             return false
+        case "keyboard":
+            return previewKeyboard()
         case "tray-menu":
         case "tray-submenu":
             for (i = 0; i < tray.children.length; ++i)
@@ -675,6 +677,8 @@ Item {
             if (icon)
                 dock.openMenu(icon, icon.modelData, icon.modelData.appId)
             return icon !== null
+        case "keyboard":
+            return previewKeyboard()
         case "stack-menu":
         case "group":
         case "thumbnails":
@@ -687,6 +691,23 @@ Item {
             return icon !== null
         }
         return undefined
+    }
+    // The keyboard on the bar (taskbar_focus) at a stack's second window: a picture on the card,
+    // or a row of the list.
+    function previewKeyboard() {
+        if (taskbar)
+            taskbar.tasks.forceLayout()
+        barKeyboard.toggle()
+        var list = barKeyboard.stops()
+        for (var i = 0; i < list.length; ++i) {
+            var item = barKeyboard.itemOf(list[i])
+            if (item && item.stacked) {
+                barKeyboard.select(list, i)
+                barKeyboard.window = 1
+                return groupOpen
+            }
+        }
+        return false
     }
     // For a preview: opens the first submenu of a menu just opened, once its rows are laid out.
     Timer {

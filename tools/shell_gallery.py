@@ -32,8 +32,9 @@ import zlib
 
 # The names previewPopup in shell/Panel.qml knows.
 POPUPS = ["bar", "launcher", "power", "bar-menu", "bar-submenu", "task-menu", "stack-menu",
-          "pin-menu", "group", "thumbnails", "tray-menu", "tray-submenu", "calendar", "mixer", "outputs",
-          "profiles", "wallpapers", "notifications", "clock-empty", "calendar-years"]
+          "pin-menu", "group", "thumbnails", "keyboard", "tray-menu", "tray-submenu", "calendar",
+          "mixer", "outputs", "profiles", "wallpapers", "notifications", "clock-empty",
+          "calendar-years"]
 # The overlay surfaces, each shown over the bar alone (PreviewData::surfaces in shell/preview.cpp).
 POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switcher",
            "overview", "palette-empty"]
