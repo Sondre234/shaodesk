@@ -120,6 +120,18 @@ when more windows than fit across the monitor share a button, down to 60 % of th
 past that the stack lists its windows by title instead. The macOS style's dock lists a stack's
 windows by title, pictures or not.
 
+While a window's process plays sound, a speaker shows beside its title on the card, as on a
+browser's tab; clicking it mutes the window's sound, and the speaker stays, crossed out, while it
+is muted, to unmute it. The sound is that of the sound server's streams (PulseAudio's, or
+PipeWire's) played by the process that made the window, or by one it started that has no window
+of its own: a browser playing from a child process shows it, and so does a terminal running a
+player, unless the player has a window. Windows of one process cannot be told apart, so all of a
+browser's windows show the speaker when one of its tabs plays, and muting one mutes them all. A
+stream counts while it is open and not paused: an application that keeps one open while it plays
+nothing, as some games and voice-chat applications do, shows the speaker until it closes it. An
+application in a sandbox with a process namespace of its own (Flatpak) names its processes by
+numbers that mean nothing outside it, so its windows show no speaker.
+
 ```lua
 shell = {
     thumbnails = {

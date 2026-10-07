@@ -65,6 +65,12 @@ shadows.
   stack's list, which still shows when the pictures would not fit across the monitor.
   `shell.thumbnails` sets the delay, the pictures' size and whether they follow the windows, and
   `enabled = false` turns them off. The macOS style's dock lists a stack's windows as before.
+- A window whose process plays sound has a speaker beside its title on its picture, as a
+  browser's tab has: a click mutes the window's sound, and a crossed-out speaker stays to unmute
+  it. Sound from a process the window's process started counts as the window's (a browser's
+  audio process, a player run in a terminal) unless that process has a window of its own, and
+  all windows of one process show it. The compositor names each window's process to the shell
+  through `shaodesk-window-control-v1` version 3.
 - A window's taskbar menu is headed by its application's icon and name over the window's title,
   and offers the application's desktop actions and a new window, then minimize or restore,
   maximize or restore, fullscreen, moving the window to another workspace or monitor, keeping it

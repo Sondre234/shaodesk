@@ -102,6 +102,11 @@ the source again only where the window changed since it last did, and for every 
 once: a session started while another runs on the same window gets its first frame only when
 the window next draws, so a client keeps one session per window.
 
+Since version 3 a `shaodesk_window_v1` also sends the window's `pid` with its state, before
+`done`: `toplevel_pid` (`toplevel.c`), the Wayland client's peer credentials or the process XRes
+names for an X11 window, 0 when unknown, for the shell to match the window with the sound
+server's streams.
+
 ## The shell (`shell/`)
 
 `ShellController` (`controller.cpp`) loads the configuration, keeps the compositor's state from
@@ -195,6 +200,18 @@ redraws, every 100 ms at most. The last picture stays until the window closes, s
 with it. A stand-in model (the preview's, the tests') has no `watchPicture`, which the card then
 does not call, and names pictures of its own (`image://preview-windows/ID`, painted by
 `preview.cpp`).
+
+The speaker on a picture's tile is a `WindowSound` (`audio.cpp`), which the tile makes with the
+panel's `audioSource` and `taskSource` and its window's `pid` (`TaskModel`'s role, from the window
+control's version 3). The sound server's backend gives each stream the process that plays it
+(`application.process.id`) and that process's parents, nearest first, read once per stream from
+`/proc/PID/stat` by `processAncestry`, 64 at most and stopping before pid 1, as `swallow.c`
+walks them. `soundOwner` gives a stream to the nearest of those processes that has a window among
+the task source's `pid` roles, so a browser's audio process plays in its window and a player
+started in a terminal in the terminal's, unless the player has a window. `playing` is a stream of
+the window's that is open and not paused (corked) or muted, `muted` one that is muted while none
+plays, and `toggleMute()` mutes or unmutes all of them through `Audio::setStreamMuted`. The
+preview's and the tests' stand-ins give the `pid` roles, and the streams' `processes`, themselves.
 
 The start menu (`Launcher.qml` and its `Start*.qml` parts) reads `shell.startMenu`, a `StartMenu`
 (`start_menu.cpp`): its own pins, seeded from the taskbar's; the applications launched lately
