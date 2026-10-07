@@ -101,6 +101,10 @@ void focus_toplevel_raise(struct sh_toplevel *toplevel, bool raise) {
         wlr_log(WLR_INFO, "Urgent window focused");
         notify_subscribers(server);
     }
+    // Peeked at, as a taskbar's picture of it is clicked, it is shown for good now, where the
+    // peek showed it: the others fade back around it.
+    if (server->peek_window == toplevel)
+        end_window_peek(server, true);
 }
 
 void focus_toplevel(struct sh_toplevel *toplevel) { focus_toplevel_raise(toplevel, true); }

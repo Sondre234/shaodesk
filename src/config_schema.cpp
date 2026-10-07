@@ -296,7 +296,8 @@ const Option options[] = {
 
     {"peek", "table", "", "", none, none,
      "Peek: `peek` (hold a key) and `peek_toggle` make every window nearly transparent to show "
-     "the desktop, with borders and the panel left alone."},
+     "the desktop, with borders and the panel left alone. Resting on a window's picture on the "
+     "taskbar's card fades every other window the same way."},
     {"peek.opacity", "number", "0.12", "0.12", 0, 0.9,
      "Opacity windows fade to while peeking; 0 hides them completely."},
     {"peek.duration", "integer", "150", "150", 0, 2000,
@@ -563,7 +564,8 @@ const Option options[] = {
      "window's proportions make it, and get smaller, down to 60 %, when there are many."},
     {"shell.thumbnails.live", "boolean", "true", "true", none, none,
      "The pictures follow their windows while the card or the switcher is open, at most 30 "
-     "times a second; `false` takes one of each window as it opens."},
+     "times a second; `false` takes one of each window just before the card opens, or as the "
+     "switcher opens."},
     {"shell.workspaces_shown", "integer", "0", "3", 0, 10,
      "How many of the monitor's workspaces the workspace indicator shows, the current one in "
      "the middle: `3` shows it with the one before and the one after, or the first or last "

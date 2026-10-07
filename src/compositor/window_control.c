@@ -2,12 +2,13 @@
 /* The taskbar's window menu and pictures: shaodesk-window-control-v1 names a window by its
  * wlr-foreign-toplevel handle, tells the shell which output and workspace each is on, how it is
  * placed and its number, moves one to another workspace or output, makes it sticky or floats it,
- * and gives its capture source for a picture of it. */
+ * gives its capture source for a picture of it, and peeks at it. */
 #include "server.h"
 
 /* One shaodesk_window_v1: the window it names, NULL once that is gone, and what it last sent. */
 struct sh_window_object {
     struct wl_resource *resource;
+    struct sh_server *server;
     struct sh_toplevel *toplevel;
     struct wl_list link; // sh_server.window_objects
     bool sent;
@@ -97,11 +98,14 @@ void window_objects_changed(struct sh_server *server) {
         wl_display_get_event_loop(server->wl_display), send_windows, server);
 }
 
-/* The window is leaving the taskbar, its handles going inert: so do its objects. */
+/* The window is leaving the taskbar, its handles going inert: so do its objects, and a peek at
+ * it ends. */
 void window_objects_forget(struct sh_toplevel *toplevel) {
     struct sh_server *server = toplevel->server;
     if (!server->window_control)
         return;
+    if (server->peek_window == toplevel)
+        end_window_peek(server, true);
     struct sh_window_object *object;
     wl_list_for_each(object, &server->window_objects, link) {
         if (object->toplevel == toplevel)
@@ -195,6 +199,24 @@ static void window_get_scaled_capture_source(struct wl_client *client,
     create_scaled_capture_source(client, id, object ? object->toplevel : NULL, width, height);
 }
 
+/* Peeks at the window itself, a hidden member of a window group too (effects.c), until this
+ * object ends it or goes, or something else does: another peek, the window closing or being
+ * focused, the session locking, the peek action. */
+static void window_set_peek(struct wl_client *client, struct wl_resource *resource) {
+    struct sh_window_object *object = wl_resource_get_user_data(resource);
+    struct sh_toplevel *toplevel = object ? object->toplevel : NULL;
+    if (!toplevel || toplevel->server->locked || !toplevel_mapped(toplevel))
+        return;
+    peek_at_window(toplevel);
+    toplevel->server->peek_object = object;
+}
+
+static void window_unset_peek(struct wl_client *client, struct wl_resource *resource) {
+    struct sh_window_object *object = wl_resource_get_user_data(resource);
+    if (object && object->server->peek_object == object)
+        end_window_peek(object->server, true);
+}
+
 static const struct shaodesk_window_v1_interface window_implementation = {
     .destroy = window_destroy,
     .move_to_workspace = window_move_to_workspace,
@@ -205,10 +227,15 @@ static const struct shaodesk_window_v1_interface window_implementation = {
     .unset_floating = window_unset_floating,
     .get_capture_source = window_get_capture_source,
     .get_scaled_capture_source = window_get_scaled_capture_source,
+    .set_peek = window_set_peek,
+    .unset_peek = window_unset_peek,
 };
 
+/* Destroyed by its client, or as the client disconnects: a peek it asked for ends. */
 static void window_resource_destroy(struct wl_resource *resource) {
     struct sh_window_object *object = wl_resource_get_user_data(resource);
+    if (object->server->peek_object == object)
+        end_window_peek(object->server, true);
     wl_list_remove(&object->link);
     free(object);
 }
@@ -230,6 +257,7 @@ static void control_get_window(struct wl_client *client, struct wl_resource *res
     }
     wl_resource_set_implementation(object->resource, &window_implementation, object,
                                    window_resource_destroy);
+    object->server = server;
     object->toplevel = handle_toplevel(server, handle);
     wl_list_insert(&server->window_objects, &object->link);
     send_window(object);
@@ -256,7 +284,8 @@ static void control_bind(struct wl_client *client, void *data, uint32_t version,
 
 /* Offered to every client, as wlr-foreign-toplevel-management is: it does nothing to a window a
  * taskbar could not already do, and shows nothing of one that ext-foreign-toplevel-list's
- * capture sources do not, but for which process made it and the number the switcher calls it. */
+ * capture sources do not, but for which process made it and the number the switcher calls it;
+ * a peek shows the window for a moment and changes nothing about it. */
 void window_control_init(struct sh_server *server) {
     wl_list_init(&server->window_objects);
     server->window_control = wl_global_create(server->wl_display,

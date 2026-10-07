@@ -5,6 +5,7 @@
 #include "xdg-activation-v1-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -63,6 +64,13 @@ struct probe {
     int margin;
     bool commands; // --commands: an external-control window that obeys lines on standard input
     bool print_keymap, keymap_seen; // --keymap
+    // SHAODESK_PROBE_DRAG=source: a button press on the window drags a line of text from it, as
+    // a file manager drags a file; =target: the window takes text dropped on it. Either prints
+    // what it hears (see the data source's and data device's listeners).
+    bool drag_source, drag_target;
+    struct wl_data_device_manager *data_manager;
+    struct wl_data_device *data_device;
+    struct wl_data_offer *offer; // the drag's offer while it is over the window
 };
 static void die(const char *message) {
     fprintf(stderr, "wayland probe: %s\n", message);
@@ -175,8 +183,120 @@ static void global(void *data, struct wl_registry *registry, uint32_t name, cons
     } else if (!strcmp(interface, "xdg_wm_base")) {
         probe->shell = wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
         xdg_wm_base_add_listener(probe->shell, &shell_listener, probe);
+    } else if (!strcmp(interface, "wl_data_device_manager") && version >= 3) {
+        probe->data_manager =
+            wl_registry_bind(registry, name, &wl_data_device_manager_interface, 3);
     }
 }
+/* A line on standard output, at once: the test reads it while the probe runs. */
+__attribute__((format(printf, 1, 2))) static void say(const char *format, ...) {
+    va_list arguments;
+    va_start(arguments, format);
+    vprintf(format, arguments);
+    va_end(arguments);
+    putchar('\n');
+    fflush(stdout);
+}
+/* The drag's source hears where it is ("drag target MIME", or "-" where nothing takes it), the
+ * action agreed on, and how it ends: "drag dropped" then "drag finished", or "drag cancelled". */
+static void source_target(void *data, struct wl_data_source *source, const char *mime) {
+    say("drag target %s", mime ? mime : "-");
+}
+static void source_send(void *data, struct wl_data_source *source, const char *mime, int32_t fd) {
+    static const char text[] = "shaodesk drag";
+    if (write(fd, text, sizeof(text) - 1) < 0)
+        die("cannot send the dragged text");
+    close(fd);
+}
+static void source_cancelled(void *data, struct wl_data_source *source) {
+    say("drag cancelled");
+    wl_data_source_destroy(source);
+}
+static void source_dropped(void *data, struct wl_data_source *source) {
+    say("drag dropped");
+}
+static void source_finished(void *data, struct wl_data_source *source) {
+    say("drag finished");
+    wl_data_source_destroy(source);
+}
+static void source_action(void *data, struct wl_data_source *source, uint32_t action) {
+    say("drag action %u", action);
+}
+static const struct wl_data_source_listener source_listener = {
+    .target = source_target, .send = source_send, .cancelled = source_cancelled,
+    .dnd_drop_performed = source_dropped, .dnd_finished = source_finished,
+    .action = source_action};
+static const char drag_mime[] = "text/plain;charset=utf-8";
+/* Starts dragging from the window, for the press that `serial` names. */
+static void start_drag(struct probe *probe, uint32_t serial) {
+    struct wl_data_source *source = wl_data_device_manager_create_data_source(probe->data_manager);
+    wl_data_source_add_listener(source, &source_listener, probe);
+    wl_data_source_offer(source, drag_mime);
+    wl_data_source_set_actions(source, WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY |
+                                           WL_DATA_DEVICE_MANAGER_DND_ACTION_MOVE);
+    wl_data_device_start_drag(probe->data_device, source, probe->surface, NULL, serial);
+}
+static void offer_offer(void *data, struct wl_data_offer *offer, const char *mime) {}
+static void offer_source_actions(void *data, struct wl_data_offer *offer, uint32_t actions) {}
+static void offer_action(void *data, struct wl_data_offer *offer, uint32_t action) {}
+static const struct wl_data_offer_listener offer_listener = {
+    .offer = offer_offer, .source_actions = offer_source_actions, .action = offer_action};
+static void device_data_offer(void *data, struct wl_data_device *device,
+                              struct wl_data_offer *offer) {
+    wl_data_offer_add_listener(offer, &offer_listener, data);
+}
+/* A target takes the text as a copy wherever on the window it is dragged ("drop offered"), and
+ * once dropped reads it ("drop received TEXT"). */
+static void device_enter(void *data, struct wl_data_device *device, uint32_t serial,
+                         struct wl_surface *surface, wl_fixed_t x, wl_fixed_t y,
+                         struct wl_data_offer *offer) {
+    struct probe *probe = data;
+    if (probe->offer)
+        wl_data_offer_destroy(probe->offer);
+    probe->offer = offer;
+    if (!offer || !probe->drag_target)
+        return;
+    wl_data_offer_accept(offer, serial, drag_mime);
+    wl_data_offer_set_actions(offer, WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY,
+                              WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY);
+    say("drop offered");
+}
+static void device_leave(void *data, struct wl_data_device *device) {
+    struct probe *probe = data;
+    if (probe->offer)
+        wl_data_offer_destroy(probe->offer);
+    probe->offer = NULL;
+}
+static void device_motion(void *data, struct wl_data_device *device, uint32_t time, wl_fixed_t x,
+                          wl_fixed_t y) {}
+static void device_drop(void *data, struct wl_data_device *device) {
+    struct probe *probe = data;
+    int fds[2];
+    if (!probe->offer || !probe->drag_target || pipe(fds) < 0)
+        return;
+    wl_data_offer_receive(probe->offer, drag_mime, fds[1]);
+    close(fds[1]);
+    wl_display_flush(wl_proxy_get_display((struct wl_proxy *)device));
+    char text[64];
+    size_t length = 0;
+    ssize_t count;
+    while (length < sizeof(text) - 1 && (count = read(fds[0], text + length, sizeof(text) - 1 - length)) > 0)
+        length += (size_t)count;
+    close(fds[0]);
+    text[length] = '\0';
+    say("drop received %s", text);
+    wl_data_offer_finish(probe->offer);
+    wl_data_offer_destroy(probe->offer);
+    probe->offer = NULL;
+}
+static void device_selection(void *data, struct wl_data_device *device,
+                             struct wl_data_offer *offer) {
+    if (offer)
+        wl_data_offer_destroy(offer);
+}
+static const struct wl_data_device_listener device_listener = {
+    .data_offer = device_data_offer, .enter = device_enter, .leave = device_leave,
+    .motion = device_motion, .drop = device_drop, .selection = device_selection};
 /* Asks to be focused, the way an application does for a message it wants read: a token from
  * xdg-activation, made without an input serial, and then activate with it. */
 static void token_done(void *data, struct xdg_activation_token_v1 *token, const char *string) {
@@ -254,6 +374,8 @@ static void pointer_button(void *data, struct wl_pointer *pointer, uint32_t seri
         xdg_toplevel_resize(probe->toplevel, probe->seat, serial, probe->resize_edges);
     else if (probe->move_on_press && state == WL_POINTER_BUTTON_STATE_PRESSED)
         xdg_toplevel_move(probe->toplevel, probe->seat, serial);
+    else if (probe->drag_source && state == WL_POINTER_BUTTON_STATE_PRESSED)
+        start_drag(probe, serial);
 }
 static void pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t axis,
                          wl_fixed_t value) {}
@@ -610,8 +732,18 @@ int main(int argc, char **argv) {
                                  (strstr(edge, "right") ? XDG_TOPLEVEL_RESIZE_EDGE_RIGHT : 0);
         }
         probe.move_on_press = true;
-        wl_pointer_add_listener(wl_seat_get_pointer(probe.seat), &pointer_listener, &probe);
     }
+    const char *drag = getenv("SHAODESK_PROBE_DRAG");
+    probe.drag_source = drag && !strcmp(drag, "source");
+    probe.drag_target = drag && !strcmp(drag, "target");
+    if (probe.drag_source || probe.drag_target) {
+        if (!probe.data_manager)
+            die("wl_data_device_manager version 3 is not advertised");
+        probe.data_device = wl_data_device_manager_get_data_device(probe.data_manager, probe.seat);
+        wl_data_device_add_listener(probe.data_device, &device_listener, &probe);
+    }
+    if (probe.move_on_press || probe.drag_source)
+        wl_pointer_add_listener(wl_seat_get_pointer(probe.seat), &pointer_listener, &probe);
     // Tests telling several probes apart name them through SHAODESK_PROBE_TITLE, and window
     // rule tests through SHAODESK_PROBE_APP_ID.
     const char *title = getenv("SHAODESK_PROBE_TITLE"), *app_id = getenv("SHAODESK_PROBE_APP_ID");

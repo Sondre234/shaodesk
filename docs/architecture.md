@@ -54,7 +54,7 @@ all. In short:
 | `output.c`, `output_moves.c` | Monitors and their configuration; windows and workspaces moving between outputs. |
 | `layer_shell.c` | Panels and other layer surfaces. |
 | `group.c`, `scratchpad.c`, `swallow.c`, `switcher.c`, `overview.c`, `session.c` | One feature each. |
-| `effects.c` | Dimming, peek, night light, magnifier, hot corners. |
+| `effects.c` | Dimming, peeking at the desktop or at one window, night light, magnifier, hot corners. |
 | `lock.c` | Session lock and idle/sleep inhibitors. |
 | `power.c` | The power actions: suspend, hibernate, reboot and power off through logind (`src/login1.c`), locking first, closing windows first, log out. |
 | `foreign_toplevel.c` | Window lists for taskbars and single-window capture. |
@@ -90,8 +90,8 @@ and do nothing while the session is locked. A change reaches the objects through
 `window_objects_changed`, which `notify_subscribers` and the tiling call: it sends what changed
 from an idle callback, once the change is over. Like the foreign-toplevel manager, the global is
 offered to every client; it lets a client do nothing to a window a taskbar cannot already do.
-`tests/window_probe.c` is a client of it for `window_control_smoke` and `window_capture_smoke`,
-and `TaskModel` the shell's.
+`tests/window_probe.c` is a client of it for `window_control_smoke`, `window_capture_smoke` and
+`window_peek_smoke`, and `TaskModel` the shell's.
 
 A window's capture source is the one screen sharing gets for its ext-foreign-toplevel-list
 handle, from `toplevel_capture_source` (`foreign_toplevel.c`): made from a private scene that
@@ -140,7 +140,26 @@ Since version 3 a `shaodesk_window_v1` also sends the window's `pid` with its st
 names for an X11 window, 0 when unknown, for the shell to match the window with the sound
 server's streams.
 
-Since version 4 it sends the window's `id` once, with its first state: `sh_toplevel.id`, a number
+Since version 4 `set_peek` peeks at the window and `unset_peek` ends the peek (`effects.c`), for
+the taskbar's card while the pointer rests on a picture. The other windows fade with
+`peek_fade`, the desktop peek's, while the window's own `peek_shown` fade, which `peek_scale`
+(the opacity `refresh_frame` gives its buffers) weighs against it, keeps it in full. It is drawn
+over them from `peek_layer`, a tree between the fullscreen windows and the top layer, so that the
+bar and the card stay over it, while an empty tree keeps its place among the windows; one
+fullscreen over the panels stays where it is, over the others already. A hidden window
+(minimized, or on a workspace its output does not show) has its node shown for the peek where it
+is (`peek_lent`), fades in and out, and is hidden again once it has faded out (`tick_effects`);
+`scene_node_at` passes over it, so it takes no input. Moving the peek to another window keeps the
+others faded and crossfades the two; ending it fades the others back, a window shown anyway
+staying in full until they are, and puts the window back in its place unless it was moved on
+purpose meanwhile, as focusing raises it. Nothing else about the window changes. The peek ends
+as the object that asked is destroyed (its client too), as the window closes
+(`forget_window_peek` in `unmap_toplevel`) or leaves the taskbar (`window_objects_forget`), is
+focused (`focus_toplevel_raise`, which a click on its picture does), as the session locks (at
+once), and as the desktop peek starts. `shaodesk msg get window_peek` lists what it does to each
+window, and `tests/window_peek_smoke.py` tests it.
+
+Version 4 also sends the window's `id` once, with its first state: `sh_toplevel.id`, a number
 `publish_toplevel` gives a window the first time it publishes it (counting up from 1 in
 `sh_server.last_window_id`) and gives no other window while the compositor runs. A window keeps
 it when published again, as a swallowed terminal is. The control socket names windows by it
@@ -166,9 +185,10 @@ While a menu or popup is open it holds the keyboard and takes every press but th
 strip, where `inputRects` leaves a hole: a press on another bar button still switches popups in
 one press, and a press beside the popups closes them. The windows of a button shown on hover (the
 card of their pictures, or a stack's list) take only the pointer over the card and down to the bar
-(`hoverArea`), and leave the keyboard where it is. Losing the keyboard while it holds it (`dismissed`)
-closes the popups. Without layer shell (`--preview-popup`, `shell_ui_test`) it is an ordinary
-window as large as `ShellView::previewSize()`, and a preview's screenshot draws it over the bar.
+(`hoverArea`), where a drag reaches them too, and leave the keyboard where it is. Losing the
+keyboard while it holds it (`dismissed`) closes the popups. Without layer shell (`--preview-popup`,
+`shell_ui_test`) it is an ordinary window as large as `ShellView::previewSize()`, and a preview's
+screenshot draws it over the bar.
 
 `Panel.qml` loads the bars of `shell.style`. The taskbar (`Taskbar.qml`) fills the panel's surface.
 The macOS style has two: the dock (`Dock.qml`) in the panel's surface, which is then at the bottom
@@ -228,21 +248,28 @@ The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `t
 `power.cpp`, `palette.cpp`. `preview.cpp` has stand-ins for all of them for
 `--preview-popup`.
 
-The pictures of the windows on the taskbar's card (`WindowThumbnails.qml`, with
-`shell.thumbnails`) are `TaskModel`'s: its `picture` role is `image://windows/<taskId>/<serial>`
-once a window has one, `""` until then, the serial new with every picture so that an `Image`
-with `cache: false` loads it again, and the `windows` image provider serves them by task id. The
-model takes pictures of a window only while something watches it: `watchPicture(taskId,
-pixelWidth, live)`, counted, which a tile calls as it appears and `unwatchPicture(taskId)` as it
-goes. It asks the window control for the window's capture source scaled down to fit
-`pixelWidth` by 5/8 of it (`get_scaled_capture_source`, version 3; a new width asks again), or
+The pictures of the windows on the taskbar's card (`WindowThumbnails.qml`, with `shell.thumbnails`)
+are `TaskModel`'s: its `picture` role is `image://windows/<taskId>/<serial>` once a window has one,
+`""` until then, the serial new with every picture so that an `Image` with `cache: false` loads it
+again, and the `windows` image provider serves them by task id. The model takes pictures of a
+window only while something watches it: `watchPicture(taskId, pixelWidth, live)`, counted, until
+`unwatchPicture(taskId)`. It asks the window control for the window's capture source scaled down to
+fit `pixelWidth` by 5/8 of it (`get_scaled_capture_source`, version 3; a new width asks again), or
 with version 2 for it at the window's size (`get_capture_source`), captures it with
 ext-image-copy-capture into shared memory, scales the picture down off the GUI thread where the
 frame is larger than that (only ever a copy with version 3), and, when `live`, takes the next as
-the window redraws, every 33 ms at most (100 ms at the window's size). The last picture stays
-until the window closes, so the card opens with it. A stand-in model (the preview's, the
-tests') has no `watchPicture`, which the card then does not call, and names pictures of its own
-(`image://preview-windows/ID`, painted by `preview.cpp`).
+the window redraws, every 33 ms at most (100 ms at the window's size). The last picture stays until
+the window closes, so the card opens with it.
+
+On the taskbar `Panel.qml` alone calls them, for what tells it that it wants a window's picture
+with `wantPicture(taskId, wanted)`: a tile of the card as it appears and as it goes, and the panel
+itself for the windows of the button the pointer has rested on for half of `shell.thumbnailDelay`
+(`warmGroup`, until the card opens or the pointer leaves), so that the card opens on their
+pictures. It counts the wants and asks the model once a change is over (`syncPictures`), so that a
+window the tiles take over from the panel as the card opens is neither let go nor asked for
+again, which would start its capture anew, or without `live` take its one picture twice. A
+stand-in model (the preview's, the tests') has no `watchPicture`, which the panel then does not
+call, and names pictures of its own (`image://preview-windows/ID`, painted by `preview.cpp`).
 
 The window switcher's cards (`SwitcherCards.qml`, which `Switcher.qml` loads in place of its grid
 with `shell.thumbnails` outside the macOS style) show the same pictures. The switcher's lines
@@ -250,11 +277,11 @@ name a window by its app id and title, which two windows may share, and by its n
 control's `id`, `TaskModel`'s `windowId` role); each card finds its task with a `TaskFilter`
 whose `windowId` keeps that window alone, filtering again when the number comes after the window.
 While the switcher is open on the view's output (`open`, `outputName`) a card watches its
-picture as the taskbar's tiles do, and unwatches it at `switcher-close`, though the cards stay
-while the switcher fades. The cards are made as the list arrives, 120 ms before `SwitcherView`
-shows the switcher, so the pictures are asked for early: with 20 windows on a headless compositor
-with pixman at 2560 by 1440 and a scale of 1.25, every one had a frame about 75 ms after the
-switcher opened. They are asked for twice as wide as the pictures' common height,
+picture itself with `watchPicture`, unless the model is a stand-in without it, and unwatches it
+at `switcher-close`, though the cards stay while the switcher fades. The cards are made as the
+list arrives, 120 ms before `SwitcherView` shows the switcher, so the pictures are asked for
+early: with 20 windows on a headless compositor with pixman at 2560 by 1440 and a scale of 1.25,
+every one had a frame about 75 ms after the switcher opened. They are asked for twice as wide as the pictures' common height,
 `shell.thumbnailSize` × 5/8, times the device pixel ratio, a box that holds any card's picture
 (3:4 to 2:1) without scaling it up. A card is as wide as its picture's proportions, which it notes
 in `aspects` once the picture shows (16:10 until then), and `arrange` lays the cards out in rows
@@ -275,6 +302,23 @@ ms for each frame of the switcher, against under one at a scale of 1 or 2, so th
 redrawing costs the shell 35 to 37 % and five 42 to 55 % (the compositor 29 to 32 % and 43 to
 49 %); drawn through the GPU, the shell and the compositor do that on the GPU.
 
+A drag from an application never reaches the hover handlers: Wayland sends its events
+(`wl_data_device`'s enter, motion and leave) to the surface under the pointer instead, and the
+pointer stays with none while it lasts. `Panel.qml` follows it with a `DropArea` over the panel's
+surface and one over the popover's (`dragOverBar`, `dragOverPopover`), which find the button under
+it (an item with `dragWindows()`: a `TaskButton` or a `DockIcon`) or the tile or row of a window
+on the open card or list (an item with `taskId`, `active` and `minimized`). After `dragDelay` a
+button's one window is activated (`taskSource.activate`, unless it is in front already, which that
+would minimize), a stack's windows shown (`openGroup`), or a tile's window activated. What is
+open stays while `dragHolds`, which `groupHide` reads beside the hover state. Each `DropArea`
+refuses every move (`drag.accepted = false`), and Qt answers the drag's source with the move's
+answer, so the shell never takes a drop and the source sees it cancelled. Each fills its surface,
+so that a drag enters it only as it comes onto the surface, when Qt follows the enter with a move
+at once; an item entered by a later move would answer that move with its enter, which takes the
+drag. `shell_ui_test` hands the windows drag events as Qt's Wayland platform does. A drag holds the keyboard in the compositor, and wlroots
+lets no focus change through it: `drag_ended` (`input.c`) gives the keyboard to the window
+focused meanwhile once the drag ends, and the pointer to the surface under it.
+
 The speaker on a picture's tile is a `WindowSound` (`audio.cpp`), which the tile makes with the
 panel's `audioSource` and `taskSource` and its window's `pid` (`TaskModel`'s role, from the window
 control's version 3). The sound server's backend gives each stream the process that plays it
@@ -287,6 +331,18 @@ started in a terminal in the terminal's, unless the player has a window. `playin
 the window's that is open and not paused (corked) or muted, `muted` one that is muted while none
 plays, and `toggleMute()` mutes or unmutes all of them through `Audio::setStreamMuted`. The
 preview's and the tests' stand-ins give the `pid` roles, and the streams' `processes`, themselves.
+
+A tile peeks at its window while the pointer rests on its picture: a `HoverHandler` on the
+picture's box and a timer call the task source's `peek(taskId)` after 500 ms, or at once while
+its `peekedTask` names a window already, so that the peek moves straight to the next picture, and
+`endPeek(taskId)` 150 ms after the pointer leaves the picture or the card closes, time to cross to
+the next one, whose peek takes over first (`endPeek` ends only the peek at that window). Half a
+second is about Windows' wait, a little longer than the card's own, so that crossing a picture on
+the way to the cross, the speaker or another tile does not fade every window on the screen.
+`TaskModel` sends `set_peek` and `unset_peek` (version 4) for them; the compositor ends a peek by
+itself too, as the window is focused (a click on the picture), which the model does not hear, so
+`peekedTask` names the last window it peeked at until `endPeek`. A stand-in without `peek` peeks
+at nothing, and the macOS style's dock and the stack's list of titles do not peek.
 
 The start menu (`Launcher.qml` and its `Start*.qml` parts) reads `shell.startMenu`, a `StartMenu`
 (`start_menu.cpp`): its own pins, seeded from the taskbar's; the applications launched lately
@@ -311,7 +367,10 @@ fills it. It places itself beside `anchorRect` (in its parent's coordinates) on 
 `alignment` (`Qt.AlignHCenter`, `Qt.AlignLeft`, `Qt.AlignRight`, or the vertical ones beside the
 anchor); it flips to the other side when that one has more room (`placedSide` says where it went),
 and stays `margin` inside `bounds`. Its size is its `implicitWidth` and `implicitHeight`, cut to
-`availableWidth` and `availableHeight`. `opened()` is emitted once each time it opens and shows,
+`availableWidth` and `availableHeight`. With `glides` (the card of window pictures), a card that
+is shown eases to another place or size (`placedX`, `placedY`, `placedWidth`, `placedHeight`)
+rather than jumping, and one that is not shown takes it at once, so that opening and closing keep
+their own motion. `opened()` is emitted once each time it opens and shows,
 when its content resets, and `initialFocus` (the card, unless set; `null` for none) then takes the
 keyboard. Presses on it stay with it until it starts closing. With `anchored: false` it is only
 the card, for a surface that places it itself.
@@ -489,7 +548,10 @@ them in `shell/controller.cpp`.
   107 bytes, and a Gentoo package build runs the tests in a `TMPDIR` of 43 characters or more.
   Under `--headless`, `shaodesk msg headless_output` and `headless_keyboard` plug in outputs and
   keyboards (`headless_keyboard key NAME CODE press` types on one; see `keymap_smoke.py`), and
-  `wayland_probe --keymap` prints the keymap an application gets.
+  `wayland_probe --keymap` prints the keymap an application gets. A `wayland_probe` window with
+  `SHAODESK_PROBE_DRAG=source` drags a line of text on a button press of `pointer_probe`'s, and
+  one with `=target` takes it, each printing what it hears; `get seat` says where the drag is
+  (see `drag_focus_smoke.py`).
 
 ## A fast loop
 

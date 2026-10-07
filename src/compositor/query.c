@@ -460,6 +460,88 @@ static void get_pictures(struct sh_server *server, int fd, const char *arguments
     }
 }
 
+/* Where a window is stacked among the windows, from 0 at the bottom: counting the windows in the
+ * trees they are drawn in from the lowest, the one peeked at over the others; -1 for none. */
+static int stacked_at(struct sh_server *server, struct sh_toplevel *toplevel) {
+    struct wlr_scene_tree *trees[] = {server->windows, server->fullscreen, server->peek_layer,
+                                      server->fullscreen_cover};
+    int index = 0;
+    for (size_t i = 0; i < sizeof(trees) / sizeof(*trees); ++i) {
+        struct wlr_scene_node *node;
+        wl_list_for_each(node, &trees[i]->children, link) {
+            // Closing copies and the node keeping the place of the window peeked at are no
+            // window's.
+            struct sh_node *owner = node->data;
+            if (!owner || owner->kind != SH_NODE_TOPLEVEL)
+                continue;
+            if (owner->owner == toplevel)
+                return index;
+            ++index;
+        }
+    }
+    return -1;
+}
+
+static void get_window_peek(struct sh_server *server, int fd, const char *arguments) {
+    // Per window, in the order of `get windows`: whether it is the one peeked at, whether it is
+    // drawn (its node shown), where it is stacked (stacked_at), how far it shows through a peek
+    // and the opacity its buffers have (both in thousandths), and its title.
+    control_reply(fd, "ok\n");
+    int64_t now = now_ms();
+    struct sh_toplevel *toplevel;
+    wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
+        char title[512], line[640];
+        snprintf(title, sizeof(title), "%s", toplevel_title(toplevel) ? toplevel_title(toplevel) : "");
+        one_field(title);
+        snprintf(line, sizeof(line), "%d\t%d\t%d\t%ld\t%ld\t%s\n", server->peek_window == toplevel,
+                 toplevel->scene_tree && toplevel->scene_tree->node.enabled,
+                 stacked_at(server, toplevel),
+                 lround(1000 * sh_fade_value(&toplevel->peek_shown, now)),
+                 lround(1000 * toplevel->opacity), title);
+        control_reply(fd, line);
+    }
+}
+
+/* `what`, then what `surface` belongs to as "KIND NAME", tab-separated, as one line: "window"
+ * and its title, "layer" and its namespace, "other" (a popup, a lock surface) and "-", or "-"
+ * and "-" for no surface. */
+static void describe_surface(struct sh_server *server, int fd, const char *what,
+                             struct wlr_surface *surface) {
+    const char *kind = surface ? "other" : "-", *raw = "-";
+    struct wlr_surface *root = surface ? wlr_surface_get_root_surface(surface) : NULL;
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (root && toplevel_surface(toplevel) == root) {
+            kind = "window";
+            raw = toplevel_title(toplevel) ? toplevel_title(toplevel) : "";
+        }
+    }
+    struct sh_layer *layer;
+    wl_list_for_each(layer, &server->layers, link) {
+        if (root && layer->surface->surface == root) {
+            kind = "layer";
+            raw = layer->surface->namespace;
+        }
+    }
+    char name[256], line[320];
+    snprintf(name, sizeof(name), "%s", raw);
+    one_field(name);
+    snprintf(line, sizeof(line), "%s\t%s\t%s\n", what, kind, name);
+    control_reply(fd, line);
+}
+
+static void get_seat(struct sh_server *server, int fd, const char *arguments) {
+    // What has the keyboard, what the pointer is on, and, while a drag is under way, what it is
+    // over (each as describe_surface has it). During a drag the pointer is on nothing: its events
+    // go to the drag.
+    struct wlr_seat *seat = server->seat;
+    control_reply(fd, "ok\n");
+    describe_surface(server, fd, "keyboard", seat->keyboard_state.focused_surface);
+    describe_surface(server, fd, "pointer", seat->pointer_state.focused_surface);
+    if (seat->drag)
+        describe_surface(server, fd, "drag", seat->drag->focus);
+}
+
 /* The queries, "get NAME" (or "get NAME ARGUMENTS" for one that takes them), which answer
  * even while the session is locked. A handler gets NULL for no arguments. */
 static const struct {
@@ -482,6 +564,7 @@ static const struct {
     {"frame_times", get_frame_times, false},
     {"dim", get_dim, false},
     {"peek", get_peek, false},
+    {"window_peek", get_window_peek, false},
     {"opacities", get_opacities, false},
     {"frames", get_frames, false},
     {"zoom", get_zoom, false},
@@ -491,6 +574,7 @@ static const struct {
     {"keyboard", get_keyboard, false},
     {"power", get_power, false},
     {"pictures", get_pictures, false},
+    {"seat", get_seat, false},
 };
 
 /* Answers `request` if it is a query; false if it is not one. */

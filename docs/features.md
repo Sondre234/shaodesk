@@ -41,7 +41,9 @@ the dock.
   application and its name shows above it on hover. A click starts an application, its icon
   bouncing until a window opens, or brings its windows forward; one asking for attention bounces
   three times. A right click lists its windows and actions, Keep in Dock or Remove from Dock, Hide
-  and Quit. `panel_height` sets its height (the icons are 16 pixels smaller), `panel_radius` its
+  and Quit. Something dragged from an application and resting on an icon brings its window
+  forward, or lists its windows to rest on one, as on the [taskbar](#taskbar), its name showing
+  meanwhile. `panel_height` sets its height (the icons are 16 pixels smaller), `panel_radius` its
   corners and `panel_margin.bottom` how far it floats above the edge; it is always at the bottom
   and as wide as its icons, and the desktop beside it takes clicks.
 - **Launchpad** (Super + R, the `launcher` action, or the dock's first button): every application
@@ -90,6 +92,17 @@ from their button's menu; those pins are kept in `$XDG_STATE_HOME/shaodesk/pinne
 application's windows take its button's place, keeping its icon, and dragging the button moves the
 pin.
 
+Something dragged from an application (a file, text, a link) brings windows forward as on Windows:
+resting the drag on a window's button for half a second brings that window to the front, restored
+if it was minimized and its workspace shown, so that the drag goes on onto it and drops there.
+Resting on a stack's button shows its windows, as the pointer resting there does, and resting on
+one of them brings it forward; they stay while the drag is over them or the button, and go once it
+has left both or ended. The button, picture or title under the drag is lit as under the pointer.
+A drag only crossing the bar brings nothing forward, and nothing can be dropped on the bar or on
+the windows it shows: the application sees the drop cancelled, so a file moved that way is not
+lost, and a pinned application's button without windows does nothing with it. Once the drag ends,
+the window brought forward has the keyboard.
+
 The workspace indicator lists the monitor's workspaces, the current one on a pill, with a dot
 under those with windows: click one to switch to it, or scroll anywhere on the bar to page through
 them. A right click on the bar's empty space opens its menu: tiling on or off, the start menu,
@@ -111,16 +124,21 @@ icon and the window's title. The pictures follow the windows as they redraw whil
 open (30 times a second at most, so a video moves), show the window alone, without its frame or
 what covers it,
 and show a minimized window or one on another workspace too; until one has come, the
-application's icon stands in. Alt + Tab shows the same pictures, a card for each window in the
+application's icon stands in, and the first fades in over it. They are taken from halfway into
+the delay, so that the card opens on them, and none is taken for a button the pointer only
+crosses on its way. Alt + Tab shows the same pictures, a card for each window in the
 [window switcher](#window-switcher). Clicking a picture
 focuses its window, or minimizes it when it is focused already; a middle click or the cross shown
 over the one under the pointer closes it, and a right click opens its [menu](#taskbar-menus). The
 focused window's picture is marked as its button is. The pointer can cross from the button onto
 the card, which closes a moment after it has left both, or at once when a button is pressed or a
-menu opens; moving onto another button shows that one's windows at once. The pictures get narrower
-when more windows than fit across the monitor share a button, down to 60 % of their width, and
-past that the stack lists its windows by title instead. The macOS style's dock lists a stack's
-windows by title, pictures or not.
+menu opens; moving onto another button shows that one's windows at once, the card gliding over
+to it and easing to their width, as it eases to a new width when a window opens or closes. A
+drag resting on a stack's button opens the card too, and resting on a picture brings its window
+forward ([above](#taskbar)). The
+pictures get narrower when more windows than fit across the monitor share a button, down to 60 %
+of their width, and past that the stack lists its windows by title instead. The macOS style's
+dock lists a stack's windows by title, pictures or not.
 
 While a window's process plays sound, a speaker shows beside its title on the card, as on a
 browser's tab; clicking it mutes the window's sound, and the speaker stays, crossed out, while it
@@ -135,13 +153,25 @@ plays nothing, as some games and voice-chat applications do, shows the speaker u
 it. An application in a sandbox with a process namespace of its own (Flatpak) names its processes
 by numbers that mean nothing outside it, so its windows show no speaker.
 
+Resting the pointer on a picture for half a second peeks at its window, as Windows' Aero Peek
+does: every other window fades as for the desktop [peek](#effects), to `peek.opacity` over
+`peek.duration`, and the window shows over them in full where it is, a minimized one where it
+was and one on another workspace over the workspace shown. The bar and the card stay as they are.
+Nothing about the window changes: it is not focused, raised, restored or moved to the workspace
+shown, and while it shows only for the peek, clicks go through it. Moving onto another picture
+takes the peek over at once, without the others coming back in between; leaving the pictures, or
+the card closing, ends it with a fade. Clicking the picture focuses the window where the peek
+shows it. The peek also ends as the window closes or is focused another way, as the session
+locks, or as the desktop peek starts. The macOS style's dock and a stack's list of titles have no
+pictures, and do not peek.
+
 ```lua
 shell = {
     thumbnails = {
         enabled = true, -- false: a tooltip with the title, and a stack's list of titles
         delay = 400,    -- milliseconds the pointer rests on the button first (0 to 2000)
         size = 240,     -- width of one picture in pixels (120 to 480), 5/8 of it tall
-        live = true,    -- false takes one picture of each window as the card opens
+        live = true,    -- false takes one picture of each window just before the card opens
     },
 }
 ```
@@ -309,7 +339,8 @@ fullscreen, and close, from left to right) and appears when the pointer nears th
 it never covers text. With `windows.controls = "traffic_lights"` they are macOS's red, yellow and
 green circles (close, minimize, fullscreen) at the top-left instead, grey while the window has
 no focus and showing their symbols while the pointer is on one. Dragging the window's top edge (its top 6 pixels, as a title bar would;
-`windows.drag_strip` changes how many) moves the window. Other windows, and windows that ask to draw their own frame, decorate
+`windows.drag_strip` changes how many) moves the window; a file or text dragged from another
+window over it goes to the window. Other windows, and windows that ask to draw their own frame, decorate
 themselves.
 
 Dropping a dragged window with the pointer at the top edge of the screen, or on a panel along
@@ -904,7 +935,9 @@ through the black to the window.
 **Peek.** Bind `peek` to a key and every window fades to `peek.opacity` (0.12 by default; 0 hides
 them) for as long as the key is held, showing the desktop behind them; borders, the panel and
 dimming go with it. `peek_toggle` (and `shaodesk msg peek_toggle`) switches it on and off instead.
-The fade takes `peek.duration` milliseconds.
+The fade takes `peek.duration` milliseconds. Resting on a window's picture on the taskbar's card
+peeks at that window the same way, the others fading while it shows over them (see
+[Window pictures](#window-pictures)); the desktop peek takes over from it.
 
 **Night light.** `night_light = { enabled = true, night_temperature = 3400 }` turns the screen
 warm in the evening and neutral again in the morning, easing over `transition` minutes around
@@ -1248,7 +1281,14 @@ the keyboard.
 the scene (closing windows count until their animation ends), and of focus fades, mainly
 for tests. `shaodesk msg get pictures` prints one line per capture source a client asked for to
 picture a window at a size, as the taskbar does: the size asked for, the frame's size, how many
-sessions capture it, and the window's title, also mainly for tests. A client
+sessions capture it, and the window's title, also mainly for tests. `shaodesk msg get
+window_peek` prints one line per window for the taskbar's peek at a window: whether it is the
+one peeked at, whether it is drawn, where it is stacked among the windows (0 at the bottom), how
+far it shows through the peek and its opacity (both in thousandths), and its title. `shaodesk
+msg get seat` prints what has the keyboard, what the pointer is on and, while something is
+dragged, what the drag is over: a line each, `keyboard`, `pointer` or `drag`, followed by
+`window` and its title, `layer` and its namespace, `other` (a popup, the lock screen) and `-`,
+or `-` twice for nothing; during a drag the pointer is on nothing. A client
 that sends `subscribe` keeps its connection and receives `tiling on|off` and
 `workspace N` (the focused monitor's), one `output NAME N USED TILING` line per monitor
 (as in `get workspaces`), and `keyboard-layout N COUNT SHORT NAME` (the active

@@ -160,7 +160,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 
 | Setting | Type | Default | Range | Description |
 | --- | --- | --- | --- | --- |
-| `peek` | table | - | - | Peek: `peek` (hold a key) and `peek_toggle` make every window nearly transparent to show the desktop, with borders and the panel left alone. |
+| `peek` | table | - | - | Peek: `peek` (hold a key) and `peek_toggle` make every window nearly transparent to show the desktop, with borders and the panel left alone. Resting on a window's picture on the taskbar's card fades every other window the same way. |
 | `peek.opacity` | number | 0.12 | 0 to 0.9 | Opacity windows fade to while peeking; 0 hides them completely. |
 | `peek.duration` | integer | 150 | 0 to 2000 | Milliseconds of the fade in and out; 0, or `animations.enabled = false`, switches at once. |
 
@@ -327,7 +327,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.thumbnails.enabled` | boolean | true | - | Show the pictures; `false` gives a window's button its title as a tooltip again, a stack the list of its windows' titles, and the switcher its grid of icons. |
 | `shell.thumbnails.delay` | integer | 400 | 0 to 2000 | Milliseconds the pointer rests on the button before the card opens. |
 | `shell.thumbnails.size` | integer | 240 | 120 to 480 | Width of one picture in pixels, which is 5/8 as tall. With more windows than fit across the monitor they get narrower, down to 60 % of it, and past that the card lists the windows by title instead. The switcher's pictures are as tall, each as wide as its window's proportions make it, and get smaller, down to 60 %, when there are many. |
-| `shell.thumbnails.live` | boolean | true | - | The pictures follow their windows while the card or the switcher is open, at most 30 times a second; `false` takes one of each window as it opens. |
+| `shell.thumbnails.live` | boolean | true | - | The pictures follow their windows while the card or the switcher is open, at most 30 times a second; `false` takes one of each window just before the card opens, or as the switcher opens. |
 | `shell.workspaces_shown` | integer | 0 | 0 to 10 | How many of the monitor's workspaces the workspace indicator shows, the current one in the middle: `3` shows it with the one before and the one after, or the first or last three at either end. 0 shows them all. Scrolling still reaches every workspace. |
 | `shell.accent` | color | "#7da8ff" | - | Accent color, `#RRGGBB` or `#RRGGBBAA`. |
 | `shell.panel_color` | color | "#151e2c" | - | Panel color; `#RRGGBBAA` makes it translucent. |

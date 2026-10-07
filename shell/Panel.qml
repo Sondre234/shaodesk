@@ -77,13 +77,86 @@ Item {
     onThumbnailsChanged: closeGroup()
     readonly property int thumbnailGap: Theme.spacingS
     readonly property int thumbnailPadding: Theme.spacingM
-    readonly property real thumbnailWidth: {
-        var count = Math.max(1, groupWindows.count)
+    readonly property real thumbnailWidth: thumbnailWidthFor(groupWindows.count)
+    function thumbnailWidthFor(count) {
+        count = Math.max(1, count)
         var room = popupArea.width - 2 * Theme.spacingM - (count + 1) * thumbnailGap
         return Math.min(shell.thumbnailSize, Math.floor(room / count) - 2 * thumbnailPadding)
     }
-    readonly property bool thumbnailsOpen: groupOpen && thumbnails &&
-                                           (groupWindows.count < 2 || thumbnailWidth >= 0.6 * shell.thumbnailSize)
+    // Whether `count` windows' pictures fit on the card, else their list shows.
+    function picturesFit(count) { return count < 2 || thumbnailWidthFor(count) >= 0.6 * shell.thumbnailSize }
+    readonly property bool thumbnailsOpen: groupOpen && thumbnails && picturesFit(groupWindows.count)
+    // The pictures of windows are the task source's, taken while something here wants them
+    // (wantPicture; a stand-in source has no watchPicture, and none are taken). The card's tiles
+    // want their windows', and the panel those of the button the pointer has rested on for half
+    // of shell.thumbnailDelay (warmGroup), so that its card opens on them rather than on the
+    // icons standing in until they come: a pointer only crossing a button on its way elsewhere
+    // has left it by then, and the other half leaves a picture time to come. Wants are counted by
+    // task id and asked of the source once a change is over (syncPictures), so that as the card
+    // opens its tiles take over the panel's wants without the windows being let go and asked for
+    // again: their captures go on, and without shell.liveThumbnails no window's one picture is
+    // taken twice.
+    property var pictureWants: ({})
+    // The windows asked for, as {taskId: true}, and the source they were asked of.
+    property var pictureWatches: ({})
+    property var pictureSource: null
+    function wantPicture(taskId, wanted) {
+        var count = (pictureWants[taskId] || 0) + (wanted ? 1 : -1)
+        if (count > 0) pictureWants[taskId] = count
+        else delete pictureWants[taskId]
+        Qt.callLater(syncPictures)
+    }
+    function syncPictures() {
+        var source = taskSource, id
+        if (pictureSource !== source) {
+            if (pictureSource && typeof pictureSource.unwatchPicture === "function")
+                for (id in pictureWatches) pictureSource.unwatchPicture(Number(id))
+            pictureWatches = {}
+            pictureSource = source
+        }
+        for (id in pictureWatches)
+            if (!pictureWants[id]) {
+                source.unwatchPicture(Number(id))
+                delete pictureWatches[id]
+            }
+        if (!source || typeof source.watchPicture !== "function")
+            return
+        for (id in pictureWants)
+            if (!pictureWatches[id]) {
+                source.watchPicture(Number(id), Math.round(shell.thumbnailSize * Screen.devicePixelRatio),
+                                    shell.liveThumbnails)
+                pictureWatches[id] = true
+            }
+    }
+    // The windows of the button the pointer rests on, warmed up for its card, as windowsOf gives
+    // them; null while none are.
+    property var warmGroup: null
+    readonly property TaskFilter warmWindows: TaskFilter {
+        controller: shell; sourceModel: root.warmGroup ? root.taskSource : null
+        app: root.warmGroup ? root.warmGroup.slot : ""
+        windowApp: root.warmGroup ? root.warmGroup.windowApp : ""
+        taskId: root.warmGroup ? root.warmGroup.task : -1
+    }
+    Instantiator {
+        model: root.warmWindows
+        delegate: QtObject {
+            required property int taskId
+            // The window it wanted, should the row change before it goes.
+            property int wanted: -1
+            Component.onCompleted: { wanted = taskId; root.wantPicture(wanted, true) }
+            Component.onDestruction: root.wantPicture(wanted, false)
+        }
+    }
+    function warmPictures() {
+        var button = groupPending
+        if (!groupShow.running || groupOpen || !button || !button.hovered || !thumbnails)
+            return
+        warmGroup = windowsOf(button)
+        // Too many to show as pictures, they are listed instead.
+        if (!picturesFit(warmWindows.count))
+            warmGroup = null
+    }
+    Timer { id: pictureWarmup; interval: shell.thumbnailDelay / 2; onTriggered: root.warmPictures() }
     readonly property bool groupListOpen: groupOpen && !thumbnailsOpen
     // What shows the windows: the card of pictures or the list, and whether the pointer is on it.
     readonly property Item groupPopup: thumbnailsOpen ? thumbnailsLoader.item : groupListLoader.item
@@ -91,7 +164,7 @@ Item {
     // Something is open in the popover. The list shown on hover does not take the keyboard: it
     // opens under a window being typed in.
     readonly property bool expanded: menuOpen || groupOpen
-    onMenuOpenChanged: if (menuOpen) { groupShow.stop(); groupOpen = false }
+    onMenuOpenChanged: if (menuOpen) { stopWaiting(); groupOpen = false }
     // The bars the style has: the taskbar (Taskbar.qml), or in the macOS style the dock
     // (Dock.qml) in the panel's surface and the menu bar (TopMenuBar.qml) in a surface of its own
     // along the output's top edge.
@@ -178,27 +251,46 @@ Item {
         if (hovered && showsWindows(button) && !menuOpen && !button.pressed) {
             groupPending = button
             groupHide.stop()
-            if (groupOpen) showGroup(); else groupShow.restart()
+            if (groupOpen) {
+                showGroup()
+            } else {
+                warmGroup = null
+                groupShow.restart()
+                if (thumbnails) pictureWarmup.restart()
+            }
         } else if (!hovered && button === groupPending) {
             // Entering the next button can come before leaving this one.
-            groupShow.stop()
+            stopWaiting()
             if (groupOpen) groupHide.restart()
         }
     }
-    function closeGroup() {
+    // The pointer is no longer waiting for a button's windows to show.
+    function stopWaiting() {
         groupShow.stop()
+        pictureWarmup.stop()
+        warmGroup = null
+    }
+    function closeGroup() {
+        stopWaiting()
         groupOpen = false
     }
     function showGroup() {
         var button = groupPending
         if (button && button.hovered && !button.pressed && showsWindows(button) && !menuOpen)
             openGroup(button)
+        warmGroup = null
+    }
+    // The windows a button shows, as {slot, windowApp, task} for the filters' app, windowApp and
+    // taskId: a taskbar button without a group stands for its own window; a dock icon has none.
+    function windowsOf(button) {
+        return { slot: button.groupSlot, windowApp: button.groupWindowApp,
+                 task: button.group === null ? button.taskId : -1 }
     }
     function openGroup(button) {
-        // A taskbar button without a group stands for its own window; a dock icon has none.
-        groupTask = button.group === null ? button.taskId : -1
-        groupSlot = button.groupSlot
-        groupWindowApp = button.groupWindowApp
+        var windows = windowsOf(button)
+        groupTask = windows.task
+        groupSlot = windows.slot
+        groupWindowApp = windows.windowApp
         groupIcon = button.iconName
         groupX = button.mapToItem(root, button.width / 2, 0).x
         groupOpen = true
@@ -206,12 +298,123 @@ Item {
     Timer { id: groupShow; interval: root.thumbnails ? shell.thumbnailDelay : 350; onTriggered: root.showGroup() }
     Timer {
         id: groupHide; interval: 300
-        onTriggered: if (!root.groupListHovered && !(root.groupPending && root.groupPending.hovered)) root.groupOpen = false
+        onTriggered: if (!root.groupListHovered && !(root.groupPending && root.groupPending.hovered) && !root.dragHolds) root.groupOpen = false
     }
     // The pointer entering the list (or the card) keeps it, and leaving it hides it a moment later.
     function hoverGroupList(hovered) {
         if (hovered) groupHide.stop(); else groupHide.restart()
     }
+    // A drag from an application (a file, text, a link) resting on a button with windows brings
+    // them forward, as on Windows: after dragDelay a single window is activated (raised, restored,
+    // its workspace shown) and a stack shows its windows, as on hover; resting on one of those
+    // activates it in turn, and the drag goes on onto the window to drop there. A drag only
+    // crossing a button does nothing. Its events go to the surface under the pointer, never to the
+    // hover handlers, so a DropArea over the panel's surface and one over the popover's follow it
+    // (dragOverBar, dragOverPopover). What it opened stays open while it is over the card or its
+    // button (dragHolds), and closes a moment after it has left both or ended. Neither takes the
+    // drop: the application hears that nothing here would, and it is cancelled.
+    // Half a second, longer than the pointer rests for a stack's list (350 ms) or, by default, a
+    // card (shell.thumbnailDelay): a drag crosses the bar on its way elsewhere more often than the
+    // pointer does, and a window brought forward changes what lies under the drag, where a card
+    // opened by mistake only covers a little of the screen. Windows waits about as long.
+    readonly property int dragDelay: 500
+    // The button with windows the drag is over, the tile or row of a window on the open card or
+    // list it is over, null for none; and whether it is over the popover's card (or between it and
+    // the bar).
+    property Item dragButton: null
+    property Item dragTile: null
+    property bool dragOnCard: false
+    readonly property bool dragHolds: groupOpen && (dragOnCard || dragButton !== null && showsWindowsOf(dragButton))
+    onDragHoldsChanged: if (!dragHolds && groupOpen) groupHide.restart()
+    function showsWindowsOf(button) {
+        var windows = windowsOf(button)
+        return windows.slot === groupSlot && windows.windowApp === groupWindowApp && windows.task === groupTask
+    }
+    // The topmost item at (x, y) in `reference`'s coordinates among `item`'s descendants that
+    // `matches`, looking only inside items that hold the point; null for none.
+    function itemUnder(reference, item, x, y, matches) {
+        var children = item.children
+        for (var i = children.length - 1; i >= 0; --i) {
+            var child = children[i]
+            if (!child.visible || !child.contains(child.mapFromItem(reference, x, y)))
+                continue
+            if (matches(child))
+                return child
+            var found = itemUnder(reference, child, x, y, matches)
+            if (found)
+                return found
+        }
+        return null
+    }
+    // The drag at `point` on the panel's surface, or gone from it (null). A button with windows
+    // has dragWindows(); a pinned application's without any, or the dock's Trash, does nothing.
+    function dragOverBar(point) {
+        var button = point ? itemUnder(root, bar, point.x, point.y, function(item) {
+            return typeof item.dragWindows === "function" && item.enabled
+        }) : null
+        var count = button ? button.dragWindows().length : 0
+        if (count === 0)
+            button = null
+        if (button === dragButton)
+            return
+        dragButton = button
+        dragWarmup.stop()
+        if (!groupOpen)
+            warmGroup = null
+        if (!button || groupOpen && showsWindowsOf(button)) {
+            dragRest.stop()
+        } else if (groupOpen && count > 1) {
+            // Open, the card or list goes over to another stack's windows at once, as on hover.
+            dragRest.stop()
+            openGroup(button)
+        } else {
+            dragRest.restart()
+            if (thumbnails && count > 1)
+                dragWarmup.restart()
+        }
+    }
+    // The drag at `point` on the popover's surface, or gone from it (null).
+    function dragOverPopover(point) {
+        var popup = point && groupOpen ? groupPopup : null
+        dragOnCard = popup !== null
+        var tile = popup ? itemUnder(popupLayer, popup, point.x, point.y, function(item) {
+            return item.taskId !== undefined && item.active !== undefined && item.minimized !== undefined
+        }) : null
+        if (tile === dragTile)
+            return
+        dragTile = tile
+        if (tile) dragRest.restart(); else dragRest.stop()
+    }
+    // A menu opened meanwhile (by a key) has the keyboard, and keeps it.
+    function springDrag() {
+        if (menuOpen)
+            return
+        if (dragTile) {
+            bringForward(dragTile)
+            return
+        }
+        var windows = dragButton ? dragButton.dragWindows() : []
+        if (windows.length === 1)
+            bringForward(windows[0])
+        else if (windows.length > 1)
+            openGroup(dragButton)
+        warmGroup = null
+    }
+    // Activating the window in front already would minimize it.
+    function bringForward(window) {
+        if (!window.active || window.minimized)
+            taskSource.activate(window.taskId)
+    }
+    // Halfway into the delay, a stack's pictures are taken for its card, as on hover.
+    function warmDragged() {
+        if (!dragButton || groupOpen || !thumbnails)
+            return
+        warmGroup = windowsOf(dragButton)
+        if (!picturesFit(warmWindows.count))
+            warmGroup = null
+    }
+    Timer { id: dragRest; interval: root.dragDelay; onTriggered: root.springDrag() }
+    Timer { id: dragWarmup; interval: root.dragDelay / 2; onTriggered: root.warmDragged() }
     // Opens on press, as a desktop context menu does: waiting for a tap lost a press held
     // past the long-press time or moved while held. The new menu opens before the old one
     // closes, so the popover stays up in between.
@@ -590,6 +793,18 @@ Item {
         visible: root.menuOpen
         onClicked: root.closeMenus()
     }
+    // A drag over the panel's surface (dragDelay). Refusing every move refuses the drop: the
+    // application hears that nothing here takes it. It fills the surface, so that it is the one
+    // item a drag enters, once, and every answer after that is a move's.
+    DropArea {
+        anchors.fill: parent
+        onEntered: (drag) => root.dragOverBar(Qt.point(drag.x, drag.y))
+        onPositionChanged: (drag) => {
+            drag.accepted = false
+            root.dragOverBar(Qt.point(drag.x, drag.y))
+        }
+        onExited: root.dragOverBar(null)
+    }
 
     // The popups' surface, over the whole output (PopoverWindow in view.hpp). While a menu is
     // open it takes the keyboard and every press but those on the bar, and a press beside the
@@ -621,6 +836,16 @@ Item {
                 anchors.fill: parent
                 enabled: root.menuOpen
                 onPressed: root.closeMenus()
+            }
+            // A drag over the card or list of a button's windows, refused as over the bar.
+            DropArea {
+                anchors.fill: parent
+                onEntered: (drag) => root.dragOverPopover(Qt.point(drag.x, drag.y))
+                onPositionChanged: (drag) => {
+                    drag.accepted = false
+                    root.dragOverPopover(Qt.point(drag.x, drag.y))
+                }
+                onExited: root.dragOverPopover(null)
             }
 
             // Left-clicking the volume control: the default output's volume, then each application's.

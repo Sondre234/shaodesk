@@ -76,6 +76,22 @@ shadows.
   audio process, a player run in a terminal) unless that process has a window of its own, and
   all windows of one process show it. The compositor names each window's process to the shell
   through `shaodesk-window-control-v1` version 3.
+- The card of window pictures opens on the pictures rather than on icons standing in for them:
+  they are taken from halfway into the delay, and none for a button the pointer only crosses. It
+  glides from one button to the next and eases to the width of their windows, as on Windows 11,
+  and a picture that comes while it is open fades in over the icon standing in for it.
+- Resting the pointer on a window's picture for half a second peeks at the window, as Windows'
+  Aero Peek does: the other windows fade as for `peek`, and the window shows over them where it
+  is, minimized or on another workspace too, without being focused, raised or restored. The peek
+  moves at once to the next picture and ends with a fade as the pointer leaves the pictures, and
+  clicking the picture focuses the window where it shows. `shaodesk-window-control-v1` version 4
+  peeks with `set_peek` and `unset_peek`, and `shaodesk msg get window_peek` shows what it does.
+- Something dragged from an application (a file, text, a link) brings windows forward as on
+  Windows: resting it half a second on a window's taskbar button brings that window to the front,
+  restored and its workspace shown, to carry the drag on and drop it there; on a stack's button
+  it opens the card of their pictures, or their list, where resting on one brings it forward. A
+  drag only crossing the bar does nothing, and the bar takes no drop, so the application sees it
+  cancelled. The macOS style's dock does the same.
 - Alt + Tab shows each window as a card with its picture, as Windows 11 does: the application's
   icon and the window's title over the picture, the pictures at one height and each as wide as
   its window's proportions, in rows that wrap and shrink when there are many windows. The pictures
@@ -186,6 +202,8 @@ shadows.
 - The compositor tells the shell whether night light is on and whether the schedule decides
   (`night-light ACTIVE MODE` on the control socket's state stream).
 - `shaodesk msg get layers` says which layer surface holds the keyboard, in a fifth column.
+- `shaodesk msg get seat` says what has the keyboard, what the pointer is on, and what a drag is
+  over.
 
 ### Working on the shell
 
@@ -201,6 +219,10 @@ shadows.
 - A program capturing one window (ext-foreign-toplevel-image-capture-source-v1, as a portal's
   window sharing does) is no longer disconnected for asking while the session is locked: it gets
   a source whose capture stops at once, as for a window that is gone.
+- A window brought forward while something is dragged (from the taskbar, or by an application
+  asking for it) has the keyboard once the drag ends, instead of the window the drag came from,
+  and a click right after a drop, without moving, reaches the window under the pointer. A drag
+  over the top edge of a window shaodesk decorates goes to the window rather than nowhere.
 
 ## 0.1.1 (2026-10-05)
 
