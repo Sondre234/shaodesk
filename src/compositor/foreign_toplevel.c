@@ -120,6 +120,9 @@ void server_new_capture_request(struct wl_listener *listener, void *data) {
         request, toplevel ? toplevel_capture_source(toplevel) : NULL);
 }
 void publish_toplevel(struct sh_toplevel *toplevel) {
+    // Its number stays with it when it is published again, as a swallowed terminal is.
+    if (!toplevel->id)
+        toplevel->id = ++toplevel->server->last_window_id;
     list_toplevel(toplevel);
     toplevel->foreign = wlr_foreign_toplevel_handle_v1_create(toplevel->server->foreign_manager);
     if (!toplevel->foreign)

@@ -140,6 +140,13 @@ Since version 3 a `shaodesk_window_v1` also sends the window's `pid` with its st
 names for an X11 window, 0 when unknown, for the shell to match the window with the sound
 server's streams.
 
+Since version 4 it sends the window's `id` once, with its first state: `sh_toplevel.id`, a number
+`publish_toplevel` gives a window the first time it publishes it (counting up from 1 in
+`sh_server.last_window_id`) and gives no other window while the compositor runs. A window keeps
+it when published again, as a swallowed terminal is. The control socket names windows by it
+where the shell has to find them among its handles: the switcher's `switcher-window` lines end
+with it.
+
 ## The shell (`shell/`)
 
 `ShellController` (`controller.cpp`) loads the configuration, keeps the compositor's state from

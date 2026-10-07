@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* The taskbar's window menu and pictures: shaodesk-window-control-v1 names a window by its
- * wlr-foreign-toplevel handle, tells the shell which output and workspace each is on and how it
- * is placed, moves one to another workspace or output, makes it sticky or floats it, and gives
- * its capture source for a picture of it. */
+ * wlr-foreign-toplevel handle, tells the shell which output and workspace each is on, how it is
+ * placed and its number, moves one to another workspace or output, makes it sticky or floats it,
+ * and gives its capture source for a picture of it. */
 #include "server.h"
 
 /* One shaodesk_window_v1: the window it names, NULL once that is gone, and what it last sent. */
@@ -71,6 +71,10 @@ static void send_window(struct sh_window_object *object) {
         shaodesk_window_v1_send_pid(object->resource, pid);
         changed = true;
     }
+    // From version 4, once, as it never changes: the switcher's lines name the window by it.
+    if (wl_resource_get_version(object->resource) >= SHAODESK_WINDOW_V1_ID_SINCE_VERSION &&
+        !object->sent)
+        shaodesk_window_v1_send_id(object->resource, toplevel->id);
     if (changed)
         shaodesk_window_v1_send_done(object->resource);
     object->sent = true;
@@ -252,11 +256,11 @@ static void control_bind(struct wl_client *client, void *data, uint32_t version,
 
 /* Offered to every client, as wlr-foreign-toplevel-management is: it does nothing to a window a
  * taskbar could not already do, and shows nothing of one that ext-foreign-toplevel-list's
- * capture sources do not, but for which process made it. */
+ * capture sources do not, but for which process made it and the number the switcher calls it. */
 void window_control_init(struct sh_server *server) {
     wl_list_init(&server->window_objects);
     server->window_control = wl_global_create(server->wl_display,
-                                              &shaodesk_window_control_v1_interface, 3, server,
+                                              &shaodesk_window_control_v1_interface, 4, server,
                                               control_bind);
     if (!server->window_control)
         wlr_log(WLR_ERROR, "Cannot offer shaodesk-window-control-v1");
