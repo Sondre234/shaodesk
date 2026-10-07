@@ -454,7 +454,9 @@ SwitcherView::SwitcherView(ShellController &controller, QScreen *screen)
     : OverlayView(controller, screen, "switcher", false), delay_(new QTimer(this)) {
     setTitle("shaodesk switcher");
     setResizeMode(QQuickView::SizeViewToRootObject);
-    setInitialProperties({{"screenSize", screen->geometry().size()}});
+    // Only the switcher on its own output lists the windows and watches their pictures.
+    setInitialProperties(
+        {{"screenSize", screen->geometry().size()}, {"outputName", screen->name()}});
 #if SHAODESK_LAYER_SHELL
     using W = LayerShellQt::Window;
     layer_->setScope("shaodesk-switcher");

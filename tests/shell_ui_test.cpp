@@ -219,6 +219,7 @@ int main(int argc, char **argv) {
                 client->write("ok\nwork\t3\t1700000000\n");
                 client->disconnectFromServer();
             } else if (request.startsWith("output ") || request.startsWith("session ") ||
+                       request.startsWith("switcher_confirm ") ||
                        request == "toggle_tiling\n" || request == "layout_monocle\n" ||
                        request == "terminal\n" || request == "snap_left\n" || request == "snap_right\n") {
                 if (!request.startsWith("output ")) {
@@ -2118,6 +2119,203 @@ ListModel {
         QTest::mouseMove(&view, barSpace);
         if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
             return fail("leaving the stacked button did not close its windows' list");
+        // The window switcher shows each window as a card with its picture, as Windows 11 does:
+        // the application's icon and the window's title over the picture, the pictures at one
+        // height and each as wide as its window's proportions, from 3:4 to 2:1, in rows that wrap
+        // and are centred. A card finds its window's task by the number the switcher gives it
+        // and asks for its picture as soon as the switcher lists it, before it shows, at twice
+        // the pictures' height wide (240 * 5/8 * 2 pixels), live; until a picture has come, the
+        // icon stands in. It lets the pictures go as the switcher closes.
+        {
+            auto *switcherRoot = switcherView.rootObject();
+            switcherRoot->setProperty("taskSource", QVariant::fromValue(fakeModel));
+            for (const auto *task :
+                 {"{taskId: 31, title: 'Wide', appId: 'wide', windowId: 501, picture: 'image://test-windows/320x180'}",
+                  "{taskId: 32, title: 'Tall', appId: 'tall', windowId: 502, picture: 'image://test-windows/90x160'}",
+                  "{taskId: 33, title: 'Urgent', appId: 'urgent', windowId: 503, picture: ''}",
+                  "{taskId: 34, title: 'Minimized', appId: 'min', windowId: 504, minimized: true, "
+                  "picture: 'image://test-windows/160x100'}"})
+                editTasks(QString("model.append(Object.assign({active: false, minimized: false, "
+                                  "urgent: false}, %1))")
+                              .arg(task));
+            pictureRequests();
+            auto line = [&](const QString &appId, const QString &title, bool minimized, bool urgent,
+                            int id) {
+                return QString("switcher-window %1\t%2\t%3\t1\t%4\t%5\t%6\n")
+                    .arg(appId, title, output)
+                    .arg(minimized)
+                    .arg(urgent)
+                    .arg(id);
+            };
+            const QString opening = "switcher " + output + " 1 5\n" +
+                                    line("wide", "Wide", false, false, 501) +
+                                    line("tall", "Tall", false, false, 502) +
+                                    line("urgent", "Urgent", false, true, 503) +
+                                    line("min", "Minimized", true, false, 504) +
+                                    line("lost", "Lost", false, false, 505);
+            auto cards = [&] { return named(switcherRoot, "switcherCard"); };
+            // Another output's switcher is not this one's to show.
+            subscriber->write(("switcher OTHER-1 0 1\n" + line("wide", "Wide", false, false, 501)).toUtf8());
+            if (!QTest::qWaitFor([&] { return controller.switcherOutput() == "OTHER-1"; }) ||
+                !pictureRequests().isEmpty() || !switcherRoot->property("windows").toList().isEmpty())
+                return fail("the switcher of another output listed its windows here");
+            subscriber->write(opening.toUtf8());
+            if (!QTest::qWaitFor([&] { return controller.switcherWindows().size() == 5; }))
+                return fail("the switcher's windows were not parsed");
+            auto asked = pictureRequests();
+            asked.sort();
+            if (asked != QStringList{"watch 31 300 true", "watch 32 300 true", "watch 33 300 true",
+                                     "watch 34 300 true"}) {
+                std::cerr << "the switcher did not ask for its windows' pictures as it opened: "
+                          << asked.join("|").toStdString() << '\n';
+                return 1;
+            }
+            if (!QTest::qWaitFor([&] { return switcherView.isVisible() && cards().size() == 5; }))
+                return fail("the switcher did not show its windows as cards");
+            if (find(switcherRoot, "switcherGrid")->isVisible())
+                return fail("the switcher showed its grid of icons beside the cards");
+            auto pictureOf = [&](int index) { return find(cards()[index], "switcherCardPicture"); };
+            // The icon standing in for the picture fills the picture's box, shown or not.
+            auto boxOf = [&](int index) { return find(cards()[index], "switcherCardStandIn"); };
+            auto standIn = [&](int index) { return boxOf(index)->isVisible(); };
+            // The pictures come at one height; each card is as wide as its picture's proportions
+            // make it, a tall one at 3:4, those without a picture yet at 16:10.
+            const int widths[] = {267, 113, 240, 240, 240};
+            if (!QTest::qWaitFor([&] {
+                    for (int i = 0; i < 5; ++i)
+                        if (boxOf(i)->width() != widths[i] || boxOf(i)->height() != 150 ||
+                            cards()[i]->height() != cards()[0]->height() ||
+                            cards()[i]->width() - boxOf(i)->width() != cards()[0]->width() - boxOf(0)->width())
+                            return false;
+                    return true;
+                })) {
+                for (int i = 0; i < int(cards().size()); ++i)
+                    std::cerr << boxOf(i)->width() << "x" << boxOf(i)->height() << ' ';
+                return fail("\nthe switcher's cards are not as wide as their windows' pictures");
+            }
+            for (int i : {0, 1, 3}) {
+                auto *picture = pictureOf(i);
+                const qreal aspect = picture->property("implicitWidth").toReal() /
+                                     picture->property("implicitHeight").toReal();
+                if (!picture->isVisible() || standIn(i) || std::abs(picture->height() - 150) > 0.5 ||
+                    std::abs(picture->width() / picture->height() - aspect) > 0.02) {
+                    std::cerr << "card " << i << "'s picture is " << picture->width() << "x"
+                              << picture->height() << '\n';
+                    return fail("a window's picture on its card is not 150 pixels tall in its proportions");
+                }
+            }
+            if (!standIn(2) || !standIn(4) || pictureOf(2)->isVisible())
+                return fail("the icon does not stand in for a picture that has not come");
+            // Four cards across, and the fifth centred under them.
+            const auto row = cards();
+            if (row[1]->y() != row[0]->y() || row[3]->y() != row[0]->y() || row[4]->y() <= row[0]->y() ||
+                std::abs(row[4]->x() + row[4]->width() / 2 - (row[3]->x() + row[3]->width()) / 2) > 1)
+                return fail("the switcher's cards did not wrap into centred rows");
+            // A window asking for attention is tinted with a dot, a minimized one faded with a
+            // dash, as the grid of icons marks them.
+            if (named(switcherRoot, "switcherUrgent") != QList<QQuickItem *>{find(row[2], "switcherUrgent")} ||
+                named(switcherRoot, "switcherMinimized") != QList<QQuickItem *>{find(row[3], "switcherMinimized")} ||
+                pictureOf(3)->opacity() != 0.5 || pictureOf(0)->opacity() != 1)
+                return fail("the switcher's cards do not mark urgent and minimized windows");
+            // The selection is the second card, and glides to the next.
+            auto *selection = find(switcherRoot, "switcherSelection");
+            auto marks = [&](int index) {
+                auto *card = cards()[index];
+                return selection->isVisible() && selection->x() == card->x() &&
+                       selection->y() == card->y() && selection->width() == card->width() &&
+                       selection->height() == card->height();
+            };
+            if (!QTest::qWaitFor([&] { return marks(1); }))
+                return fail("the switcher's selection does not mark the selected card");
+            subscriber->write("switcher-select 2\n");
+            if (!QTest::qWaitFor([&] { return marks(2); }))
+                return fail("the switcher's selection did not move to the next card");
+            // A picture that comes later replaces the icon and widens its card, and a window
+            // whose task comes later, or learns the window's number later, gets its picture then.
+            editTasks(QString("model.setProperty(%1, 'picture', 'image://test-windows/200x100')").arg(rowOf(33)));
+            if (!QTest::qWaitFor([&] { return !standIn(2) && boxOf(2)->width() == 300 && marks(2); }))
+                return fail("a picture that came later did not widen its card");
+            editTasks("model.append({taskId: 35, title: 'Lost', appId: 'lost', windowId: 0, active: false, "
+                      "minimized: false, urgent: false, picture: 'image://test-windows/100x100'})");
+            if (!pictureRequests().isEmpty() || !standIn(4))
+                return fail("a task without the window's number was taken for the window");
+            editTasks(QString("model.setProperty(%1, 'windowId', 505)").arg(rowOf(35)));
+            if (!QTest::qWaitFor([&] { return !standIn(4) && boxOf(4)->width() == 150; }) ||
+                pictureRequests() != QStringList{"watch 35 300 true"})
+                return fail("a window's task that came later did not give its card the picture");
+            // Clicking a card picks its window, as clicking a cell of the grid does.
+            requests.clear();
+            click(cards()[3]);
+            if (!QTest::qWaitFor([&] { return requests == QStringList{"switcher_confirm 4"}; }))
+                return fail("clicking a card of the switcher did not pick its window");
+            requests.clear();
+            // Closing lets each picture go at once, though the cards stay as the switcher fades.
+            subscriber->write("switcher-close\n");
+            if (!QTest::qWaitFor([&] { return controller.switcherWindows().isEmpty(); }))
+                return fail("the switcher did not close");
+            asked = pictureRequests();
+            asked.sort();
+            if (asked != QStringList{"unwatch 31", "unwatch 32", "unwatch 33", "unwatch 34", "unwatch 35"}) {
+                std::cerr << "the switcher did not let its pictures go as it closed: "
+                          << asked.join("|").toStdString() << '\n';
+                return 1;
+            }
+            if (!QTest::qWaitFor([&] { return !switcherView.isVisible(); }))
+                return fail("the switcher did not go");
+            // Many windows shrink the pictures, down to 60 % of their height, and past that the
+            // rows scroll to the selection.
+            auto many = [&](int count, int selected) {
+                QString text = QString("switcher %1 %2 %3\n").arg(output).arg(selected).arg(count);
+                for (int i = 0; i < count; ++i)
+                    text += line("many", QString("Many %1").arg(i), false, false, 700 + i);
+                subscriber->write(text.toUtf8());
+                return QTest::qWaitFor([&] {
+                    return switcherView.isVisible() && cards().size() == count &&
+                           controller.switcherWindows().size() == count;
+                });
+            };
+            auto *scroller = find(switcherRoot, "switcherCardsView");
+            auto pictureHeight = [&] { return boxOf(0)->height(); };
+            if (!many(12, 0) || pictureHeight() >= 150 || pictureHeight() < 90 ||
+                scroller->property("contentHeight").toReal() > scroller->height())
+                return fail("twelve windows' cards did not shrink to fit the output");
+            subscriber->write("switcher-close\n");
+            if (!QTest::qWaitFor([&] { return !switcherView.isVisible(); }) || !many(40, 0) ||
+                pictureHeight() != 90 || scroller->property("contentY").toReal() != 0 ||
+                scroller->property("contentHeight").toReal() <= scroller->height())
+                return fail("forty windows' cards did not shrink to 60 % and scroll");
+            subscriber->write("switcher-select 39\n");
+            if (!QTest::qWaitFor([&] {
+                    auto *last = cards()[39];
+                    const qreal top = scroller->property("contentY").toReal();
+                    return marks(39) && last->y() >= top && last->y() + last->height() <= top + scroller->height();
+                }))
+                return fail("the switcher's rows did not scroll to the selected card");
+            subscriber->write("switcher-close\n");
+            if (!QTest::qWaitFor([&] { return !switcherView.isVisible(); }))
+                return fail("the switcher did not go");
+            // shell.thumbnails = { live = false }: one picture each.
+            if (!rewrite(QString(lua).replace("shell={", "shell={thumbnails={live=false},")))
+                return fail("could not rewrite the configuration");
+            controller.reload();
+            if (!QTest::qWaitFor([&] { return !controller.liveThumbnails(); }))
+                return fail("shell.thumbnails = { live = false } was not read");
+            pictureRequests();
+            subscriber->write(opening.toUtf8());
+            if (!QTest::qWaitFor([&] { return pictureRequests().contains("watch 31 300 false"); }))
+                return fail("without live pictures, the switcher asked for live ones");
+            subscriber->write("switcher-close\n");
+            if (!QTest::qWaitFor([&] { return !switcherView.isVisible() && controller.switcherWindows().isEmpty(); }))
+                return fail("the switcher did not go");
+            if (!rewrite(lua))
+                return fail("could not restore the configuration");
+            controller.reload();
+            if (!QTest::qWaitFor([&] { return controller.liveThumbnails(); }))
+                return fail("the configuration was not restored");
+            pictureRequests();
+            for (int id = 31; id <= 35; ++id)
+                editTasks(QString("model.remove(%1)").arg(rowOf(id)));
+        }
         // shell.thumbnails = { enabled = false }: a window's button has its tooltip and no card,
         // and a stack lists its windows as it did.
         if (!rewrite(QString(lua).replace("shell={", "shell={thumbnails={enabled=false},")))
