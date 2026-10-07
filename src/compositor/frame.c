@@ -415,16 +415,19 @@ void refresh_frame(struct sh_toplevel *toplevel) {
     sh_tween_track(server->animator, &toplevel->fade, SH_ANIM_FOCUS,
                    mapped && toplevel->shown && toplevel_visible(toplevel), target, fading,
                    fade_update, toplevel);
-    // Peeking scales the opacity, fullscreen windows included, but for a window peeked at.
-    opacity = fading[0] * peek_scale(toplevel, now_ms());
+    // Peeking scales the opacity, fullscreen windows included, but for a window peeked at. One
+    // on the screen only for a peek fades in and out whole, its controls, tabs and border too.
+    float peeked = peek_scale(toplevel, now_ms());
+    float whole = shown_for_peek(toplevel) ? peeked : 1;
+    opacity = fading[0] * peeked;
     color = fading + 1;
     float pulsing[4];
-    if (urgent) {
+    if (urgent || whole < 1) {
         // The border pulses over its fade to the urgent color; premultiplied, scaling all four
         // channels dims it.
-        float pulse = urgent_pulse(toplevel, now_ms());
+        float pulse = urgent ? urgent_pulse(toplevel, now_ms()) : 1;
         for (int i = 0; i < 4; ++i)
-            pulsing[i] = color[i] * pulse;
+            pulsing[i] = color[i] * pulse * whole;
         color = pulsing;
     }
     // New subsurfaces start opaque, so a translucent window is revisited on every commit.
@@ -435,6 +438,10 @@ void refresh_frame(struct sh_toplevel *toplevel) {
     update_dim(toplevel);
     refresh_decoration(toplevel); // the controls follow the window's width
     refresh_tabs(toplevel);
+    if (toplevel->deco)
+        wlr_scene_buffer_set_opacity(toplevel->deco, whole);
+    if (toplevel->tabs)
+        wlr_scene_buffer_set_opacity(toplevel->tabs, whole);
 
     // Windows on an output that tiles get rounded corners, floating ones too, and with
     // windows.round = "always" so does every other window but one that draws a shadow of its
