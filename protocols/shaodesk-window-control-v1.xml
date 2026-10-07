@@ -147,11 +147,13 @@
         at its logical size, as get_capture_source gives it. A frame's size follows the
         window's, each new one sent as the session's buffer constraints. The compositor scales
         smoothly, each pixel of a frame standing for all those it covers, so that a frame can
-        be shown at its size as it is.
+        be shown at its size as it is. A session's first frame comes at once, and each one
+        after it once the window has changed. A width or height of 0 is an invalid_size error.
 
         Each request makes a source of its own. Like get_capture_source's, it is inert when the
         window is gone or the session is locked, also on an inert shaodesk_window_v1, and a
-        session stops when the window closes.
+        session stops when the window closes; it is inert too when the window has many such
+        sources already.
       </description>
       <arg name="id" type="new_id" interface="ext_image_capture_source_v1"/>
       <arg name="width" type="uint" summary="the widest a frame may be, in buffer pixels"/>
