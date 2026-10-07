@@ -1236,7 +1236,11 @@ the keyboard.
 the scene (closing windows count until their animation ends), and of focus fades, mainly
 for tests. `shaodesk msg get pictures` prints one line per capture source a client asked for to
 picture a window at a size, as the taskbar does: the size asked for, the frame's size, how many
-sessions capture it, and the window's title, also mainly for tests. A client
+sessions capture it, and the window's title, also mainly for tests. `shaodesk msg get seat`
+prints what has the keyboard, what the pointer is on and, while something is dragged, what the
+drag is over: a line each, `keyboard`, `pointer` or `drag`, followed by `window` and its title,
+`layer` and its namespace, `other` (a popup, the lock screen) and `-`, or `-` twice for nothing;
+during a drag the pointer is on nothing. A client
 that sends `subscribe` keeps its connection and receives `tiling on|off` and
 `workspace N` (the focused monitor's), one `output NAME N USED TILING` line per monitor
 (as in `get workspaces`), and `keyboard-layout N COUNT SHORT NAME` (the active
