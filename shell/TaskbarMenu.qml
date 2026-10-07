@@ -10,7 +10,8 @@ import "WindowMenu.js" as WindowMenu
 // state, and where it is), pinning and closing it; a stacked button's acts on all its windows. A
 // pinned application's offers what it starts, and unpinning it. On the dock of the macOS style it
 // opens above the icon pressed, and an application's is macOS's: its windows to bring up, what it
-// starts, keeping it in the dock, hiding and quitting it.
+// starts, keeping it in the dock, hiding and quitting it. Each ends with killing the processes
+// of its windows.
 PopupMenu {
     id: contextMenu
     required property var panel
@@ -82,7 +83,23 @@ PopupMenu {
         return sections([[titleEntry(record, lead.appId, stacked ? windows.length + " windows" : lead.title)],
                          launchEntries(record, "New window"),
                          stacked ? stackEntries(windows, tasks) : windowEntries(lead, tasks),
-                         (panel.taskMenuApp ? [panel.pinAction(panel.taskMenuApp)] : []).concat([close])])
+                         (panel.taskMenuApp ? [panel.pinAction(panel.taskMenuApp)] : []).concat([close])
+                             .concat(killEntries(windows, tasks))])
+    }
+    // Killing the processes that made `windows` with SIGKILL, for an application that does not
+    // close, one window of each standing for it; none where no process is known. On the dock it
+    // is macOS's Force Quit, without an icon.
+    function killEntries(windows, tasks) {
+        var byPid = {}
+        windows.forEach(function(w) { if (w.pid > 0 && !(w.pid in byPid)) byPid[w.pid] = w.taskId })
+        var ids = Object.keys(byPid).map(function(pid) { return byPid[pid] })
+        if (ids.length === 0)
+            return []
+        var kill = function() { ids.forEach(function(id) { tasks.kill(id) }) }
+        return [panel.macos
+                ? { text: "Force Quit", objectName: "contextMenuKill", run: kill }
+                : { text: ids.length > 1 ? "Kill " + ids.length + " processes" : "Kill process",
+                    icon: "octagon-x", danger: true, objectName: "contextMenuKill", run: kill }]
     }
     // An application's menu on the dock: its windows, the focused one marked, then what it starts,
     // keeping it there, and hiding or quitting it, which minimizes or closes every window.
@@ -100,7 +117,8 @@ PopupMenu {
                          [{ text: "Hide", objectName: "contextMenuHide",
                             run: function() { windows.forEach(function(w) { if (!w.minimized) tasks.minimize(w.taskId) }) } },
                           { text: "Quit", objectName: "contextMenuClose",
-                            run: function() { windows.forEach(function(w) { tasks.close(w.taskId) }) } }]])
+                            run: function() { windows.forEach(function(w) { tasks.close(w.taskId) }) } }]
+                         .concat(killEntries(windows, tasks))])
     }
     // Entries without their icons, as macOS's menus have them.
     function bare(entries) {

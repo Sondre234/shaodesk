@@ -895,6 +895,7 @@ ListModel {
     function maximize(id) { note("maximize " + id) }
     function setFullscreen(id, on) { note("fullscreen " + id + " " + on) }
     function close(id) { note("close " + id) }
+    function kill(id) { note("kill " + id) }
     function moveToWorkspace(id, number) { note("workspace " + id + " " + number) }
     function moveToOutput(id, output) { note("output " + id + " " + output) }
     function setSticky(id, on) { note("sticky " + id + " " + on) }
@@ -1167,6 +1168,26 @@ ListModel {
         }
         if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
             return fail("the popover did not close after closing the window");
+    }
+    // Killing its process comes after that, once the process is known.
+    {
+        editTasks("model.setProperty(0, 'pid', 4242)");
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Kill process"); }))
+            return fail("the window's menu does not offer to kill its process");
+        const auto entries = menu->property("entries").value<QJSValue>();
+        const auto last = entries.property(entries.property("length").toUInt() - 1);
+        if (last.property("text").toString() != "Kill process" ||
+            !menuItem("Kill process")->property("danger").toBool())
+            return fail("killing a window's process is not the last entry of its menu, in the danger colour");
+        click(menuItem("Kill process"));
+        if (const auto asked = taskRequests(); asked != "kill 7") {
+            std::cerr << "killing from a task's menu asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the popover did not close after killing the process");
+        editTasks("model.setProperty(0, 'pid', 0)");
     }
     // A stacked button's menu is about all its windows: counted under the title, minimized or
     // restored, moved and closed together, the workspace they share marked.

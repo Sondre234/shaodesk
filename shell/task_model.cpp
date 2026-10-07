@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cerrno>
 #include <climits>
+#include <csignal>
 #include <cstring>
+#include <unistd.h>
 
 TaskModel::TaskModel(QObject *parent) : QAbstractListModel(parent) {
     connect(&pictures_, &WindowPictures::changed, this, [this](int id) {
@@ -203,6 +205,12 @@ void TaskModel::close(int id) {
     if (auto *task = find(id))
         zwlr_foreign_toplevel_handle_v1_close(task->handle);
     flush();
+}
+void TaskModel::kill(int id) {
+    auto *task = find(id);
+    const pid_t pid = task ? task->state.pid : 0;
+    if (pid > 1 && pid != getpid() && pid != getppid())
+        ::kill(pid, SIGKILL);
 }
 void TaskModel::showDesktop() {
     for (const auto &task : tasks_)
