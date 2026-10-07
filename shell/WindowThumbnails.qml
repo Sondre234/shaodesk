@@ -100,7 +100,8 @@ PopupCard {
                 Component.onDestruction: if (owner) owner.wantPicture(watched, false)
                 readonly property bool marked: active || urgent
                 background: ButtonFill {
-                    hovered: tile.hovered
+                    // Lit under a drag too, which brings its window forward (the panel's dragDelay).
+                    hovered: tile.hovered || thumbnails.panel.dragTile === tile
                     pressed: tile.pressed
                     active: tile.active
                     Rectangle {

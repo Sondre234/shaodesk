@@ -298,12 +298,120 @@ Item {
     Timer { id: groupShow; interval: root.thumbnails ? shell.thumbnailDelay : 350; onTriggered: root.showGroup() }
     Timer {
         id: groupHide; interval: 300
-        onTriggered: if (!root.groupListHovered && !(root.groupPending && root.groupPending.hovered)) root.groupOpen = false
+        onTriggered: if (!root.groupListHovered && !(root.groupPending && root.groupPending.hovered) && !root.dragHolds) root.groupOpen = false
     }
     // The pointer entering the list (or the card) keeps it, and leaving it hides it a moment later.
     function hoverGroupList(hovered) {
         if (hovered) groupHide.stop(); else groupHide.restart()
     }
+    // A drag from an application (a file, text, a link) resting on a button with windows brings
+    // them forward, as on Windows: after dragDelay a single window is activated (raised, restored,
+    // its workspace shown) and a stack shows its windows, as on hover; resting on one of those
+    // activates it in turn, and the drag goes on onto the window to drop there. A drag only
+    // crossing a button does nothing. Its events go to the surface under the pointer, never to the
+    // hover handlers, so a DropArea over the panel's surface and one over the popover's follow it
+    // (dragOverBar, dragOverPopover). What it opened stays open while it is over the card or its
+    // button (dragHolds), and closes a moment after it has left both or ended. Neither takes the
+    // drop: the application hears that nothing here would, and it is cancelled.
+    // Half a second, longer than the pointer rests for a stack's list (350 ms) or, by default, a
+    // card (shell.thumbnailDelay): a drag crosses the bar on its way elsewhere more often than the
+    // pointer does, and a window brought forward changes what lies under the drag, where a card
+    // opened by mistake only covers a little of the screen. Windows waits about as long.
+    readonly property int dragDelay: 500
+    // The button with windows the drag is over, the tile or row of a window on the open card or
+    // list it is over, null for none; and whether it is over the popover's card (or between it and
+    // the bar).
+    property Item dragButton: null
+    property Item dragTile: null
+    property bool dragOnCard: false
+    readonly property bool dragHolds: groupOpen && (dragOnCard || dragButton !== null && showsWindowsOf(dragButton))
+    onDragHoldsChanged: if (!dragHolds && groupOpen) groupHide.restart()
+    function showsWindowsOf(button) {
+        var windows = windowsOf(button)
+        return windows.slot === groupSlot && windows.windowApp === groupWindowApp && windows.task === groupTask
+    }
+    // The topmost item at (x, y) in `reference`'s coordinates among `item`'s descendants that
+    // `matches`, looking only inside items that hold the point; null for none.
+    function itemUnder(reference, item, x, y, matches) {
+        var children = item.children
+        for (var i = children.length - 1; i >= 0; --i) {
+            var child = children[i]
+            if (!child.visible || !child.contains(child.mapFromItem(reference, x, y)))
+                continue
+            if (matches(child))
+                return child
+            var found = itemUnder(reference, child, x, y, matches)
+            if (found)
+                return found
+        }
+        return null
+    }
+    // The drag at `point` on the panel's surface, or gone from it (null). A button with windows
+    // has dragWindows(); a pinned application's without any, or the dock's Trash, does nothing.
+    function dragOverBar(point) {
+        var button = point ? itemUnder(root, bar, point.x, point.y, function(item) {
+            return typeof item.dragWindows === "function" && item.enabled
+        }) : null
+        var count = button ? button.dragWindows().length : 0
+        if (count === 0)
+            button = null
+        if (button === dragButton)
+            return
+        dragButton = button
+        dragWarmup.stop()
+        if (!groupOpen)
+            warmGroup = null
+        if (!button || groupOpen && showsWindowsOf(button)) {
+            dragRest.stop()
+        } else if (groupOpen && count > 1) {
+            // Open, the card or list goes over to another stack's windows at once, as on hover.
+            dragRest.stop()
+            openGroup(button)
+        } else {
+            dragRest.restart()
+            if (thumbnails && count > 1)
+                dragWarmup.restart()
+        }
+    }
+    // The drag at `point` on the popover's surface, or gone from it (null).
+    function dragOverPopover(point) {
+        var popup = point && groupOpen ? groupPopup : null
+        dragOnCard = popup !== null
+        var tile = popup ? itemUnder(popupLayer, popup, point.x, point.y, function(item) {
+            return item.taskId !== undefined && item.active !== undefined && item.minimized !== undefined
+        }) : null
+        if (tile === dragTile)
+            return
+        dragTile = tile
+        if (tile) dragRest.restart(); else dragRest.stop()
+    }
+    function springDrag() {
+        if (dragTile) {
+            bringForward(dragTile)
+            return
+        }
+        var windows = dragButton ? dragButton.dragWindows() : []
+        if (windows.length === 1)
+            bringForward(windows[0])
+        else if (windows.length > 1 && !menuOpen)
+            openGroup(dragButton)
+        warmGroup = null
+    }
+    // Activating the window in front already would minimize it.
+    function bringForward(window) {
+        if (!window.active || window.minimized)
+            taskSource.activate(window.taskId)
+    }
+    // Halfway into the delay, a stack's pictures are taken for its card, as on hover.
+    function warmDragged() {
+        if (!dragButton || groupOpen || !thumbnails)
+            return
+        warmGroup = windowsOf(dragButton)
+        if (!picturesFit(warmWindows.count))
+            warmGroup = null
+    }
+    Timer { id: dragRest; interval: root.dragDelay; onTriggered: root.springDrag() }
+    Timer { id: dragWarmup; interval: root.dragDelay / 2; onTriggered: root.warmDragged() }
     // Opens on press, as a desktop context menu does: waiting for a tap lost a press held
     // past the long-press time or moved while held. The new menu opens before the old one
     // closes, so the popover stays up in between.
@@ -682,6 +790,18 @@ Item {
         visible: root.menuOpen
         onClicked: root.closeMenus()
     }
+    // A drag over the panel's surface (dragDelay). Refusing every move refuses the drop: the
+    // application hears that nothing here takes it. It fills the surface, so that it is the one
+    // item a drag enters, once, and every answer after that is a move's.
+    DropArea {
+        anchors.fill: parent
+        onEntered: (drag) => root.dragOverBar(Qt.point(drag.x, drag.y))
+        onPositionChanged: (drag) => {
+            drag.accepted = false
+            root.dragOverBar(Qt.point(drag.x, drag.y))
+        }
+        onExited: root.dragOverBar(null)
+    }
 
     // The popups' surface, over the whole output (PopoverWindow in view.hpp). While a menu is
     // open it takes the keyboard and every press but those on the bar, and a press beside the
@@ -713,6 +833,16 @@ Item {
                 anchors.fill: parent
                 enabled: root.menuOpen
                 onPressed: root.closeMenus()
+            }
+            // A drag over the card or list of a button's windows, refused as over the bar.
+            DropArea {
+                anchors.fill: parent
+                onEntered: (drag) => root.dragOverPopover(Qt.point(drag.x, drag.y))
+                onPositionChanged: (drag) => {
+                    drag.accepted = false
+                    root.dragOverPopover(Qt.point(drag.x, drag.y))
+                }
+                onExited: root.dragOverPopover(null)
             }
 
             // Left-clicking the volume control: the default output's volume, then each application's.

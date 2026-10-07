@@ -55,7 +55,8 @@ PopupCard {
                 // Closing the list destroys this row, so it goes last.
                 onClicked: { shell.tasks.activate(taskId); panel.groupOpen = false }
                 background: ButtonFill {
-                    hovered: groupWindow.hovered
+                    // Lit under a drag too, which brings its window forward (the panel's dragDelay).
+                    hovered: groupWindow.hovered || groupList.panel.dragTile === groupWindow
                     pressed: groupWindow.pressed
                     active: groupWindow.active
                     Rectangle {

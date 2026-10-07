@@ -32,6 +32,12 @@ Button {
     readonly property bool shownMinimized: group && group.count > 0 ? group.minimized : minimized
     // Asking for attention: any window of a stack will do.
     readonly property bool shownUrgent: group && group.count > 0 ? group.urgent : urgent
+    // The windows a drag resting on it brings forward (the panel's dragDelay), as
+    // {taskId, active, minimized} each; it is lit while the drag is over it, as under the pointer.
+    function dragWindows() {
+        return group && group.count > 0 ? group.windows : [{ taskId: taskId, active: active, minimized: minimized }]
+    }
+    readonly property bool dragOver: panel.dragButton === task
     height: Theme.barButtonHeight
     // Hovering a stacked button lists its windows, whatever the platform thinks of hover.
     hoverEnabled: true
@@ -74,7 +80,7 @@ Button {
     function enter() { entering.restart(); revealing.restart() }
     function appear() { revealing.restart() }
     background: ButtonFill {
-        hovered: task.hovered
+        hovered: task.hovered || task.dragOver
         pressed: task.pressed
         active: task.shownActive
         color: task.shownUrgent ? Theme.urgentSubtle : stateColor
