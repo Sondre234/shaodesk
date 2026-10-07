@@ -59,6 +59,9 @@ class TaskModel : public QAbstractListModel {
     Q_INVOKABLE void setSticky(int id, bool sticky);
     Q_INVOKABLE void setFloating(int id, bool floating);
     Q_INVOKABLE void close(int id);
+    // Ends the process that made window `id` with SIGKILL, when its pid is known and is neither
+    // the shell's nor the compositor's, which started it.
+    Q_INVOKABLE void kill(int id);
     Q_INVOKABLE void showDesktop();
     // Counted per window: while watched, the window is pictured, once or as it redraws when
     // `live`, at `pixelWidth` device pixels wide. Its last picture stays until it closes.
