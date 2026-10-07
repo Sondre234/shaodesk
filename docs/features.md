@@ -143,7 +143,7 @@ shell = {
         enabled = true, -- false: a tooltip with the title, and a stack's list of titles
         delay = 400,    -- milliseconds the pointer rests on the button first (0 to 2000)
         size = 240,     -- width of one picture in pixels (120 to 480), 5/8 of it tall
-        live = true,    -- false takes one picture of each window as the card opens
+        live = true,    -- false takes one picture of each window just before the card opens
     },
 }
 ```

@@ -97,7 +97,7 @@ struct ShellThumbnails {
     bool enabled = true;
     int delay = 400; // milliseconds the pointer rests on the button first
     int size = 240;  // width of one picture in pixels; 5/8 of it tall
-    bool live = true; // the pictures follow the windows while shown; false: one as the card opens
+    bool live = true; // pictures follow the windows while shown; false: one just before the card opens
 };
 
 struct ShellConfig {
