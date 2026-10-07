@@ -37,6 +37,7 @@ COMMON_DEPEND="
 	dev-libs/wayland
 	gui-libs/wlroots:0.20[drm,libinput,session,X=]
 	x11-libs/libxkbcommon
+	x11-libs/pixman
 	|| (
 		sys-apps/systemd
 		sys-auth/elogind

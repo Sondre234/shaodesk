@@ -20,7 +20,7 @@
     compositor offers it as it offers zwlr_foreign_toplevel_manager_v1.
   </description>
 
-  <interface name="shaodesk_window_control_v1" version="2">
+  <interface name="shaodesk_window_control_v1" version="3">
     <description summary="controls windows named by their taskbar handles">
       A global for getting the shaodesk_window_v1 of a window, from the
       zwlr_foreign_toplevel_handle_v1 the client holds for it.
@@ -44,7 +44,7 @@
     </request>
   </interface>
 
-  <interface name="shaodesk_window_v1" version="2">
+  <interface name="shaodesk_window_v1" version="3">
     <description summary="one window's workspace, output and tiling">
       Where a window is and how it is placed, and requests that move it. It becomes inert when
       the window's taskbar handle is sent closed; the client then destroys it.
@@ -60,6 +60,11 @@
       <entry name="tiled" value="4" summary="a tile of its output's tiling"/>
       <entry name="tiling" value="8"
              summary="the workspace it is on tiles windows automatically"/>
+    </enum>
+
+    <enum name="error">
+      <entry name="invalid_size" value="0" since="3"
+             summary="get_scaled_capture_source was given a width or height of 0"/>
     </enum>
 
     <request name="destroy" type="destructor">
@@ -132,6 +137,25 @@
         source.
       </description>
       <arg name="id" type="new_id" interface="ext_image_capture_source_v1"/>
+    </request>
+
+    <request name="get_scaled_capture_source" since="3">
+      <description summary="a capture source for a small picture of the window">
+        Creates an ext_image_capture_source_v1 for what get_capture_source captures, the
+        window's own surfaces, scaled down to fit within `width` by `height` buffer pixels and
+        keeping its aspect ratio. It is never scaled up: a window that fits already is captured
+        at its logical size, as get_capture_source gives it. A frame's size follows the
+        window's, each new one sent as the session's buffer constraints. The compositor scales
+        smoothly, each pixel of a frame standing for all those it covers, so that a frame can
+        be shown at its size as it is.
+
+        Each request makes a source of its own. Like get_capture_source's, it is inert when the
+        window is gone or the session is locked, also on an inert shaodesk_window_v1, and a
+        session stops when the window closes.
+      </description>
+      <arg name="id" type="new_id" interface="ext_image_capture_source_v1"/>
+      <arg name="width" type="uint" summary="the widest a frame may be, in buffer pixels"/>
+      <arg name="height" type="uint" summary="the tallest a frame may be, in buffer pixels"/>
     </request>
 
     <event name="output">
