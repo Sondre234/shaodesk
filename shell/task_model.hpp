@@ -15,7 +15,8 @@
 // (of that output, from 1; 0 until it is known), whether it is `sticky` or `floating`, and whether
 // its workspace is `tiling`. From its version 2, a window watched with watchPicture also has a
 // `picture` (WindowPictures), "" until one has arrived; from version 3 each has the `pid` of the
-// process that made it, 0 until it is known.
+// process that made it, 0 until it is known, and from version 4 its `windowId`, the number the
+// compositor's control socket names it by (as the window switcher does), 0 until it is known.
 class TaskModel : public QAbstractListModel {
     Q_OBJECT
   public:
@@ -34,7 +35,8 @@ class TaskModel : public QAbstractListModel {
         Floating,
         Tiling,
         Picture,
-        Pid
+        Pid,
+        WindowId
     };
     explicit TaskModel(QObject *parent = nullptr);
     ~TaskModel() override;
@@ -78,6 +80,7 @@ class TaskModel : public QAbstractListModel {
         int workspace = 0;
         bool sticky = false, floating = false, tiling = false;
         int pid = 0;
+        int windowId = 0;
     };
     struct Task {
         TaskModel *model;
@@ -124,4 +127,5 @@ class TaskModel : public QAbstractListModel {
     static void windowState(void *, shaodesk_window_v1 *, uint32_t);
     static void windowDone(void *, shaodesk_window_v1 *);
     static void windowPid(void *, shaodesk_window_v1 *, uint32_t);
+    static void windowId(void *, shaodesk_window_v1 *, uint32_t);
 };
