@@ -204,7 +204,8 @@ does not call, and names pictures of its own (`image://preview-windows/ID`, pain
 The speaker on a picture's tile is a `WindowSound` (`audio.cpp`), which the tile makes with the
 panel's `audioSource` and `taskSource` and its window's `pid` (`TaskModel`'s role, from the window
 control's version 3). The sound server's backend gives each stream the process that plays it
-(`application.process.id`) and that process's parents, nearest first, read once per stream from
+(`application.process.id`, or its client's when the stream names none, as a PipeWire
+application's may not) and that process's parents, nearest first, read once per stream from
 `/proc/PID/stat` by `processAncestry`, 64 at most and stopping before pid 1, as `swallow.c`
 walks them. `soundOwner` gives a stream to the nearest of those processes that has a window among
 the task source's `pid` roles, so a browser's audio process plays in its window and a player
