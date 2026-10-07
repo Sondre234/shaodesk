@@ -1,0 +1,83 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""The taskbar's pictures of windows in a session: resting the pointer on a minimized window's
+button shows a card above it, in the popover, with the window's picture, which the shell copied
+from the compositor through the window control's capture source; leaving takes it away. The
+window is minimized, so its colours on the screen can only be the picture's. Without grim the
+pixels are left out."""
+from pathlib import Path
+import subprocess
+import sys
+
+import harness
+
+compositor, shell, probe, window_probe, pointer_probe = (str(Path(p).resolve())
+                                                          for p in sys.argv[1:6])
+grim = sys.argv[6] if len(sys.argv) > 6 else ""
+
+CONFIG = """return {
+    xwayland = false,
+    layout = { tiling = false },
+    outputs = { monitors = { ["HEADLESS-1"] = { mode = "1280x720" } } },
+    notifications = { enabled = false },
+    shell = { panel_height = 52, thumbnails = { delay = 100 } },
+}"""
+WIDTH, HEIGHT, BAR = 1280, 720, 52
+BODY = (0x41, 0x7b, 0xc4)  # the probe's window below its top band
+# Where the card opens: above the window's button, near the bar's start.
+AREA = (0, HEIGHT - BAR - 300, 600, HEIGHT - BAR)
+
+with harness.Compositor(compositor, CONFIG, start=False) as desktop:
+    root, env = desktop.root, desktop.env
+    env.update(QT_QPA_PLATFORM="wayland", QT_QUICK_BACKEND="software",
+               QT_FORCE_STDERR_LOGGING="1", XDG_DATA_HOME=str(root), XDG_DATA_DIRS=str(root),
+               XDG_STATE_HOME=str(root), DBUS_SESSION_BUS_ADDRESS="disabled:")
+    desktop.start()
+    shell_log = root / "shell.log"
+
+    def log():
+        return shell_log.read_text()
+
+    def layers():
+        return {(row[0], row[1]): row[2:4] for row in desktop.rows("layers")}
+
+    def windows():
+        return desktop.rows("windows")
+
+    def body_pixels():
+        """How many pixels above the bar have the window's colour, or None without grim."""
+        shot = harness.grab(grim, env)
+        if shot is None:
+            return None
+        left, top, right, bottom = AREA
+        return sum(1 for y in range(top, bottom, 2) for x in range(left, right, 2)
+                   if all(abs(a - b) <= 2 for a, b in zip(shot.at(x, y), BODY)))
+
+    desktop.detail = lambda: f"layers: {layers()}, windows: {windows()}\n{log()[-1500:]}"
+    desktop.spawn([shell, "--config", str(desktop.config)], log="shell.log")
+    desktop.wait_for(lambda: "shaodesk surface rendered: shaodesk taskbar" in log(), "the panel")
+    desktop.spawn([probe, "--window-only"])
+    desktop.wait_for(lambda: len(windows()) == 1 and windows()[0][2] == "0", "the window")
+    subprocess.run([window_probe, "shaodesk protocol probe", "minimize"], env=env, check=True,
+                   timeout=30, stdout=subprocess.DEVNULL)
+    desktop.wait_for(lambda: windows()[0][2] == "1", "the window minimized")
+    popover = ("shaodesk-popover", "HEADLESS-1")
+    assert popover not in layers(), layers()
+    assert not body_pixels(), "the window's colour on the screen before any picture"
+
+    # The window's button follows the start button.
+    pointer = desktop.virtual_pointer(pointer_probe, WIDTH, HEIGHT)
+    pointer("move", "85", str(HEIGHT - BAR // 2))
+    desktop.wait_for(lambda: layers().get(popover) == ["3", "1"], "the card in the popover")
+    # Every other pixel of the 133 x 64 body, at least, in a picture shown at its own size.
+    desktop.wait_for(lambda: (pixels := body_pixels()) is None or pixels > 1500,
+                     "the window's picture on the card")
+    assert windows()[0][2] == "1", windows()
+
+    pointer("move", "900", "300")
+    desktop.wait_for(lambda: popover not in layers(), "the card gone once the pointer left")
+    assert not body_pixels(), "the picture left on the screen"
+
+    for message in ("ReferenceError", "TypeError", "is not defined", "Cannot read"):
+        assert message not in log(), log()
+print("taskbar thumbnails: a minimized window's picture on the card above its button"
+      + ("" if grim else " (no grim: no pixels)"))
