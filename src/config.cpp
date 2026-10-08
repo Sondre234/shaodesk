@@ -1270,6 +1270,13 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
     }
     lua_pop(L, 1);
     current_section.clear();
+    if (section(L, "touch")) {
+        text_field(L, "output", config.settings.touch_output);
+        if (!std::strcmp(config.settings.touch_output, "desc:"))
+            fail("touch.output needs a description after desc:", "output");
+    }
+    lua_pop(L, 1);
+    current_section.clear();
     if (section(L, "layout")) {
         // gap sets both; gap_inner and gap_outer override it.
         int gap = integer(L, "gap", 8, 0, 100);

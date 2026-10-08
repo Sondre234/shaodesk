@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Configuration of touch input: the touchpad swipes the compositor takes (`gestures`).
+// Configuration of touch input: the touchpad swipes the compositor takes (`gestures`) and the
+// output touchscreens are mapped to (`touch`).
 #include "shaodesk/config.hpp"
 #include <cstring>
 #include <iostream>
@@ -102,9 +103,27 @@ static void gestures() {
     rejects(many + "}}}", "list is too long");
 }
 
+static void touch() {
+    require(shaodesk::parse_config("return {}").settings.touch_output[0] == '\0',
+            "touchscreens follow their device or the built-in panel by default");
+    require(!std::strcmp(shaodesk::parse_config("return {touch={output='eDP-1'}}")
+                             .settings.touch_output,
+                         "eDP-1"),
+            "touch.output by connector");
+    require(!std::strcmp(shaodesk::parse_config("return {touch={output='desc:Dell U2720Q'}}")
+                             .settings.touch_output,
+                         "desc:Dell U2720Q"),
+            "touch.output by description");
+    rejects("return {touch={output=1}}", "output must be a string");
+    rejects("return {touch={output='desc:'}}", "touch.output needs a description");
+    rejects("return {touch={output='" + std::string(200, 'x') + "'}}", "output is too long");
+    rejects("return {touch={ouptut='eDP-1'}}", "did you mean 'output'");
+}
+
 int main() {
     try {
         gestures();
+        touch();
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';
         return 1;

@@ -380,6 +380,10 @@ struct sh_settings {
     int close_timeout;
     bool close_force;
     struct sh_gesture_settings gestures;
+    /* touch.output: the output touchscreens are mapped to, by connector name or "desc:" and the
+     * start of its description; "" for the one the device names, else a built-in panel, else
+     * the whole layout. */
+    char touch_output[128];
 };
 
 /* What a mouse button was pressed over. */
