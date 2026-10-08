@@ -5,16 +5,19 @@ input (text-input-unstable-v3, `text_input_probe`) and the input method (input-m
 and tells it its surrounding text, content type and text cursor; the input method's preedit,
 committed text and deletions go back to it. Its keyboard grab gets the keys no binding takes, and
 what it passes on through its virtual keyboard reaches the window. Its popup sits under the text
-cursor, kept on the output, above it where there is no room below. Focus moving between windows,
-either client going away and the session locking leave both sides consistent, and a second input
-method is told it is unavailable. `get input_method` shows it all."""
+cursor, kept on the output, above it where there is no room below, drawn over the window and under
+the overlays. Focus moving between windows, either client going away and the session locking leave
+both sides consistent, and a second input method is told it is unavailable. `get input_method`
+shows it all."""
 from pathlib import Path
 import subprocess
 import sys
 
 import harness
 
-compositor, text_probe, method_probe, lock_probe = (str(Path(p).resolve()) for p in sys.argv[1:5])
+compositor, text_probe, method_probe, lock_probe, input_probe = (
+    str(Path(p).resolve()) for p in sys.argv[1:6])
+grim = sys.argv[6] if len(sys.argv) > 6 else ""
 
 CONFIG = """return {
     xwayland = false,
@@ -32,6 +35,8 @@ SUPER, T, A = 125, 20, 30
 # text-input-v3's spellcheck hint, normal purpose and "other" change cause
 SPELLCHECK, NORMAL, OTHER = 2, 0, 1
 UTF8 = {"encoding": "utf-8"}
+# The probes' colours: the text input's window, the input method's popup, input_probe's panel
+PAPER, POPUP, PANEL = (0xf4, 0xf1, 0xe8), (0x2a, 0x5b, 0xd7), (0x6a, 0x8f, 0x3c)
 
 with harness.Compositor(compositor, CONFIG) as desktop:
     msg = desktop.msg
@@ -58,6 +63,10 @@ with harness.Compositor(compositor, CONFIG) as desktop:
         inputs = [(r[1] == "1", r[2] == "1", r[4]) for r in rows if r[0] == "text_input"]
         popups = [(r[1] == "1", *map(int, r[2:])) for r in rows if r[0] == "popup"]
         return method, inputs, popups
+
+    def served():
+        """The window or panel of the text input the input method serves, or None."""
+        return next((name for enabled, active, name in state()[1] if active), None)
 
     def tell(process, command):
         process.stdin.write(command + "\n")
@@ -167,6 +176,33 @@ with harness.Compositor(compositor, CONFIG) as desktop:
     tell(writer, f"cursor 40 {700 - y} 2 20")
     desktop.wait_for(lambda: state()[2] == [(True, x + 40, 600, 200, 100)], "the popup above")
     desktop.wait_for(lambda: "rectangle 0 100 2 20" in since("ime", mark), "the cursor told")
+    # It is drawn over the window, and under a panel on the overlay layer (as the shell's
+    # overlays are) along the bottom of the output.
+    if grim:
+        def shows(*points):
+            shot = harness.grab(grim, desktop.env, "HEADLESS-1")
+            return all(shot.at(px, py) == colour for px, py, colour in points)
+        desktop.wait_for(lambda: shows((x + 60, 620, POPUP), (x + 60, 690, POPUP),
+                                       (x + 300, y + 20, PAPER)), "the popup over the window")
+        bar = desktop.spawn([input_probe, "--overlay", "--no-gestures", "--no-touch",
+                             "--no-tablet", "Bar"], log="bar.log")
+        desktop.wait_for(lambda: "ready" in log("bar") and
+                         shows((x + 60, 620, POPUP), (x + 60, 690, PANEL)),
+                         "the popup under the overlay")
+        bar.terminate()
+        desktop.reap(bar)
+    # A search field on the overlay layer, as the shell's start menu is, takes the keyboard: the
+    # input method serves it, and its popup follows it and is drawn over the overlay.
+    search = desktop.spawn([text_probe, "--overlay", "Search"], log="Search.log",
+                           stdin=subprocess.PIPE, text=True, **UTF8)
+    desktop.wait_for(lambda: served() == "Search", "the input method serving the search field")
+    tell(search, "cursor 40 0 2 20")  # the field is 400 by 60 at the middle of the top edge
+    desktop.wait_for(lambda: state()[2] == [(True, 480, 20, 200, 100)], "the popup at the field")
+    if grim:
+        desktop.wait_for(lambda: shows((500, 40, POPUP)), "the popup over the overlay")
+    search.terminate()
+    desktop.reap(search)
+    desktop.wait_for(lambda: served() == "Writer", "the input method back at Writer")
     mark = len(log("ime"))
     tell(writer, "cursor 40 50 2 20")
     desktop.wait_for(lambda: since("ime", mark)[-1:] == ["rectangle 0 -20 2 20"],

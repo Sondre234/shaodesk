@@ -500,6 +500,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
         add_executable(text_input_probe tests/text_input_probe.c
             ${CMAKE_CURRENT_BINARY_DIR}/text-input-unstable-v3-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/text-input-unstable-v3-protocol.c
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-layer-shell-unstable-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-layer-shell-unstable-v1-protocol.c
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.c)
         target_include_directories(text_input_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
@@ -987,7 +989,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
         add_test(NAME input_method_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/input_method_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:text_input_probe>
-            $<TARGET_FILE:input_method_probe> $<TARGET_FILE:lock_probe>)
+            $<TARGET_FILE:input_method_probe> $<TARGET_FILE:lock_probe>
+            $<TARGET_FILE:input_probe> "${GRIM_ARGUMENT}")
         set_tests_properties(input_method_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME window_capture_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_capture_smoke.py
