@@ -909,6 +909,8 @@ void overview_forget(struct sh_toplevel *toplevel);
 void overview_open(struct sh_server *server);
 void overview_close(struct sh_server *server, struct sh_toplevel *chosen, int workspace);
 void overview_dismiss(struct sh_server *server);
+void overview_hold(struct sh_server *server, double progress);
+void overview_release(struct sh_server *server, bool open);
 void overview_confirm(struct sh_server *server, int index);
 void overview_view(struct sh_server *server, int workspace);
 void overview_set_filter(struct sh_server *server, const char *text);
