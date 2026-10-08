@@ -1,11 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* The taskbar's window menu and pictures: shaodesk-window-control-v1 names a window by its
  * wlr-foreign-toplevel handle, tells the shell which output and workspace each is on, how it is
- * placed and its number, moves one to another workspace or output, makes it sticky or floats it,
- * gives its capture source for a picture of it, and peeks at it. */
+ * placed, its number and its own icon, moves one to another workspace or output, makes it sticky
+ * or floats it, gives its capture source for a picture of it, and peeks at it. */
 #include "server.h"
+#include <sys/mman.h>
 
-/* One shaodesk_window_v1: the window it names, NULL once that is gone, and what it last sent. */
+/* One shaodesk_window_v1: the window it names, NULL once that is gone, and what it last sent
+ * (the icon as the window's icon_serial then). */
 struct sh_window_object {
     struct wl_resource *resource;
     struct sh_server *server;
@@ -14,6 +16,7 @@ struct sh_window_object {
     bool sent;
     char output[64];
     uint32_t workspace, state, pid;
+    unsigned icon_serial;
 };
 
 /* The window a taskbar handle the client holds stands for, or NULL when it is gone: the handles
@@ -38,6 +41,46 @@ static uint32_t window_state(struct sh_toplevel *toplevel) {
            (toplevel->floating || toplevel->sticky ? SHAODESK_WINDOW_V1_STATE_FLOATING : 0) |
            (toplevel->tiled ? SHAODESK_WINDOW_V1_STATE_TILED : 0) |
            (tiles_for(toplevel, output) ? SHAODESK_WINDOW_V1_STATE_TILING : 0);
+}
+
+/* A file holding the icon's pixels for icon_image, sealed so that no client changes what
+ * another reads from it; -1 when it cannot be made. */
+static int icon_file(const struct sh_icon *icon) {
+    int fd = memfd_create("shaodesk-window-icon", MFD_CLOEXEC | MFD_ALLOW_SEALING);
+    if (fd < 0)
+        return -1;
+    const char *data = (const char *)icon->pixels;
+    size_t size = (size_t)icon->width * icon->height * 4;
+    while (size) {
+        ssize_t written = write(fd, data, size);
+        if (written < 0 && errno == EINTR)
+            continue;
+        if (written <= 0) {
+            close(fd);
+            return -1;
+        }
+        data += written;
+        size -= (size_t)written;
+    }
+    fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_WRITE | F_SEAL_SEAL);
+    return fd;
+}
+
+/* The window's icon: its name (null for none, as for an icon dropped), then its pixels when it
+ * has them, in a file of the client's own, which libwayland passes a copy of, so the
+ * compositor's goes at once. */
+static void send_icon(struct wl_resource *resource, const struct sh_icon *icon) {
+    shaodesk_window_v1_send_icon(resource, icon->name);
+    if (!icon->pixels)
+        return;
+    int fd = icon_file(icon);
+    if (fd < 0) {
+        wlr_log_errno(WLR_ERROR, "Cannot pass a window's icon to a client");
+        return;
+    }
+    shaodesk_window_v1_send_icon_image(resource, fd, (uint32_t)icon->width,
+                                       (uint32_t)icon->height);
+    close(fd);
 }
 
 /* Sends what changed since the object last heard, then done; everything the first time. */
@@ -76,6 +119,16 @@ static void send_window(struct sh_window_object *object) {
     if (wl_resource_get_version(object->resource) >= SHAODESK_WINDOW_V1_ID_SINCE_VERSION &&
         !object->sent)
         shaodesk_window_v1_send_id(object->resource, toplevel->id);
+    // From version 5, as it changes: the icon the window supplies itself, which goes with the
+    // first state only when the window has one, there being nothing yet for the client to drop.
+    if (wl_resource_get_version(object->resource) >= SHAODESK_WINDOW_V1_ICON_SINCE_VERSION &&
+        object->icon_serial != toplevel->icon_serial) {
+        object->icon_serial = toplevel->icon_serial;
+        if (object->sent || toplevel->icon.name || toplevel->icon.pixels) {
+            send_icon(object->resource, &toplevel->icon);
+            changed = true;
+        }
+    }
     if (changed)
         shaodesk_window_v1_send_done(object->resource);
     object->sent = true;
@@ -284,12 +337,13 @@ static void control_bind(struct wl_client *client, void *data, uint32_t version,
 
 /* Offered to every client, as wlr-foreign-toplevel-management is: it does nothing to a window a
  * taskbar could not already do, and shows nothing of one that ext-foreign-toplevel-list's
- * capture sources do not, but for which process made it and the number the switcher calls it;
- * a peek shows the window for a moment and changes nothing about it. */
+ * capture sources do not, but for which process made it, the number the switcher calls it and
+ * the icon it gives for taskbars to show; a peek shows the window for a moment and changes
+ * nothing about it. */
 void window_control_init(struct sh_server *server) {
     wl_list_init(&server->window_objects);
     server->window_control = wl_global_create(server->wl_display,
-                                              &shaodesk_window_control_v1_interface, 4, server,
+                                              &shaodesk_window_control_v1_interface, 5, server,
                                               control_bind);
     if (!server->window_control)
         wlr_log(WLR_ERROR, "Cannot offer shaodesk-window-control-v1");
