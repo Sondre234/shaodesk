@@ -27,6 +27,8 @@ PopupCard {
     readonly property var wifi: panel.wifiSource
     // NetworkManager with a Wi-Fi device: its tile stands for the network's state.
     readonly property bool wifiManaged: !!wifi && wifi.available && wifi.hasWifi
+    readonly property var bluetooth: panel.bluetoothSource
+    readonly property bool bluetoothShown: quick.widgets.bluetooth && !!bluetooth && bluetooth.available
     readonly property var center: shell.notifications
     // A power-profiles-daemon profile's name and icon.
     function powerModeName(profile) {
@@ -37,7 +39,7 @@ PopupCard {
         return profile === "power-saver" ? "leaf" : profile === "performance" ? "zap" : "gauge"
     }
     // Which list is open under its tile or row: "profiles", "outputs", "mixer", "powerMode", "wifi",
-    // or "" for none.
+    // "bluetooth", or "" for none.
     property string expanded: ""
     function toggle(list) { expanded = expanded === list ? "" : list }
     onOpened: expanded = ""
@@ -112,6 +114,7 @@ PopupCard {
         Module { section: profileList }
         Module { section: powerModeList }
         Module { section: wifiList }
+        Module { section: bluetoothList }
         Module { section: brightness; heading: "Display" }
         Module { section: sound; heading: "Sound" }
         ColumnLayout {
@@ -160,6 +163,22 @@ PopupCard {
                     expanded: quick.expanded === "wifi"
                     onClicked: quick.wifi.setEnabled(!quick.wifi.enabled)
                     onExpandClicked: quick.toggle("wifi")
+                }
+                // Bluetooth: the tile turns the adapter on and off, its chevron lists the devices.
+                QuickTile {
+                    objectName: "quickTile:bluetooth"
+                    visible: quick.bluetoothShown
+                    Layout.fillWidth: true; Layout.preferredWidth: 1
+                    readonly property int connected: quick.bluetooth.connectedCount
+                    glyph: !quick.bluetooth.powered ? "bluetooth-off" : connected > 0 ? "bluetooth-connected" : "bluetooth"
+                    label: "Bluetooth"
+                    detail: !quick.bluetooth.powered ? "Off" : connected > 1 ? connected + " devices"
+                          : connected === 1 ? quick.bluetooth.connectedName : "Not connected"
+                    checked: quick.bluetooth.powered
+                    expandable: true; split: true
+                    expanded: quick.expanded === "bluetooth"
+                    onClicked: quick.bluetooth.setPowered(!quick.bluetooth.powered)
+                    onExpandClicked: quick.toggle("bluetooth")
                 }
                 QuickTile {
                     objectName: "quickTile:dnd"
@@ -248,6 +267,16 @@ PopupCard {
                 returnFocus: quick
                 Layout.fillWidth: true
                 wifi: quick.wifi
+            }
+            // The Bluetooth devices, under their tile.
+            BluetoothList {
+                id: bluetoothList
+                objectName: "quickBluetoothList"
+                visible: quick.expanded === "bluetooth" && quick.bluetoothShown
+                shown: visible && quick.open
+                returnFocus: quick
+                Layout.fillWidth: true
+                bluetooth: quick.bluetooth
             }
             // The power modes, under their tile; performance says when the daemon holds it back.
             Column {

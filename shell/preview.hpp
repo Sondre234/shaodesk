@@ -8,6 +8,7 @@
 
 class Audio;
 class Backlight;
+class Bluetooth;
 class Media;
 class PowerMode;
 class QQuickItem;
@@ -22,7 +23,8 @@ class SystemStatus;
 // minimized, one asking for attention), sound outputs and applications playing, a battery and
 // Wi-Fi, a backlight, tray items (one with a menu), a few notifications, every power action,
 // night light on, a music player playing with a browser paused behind it, power-profiles-daemon
-// in its balanced mode, and NetworkManager connected to a Wi-Fi network among others. The controller's own models take the tray, the notifications and the power
+// in its balanced mode, NetworkManager connected to a Wi-Fi network among others, and BlueZ with
+// devices connected, paired and in range. The controller's own models take the tray, the notifications and the power
 // actions; the panel's sources, which the tests swap the same way, take the rest.
 class PreviewData : public QObject {
     Q_OBJECT
@@ -59,6 +61,7 @@ class PreviewData : public QObject {
     std::unique_ptr<Media> media_;
     std::unique_ptr<PowerMode> powerMode_;
     std::unique_ptr<Wifi> wifi_;
+    std::unique_ptr<Bluetooth> bluetooth_;
     QObject *tasks_ = nullptr;
 };
 

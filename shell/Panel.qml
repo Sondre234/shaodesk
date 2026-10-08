@@ -43,6 +43,8 @@ Item {
     // Wi-Fi and the connection out (NetworkManager), swapped the same way. Its popup on the bar is
     // "wifi", by the network widget.
     property var wifiSource: shell.wifi
+    // Bluetooth (BlueZ), swapped the same way.
+    property var bluetoothSource: shell.bluetooth
     property string audioPopup: ""
     // The middle of the item it opens by, and the item's width.
     property real audioPopupX: 0
@@ -635,7 +637,9 @@ Item {
         case "quick-settings-mixer":
         case "quick-settings-power":
         case "quick-settings-wifi":
-            // Quick Settings; with the applications' volumes open, the power modes or the networks.
+        case "quick-settings-bluetooth":
+            // Quick Settings; with the applications' volumes open, the power modes, the networks or
+            // the Bluetooth devices.
             toggleAudioPopup("quick", quickButton)
             if (name === "quick-settings-mixer")
                 Qt.callLater(function() { quickSettingsLoader.item.expanded = "mixer" })
@@ -643,6 +647,8 @@ Item {
                 Qt.callLater(function() { quickSettingsLoader.item.expanded = "powerMode" })
             if (name === "quick-settings-wifi")
                 Qt.callLater(function() { quickSettingsLoader.item.expanded = "wifi" })
+            if (name === "quick-settings-bluetooth")
+                Qt.callLater(function() { quickSettingsLoader.item.expanded = "bluetooth" })
             return quickButton.visible
         case "wifi":
             // The network widget's networks, on the bar.

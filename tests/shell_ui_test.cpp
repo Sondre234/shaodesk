@@ -91,6 +91,23 @@ class FakeWifi : public Wifi {
     void sendDisconnect() override { requests << "disconnect"; }
 };
 
+// Records what the panel asks of BlueZ.
+class FakeBluetooth : public Bluetooth {
+  public:
+    QStringList requests;
+
+  protected:
+    void sendPowered(bool powered) override { requests << QString("powered %1").arg(powered); }
+    void sendDiscovery(bool discovering) override { requests << QString("discovery %1").arg(discovering); }
+    void sendConnect(const QString &path) override { requests << "connect " + path.section('/', -1); }
+    void sendDisconnect(const QString &path) override { requests << "disconnect " + path.section('/', -1); }
+    void sendPair(const QString &path) override { requests << "pair " + path.section('/', -1); }
+    void sendForget(const QString &path) override { requests << "forget " + path.section('/', -1); }
+    void sendAnswer(bool accepted, const QString &input) override {
+        requests << QString("answer %1 %2").arg(accepted).arg(input).trimmed();
+    }
+};
+
 // Pictures for the stand-in windows, image://test-windows/WIDTHxHEIGHT: that large, in one colour.
 class TestPictures : public QQuickImageProvider {
   public:
@@ -4969,6 +4986,130 @@ ListModel {
             return fail("could not restore the configuration");
         controller.reload();
         view.rootObject()->setProperty("wifiSource", QVariant::fromValue<QObject *>(controller.wifi()));
+    }
+    // Bluetooth through BlueZ: Quick Settings' tile turns the adapter on and off, and its chevron
+    // lists the devices, paired ones connected, disconnected and forgotten, those in range found and
+    // paired with, and what BlueZ asks as one pairs answered. The state is put in the model by hand,
+    // as the BlueZ backend puts it, and its questions asked as the agent asks them.
+    {
+        FakeBluetooth bluetooth;
+        QQmlEngine::setObjectOwnership(&bluetooth, QQmlEngine::CppOwnership);
+        auto device = [](const QString &name, bool paired, bool connected, int battery = -1) {
+            BluetoothDevice device;
+            device.path = "/org/bluez/hci0/" + name;
+            device.name = name;
+            device.icon = name == "Buds" ? "audio-headphones" : "phone";
+            device.paired = paired;
+            device.connected = connected;
+            device.named = true;
+            device.battery = battery;
+            return device;
+        };
+        bluetooth.update({true, true, false,
+                          {device("Speaker", true, false), device("Buds", true, true, 72), device("Phone", false, false)}});
+        view.rootObject()->setProperty("bluetoothSource", QVariant::fromValue<QObject *>(&bluetooth));
+        auto *button = find(view.rootObject(), "quickSettingsButton");
+        click(button);
+        auto *quick = find(view.rootObject(), "quickSettings");
+        auto *tile = find(quick, "quickTile:bluetooth");
+        if (!tile || !QTest::qWaitFor([&] { return inPopover(quick) && tile->isVisible(); }) ||
+            tile->property("detail").toString() != "Buds" || !tile->property("checked").toBool())
+            return fail("Quick Settings has no Bluetooth tile naming the device connected");
+        click(tile);
+        if (bluetooth.requests != QStringList{"powered 0"} || tile->property("detail").toString() != "Off")
+            return fail("the Bluetooth tile did not turn the adapter off");
+        click(tile);
+        auto *list = find(quick, "quickBluetoothList");
+        click(find(quick, "quickTile:bluetooth:arrow"));
+        if (!list || !QTest::qWaitFor([&] { return list->isVisible() && list->height() > 0; }))
+            return fail("the Bluetooth tile's chevron did not list the devices");
+        // Each device has its buttons, shown while it is open: the one shown.
+        std::function<QQuickItem *(QQuickItem *, const QString &)> visible =
+            [&](QQuickItem *parent, const QString &name) -> QQuickItem * {
+            for (auto *item : parent->childItems()) {
+                if (item->objectName() == name && item->isVisible())
+                    return item;
+                if (auto *found = visible(item, name))
+                    return found;
+            }
+            return nullptr;
+        };
+        auto row = [&](const QString &name) { return findNamed(list, "bluetoothDevice", name); };
+        // Opens a device and clicks its button `name` once it shows, `text` on it.
+        auto act = [&](const QString &device, const char *name, const QString &text) {
+            click(row(device));
+            QQuickItem *button = nullptr;
+            if (!QTest::qWaitFor([&] {
+                    button = visible(list, name);
+                    return button && (text.isEmpty() || button->property("text").toString() == text);
+                }))
+                return false;
+            QTest::qWait(50); // laid out
+            click(button);
+            return true;
+        };
+        if (!row("Buds") || !row("Speaker") || row("Phone") ||
+            row("Buds")->mapToScene(QPointF()).y() > row("Speaker")->mapToScene(QPointF()).y())
+            return fail("the paired devices are not listed, the one connected first");
+        bluetooth.requests.clear();
+        if (!act("Speaker", "bluetoothConnect", "Connect") || !act("Buds", "bluetoothConnect", "Disconnect") ||
+            !act("Buds", "bluetoothForget", {}))
+            return fail("the paired devices offer no Connect, Disconnect and Forget");
+        if (bluetooth.requests != QStringList{"connect Speaker", "disconnect Buds", "forget Buds"}) {
+            std::cerr << "the paired devices' buttons did not reach BlueZ: "
+                      << bluetooth.requests.join(", ").toStdString() << '\n';
+            return 1;
+        }
+        // Looking for devices lists those in range, to pair with.
+        bluetooth.requests.clear();
+        click(find(list, "bluetoothLook"));
+        if (!QTest::qWaitFor([&] { return row("Phone") != nullptr; }) || bluetooth.requests != QStringList{"discovery 1"})
+            return fail("Pair a new device did not look for devices");
+        if (!act("Phone", "bluetoothConnect", "Pair"))
+            return fail("a device in range offers no Pair");
+        // What BlueZ asks: a passkey to confirm, a PIN to type, a code to type on the device.
+        bluetooth.ask({"confirm", "/org/bluez/hci0/Phone", "Phone", "482916"});
+        auto *request = find(list, "bluetoothRequest");
+        if (!request || !QTest::qWaitFor([&] {
+                return request->isVisible() && find(list, "bluetoothRequestCode")->property("text").toString() == "482916";
+            }))
+            return fail("the passkey to confirm is not shown");
+        QTest::qWait(50); // laid out
+        click(find(list, "bluetoothAccept"));
+        bluetooth.ask({"pin", "/org/bluez/hci0/Phone", "Phone", {}});
+        auto *answer = find(list, "bluetoothAnswer");
+        if (!QTest::qWaitFor([&] { return answer->isVisible() && answer->hasActiveFocus(); }))
+            return fail("the PIN to type has no field with the keyboard");
+        for (char c : std::string("0000"))
+            QTest::keyClick(popover, c);
+        QTest::keyClick(popover, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return !request->isVisible() && quick->hasActiveFocus(); }))
+            return fail("the PIN did not answer and give the keyboard back");
+        bluetooth.ask({"display", "/org/bluez/hci0/Phone", "Phone", "654321"});
+        if (!QTest::qWaitFor([&] { return request->isVisible() && !find(list, "bluetoothAccept")->isVisible(); }))
+            return fail("the code to type on the device is not shown on its own");
+        QTest::qWait(50); // laid out
+        click(find(list, "bluetoothReject"));
+        if (bluetooth.requests != QStringList{"discovery 1", "pair Phone", "answer 1", "answer 1 0000", "answer 0"}) {
+            std::cerr << "the answers did not reach BlueZ: " << bluetooth.requests.join(", ").toStdString() << '\n';
+            return 1;
+        }
+        // Closed, it stops looking.
+        QTest::keyClick(popover, Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }) || bluetooth.requests.last() != "discovery 0")
+            return fail("closing Quick Settings did not stop looking for devices");
+        if (!rewrite(QString(lua).replace("widgets={", "widgets={bluetooth=false,")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return !tile->isVisible(); }))
+            return fail("the Bluetooth tile stayed with shell.widgets.bluetooth off");
+        if (!rewrite(lua))
+            return fail("could not restore the configuration");
+        controller.reload();
+        bluetooth.update({});
+        if (!QTest::qWaitFor([&] { return !tile->isVisible(); }))
+            return fail("the Bluetooth tile stayed without BlueZ");
+        view.rootObject()->setProperty("bluetoothSource", QVariant::fromValue<QObject *>(controller.bluetooth()));
     }
     // The system tray: hidden while empty, a button for each item shown in the order they came,
     // and clicks and the wheel passed on to the item's application. The items are put in the

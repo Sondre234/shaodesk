@@ -38,6 +38,17 @@ class PreviewPowerMode : public PowerMode {
   protected:
     void sendProfile(const QString &) override {}
 };
+// BlueZ, taking every request and doing nothing with it.
+class PreviewBluetooth : public Bluetooth {
+  protected:
+    void sendPowered(bool) override {}
+    void sendDiscovery(bool) override {}
+    void sendConnect(const QString &) override {}
+    void sendDisconnect(const QString &) override {}
+    void sendPair(const QString &) override {}
+    void sendForget(const QString &) override {}
+    void sendAnswer(bool, const QString &) override {}
+};
 // NetworkManager, taking every request and doing nothing with it.
 class PreviewWifi : public Wifi {
   protected:
@@ -223,7 +234,7 @@ Notification notification(const QString &app, const QString &icon, const QString
 PreviewData::PreviewData(ShellController &controller)
     : QObject(&controller), controller_(controller), audio_(std::make_unique<PreviewAudio>()),
       media_(std::make_unique<PreviewMedia>()), powerMode_(std::make_unique<PreviewPowerMode>()),
-      wifi_(std::make_unique<PreviewWifi>()) {
+      wifi_(std::make_unique<PreviewWifi>()), bluetooth_(std::make_unique<PreviewBluetooth>()) {
     // Firefox plays from a child process of its window's, and the music player from the shell of
     // the first terminal, which has no window of its own (the processes are the stand-in tasks').
     audio_->update({"speakers",
@@ -352,6 +363,28 @@ PreviewData::PreviewData(ShellController &controller)
     wifi.primaryType = "wifi";
     wifi.primaryName = "Harbour View";
     wifi_->update(wifi);
+    // Headphones and a keyboard connected, a speaker paired, and two devices in range while it looks
+    // for more.
+    auto device = [](const QString &id, const QString &name, const QString &icon, bool paired,
+                     bool connected, int battery = -1, int rssi = 0) {
+        BluetoothDevice device;
+        device.path = "/org/bluez/hci0/dev_" + id;
+        device.name = name;
+        device.icon = icon;
+        device.paired = paired;
+        device.connected = connected;
+        device.named = true;
+        device.battery = battery;
+        device.rssi = rssi;
+        return device;
+    };
+    bluetooth_->update({true, true, true,
+                        {device("buds", "Harbour Buds", "audio-headphones", true, true, 72),
+                         device("keys", "MX Keys", "input-keyboard", true, true, 40),
+                         device("speaker", "Kitchen speaker", "audio-card", true, false),
+                         device("phone", "Pixel 9", "phone", false, false, -1, -48),
+                         device("pad", "Controller", "input-gaming", false, false, -1, -70)}});
+    bluetooth_->lookFor(true);
 
     // The start menu as on a desktop in use: two pages of pins, applications launched lately and
     // someone logged in; those of tools/shell_gallery.py that are installed show.
@@ -427,6 +460,8 @@ void PreviewData::fill(QQuickItem *panel) {
     panel->setProperty("powerModeSource", QVariant::fromValue<QObject *>(powerMode_.get()));
     QQmlEngine::setObjectOwnership(wifi_.get(), QQmlEngine::CppOwnership);
     panel->setProperty("wifiSource", QVariant::fromValue<QObject *>(wifi_.get()));
+    QQmlEngine::setObjectOwnership(bluetooth_.get(), QQmlEngine::CppOwnership);
+    panel->setProperty("bluetoothSource", QVariant::fromValue<QObject *>(bluetooth_.get()));
     if (tasks_)
         panel->setProperty("taskSource", QVariant::fromValue(tasks_));
 }
@@ -435,6 +470,11 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
     if (surfaces().contains(name))
         return open(panel, "bar") && panel->window() &&
                showSurface(panel->window()->screen(), name);
+    // The Bluetooth devices while a phone pairs, BlueZ asking to confirm its passkey.
+    if (name == "quick-settings-pairing") {
+        bluetooth_->ask({"confirm", "/org/bluez/hci0/dev_phone", "Pixel 9", "482916"});
+        return open(panel, "quick-settings-bluetooth");
+    }
     QVariant opened;
     QMetaObject::invokeMethod(panel, "previewPopup", Q_RETURN_ARG(QVariant, opened),
                               Q_ARG(QVariant, name));

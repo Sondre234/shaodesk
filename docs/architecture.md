@@ -250,6 +250,7 @@ what was there.
 | `CalendarPopup.qml`, `NotificationHistory.qml` | The clock flyout's cards: the month calendar, and the notifications grouped by application. |
 | `QuickTile.qml` | A tile of Quick Settings: a toggle, a list it opens, or a state. |
 | `MediaCard.qml` | Quick Settings' card of what is playing: the current media player's cover, track, position and controls. |
+| `BluetoothList.qml` | The Bluetooth devices under Quick Settings' Bluetooth tile: the paired ones to connect, disconnect and forget, those in range to pair with while looking, and what BlueZ asks as one pairs. |
 | `WifiList.qml`, `WifiPopup.qml` | The Wi-Fi networks in range, to connect to (with a password field where one is needed) or disconnect from, under Quick Settings' Wi-Fi tile; and the network widget's popup on the bar with them under a switch for the radio. |
 | `Icon.qml`, `FadingIcon.qml`, `SpeakerIcon.qml`, `BatteryIcon.qml` | Line icons (Lucide), drawn as vectors in any colour; one that crossfades as the state it shows changes, the loudspeaker for a volume, and a battery filled to its charge. |
 | `FlatButton.qml`, `ButtonFill.qml` | The frameless button of the bar and of menus, and its background, which fades between the hover, pressed and active states. |
