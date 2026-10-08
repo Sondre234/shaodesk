@@ -357,6 +357,10 @@ struct sh_settings {
     bool snap_corners;
     bool snap_preview;
     float snap_color[4]; /* premultiplied RGBA */
+    /* windows.snap.assist: after a window snaps into a half or a quarter, by the pointer or the
+     * keyboard, the free part of its output beside it lists the output's other windows to fill
+     * it with (Windows' Snap Assist). */
+    bool snap_assist;
     /* windows.placement: enum sh_place_mode, where new floating windows open. */
     int placement;
     /* windows.drag_strip: how many pixels along the top of a window without a title bar move

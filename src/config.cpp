@@ -780,7 +780,7 @@ void read_magnet(lua_State *L, Config &config) {
     }
     lua_pop(L, 1);
 }
-// `windows.snap = { enabled, distance, corners, preview, color }`. The preview's colour follows
+// `windows.snap = { enabled, distance, corners, preview, color, assist }`. The preview's colour follows
 // the focused window's border, a quarter opaque, unless it is given.
 void read_snap(lua_State *L, Config &config) {
     auto &settings = config.settings;
@@ -793,6 +793,7 @@ void read_snap(lua_State *L, Config &config) {
         settings.snap_distance = integer(L, "distance", settings.snap_distance, 1, 100);
         boolean(L, "corners", "windows.snap.corners", settings.snap_corners);
         boolean(L, "preview", "windows.snap.preview", settings.snap_preview);
+        boolean(L, "assist", "windows.snap.assist", settings.snap_assist);
         lua_getfield(L, -1, "color");
         if (!lua_isnil(L, -1)) {
             premultiplied(string(L, -1, "color"), "color", settings.snap_color);
