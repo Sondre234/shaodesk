@@ -156,10 +156,12 @@ if(SHAODESK_BUILD_COMPOSITOR)
     # A window's capture source, which shaodesk-window-control-v1 hands out and the shell's window
     # pictures copy, is ext-image-capture-source-v1's, and that protocol names ext-foreign-toplevel
     # handles. wlroots implements them but keeps their interfaces to itself, so every program
-    # speaking shaodesk-window-control-v1 compiles these in.
+    # speaking shaodesk-window-control-v1 compiles these in. The shell's clipboard history speaks
+    # ext-data-control-v1.
     foreach(PROTOCOL staging/ext-foreign-toplevel-list/ext-foreign-toplevel-list-v1
             staging/ext-image-capture-source/ext-image-capture-source-v1
-            staging/ext-image-copy-capture/ext-image-copy-capture-v1)
+            staging/ext-image-copy-capture/ext-image-copy-capture-v1
+            staging/ext-data-control/ext-data-control-v1)
         get_filename_component(NAME ${PROTOCOL} NAME)
         add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${NAME}-client-protocol.h
             COMMAND ${WAYLAND_SCANNER} client-header ${PROTOCOL_DIR}/${PROTOCOL}.xml
@@ -414,6 +416,14 @@ if(SHAODESK_BUILD_COMPOSITOR)
         target_include_directories(window_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
         target_link_libraries(window_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
         target_compile_options(window_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        # A program copying and pasting through ext-data-control-v1, for the shell's clipboard
+        # history test.
+        add_executable(clipboard_probe tests/clipboard_probe.c
+            ${CMAKE_CURRENT_BINARY_DIR}/ext-data-control-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/ext-data-control-v1-protocol.c)
+        target_include_directories(clipboard_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        target_link_libraries(clipboard_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
+        target_compile_options(clipboard_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
         add_test(NAME output_management COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_management_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:output_management_probe>)

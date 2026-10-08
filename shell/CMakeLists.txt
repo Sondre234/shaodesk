@@ -233,6 +233,20 @@ if(BUILD_TESTING)
         $<TARGET_FILE:wayland_probe> ${EXAMPLE_CONFIG}
         $<TARGET_FILE:task_model_test>)
     set_tests_properties(shell_tasks PROPERTIES TIMEOUT 60)
+    # The clipboard history against a private compositor, with clipboard_probe copying.
+    add_executable(clipboard_test ${PROJECT_SOURCE_DIR}/tests/clipboard_test.cpp
+        clipboard.cpp clipboard.hpp clipboard_images.hpp
+        ${PROJECT_BINARY_DIR}/ext-data-control-v1-protocol.c
+        ${PROJECT_BINARY_DIR}/ext-data-control-v1-client-protocol.h)
+    set_target_properties(clipboard_test PROPERTIES AUTOMOC ON)
+    target_include_directories(clipboard_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
+    target_compile_definitions(clipboard_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(clipboard_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(clipboard_test PRIVATE Qt6::Gui Qt6::Quick Qt6::Test PkgConfig::SHELL_WAYLAND)
+    add_test(NAME shell_clipboard COMMAND ${Python3_EXECUTABLE}
+        ${PROJECT_SOURCE_DIR}/tests/clipboard_smoke.py $<TARGET_FILE:shaodesk>
+        $<TARGET_FILE:clipboard_probe> $<TARGET_FILE:clipboard_test>)
+    set_tests_properties(shell_clipboard PROPERTIES TIMEOUT 120)
     # The window pictures' formats and sizes, without a compositor.
     add_executable(window_pictures_test ${PROJECT_SOURCE_DIR}/tests/window_pictures_test.cpp
         window_pictures.cpp window_pictures.hpp ${SHAODESK_TASK_PROTOCOL_SOURCES})
