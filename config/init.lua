@@ -238,6 +238,8 @@ return {
         --     max_files = 20000,  -- names read at most (100-200000)
         --     web = "https://duckduckgo.com/?q=%s", -- Search the web for “…”; false: none
         -- },
+        -- The clipboard history (Super + Shift + V), kept in memory only unless persist:
+        -- clipboard = { enabled = true, max_entries = 50, images = true, persist = false },
         -- widgets = { workspaces = true, battery = true, network = true, volume = true,
         --             clock = true, calendar = true, tiling = true, wallpapers = true,
         --             keyboard_layout = true }, -- false hides one; battery, network, volume,

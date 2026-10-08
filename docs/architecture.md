@@ -273,7 +273,7 @@ The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `t
 (the taskbar's slots and groups), `audio.cpp` with `pulse_audio.cpp`, `system_status.cpp`
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
 `power.cpp`, `palette.cpp` (with `fuzzy.cpp`, and `calculator.cpp`, `file_index.cpp` and
-`web_search.cpp`, which the start menu's search shares). `preview.cpp` has stand-ins for all of them for `--preview-popup`.
+`web_search.cpp`, which the start menu's search shares), `clipboard.cpp` (the clipboard history). `preview.cpp` has stand-ins for all of them for `--preview-popup`.
 
 A window is known by its app id alone. `app_match.cpp` finds the desktop entry it belongs to: an
 `app_match::Index` of the entries, which `refreshApps` builds, tries each way of matching from the
@@ -426,6 +426,22 @@ the start menu bump `searchRevision`, which `StartSearch.qml`'s results read. A 
 index stand-ins with `preview()`, after which it reads nothing. `FileIndex::open` opens a file, or
 its folder, with GIO's default handler (`g_app_info_launch_default_for_uri`), and
 `ShellController::openFile` shows a failure across the panel.
+
+The clipboard history (`ClipboardHistory`, `clipboard.cpp`; `shell.clipboard`) is a client of
+ext-data-control-v1 on a Wayland connection of its own, as `TaskModel` is (`connectDisplay`, which
+`main.cpp` calls). Its device announces each offer with its types, then the selection. A
+selection is read a type at a time into a pipe a `QSocketNotifier` watches (the secret hint first,
+then the text, HTML, a list of files and a picture), each type given two seconds and a size cap,
+and what was read goes to `record()`, which the tests call too. While the history's own data
+source is what is copied (`restore()`), the selection announcing it is not read; another program
+copying cancels that source first. A source hands each program pasting the bytes it asks for with
+non-blocking writes, SIGPIPE held off. `locked on|off` in the control socket's state calls
+`setLocked`, and `clipboard OUTPUT` from the `clipboard_history` action toggles `output`, which a
+`PickerView` (`picker_view.cpp`) follows: an `OverlayView` on every output, like the palette's,
+showing `ClipboardPicker.qml`, which filters the entries; `image://clipboard/ID/SERIAL`
+(`clipboard_images.hpp`) serves their pictures. Its file is touched only once the history is the
+session's (connected) or was given a path, so tests and previews that make a controller never
+read or remove it.
 
 ### Popups and menus
 
