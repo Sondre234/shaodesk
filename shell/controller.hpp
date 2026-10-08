@@ -3,6 +3,7 @@
 #include "app_match.hpp"
 #include "audio.hpp"
 #include "backlight.hpp"
+#include "clipboard.hpp"
 #include "file_index.hpp"
 #include "notifications.hpp"
 #include "osd.hpp"
@@ -135,6 +136,8 @@ class ShellController : public QObject {
     Q_PROPERTY(Power *power READ power CONSTANT)
     // The start menu's pins, launch history, applications by letter, search and user.
     Q_PROPERTY(StartMenu *startMenu READ startMenu CONSTANT)
+    // The history of what is copied (shell.clipboard), and its popup.
+    Q_PROPERTY(ClipboardHistory *clipboard READ clipboard CONSTANT)
     // The compositor's overview: the output showing it, empty while closed; its thumbnails as
     // {x, y, w, h, appId, title, workspace, urgent} and workspace strip cells as {x, y, w, h,
     // workspace, windows}, in the output's coordinates; the selected thumbnail, the workspace
@@ -225,6 +228,7 @@ class ShellController : public QObject {
     StartMenu *startMenu() { return &startMenu_; }
     // The files the palette's and the start menu's search find (shell.search).
     FileIndex *files() { return &files_; }
+    ClipboardHistory *clipboard() { return &clipboard_; }
     // Opens a file in its default application, or with `folder` the folder that holds it; a
     // failure shows across the panel.
     Q_INVOKABLE bool openFile(const QString &path, bool folder = false);
@@ -362,6 +366,8 @@ class ShellController : public QObject {
     void loadConfig();
     // Hands the file index and the start menu shell.search's settings.
     void configureSearch();
+    // Hands the clipboard history shell.clipboard's.
+    void configureClipboard();
     std::filesystem::path path_;
     shaodesk::Config config_;
     TaskModel tasks_;
@@ -369,6 +375,7 @@ class ShellController : public QObject {
     Palette palette_{*this};
     Power power_{*this};
     StartMenu startMenu_{{}, this};
+    ClipboardHistory clipboard_;
     std::unique_ptr<Audio> audio_ = makeAudio();
     SystemStatus status_{"/sys", nullptr, true};
     NotificationCenter notifications_;

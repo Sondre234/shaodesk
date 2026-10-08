@@ -36,6 +36,11 @@ endif()
 # share.
 set(SHAODESK_START_SOURCES start_menu.cpp start_menu.hpp launch_history.cpp launch_history.hpp
     calculator.cpp calculator.hpp file_index.cpp file_index.hpp web_search.cpp web_search.hpp)
+# The clipboard history, its pictures, and the overlay its popup shows in, in everything that
+# builds the controller.
+set(SHAODESK_PICKER_SOURCES clipboard.cpp clipboard.hpp clipboard_images.hpp picker_view.cpp
+    picker_view.hpp ${PROJECT_BINARY_DIR}/ext-data-control-v1-protocol.c
+    ${PROJECT_BINARY_DIR}/ext-data-control-v1-client-protocol.h)
 set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_images.cpp
     notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp tray.cpp tray.hpp
     tray_images.cpp tray_images.hpp)
@@ -89,7 +94,8 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     TopMenuBar.qml
     MenuBarMenu.qml
     QuickSettings.qml
-    QuickTile.qml)
+    QuickTile.qml
+    ClipboardPicker.qml)
 # The protocols task_model.cpp and window_pictures.cpp speak, generated in the top-level build
 # directory.
 set(SHAODESK_TASK_PROTOCOL_SOURCES
@@ -105,7 +111,7 @@ add_executable(shaodesk-shell main.cpp ${SHAODESK_NOTIFY_SOURCES} controller.cpp
     ${SHAODESK_TASK_PROTOCOL_SOURCES})
 add_dependencies(shaodesk-shell shaodesk_wlr_client_protocols shaodesk_version)
 set_target_properties(shaodesk-shell PROPERTIES AUTOMOC ON RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
-target_sources(shaodesk-shell PRIVATE ${SHAODESK_START_SOURCES})
+target_sources(shaodesk-shell PRIVATE ${SHAODESK_START_SOURCES} ${SHAODESK_PICKER_SOURCES})
 target_include_directories(shaodesk-shell PRIVATE ${PROJECT_BINARY_DIR})
 target_link_libraries(shaodesk-shell PRIVATE shaodesk_config Qt6::Core Qt6::Gui Qt6::Network Qt6::Qml Qt6::Quick
     PkgConfig::GIO PkgConfig::SHELL_WAYLAND)
@@ -142,7 +148,7 @@ if(BUILD_TESTING)
         task_filter.cpp task_filter.hpp icons.cpp icons.hpp app_match.cpp app_match.hpp wallpapers.cpp wallpapers.hpp window_images.cpp window_images.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
         ${SHAODESK_TASK_PROTOCOL_SOURCES})
     set_target_properties(shell_ui_test PROPERTIES AUTOMOC ON)
-    target_sources(shell_ui_test PRIVATE ${SHAODESK_START_SOURCES})
+    target_sources(shell_ui_test PRIVATE ${SHAODESK_START_SOURCES} ${SHAODESK_PICKER_SOURCES})
     target_include_directories(shell_ui_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
     target_compile_definitions(shell_ui_test PRIVATE QT_NO_KEYWORDS SHAODESK_LAYER_SHELL=0)
     target_compile_options(shell_ui_test PRIVATE -Wall -Wextra -Wpedantic)
@@ -157,7 +163,7 @@ if(BUILD_TESTING)
         task_filter.cpp task_filter.hpp icons.cpp icons.hpp app_match.cpp app_match.hpp wallpapers.cpp wallpapers.hpp window_images.cpp window_images.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
         ${SHAODESK_TASK_PROTOCOL_SOURCES})
     set_target_properties(task_filter_test PROPERTIES AUTOMOC ON)
-    target_sources(task_filter_test PRIVATE ${SHAODESK_START_SOURCES})
+    target_sources(task_filter_test PRIVATE ${SHAODESK_START_SOURCES} ${SHAODESK_PICKER_SOURCES})
     target_include_directories(task_filter_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
     target_compile_definitions(task_filter_test PRIVATE QT_NO_KEYWORDS SHAODESK_LAYER_SHELL=0)
     target_compile_options(task_filter_test PRIVATE -Wall -Wextra -Wpedantic)
@@ -321,7 +327,7 @@ if(BUILD_TESTING)
         task_filter.cpp task_filter.hpp icons.cpp icons.hpp app_match.cpp app_match.hpp wallpapers.cpp wallpapers.hpp window_images.cpp window_images.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
         ${SHAODESK_TASK_PROTOCOL_SOURCES})
     set_target_properties(osd_test PROPERTIES AUTOMOC ON)
-    target_sources(osd_test PRIVATE ${SHAODESK_START_SOURCES})
+    target_sources(osd_test PRIVATE ${SHAODESK_START_SOURCES} ${SHAODESK_PICKER_SOURCES})
     target_include_directories(osd_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
     target_compile_definitions(osd_test PRIVATE QT_NO_KEYWORDS SHAODESK_LAYER_SHELL=0)
     target_compile_options(osd_test PRIVATE -Wall -Wextra -Wpedantic)

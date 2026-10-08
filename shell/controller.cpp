@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "controller.hpp"
+#include "clipboard_images.hpp"
 #include "icons.hpp"
 #include "notification_images.hpp"
 #include "tray_images.hpp"
@@ -55,6 +56,8 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
     connect(&startMenu_, &StartMenu::installedChanged, this, &ShellController::refreshApps);
     startMenu_.setFiles(&files_);
     configureSearch();
+    connect(&clipboard_, &ClipboardHistory::failed, this, &ShellController::report);
+    configureClipboard();
     refreshApps();
     subscribe();
     notifications_.configure(config_.notifications);
@@ -84,6 +87,7 @@ QQmlEngine *ShellController::engine() {
         engine_->addImageProvider("tray", new TrayImages(tray_));
         engine_->addImageProvider("thumbs", new Thumbnails);
         engine_->addImageProvider("windows", new WindowImages(tasks_));
+        engine_->addImageProvider("clipboard", new ClipboardImages(clipboard_));
         engine_->rootContext()->setContextProperty("shell", this);
     }
     return engine_;
@@ -480,6 +484,15 @@ void ShellController::configureSearch() {
     files_.configure(settings);
     startMenu_.setWebSearch(webSearch());
 }
+void ShellController::configureClipboard() {
+    const auto &clipboard = config_.shell.clipboard;
+    ClipboardHistory::Settings settings;
+    settings.enabled = clipboard.enabled;
+    settings.limit = clipboard.max_entries;
+    settings.images = clipboard.images;
+    settings.persist = clipboard.persist;
+    clipboard_.configure(settings);
+}
 bool ShellController::openUrl(const QString &url) {
     // In the default browser, as the shell's own platform settings are not its.
     GAppLaunchContext *context = g_app_launch_context_new();
@@ -620,6 +633,7 @@ void ShellController::reload() {
         osd_.configure(config_.osd);
         power_.setCountdown(config_.power.countdown);
         configureSearch();
+        configureClipboard();
         updateNotificationService();
         updateTrayHost();
         refreshApps();
@@ -747,6 +761,13 @@ void ShellController::subscribe() {
                 continue;
             } else if (line.startsWith("notifications ")) {
                 Q_EMIT notificationsRequested(line.sliced(14));
+                continue;
+            } else if (line.startsWith("clipboard ")) {
+                clipboard_.toggle(line.sliced(10));
+                continue;
+            } else if (line.startsWith("locked ")) {
+                // locked on|off: nothing copied while the session is locked is kept.
+                clipboard_.setLocked(line == "locked on");
                 continue;
             } else if (line.startsWith("power ")) {
                 // power ACTIONS: those that may run, as "lock,suspend,logout", or "-".

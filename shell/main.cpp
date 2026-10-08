@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "controller.hpp"
 #include "icons.hpp"
+#include "picker_view.hpp"
 #include "preview.hpp"
 #include "version.h"
 #include "view.hpp"
@@ -136,6 +137,9 @@ int main(int argc, char **argv) {
             std::cerr << "The compositor must support foreign-toplevel-management\n";
             return 1;
         }
+        // Without data-control the clipboard history keeps nothing, quietly.
+        if (!preview && !controller.clipboard()->connectDisplay())
+            std::cerr << "The compositor offers no ext-data-control-v1: no clipboard history\n";
         qmlRegisterUncreatableType<TaskModel>("Shaodesk", 1, 0, "TaskModel", "Provided by the shell");
         // Made before the views, which refer to it, and so destroyed after them.
         std::unique_ptr<PreviewData> previewData;
@@ -144,6 +148,7 @@ int main(int argc, char **argv) {
         std::vector<std::unique_ptr<ShellView>> views;
         std::vector<std::unique_ptr<SwitcherView>> switchers;
         std::vector<std::unique_ptr<PaletteView>> palettes;
+        std::vector<std::unique_ptr<PickerView>> pickers;
         std::vector<std::unique_ptr<PowerView>> powerViews;
         std::vector<std::unique_ptr<OverviewView>> overviews;
         std::vector<std::unique_ptr<CardsView>> cardViews;
@@ -236,6 +241,15 @@ int main(int argc, char **argv) {
                     throw std::runtime_error("could not load shell QML");
                 }
                 palettes.push_back(std::move(palette));
+                auto clipboard = std::make_unique<PickerView>(controller, screen, "clipboard",
+                                                              "ClipboardPicker.qml",
+                                                              controller.clipboard());
+                if (clipboard->status() == QQuickView::Error) {
+                    for (const auto &error : clipboard->errors())
+                        std::cerr << error.toString().toStdString() << '\n';
+                    throw std::runtime_error("could not load shell QML");
+                }
+                pickers.push_back(std::move(clipboard));
                 auto powerView = std::make_unique<PowerView>(controller, screen);
                 if (powerView->status() == QQuickView::Error) {
                     for (const auto &error : powerView->errors())
@@ -303,6 +317,9 @@ int main(int argc, char **argv) {
             });
             std::erase_if(palettes, [screen](const auto &palette) {
                 return palette->outputScreen() == screen;
+            });
+            std::erase_if(pickers, [screen](const auto &picker) {
+                return picker->outputScreen() == screen;
             });
             std::erase_if(powerViews, [screen](const auto &view) { return view->outputScreen() == screen; });
             std::erase_if(overviews, [screen](const auto &overview) {
