@@ -38,6 +38,8 @@ bool set_output_power(struct sh_output *output, bool on) {
     output->powered_off = false;
     output->idle_off = false;
     configure_output(server, output);
+    if (output->disabled)
+        return false; // a laptop's panel behind its closed lid, out of the layout now
     if (!wlr_output->enabled) {
         output->powered_off = true;
         wlr_log(WLR_ERROR, "Cannot turn %s on", wlr_output->name);
