@@ -262,6 +262,12 @@ shadows.
   desktop get the first finger as the pointer and its left button. `touch.output` names the
   monitor a touchscreen covers; unset, it is the one the device names, else the built-in panel,
   else every monitor. `shaodesk msg get touch` lists the touchscreens and the fingers down.
+- Drawing tablets (tablet-v2): a pen's or eraser's position, pressure, distance, tilt, rotation,
+  slider, wheel, tip and buttons reach the window under it, for Krita's, GIMP's and Inkscape's
+  pressure; its tip focuses the window and keeps it while down. Over a window without tablet
+  input, the window controls or the desktop the pen is the pointer. Pads' buttons, rings and
+  strips go to the window with the keyboard. `tablet.output` maps a tablet to one monitor, and
+  `shaodesk msg get tablet` lists tablets, pads and tools.
 
 ### Working on the shell
 

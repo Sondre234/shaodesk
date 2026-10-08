@@ -1,18 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* A window that prints the input it gets, a line per event, for the input tests: the pointer
  * entering, moving and pressing buttons over it, touchpad gestures through
- * pointer-gestures-unstable-v1, and fingers on a touchscreen through wl_touch. It prints "ready"
- * once it has drawn, and runs until it is ended.
+ * pointer-gestures-unstable-v1, fingers on a touchscreen through wl_touch, and drawing tablets'
+ * tools and pads through tablet-v2. It prints "ready" once it has drawn, and runs until it is
+ * ended.
  *   pointer enter X Y | pointer leave | pointer motion X Y | pointer button CODE pressed|released
  *   swipe begin FINGERS | swipe update DX DY | swipe end CANCELLED
  *   pinch begin FINGERS | pinch update DX DY SCALE ROTATION | pinch end CANCELLED
  *   hold begin FINGERS | hold end CANCELLED
  *   touch down ID X Y | touch motion ID X Y | touch up ID | touch frame | touch cancel
- * Usage: input_probe [--no-gestures] [--no-touch] [--layer] [TITLE]: without the gestures or
- * touch it never binds them, as most applications; with --layer it is a panel along the bottom
- * of the output, 60 pixels high, rather than a window. */
+ *   tool in TYPE | tool out | tool down | tool up | tool motion X Y | tool pressure P |
+ *   tool distance D | tool tilt X Y | tool rotation DEGREES | tool slider P |
+ *   tool wheel DEGREES CLICKS | tool button CODE pressed|released | tool frame
+ *   pad enter | pad leave | pad button N pressed|released
+ * (pressure, distance and the slider in 65535ths). Usage: input_probe [--no-gestures]
+ * [--no-touch] [--no-tablet] [--layer] [TITLE]: without the gestures, touch or tablets it never
+ * binds them, as most applications; with --layer it is a panel along the bottom of the output,
+ * 60 pixels high, rather than a window. */
 #define _GNU_SOURCE
 #include "pointer-gestures-unstable-v1-client-protocol.h"
+#include "tablet-v2-client-protocol.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 #include <stdarg.h>
@@ -41,6 +48,8 @@ struct probe {
     bool want_gestures;
     struct wl_touch *touch;
     bool want_touch;
+    struct zwp_tablet_manager_v2 *tablets;
+    bool want_tablet;
     struct zwlr_layer_shell_v1 *layer_shell;
     struct zwlr_layer_surface_v1 *layer;
     struct wl_surface *surface;
@@ -168,6 +177,151 @@ static const struct wl_touch_listener touch_listener = {.down = touch_down,
                                                         .frame = touch_frame,
                                                         .cancel = touch_cancel};
 
+static const char *tool_type(uint32_t type) {
+    switch (type) {
+    case ZWP_TABLET_TOOL_V2_TYPE_PEN:
+        return "pen";
+    case ZWP_TABLET_TOOL_V2_TYPE_ERASER:
+        return "eraser";
+    default:
+        return "other";
+    }
+}
+static void tool_type_event(void *data, struct zwp_tablet_tool_v2 *tool, uint32_t type) {
+    zwp_tablet_tool_v2_set_user_data(tool, (void *)(uintptr_t)type);
+}
+static void tool_serial(void *data, struct zwp_tablet_tool_v2 *tool, uint32_t high, uint32_t low) {}
+static void tool_wacom(void *data, struct zwp_tablet_tool_v2 *tool, uint32_t high, uint32_t low) {}
+static void tool_capability(void *data, struct zwp_tablet_tool_v2 *tool, uint32_t capability) {}
+static void tool_done(void *data, struct zwp_tablet_tool_v2 *tool) {}
+static void tool_removed(void *data, struct zwp_tablet_tool_v2 *tool) {
+    zwp_tablet_tool_v2_destroy(tool);
+}
+static void tool_proximity_in(void *data, struct zwp_tablet_tool_v2 *tool, uint32_t serial,
+                              struct zwp_tablet_v2 *tablet, struct wl_surface *surface) {
+    say("tool in %s", tool_type((uint32_t)(uintptr_t)zwp_tablet_tool_v2_get_user_data(tool)));
+}
+static void tool_proximity_out(void *data, struct zwp_tablet_tool_v2 *tool) {
+    say("tool out");
+}
+static void tool_down(void *data, struct zwp_tablet_tool_v2 *tool, uint32_t serial) {
+    say("tool down");
+}
+static void tool_up(void *data, struct zwp_tablet_tool_v2 *tool) {
+    say("tool up");
+}
+static void tool_motion(void *data, struct zwp_tablet_tool_v2 *tool, wl_fixed_t x, wl_fixed_t y) {
+    say("tool motion %.0f %.0f", wl_fixed_to_double(x), wl_fixed_to_double(y));
+}
+static void tool_pressure(void *data, struct zwp_tablet_tool_v2 *tool, uint32_t pressure) {
+    say("tool pressure %u", pressure);
+}
+static void tool_distance(void *data, struct zwp_tablet_tool_v2 *tool, uint32_t distance) {
+    say("tool distance %u", distance);
+}
+static void tool_tilt(void *data, struct zwp_tablet_tool_v2 *tool, wl_fixed_t x, wl_fixed_t y) {
+    say("tool tilt %.1f %.1f", wl_fixed_to_double(x), wl_fixed_to_double(y));
+}
+static void tool_rotation(void *data, struct zwp_tablet_tool_v2 *tool, wl_fixed_t degrees) {
+    say("tool rotation %.1f", wl_fixed_to_double(degrees));
+}
+static void tool_slider(void *data, struct zwp_tablet_tool_v2 *tool, int32_t position) {
+    say("tool slider %d", position);
+}
+static void tool_wheel(void *data, struct zwp_tablet_tool_v2 *tool, wl_fixed_t degrees,
+                       int32_t clicks) {
+    say("tool wheel %.1f %d", wl_fixed_to_double(degrees), clicks);
+}
+static void tool_button(void *data, struct zwp_tablet_tool_v2 *tool, uint32_t serial,
+                        uint32_t button, uint32_t state) {
+    say("tool button %u %s", button,
+        state == ZWP_TABLET_TOOL_V2_BUTTON_STATE_PRESSED ? "pressed" : "released");
+}
+static void tool_frame(void *data, struct zwp_tablet_tool_v2 *tool, uint32_t time) {
+    say("tool frame");
+}
+static const struct zwp_tablet_tool_v2_listener tool_listener = {
+    .type = tool_type_event,
+    .hardware_serial = tool_serial,
+    .hardware_id_wacom = tool_wacom,
+    .capability = tool_capability,
+    .done = tool_done,
+    .removed = tool_removed,
+    .proximity_in = tool_proximity_in,
+    .proximity_out = tool_proximity_out,
+    .down = tool_down,
+    .up = tool_up,
+    .motion = tool_motion,
+    .pressure = tool_pressure,
+    .distance = tool_distance,
+    .tilt = tool_tilt,
+    .rotation = tool_rotation,
+    .slider = tool_slider,
+    .wheel = tool_wheel,
+    .button = tool_button,
+    .frame = tool_frame,
+};
+
+static void tablet_name(void *data, struct zwp_tablet_v2 *tablet, const char *name) {}
+static void tablet_id(void *data, struct zwp_tablet_v2 *tablet, uint32_t vendor,
+                      uint32_t product) {}
+static void tablet_path(void *data, struct zwp_tablet_v2 *tablet, const char *path) {}
+static void tablet_done(void *data, struct zwp_tablet_v2 *tablet) {}
+static void tablet_removed(void *data, struct zwp_tablet_v2 *tablet) {
+    zwp_tablet_v2_destroy(tablet);
+}
+static const struct zwp_tablet_v2_listener tablet_listener = {.name = tablet_name,
+                                                              .id = tablet_id,
+                                                              .path = tablet_path,
+                                                              .done = tablet_done,
+                                                              .removed = tablet_removed};
+
+static void pad_group(void *data, struct zwp_tablet_pad_v2 *pad,
+                      struct zwp_tablet_pad_group_v2 *group) {
+    zwp_tablet_pad_group_v2_destroy(group);
+}
+static void pad_path(void *data, struct zwp_tablet_pad_v2 *pad, const char *path) {}
+static void pad_buttons(void *data, struct zwp_tablet_pad_v2 *pad, uint32_t buttons) {}
+static void pad_done(void *data, struct zwp_tablet_pad_v2 *pad) {}
+static void pad_button(void *data, struct zwp_tablet_pad_v2 *pad, uint32_t time, uint32_t button,
+                       uint32_t state) {
+    say("pad button %u %s", button,
+        state == ZWP_TABLET_PAD_V2_BUTTON_STATE_PRESSED ? "pressed" : "released");
+}
+static void pad_enter(void *data, struct zwp_tablet_pad_v2 *pad, uint32_t serial,
+                      struct zwp_tablet_v2 *tablet, struct wl_surface *surface) {
+    say("pad enter");
+}
+static void pad_leave(void *data, struct zwp_tablet_pad_v2 *pad, uint32_t serial,
+                      struct wl_surface *surface) {
+    say("pad leave");
+}
+static void pad_removed(void *data, struct zwp_tablet_pad_v2 *pad) {
+    zwp_tablet_pad_v2_destroy(pad);
+}
+static const struct zwp_tablet_pad_v2_listener pad_listener = {.group = pad_group,
+                                                               .path = pad_path,
+                                                               .buttons = pad_buttons,
+                                                               .done = pad_done,
+                                                               .button = pad_button,
+                                                               .enter = pad_enter,
+                                                               .leave = pad_leave,
+                                                               .removed = pad_removed};
+
+static void tablet_added(void *data, struct zwp_tablet_seat_v2 *seat,
+                         struct zwp_tablet_v2 *tablet) {
+    zwp_tablet_v2_add_listener(tablet, &tablet_listener, data);
+}
+static void tool_added(void *data, struct zwp_tablet_seat_v2 *seat,
+                       struct zwp_tablet_tool_v2 *tool) {
+    zwp_tablet_tool_v2_add_listener(tool, &tool_listener, data);
+}
+static void pad_added(void *data, struct zwp_tablet_seat_v2 *seat, struct zwp_tablet_pad_v2 *pad) {
+    zwp_tablet_pad_v2_add_listener(pad, &pad_listener, data);
+}
+static const struct zwp_tablet_seat_v2_listener tablet_seat_listener = {
+    .tablet_added = tablet_added, .tool_added = tool_added, .pad_added = pad_added};
+
 static void seat_capabilities(void *data, struct wl_seat *seat, uint32_t capabilities) {
     struct probe *probe = data;
     if ((capabilities & WL_SEAT_CAPABILITY_TOUCH) && !probe->touch && probe->want_touch) {
@@ -216,6 +370,8 @@ static void global(void *data, struct wl_registry *registry, uint32_t name, cons
     } else if (!strcmp(interface, wl_seat_interface.name) && !probe->seat) {
         probe->seat = wl_registry_bind(registry, name, &wl_seat_interface, version < 5 ? version : 5);
         wl_seat_add_listener(probe->seat, &seat_listener, probe);
+    } else if (!strcmp(interface, zwp_tablet_manager_v2_interface.name)) {
+        probe->tablets = wl_registry_bind(registry, name, &zwp_tablet_manager_v2_interface, 1);
     } else if (!strcmp(interface, zwlr_layer_shell_v1_interface.name)) {
         probe->layer_shell = wl_registry_bind(registry, name, &zwlr_layer_shell_v1_interface, 1);
     } else if (!strcmp(interface, zwp_pointer_gestures_v1_interface.name)) {
@@ -295,7 +451,8 @@ static const struct zwlr_layer_surface_v1_listener layer_listener = {.configure 
                                                                      .closed = layer_closed};
 
 int main(int argc, char **argv) {
-    struct probe probe = {.want_gestures = true, .want_touch = true, .width = 400, .height = 300};
+    struct probe probe = {
+        .want_gestures = true, .want_touch = true, .want_tablet = true, .width = 400, .height = 300};
     const char *title = "input probe";
     bool layer = false;
     for (int i = 1; i < argc; ++i) {
@@ -303,6 +460,8 @@ int main(int argc, char **argv) {
             probe.want_gestures = false;
         else if (!strcmp(argv[i], "--no-touch"))
             probe.want_touch = false;
+        else if (!strcmp(argv[i], "--no-tablet"))
+            probe.want_tablet = false;
         else if (!strcmp(argv[i], "--layer"))
             layer = true;
         else
@@ -319,6 +478,12 @@ int main(int argc, char **argv) {
         die("required globals missing");
     if (probe.want_gestures && !probe.gestures)
         die("zwp_pointer_gestures_v1 is not offered");
+    if (probe.want_tablet && !probe.tablets)
+        die("zwp_tablet_manager_v2 is not offered");
+    if (probe.want_tablet)
+        zwp_tablet_seat_v2_add_listener(
+            zwp_tablet_manager_v2_get_tablet_seat(probe.tablets, probe.seat),
+            &tablet_seat_listener, &probe);
     probe.surface = wl_compositor_create_surface(probe.compositor);
     if (layer) {
         if (!probe.layer_shell)

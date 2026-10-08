@@ -48,6 +48,9 @@ you save it.
   updaters ask for a password in a dialog of their own.
 - **Effects:** interruptible animations with spring curves, dimming of inactive windows, peek,
   night light, a magnifier, and hot corners.
+- **Touch:** three-finger swipes move between workspaces with the fingers and open the
+  overview, other touchpad gestures reach applications (pinch-zoom), touchscreens take several
+  fingers at once, and drawing tablets give applications pressure and tilt.
 - **Lua configuration** that is validated with file and line, reloads on save, can extend
   the defaults instead of copying them, and switches between appearance profiles.
   `shaodesk import` carries over an existing Hyprland/Waybar setup.

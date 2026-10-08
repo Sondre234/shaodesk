@@ -259,6 +259,7 @@ void arrange_outputs(struct sh_server *server) {
     arrange_layers(server);
     refit_fullscreen(server);
     map_touchscreens(server);
+    map_tablets(server);
     publish_output_configuration(server);
     notify_subscribers(server); // the list of outputs and their workspaces
 }

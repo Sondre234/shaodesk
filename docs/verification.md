@@ -675,3 +675,18 @@ Not checked: a real touchscreen through libinput (its device's `WL_OUTPUT`, a ro
 built-in panel, which libinput's calibration matrix from udev must match, palm rejection's
 cancels), GTK, Firefox and Chromium windows and X11 applications under real fingers, and how
 the cursor jumping to a finger that stands in for the pointer looks.
+
+Drawing tablets are `headless_tablet` devices, a tablet with a pen and an eraser and a pad.
+`tablet_smoke` checks with `input_probe` that a pen near a window reaches it with its position,
+pressure, distance, tilt, rotation, slider and wheel (in tablet-v2's units), that its tip
+focuses the window and keeps the pen past its edge, that over a window without tablet-v2 it is the
+pointer, the tip and the stylus buttons its left, right and middle buttons, that the eraser
+comes as a tool of its own, that the pad's buttons reach the window with the keyboard and none
+other, and `tablet.output`. `touch_shell_smoke` checks that the Qt shell takes the pen through
+tablet-v2 and opens and closes the launcher with its tip.
+
+Not checked: a real tablet through libinput (Wacom's tools and their serials, a tablet's mouse
+or lens, which act as absolute tools here, a pad that libinput attaches to its tablet, pad rings
+and strips, which go through groups the headless pad has none of), pressure in Krita, GIMP and
+Inkscape, the cursors applications set for a tool, and a tablet mapped to a rotated or scaled
+monitor.

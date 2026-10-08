@@ -96,6 +96,9 @@
 #include <wlr/types/wlr_session_lock_v1.h>
 #include <wlr/types/wlr_single_pixel_buffer_v1.h>
 #include <wlr/types/wlr_subcompositor.h>
+#include <wlr/types/wlr_tablet_pad.h>
+#include <wlr/types/wlr_tablet_tool.h>
+#include <wlr/types/wlr_tablet_v2.h>
 #include <wlr/types/wlr_touch.h>
 #include <wlr/types/wlr_viewporter.h>
 #include <wlr/types/wlr_xcursor_manager.h>
@@ -274,6 +277,14 @@ struct sh_touch {
     struct wl_list devices; // struct sh_touch_device
     int32_t pointer_id;
     struct sh_touch_point points[16];
+};
+
+/* Drawing tablets (tablet.c): tablet-v2, the tablets, pads and tools, and the cursor's tool
+ * events and the keyboard's focus, which the pads follow. */
+struct sh_tablets {
+    struct wlr_tablet_manager_v2 *manager;
+    struct wl_list tablets, pads, tools;
+    struct wl_listener tool_proximity, tool_axis, tool_tip, tool_button, keyboard_focus_change;
 };
 
 /* The touchpad swipe under way (gestures.c). */
@@ -457,6 +468,7 @@ struct sh_server {
     struct sh_gesture gesture;
     struct sh_touch touch;
     struct wl_listener touch_down, touch_motion, touch_up, touch_cancel, touch_frame;
+    struct sh_tablets tablet;
 
     struct wlr_seat *seat;
     struct wl_listener new_input;
@@ -487,6 +499,7 @@ struct sh_server {
     struct wl_list headless_keyboards; // added by tests with "headless_keyboard add"
     struct wl_list headless_pointers;  // and "headless_pointer add" (headless_input.c)
     struct wl_list headless_touches;   // and "headless_touch add"
+    struct wl_list headless_tablets;   // and "headless_tablet add"
     struct wl_list pointers; /* struct sh_pointer */
     enum sh_cursor_mode cursor_mode;
     struct sh_toplevel *grabbed_toplevel;
@@ -901,6 +914,7 @@ void dissolve_groups(struct sh_server *server);
 /* headless_input.c */
 void control_headless_pointer(struct sh_server *server, int fd, const char *arguments);
 void control_headless_touch(struct sh_server *server, int fd, const char *arguments);
+void control_headless_tablet(struct sh_server *server, int fd, const char *arguments);
 void destroy_headless_inputs(struct sh_server *server);
 
 /* input.c */
@@ -1067,6 +1081,15 @@ void switcher_open(struct sh_server *server, bool backward, uint32_t modifiers,
                    xkb_keysym_t key);
 void switcher_forget(struct sh_toplevel *toplevel);
 void switcher_key(struct sh_server *server, uint32_t modifiers, xkb_keysym_t sym);
+
+/* tablet.c */
+void map_tablets(struct sh_server *server);
+void server_new_tablet(struct sh_server *server, struct wlr_input_device *device);
+void server_new_tablet_pad(struct sh_server *server, struct wlr_input_device *device);
+void describe_tablets(struct sh_server *server, int fd,
+                      void (*surface)(struct sh_server *, int, const char *, struct wlr_surface *));
+void tablet_init(struct sh_server *server);
+void tablet_finish(struct sh_server *server);
 
 /* tiling.c */
 struct wlr_output *tiled_output(struct sh_toplevel *toplevel);

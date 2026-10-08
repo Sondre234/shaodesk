@@ -208,6 +208,12 @@ void server_new_input(struct wl_listener *listener, void *data) {
     case WLR_INPUT_DEVICE_TOUCH:
         server_new_touch(server, device);
         break;
+    case WLR_INPUT_DEVICE_TABLET:
+        server_new_tablet(server, device);
+        break;
+    case WLR_INPUT_DEVICE_TABLET_PAD:
+        server_new_tablet_pad(server, device);
+        break;
     default:
         break;
     }

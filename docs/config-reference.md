@@ -67,6 +67,13 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `touch` | table | - | - | Touchscreens (standalone sessions): each finger goes to what is under it. |
 | `touch.output` | string | unset | - | The monitor touchscreens are mapped to, by connector name or `"desc:"` and the start of its description as in `outputs.monitors`. Unset, a touchscreen goes to the monitor its device names, else to the built-in panel (eDP, LVDS or DSI), else across every monitor. |
 
+## `tablet`
+
+| Setting | Type | Default | Range | Description |
+| --- | --- | --- | --- | --- |
+| `tablet` | table | - | - | Drawing tablets (standalone sessions): pens with pressure and tilt, and their pads. |
+| `tablet.output` | string | unset | - | The monitor a tablet's area is mapped to, by connector name or `"desc:"` and the start of its description as in `outputs.monitors`. Unset, or naming none that is plugged in, the tablet spans every monitor. |
+
 ## `layout`
 
 | Setting | Type | Default | Range | Description |

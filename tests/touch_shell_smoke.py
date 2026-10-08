@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""The shell under a finger: with a touchscreen plugged in, Qt binds wl_touch, and a tap on the
-start button opens the launcher in the popover, which a tap beside it closes, as clicks do."""
+"""The shell under a finger and a pen: with a touchscreen plugged in, Qt binds wl_touch, and a tap
+on the start button opens the launcher in the popover, which a tap beside it closes, as clicks
+do; a drawing tablet's pen does the same through tablet-v2."""
 from pathlib import Path
 import sys
 
@@ -58,3 +59,23 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
     tap(1100, 200, 2, ["layer", "shaodesk-popover"])
     desktop.wait_for(lambda: "shaodesk popover hidden on HEADLESS-1" in log(),
                      "the launcher closed")
+
+    # A pen's tip on the start button, as the shell's own tablet input.
+    msg("headless_tablet", "add", "wacom")
+
+    def pen(x, y, surface):
+        """The pen's tip down and up at x, y, over `surface` as a tablet tool."""
+        msg("headless_tablet", "in", "wacom", "pen", f"{x / WIDTH:.6f}", f"{y / HEIGHT:.6f}")
+        assert ["tool", "pen", "1", *surface] in desktop.rows("tablet"), desktop.rows("tablet")
+        msg("headless_tablet", "tip", "wacom", "pen", "down")
+        msg("headless_tablet", "tip", "wacom", "pen", "up")
+        msg("headless_tablet", "out", "wacom", "pen")
+
+    shown = log().count("shaodesk popover shown on HEADLESS-1")
+    pen(30, HEIGHT - BAR // 2, ["layer", "shaodesk-panel"])
+    desktop.wait_for(lambda: log().count("shaodesk popover shown on HEADLESS-1") > shown,
+                     "the launcher opened by the pen")
+    hidden = log().count("shaodesk popover hidden on HEADLESS-1")
+    pen(1100, 200, ["layer", "shaodesk-popover"])
+    desktop.wait_for(lambda: log().count("shaodesk popover hidden on HEADLESS-1") > hidden,
+                     "the launcher closed by the pen")

@@ -137,8 +137,8 @@ with harness.Compositor(compositor, CONFIG % "") as desktop:
     x, y = windows()["Framed"][1:]
     finger("down", "screen", "9", *at(x + 14, y + 14))
     finger("up", "screen", "9")
+    assert desktop.reap(framed) == 0  # it closes its window and exits
     desktop.wait_for(lambda: "Framed" not in windows(), "the close light tapped")
-    assert desktop.reap(framed) == 0
     # A tap on the bare desktop puts the pointer there, on nothing.
     finger("down", "screen", "10", *at(1000, 500))
     finger("up", "screen", "10")

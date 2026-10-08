@@ -42,11 +42,12 @@ all. In short:
 | `actions.c` | `run_action`: one `case` per action, handing it to the module that does it. |
 | `control.c` | The control socket: reading requests, commands that are not actions, subscribers and shell events. |
 | `query.c` | `shaodesk msg get ...`: one function per query, and the table that names them. |
-| `headless_input.c` | Input devices without hardware for tests under `--headless`: pointers that move and make touchpad gestures, and touchscreens. |
+| `headless_input.c` | Input devices without hardware for tests under `--headless`: pointers that move and make touchpad gestures, touchscreens, and drawing tablets with a pen, an eraser and a pad. |
 | `input.c` | Keyboards, key bindings, pointers' libinput settings, virtual devices, selection and drag-and-drop. |
 | `keymap.c` | The keymap from the keyboard settings, given to every keyboard but virtual ones. |
 | `cursor.c` | What is under the pointer, focus on hover, button bindings, scrolling, the cursor image. |
 | `gestures.c` | Touchpad gestures: the swipes `gestures` takes (workspaces and the overview following the fingers, requests), and the rest passed on to the surface under the pointer (pointer-gestures-unstable-v1). |
+| `tablet.c` | Drawing tablets (tablet-v2): tools with pressure and tilt to the surfaces under them, the pointer where tablet input is not taken, pads to the surface with the keyboard, and the output a tablet is mapped to. |
 | `touch.c` | Touchscreens: fingers to the surfaces under them (wl_touch), the pointer for clients without touch and the compositor's own controls, and the output each screen is mapped to. |
 | `grab.c` | Moving and resizing with the pointer, magnetic edges, dropping. |
 | `focus.c` | Keyboard focus and urgent windows. |
@@ -229,6 +230,13 @@ motion stays in its coordinates when it leaves it. Anything else gets the first 
 pointer: the cursor warps to it and `server_cursor_button` hears a left button as from a mouse, so
 the controls, the drag strip, button bindings and the overview take it as a click.
 `map_touchscreens`, which `arrange_outputs` calls, maps each device to its output.
+
+`tablet.c` does the same for drawing tablets' tools: one over a surface that takes tablet-v2
+(`wlr_surface_accepts_tablet_v2`) is near it, as wlroots' tablet tool, and keeps it while its tip
+is down (an implicit grab, its motion in the surface's coordinates as a finger's); over anything
+else it is the pointer, the cursor following it and `server_cursor_button` hearing its tip and
+buttons. Pads follow the keyboard's focus through a listener of their own; wlroots would send
+their buttons to the last surface they entered, so `pad_focused` checks it first.
 
 ## The shell (`shell/`)
 

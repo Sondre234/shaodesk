@@ -387,6 +387,9 @@ struct sh_settings {
      * start of its description; "" for the one the device names, else a built-in panel, else
      * the whole layout. */
     char touch_output[128];
+    /* tablet.output: the output drawing tablets are mapped to, as touch_output names one; ""
+     * for the whole layout. */
+    char tablet_output[128];
 };
 
 /* What a login session keeps of the last one: nothing; where its windows were, for those that open

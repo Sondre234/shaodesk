@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Configuration of touch input: the touchpad swipes the compositor takes (`gestures`) and the
-// output touchscreens are mapped to (`touch`).
+// outputs touchscreens and drawing tablets are mapped to (`touch`, `tablet`).
 #include "shaodesk/config.hpp"
 #include <cstring>
 #include <iostream>
@@ -120,10 +120,23 @@ static void touch() {
     rejects("return {touch={ouptut='eDP-1'}}", "did you mean 'output'");
 }
 
+static void tablet() {
+    require(shaodesk::parse_config("return {}").settings.tablet_output[0] == '\0',
+            "tablets span every output by default");
+    require(!std::strcmp(shaodesk::parse_config("return {tablet={output='DP-2'}}")
+                             .settings.tablet_output,
+                         "DP-2"),
+            "tablet.output");
+    rejects("return {tablet={output=true}}", "output must be a string");
+    rejects("return {tablet={output='desc:'}}", "tablet.output needs a description");
+    rejects("return {tablet={mapping='DP-2'}}", "unknown setting 'mapping' in tablet");
+}
+
 int main() {
     try {
         gestures();
         touch();
+        tablet();
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';
         return 1;
