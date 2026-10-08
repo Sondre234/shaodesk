@@ -94,5 +94,5 @@ with harness.Compositor(compositor, CONFIG, start=False,
 
     # Without a trial, Escape closes the window.
     escape()
-    desktop.wait_for(lambda: window() is None or not window()[1], "the window closed")
+    desktop.wait_for(lambda: (window() or ("", False, False))[1] is False, "the window closed")
 print("The display settings window opened, followed trials and their end, and closed")
