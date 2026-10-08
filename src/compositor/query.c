@@ -440,6 +440,30 @@ static void get_power(struct sh_server *server, int fd, const char *arguments) {
     control_reply(fd, line);
 }
 
+static void get_idle(struct sh_server *server, int fd, const char *arguments) {
+    // "state", the milliseconds since the last input, whether an idle inhibitor (or the session
+    // being away from the front) holds the steps off, whether the machine runs on battery, and how
+    // dark the screens are dimmed (thousandths); then a line per step (idle.c): its name, its
+    // timeout in milliseconds on that power (0 for never), and whether it was taken since the
+    // last input.
+    const struct sh_idle *idle = &server->idle;
+    int64_t now = now_ms();
+    bool battery;
+    const struct sh_idle_steps *steps = idle_steps(server, &battery);
+    char line[128];
+    snprintf(line, sizeof(line), "ok\nstate\t%lld\t%d\t%d\t%ld\n",
+             (long long)(now - idle->last_input), idle_held(server), battery,
+             idle->dim ? lround(1000 * sh_fade_value(&idle->fade, now)) : 0);
+    control_reply(fd, line);
+    for (int step = 0; step < SH_IDLE_STEPS; ++step) {
+        const char *name;
+        int timeout = idle_step_timeout(steps, step, &name);
+        snprintf(line, sizeof(line), "%s\t%d\t%d\n", name, timeout,
+                 (idle->done & (1u << step)) != 0);
+        control_reply(fd, line);
+    }
+}
+
 static void get_pictures(struct sh_server *server, int fd, const char *arguments) {
     // Per capture source a client asked for a window's picture (get_scaled_capture_source),
     // oldest window first: the box asked for, the frame's size (0x0 before the first), how many
@@ -599,6 +623,7 @@ static const struct {
     {"layers", get_layers, false},
     {"keyboard", get_keyboard, false},
     {"power", get_power, false},
+    {"idle", get_idle, false},
     {"pictures", get_pictures, false},
     {"seat", get_seat, false},
 };

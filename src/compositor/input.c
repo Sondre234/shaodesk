@@ -7,12 +7,14 @@
 static bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, uint32_t modifiers,
                               xkb_keysym_t sym);
 
-/* Input from the user: idle daemons hear of it (ext-idle-notify-v1), and with `wakes` (a key or
- * button pressed, the pointer moved or scrolled) it turns the monitors on when every one is off
- * (output_power.c). True when it did, so that a key that woke them goes no further. */
+/* Input from the user: idle daemons hear of it (ext-idle-notify-v1), the idle steps start
+ * counting again and undo what they did (idle.c), and with `wakes` (a key or button pressed, the
+ * pointer moved or scrolled) it turns the monitors on when every one is off (output_power.c).
+ * True when it turned some on, so that a key that woke them goes no further. */
 bool input_activity(struct sh_server *server, bool wakes) {
     wlr_idle_notifier_v1_notify_activity(server->idle_notifier, server->seat);
-    return wakes && wake_displays(server);
+    bool woke = idle_activity(server);
+    return (wakes && wake_displays(server)) || woke;
 }
 
 static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) {

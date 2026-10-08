@@ -57,6 +57,7 @@ all. In short:
 | `group.c`, `scratchpad.c`, `swallow.c`, `switcher.c`, `overview.c`, `session.c` | One feature each. |
 | `effects.c` | Dimming, peeking at the desktop or at one window, night light, magnifier, hot corners. |
 | `lock.c` | Session lock and idle/sleep inhibitors. |
+| `idle.c` | Power saving after a while without input: dimming, monitors off, locking, suspending. |
 | `power.c` | The power actions: suspend, hibernate, reboot and power off through logind (`src/login1.c`), locking first, closing windows first, log out. |
 | `foreign_toplevel.c` | Window lists for taskbars and single-window capture. |
 | `window_control.c` | The shell's window menu, window pictures and windows' own icons: shaodesk-window-control-v1, which names a window by its taskbar handle. |

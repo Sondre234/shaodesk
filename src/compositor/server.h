@@ -247,6 +247,20 @@ struct sh_power {
     } clients[64];
 };
 
+/* Power saving without an idle daemon (idle.c): when the last input came, the steps taken since
+ * (a bit each), the timer for the next and whether it is set, the power the steps were last
+ * picked for, and the black laid over every output while the screens dim. */
+enum sh_idle_step { SH_IDLE_DIM, SH_IDLE_DISPLAY_OFF, SH_IDLE_LOCK, SH_IDLE_SUSPEND, SH_IDLE_STEPS };
+struct sh_idle {
+    int64_t last_input; /* milliseconds, CLOCK_MONOTONIC */
+    unsigned done;
+    struct wl_event_source *timer;
+    bool armed, on_battery;
+    struct wlr_scene_tree *tree; /* over everything, the lock too */
+    struct wlr_scene_buffer *dim; /* NULL while the screens are not dimmed */
+    struct sh_fade fade;
+};
+
 struct sh_window_object; // a shaodesk_window_v1 (window_control.c)
 
 struct sh_server {
@@ -384,6 +398,7 @@ struct sh_server {
     int sleep_inhibitor; // logind inhibitor fd while this VT is in front, else -1
 #endif
     struct sh_power power;
+    struct sh_idle idle;
     struct wlr_renderer *renderer;
     struct wlr_allocator *allocator;
     struct wlr_scene *scene;
@@ -491,6 +506,7 @@ struct sh_output {
     /* Turned off in the layout (output_power.c): it keeps its windows, workspaces and panels,
      * but the wlr_output is disabled, so it neither scans out nor draws frames. */
     bool powered_off;
+    bool idle_off; /* turned off by the idle display_off step (idle.c), which input undoes */
     /* Settings a wlr-output-management client (wlr-randr, kanshi) applied at runtime. They
      * replace the configured monitor until the configuration is reloaded. */
     bool has_override;
@@ -834,6 +850,18 @@ void group_cycle(struct sh_server *server, struct sh_toplevel *current, int step
 void ungroup(struct sh_server *server, struct sh_toplevel *current);
 void group_merge(struct sh_server *server, enum sh_action action);
 void dissolve_groups(struct sh_server *server);
+
+/* idle.c */
+int idle_step_timeout(const struct sh_idle_steps *steps, enum sh_idle_step step,
+                      const char **name);
+const struct sh_idle_steps *idle_steps(struct sh_server *server, bool *battery);
+bool idle_held(struct sh_server *server);
+bool tick_idle(struct sh_server *server);
+bool idle_activity(struct sh_server *server);
+void idle_hold_changed(struct sh_server *server);
+void idle_reload(struct sh_server *server);
+void idle_init(struct sh_server *server);
+void idle_finish(struct sh_server *server);
 
 /* input.c */
 bool input_activity(struct sh_server *server, bool wakes);

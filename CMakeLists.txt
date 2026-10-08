@@ -204,6 +204,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/frame.c
         src/compositor/grab.c
         src/compositor/group.c
+        src/compositor/idle.c
         src/compositor/input.c
         src/compositor/keymap.c
         src/compositor/layer_shell.c
@@ -235,6 +236,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         ${CMAKE_CURRENT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
         ${CAPTURE_SOURCE_PROTOCOL_SOURCES})
     target_sources(shaodesk PRIVATE src/overview_scene.c)
+    target_sources(shaodesk PRIVATE src/power_supply.c)
     target_include_directories(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_compile_definitions(shaodesk PRIVATE WLR_USE_UNSTABLE)
     # version.h, for --version: the project version, and `git describe` in a git checkout.
@@ -414,6 +416,27 @@ if(SHAODESK_BUILD_COMPOSITOR)
         target_include_directories(output_power_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
         target_link_libraries(output_power_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
         target_compile_options(output_power_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        # Clients of idle-inhibit-unstable-v1 and ext-idle-notify-v1, for idle_smoke.
+        foreach(PROTOCOL unstable/idle-inhibit/idle-inhibit-unstable-v1
+                staging/ext-idle-notify/ext-idle-notify-v1)
+            get_filename_component(NAME ${PROTOCOL} NAME)
+            add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${NAME}-client-protocol.h
+                COMMAND ${WAYLAND_SCANNER} client-header ${PROTOCOL_DIR}/${PROTOCOL}.xml
+                ${CMAKE_CURRENT_BINARY_DIR}/${NAME}-client-protocol.h
+                DEPENDS ${PROTOCOL_DIR}/${PROTOCOL}.xml)
+            add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${NAME}-protocol.c
+                COMMAND ${WAYLAND_SCANNER} private-code ${PROTOCOL_DIR}/${PROTOCOL}.xml
+                ${CMAKE_CURRENT_BINARY_DIR}/${NAME}-protocol.c
+                DEPENDS ${PROTOCOL_DIR}/${PROTOCOL}.xml)
+        endforeach()
+        add_executable(idle_probe tests/idle_probe.c
+            ${CMAKE_CURRENT_BINARY_DIR}/idle-inhibit-unstable-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/idle-inhibit-unstable-v1-protocol.c
+            ${CMAKE_CURRENT_BINARY_DIR}/ext-idle-notify-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/ext-idle-notify-v1-protocol.c)
+        target_include_directories(idle_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        target_link_libraries(idle_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
+        target_compile_options(idle_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
         # A taskbar's window menu through shaodesk-window-control-v1, for window_control_smoke,
         # its capture of a window, for window_capture_smoke, its peek at one, for
         # window_peek_smoke, and windows' own icons, for window_icon_smoke.
@@ -715,6 +738,11 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/dim_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")
         set_tests_properties(dim_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME idle_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/idle_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:idle_probe> $<TARGET_FILE:lock_probe>
+            $<TARGET_FILE:pointer_probe> "${GRIM_ARGUMENT}")
+        set_tests_properties(idle_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME urgent_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/urgent_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)

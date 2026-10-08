@@ -162,6 +162,7 @@ static void prepare_for_sleep(void *data, bool before) {
     if (!before) {
         wlr_log(WLR_INFO, "The machine woke up");
         hold_sleep(server);
+        idle_activity(server); // as input would: the monitors come on, the steps start again
         return;
     }
     // A suspend of ours still waiting for the lock is not needed any more: the machine sleeps.
