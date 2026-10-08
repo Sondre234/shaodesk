@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The start menu's model: its pins, the launch history and the applications from A to Z.
+#include "file_index.hpp"
 #include "launch_history.hpp"
 #include "start_menu.hpp"
 #include <QDir>
@@ -327,6 +328,22 @@ class StartMenuTest : public QObject {
         QCOMPARE(calc["title"].toString(), QString("3.10685596119 mi"));
         QCOMPARE(calc["target"].toString(), QString("3.10685596119"));
         QCOMPARE(found("2").first(), QString("best:Workspace 2: web"));
+        // Files come last, unless nothing else matches as well; / finds only them.
+        FileIndex files;
+        files.preview({{"/srv/docs"},
+                       {{0, "Kate notes.txt", "kate notes.txt", false, 0},
+                        {0, "Quarterly report.pdf", "quarterly report.pdf", false, 0},
+                        {0, "Firefox profile", "firefox profile", true, 0}}});
+        menu.setFiles(&files);
+        QCOMPARE(found("kate").first(), QString("best:Kate"));
+        QCOMPARE(found("kate").last(), QString("files:Kate notes.txt"));
+        QCOMPARE(found("quarterly"), QStringList{"best:Quarterly report.pdf"});
+        QCOMPARE(found("/fire"), QStringList{"best:Firefox profile"});
+        QCOMPARE(found("/kate"), QStringList{"best:Kate notes.txt"});
+        QCOMPARE(found("@kate"), QStringList{});
+        const auto file = menu.search("quarterly", others).first().toMap();
+        QCOMPARE(file["kind"].toString(), QString("file"));
+        QCOMPARE(file["target"].toString(), QString("/srv/docs/Quarterly report.pdf"));
         // An application's result is its record, with what the menu shows of it.
         const auto best = menu.search("kate", others).first().toMap();
         QCOMPARE(best["kind"].toString(), QString("app"));

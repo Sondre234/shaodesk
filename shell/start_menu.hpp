@@ -7,6 +7,7 @@
 #include <QUrl>
 #include <QVariantList>
 
+class FileIndex;
 class QTimer;
 typedef struct _GAppInfoMonitor GAppInfoMonitor;
 
@@ -33,6 +34,9 @@ class StartMenu : public QObject {
     // (~/.face, ~/.face.icon, or AccountsService's when the shell has D-Bus), empty for none.
     Q_PROPERTY(QString userName READ userName NOTIFY userChanged)
     Q_PROPERTY(QUrl userIcon READ userIcon NOTIFY userChanged)
+    // Counts the times what a search finds changed without the applications changing (the
+    // files were read again), for a search to be made again.
+    Q_PROPERTY(int searchRevision READ searchRevision NOTIFY searchChanged)
   public:
     // `stateDir` holds start-pinned and launches: $XDG_STATE_HOME/shaodesk unless given.
     explicit StartMenu(QString stateDir = {}, QObject *parent = nullptr);
@@ -42,6 +46,9 @@ class StartMenu : public QObject {
     QVariantList apps() const { return sorted_; }
     QString userName() const { return userName_; }
     QUrl userIcon() const { return userIcon_; }
+    int searchRevision() const { return searchRevision_; }
+    // The files its search finds; none until set.
+    void setFiles(FileIndex *files);
 
     // The applications, as the controller's records, and the taskbar's pins, which seed the
     // start menu's own until it has them.
@@ -69,7 +76,9 @@ class StartMenu : public QObject {
     // are found by name, generic name, keywords, desktop id and comment, those launched often a
     // little ahead. A result is its entry, an application's being its record with `kind` "app",
     // a `title` and a `subtitle`, with its `group` and `score` added. A calculation's value
-    // (calculator::entry) is the best match when there is one.
+    // (calculator::entry) is the best match when there is one. Files (FileIndex::search) come
+    // last, as "files", and are the best match only when they match better than the rest; a
+    // leading / finds only files.
     Q_INVOKABLE QVariantList search(const QString &query, const QVariantList &others) const;
     // When `then` was, said from `now`: "Just now", "5 min ago", "2 hours ago", "Yesterday", a
     // day of the week, or a date.
@@ -89,6 +98,7 @@ class StartMenu : public QObject {
     void recentChanged();
     void appsChanged();
     void userChanged();
+    void searchChanged();
     // Applications were installed or removed (GIO's GAppInfoMonitor), and want reading again.
     void installedChanged();
     // Saving the pins or the history failed.
@@ -100,6 +110,8 @@ class StartMenu : public QObject {
     // The pins, of installed applications or not, in their order; own once start-pinned exists.
     QStringList pins_;
     bool ownPins_ = false, previewOnly_ = false, userSet_ = false;
+    FileIndex *files_ = nullptr;
+    int searchRevision_ = 0;
     LaunchHistory history_;
     QString userName_;
     QUrl userIcon_;
