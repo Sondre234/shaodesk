@@ -1345,7 +1345,9 @@ Monitors can also be changed while running with any wlr-output-management client
 `kanshi`, `wdisplays`): mode, scale, rotation, position, and turning outputs on or off. Those
 settings replace the `outputs.monitors` entry of the outputs they touch until the Lua
 configuration is reloaded, which brings the configured setup back. The last enabled output
-cannot be turned off.
+cannot be turned off. The [display settings](#display-settings) window changes them too, and
+keeps what it is told to keep across logins; that section says which settings win where several
+say something of a monitor.
 
 ### Colour depth
 
@@ -1434,8 +1436,8 @@ keeps the main monitor alone (Windows' "PC screen only") and `external` every mo
 ("Second screen only"). The main monitor is a laptop's built-in panel; on a machine without one,
 the primary monitor (`outputs.primary`, else the first connected one in `outputs.order`, else the
 first by connector name). A choice keeps each monitor's mode, scale and position, and lasts until
-the configuration is reloaded, as wlr-output-management changes do. With one monitor connected,
-only `extend` can be had.
+the configuration is reloaded or the display settings window applies its settings, as
+wlr-output-management changes do. With one monitor connected, only `extend` can be had.
 
 XF86Display, the key a laptop sends for Fn and its display key, runs `display_mode` without a
 choice: a popup on the focused monitor shows the four in Windows' order (PC screen only,
@@ -1460,6 +1462,64 @@ open, the one it shows and its monitor (`-` for both while it is closed).
 
 The `display_settings` action asks the shell for its display settings window, on the monitor
 under the pointer.
+
+Settings applied there are tried first, as on Windows and KDE: every monitor's settings are
+tested at once, as a wlr-output-management client's are, and nothing changes where a monitor
+refuses them; then they are applied on trial for 15 seconds, and go back by themselves unless
+they are kept. They go back at once where a monitor does not take them after all, and when the
+configuration is reloaded during the trial. Kept, they are written to
+`$XDG_STATE_HOME/shaodesk/outputs` (else `~/.local/state/shaodesk/outputs`), a line per monitor,
+which is laid over `outputs.monitors` every time the configuration loads, at login and on each
+reload. Each line holds for the monitor it was kept for: the same connector, and the same "make
+model serial" as `shaodesk msg get outputs` prints it, so that another monitor plugged into that
+connector, as at another desk, keeps the configuration's settings. shaodesk never edits the Lua
+files: Reset to configuration puts the configuration's settings alone on trial, and removes the
+file once they are kept; deleting the file by hand does the same at the next reload.
+
+Where a monitor's settings come from, the first that has any for it winning:
+
+1. A wlr-output-management client's change (`wlr-randr`, `kanshi`, `wdisplays`) or a
+   `display_mode` choice, for the monitors it touches, until the configuration is reloaded or
+   the display settings window applies settings of its own.
+2. The display settings window's, on trial or kept, for the monitor they were kept for. The
+   window sets every setting of every monitor at once, so they replace its `outputs.monitors`
+   entry whole, but for `tiling`, which stays the configuration's; the primary monitor chosen
+   there wins over `outputs.primary`.
+3. `outputs.monitors`, `outputs.primary` and `outputs.order` in the configuration.
+4. The defaults: the preferred resolution at the fastest refresh rate, at scale 1, side by side.
+
+Scripts reach the same through the control socket. `shaodesk msg monitors apply` takes monitors
+by connector name, each followed by the settings that change, as the state file writes them:
+`enabled`, `mode` (as in `outputs.monitors`), `scale`, `transform` (0 to 7), `position` (`X,Y`),
+`vrr`, `mirror` (a connector name, or `-` for none), `bit_depth` (8 or 10), `hdr` and `primary`
+(`on` or `off`), and prints how many milliseconds the trial lasts; the monitors it leaves out, and
+their settings it leaves out, stay as they are. `shaodesk msg monitors keep` keeps the settings on
+trial, `monitors revert` takes them back at once, and `monitors reset` puts the configuration's
+settings on trial.
+
+```sh
+shaodesk msg monitors apply DP-3 scale=1.5 position=0,0 HDMI-A-1 mirror=DP-3
+shaodesk msg monitors keep
+```
+
+A request that cannot be had says why and changes nothing: a monitor that is not connected, a
+mode it does not offer, a monitor mirroring one that mirrors another, or none left showing the
+desktop (on, and mirroring none). `shaodesk msg get monitors_trial` prints the milliseconds left
+on trial, or `-`, and subscribers hear `monitors-trial MILLISECONDS` as a trial starts,
+`monitors-kept`, and `monitors-reverted REASON`: `asked`, `timeout`, `reload`, or `refused NAME`
+for a monitor that did not take its settings.
+
+`shaodesk msg get monitors` prints what the window shows of each monitor, a tab-separated line
+each in the order of `get outputs`: its connector name, "make model serial", whether it is a
+laptop's built-in panel (1 or 0), where its settings come from (`override` for a
+wlr-output-management client's or `display_mode`'s, `window`, `config` or `default`), whether
+it is to be on (1 or 0), whether it shows a picture (`on`, `off`, or `lid` while the lid holds it
+off), the monitor it mirrors or `-`, its place in the arrangement (x and y, before the layout is
+moved to start at 0, 0), its mode, scale and transform, adaptive sync (`on`, `off`, or `-` where
+the monitor has none), the bits per colour channel asked for and drawn in, HDR asked for (`on` or
+`off`) and driven (`hdr` or `sdr`), why it cannot have HDR (or `-`), whether it is the primary
+monitor (1 or 0), and the modes it offers, separated by commas, its preferred one marked with
+`*`. Where it shows a picture, its mode, scale, transform and adaptive sync are what it has now.
 
 ### Turning monitors off
 
