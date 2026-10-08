@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
-/* Turning monitors off and on without taking them out of the layout, for wlr-output-power-
- * management clients (wlopm, idle daemons). A monitor that is off keeps its windows, workspaces
- * and panels; its wlr_output is disabled, so it neither scans out nor draws frames. */
+/* Turning monitors off and on without taking them out of the layout: wlr-output-power-management
+ * clients (wlopm, idle daemons), and the display_off, display_on and display_toggle actions. A
+ * monitor that is off keeps its windows, workspaces and panels; its wlr_output is disabled, so it
+ * neither scans out nor draws frames. */
 #include "server.h"
 
 /* Turns a monitor in the layout off or on. On, it is configured as outputs.monitors says, which
@@ -42,6 +43,48 @@ bool set_output_power(struct sh_output *output, bool on) {
     wlr_output_schedule_frame(wlr_output);
     wlr_log(WLR_INFO, "Turned %s on", wlr_output->name);
     return true;
+}
+
+bool display_action(enum sh_action action) {
+    return action == SH_DISPLAY_OFF || action == SH_DISPLAY_ON || action == SH_DISPLAY_TOGGLE;
+}
+
+/* display_off, display_on and display_toggle, on the monitor the action's target names (or the
+ * control socket's "output NAME" does), else on every monitor in the layout. Toggling turns them
+ * all off while any of them is on. False, with the reason, when no monitor is named so, or one
+ * could not be turned off or on. */
+bool display_power(struct sh_server *server, enum sh_action action, char *error,
+                   size_t error_size) {
+    const struct sh_callbacks *callbacks = server->callbacks;
+    const char *named = callbacks->action_target ? callbacks->action_target(callbacks->userdata) : "";
+    if (!named[0] && server->target_output)
+        named = server->target_output->name;
+    bool found = false, any_on = false;
+    struct sh_output *output, *temporary;
+    wl_list_for_each(output, &server->outputs, link) {
+        if (named[0] && !output_key_matches(named, output->wlr_output))
+            continue;
+        found = true;
+        any_on |= !output->powered_off;
+    }
+    if (!found) {
+        if (named[0])
+            snprintf(error, error_size, "no monitor %s", named);
+        else
+            snprintf(error, error_size, "no monitor");
+        return false;
+    }
+    bool on = action == SH_DISPLAY_ON || (action == SH_DISPLAY_TOGGLE && !any_on), done = true;
+    wl_list_for_each_safe(output, temporary, &server->outputs, link) {
+        if (named[0] && !output_key_matches(named, output->wlr_output))
+            continue;
+        if (!set_output_power(output, on)) {
+            snprintf(error, error_size, "cannot turn %s %s", output->wlr_output->name,
+                     on ? "on" : "off");
+            done = false;
+        }
+    }
+    return done;
 }
 
 /* A wlr-output-power-management client sets a monitor's mode. A monitor out of the layout

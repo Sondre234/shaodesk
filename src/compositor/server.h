@@ -897,6 +897,9 @@ void swap_output_workspaces(struct sh_server *server, const char *target);
 /* output_power.c */
 bool set_output_power(struct sh_output *output, bool on);
 void output_power_set_mode(struct wl_listener *listener, void *data);
+bool display_action(enum sh_action action);
+bool display_power(struct sh_server *server, enum sh_action action, char *error,
+                   size_t error_size);
 
 /* overview.c */
 size_t overview_describe(struct sh_server *server, char *text, size_t size);

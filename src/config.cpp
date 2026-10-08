@@ -1499,8 +1499,17 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
                                                                            : "move_workspace_to_output") +
                          " needs an output: \"left\", \"right\", \"next\", \"prev\", or a "
                          "connector name");
+            } else if (action_takes_display(binding.action)) {
+                // Without one, every monitor.
+                if (!lua_isnil(L, -1)) {
+                    binding.output = string(L, -1, "output");
+                    if (!valid_output_target(binding.output))
+                        fail("output must be a monitor's connector name or \"desc:\" and the "
+                             "start of its description");
+                }
             } else if (!lua_isnil(L, -1)) {
-                fail("output is only valid with move_workspace_to_output and swap_workspaces");
+                fail("output is only valid with move_workspace_to_output, swap_workspaces and "
+                     "the display_* actions");
             }
             lua_pop(L, 1);
             lua_getfield(L, -1, "mode");
@@ -1624,6 +1633,9 @@ constexpr std::pair<std::string_view, sh_action> action_table[] = {
         {"logout", SH_LOGOUT},
         {"lock", SH_LOCK},
         {"power_menu", SH_POWER_MENU},
+        {"display_off", SH_DISPLAY_OFF},
+        {"display_on", SH_DISPLAY_ON},
+        {"display_toggle", SH_DISPLAY_TOGGLE},
         {"scroll_left", SH_SCROLL_LEFT},
         {"scroll_right", SH_SCROLL_RIGHT},
         {"column_widen", SH_COLUMN_WIDEN},
@@ -1726,6 +1738,10 @@ bool valid_output_target(const std::string &target) {
         if (c < 0x20 || c == 0x7f)
             return false;
     return target != "desc:";
+}
+
+bool action_takes_display(sh_action action) {
+    return action == SH_DISPLAY_OFF || action == SH_DISPLAY_ON || action == SH_DISPLAY_TOGGLE;
 }
 
 bool action_takes_amount(sh_action action) {

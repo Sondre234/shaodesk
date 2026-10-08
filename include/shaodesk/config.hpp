@@ -331,6 +331,9 @@ bool action_takes_amount(sh_action action); // resize_*: pixels, 1 to max_resize
 bool action_takes_output(sh_action action);
 // Whether `target` reads as one of those (it says nothing of whether such an output exists).
 bool valid_output_target(const std::string &target);
+// display_off, display_on and display_toggle: a monitor's connector name or "desc:...", which
+// may be left out for every monitor.
+bool action_takes_display(sh_action action);
 // "region", "output", or "window"; throws for other names.
 sh_screenshot_mode parse_screenshot_mode(const std::string &name);
 // switch_layout's "next" (0), "prev" (-1), or a layout's number from 1; throws for others.

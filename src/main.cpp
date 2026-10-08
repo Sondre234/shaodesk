@@ -334,7 +334,8 @@ struct Runtime {
     }
     /* Control requests: "<action> [workspace]", "screenshot [region|output|window]",
      * "resize_<direction> [pixels]", "switcher_confirm [N]", "switch_layout [next|prev|N]",
-     * "profile NAME|next|prev", or "spawn PROGRAM [ARGS...]". */
+     * "display_off [OUTPUT]" (and on, toggle), "profile NAME|next|prev", or
+     * "spawn PROGRAM [ARGS...]". */
     static sh_action command(void *data, const char *request, int *argument, char *error,
                              size_t error_size) {
         auto &self = *static_cast<Runtime *>(data);
@@ -374,6 +375,15 @@ struct Runtime {
                 if (!shaodesk::valid_output_target(target))
                     throw std::runtime_error(words[0] + " takes one output: left, right, next, "
                                                         "prev, or a connector name");
+                self.target = target;
+            } else if (shaodesk::action_takes_display(action)) {
+                // One monitor, or every one without a name; a description may hold spaces.
+                std::string target;
+                for (std::size_t i = 1; i < words.size(); ++i)
+                    target += (i > 1 ? " " : "") + words[i];
+                if (!target.empty() && !shaodesk::valid_output_target(target))
+                    throw std::runtime_error(words[0] + " takes a monitor's connector name, or "
+                                                        "none for every monitor");
                 self.target = target;
             } else if (action == SH_SCREENSHOT) {
                 if (words.size() > 2)

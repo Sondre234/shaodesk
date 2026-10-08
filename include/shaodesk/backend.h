@@ -168,6 +168,12 @@ enum sh_action {
     /* Asks the shell to give the keyboard to the taskbar (or the dock) on the focused output, to
      * walk its buttons and their windows with the arrows, as Windows' Win+T; again, to leave. */
     SH_TASKBAR_FOCUS,
+    /* Monitors off and on without leaving the layout: every one, or the one the action's target
+     * names (sh_callbacks.action_target: a connector, or "desc:" and the start of a description).
+     * Toggling turns them all off while any of them is on. */
+    SH_DISPLAY_OFF,
+    SH_DISPLAY_ON,
+    SH_DISPLAY_TOGGLE,
 };
 
 enum sh_screenshot_mode {
