@@ -513,6 +513,7 @@ void free_toplevel(struct sh_toplevel *toplevel) {
     sh_tween_stop(&toplevel->fade);
     free(toplevel->opacity_rule.app_id);
     free(toplevel->opacity_rule.title);
+    free_icon(&toplevel->icon);
     wl_list_remove(&toplevel->destroy.link);
     wl_list_remove(&toplevel->request_move.link);
     wl_list_remove(&toplevel->request_resize.link);

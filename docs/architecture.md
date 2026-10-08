@@ -60,6 +60,7 @@ all. In short:
 | `foreign_toplevel.c` | Window lists for taskbars and single-window capture. |
 | `window_control.c` | The shell's window menu and window pictures: shaodesk-window-control-v1, which names a window by its taskbar handle. |
 | `scaled_capture.c` | The capture source for a window's picture: the window scaled down to fit a size on the renderer, smoothly. |
+| `window_icon.c` | The icons windows supply themselves, kept for the window control to send the shell. |
 
 A function used by one file is `static`; one used by several is declared in `server.h` under
 the file that defines it. The build warns (`-Wmissing-prototypes`) about one that is neither.

@@ -501,6 +501,15 @@ struct sh_output {
     struct wl_listener destroy;
 };
 
+/* An icon a window supplies itself (window_icon.c): the icon theme name it gave, and the pixels
+ * of one of its sizes as wl_shm's ARGB8888 (premultiplied 0xAARRGGBB words, rows without
+ * padding). Either may be missing; neither is an icon the window does not have. */
+struct sh_icon {
+    char *name;
+    uint32_t *pixels;
+    int width, height;
+};
+
 struct sh_opacity_rule {
     unsigned generation; // server->config_generation it was computed under; 0 for never
     bool active;
@@ -529,6 +538,10 @@ struct sh_toplevel {
     struct wlr_ext_foreign_toplevel_handle_v1 *listed;
     struct wlr_scene *capture_scene;
     struct wlr_ext_image_capture_source_v1 *capture_source;
+    /* The icon the window supplies itself, and how many times it has changed, which the window
+     * control's objects hold against what they last sent. */
+    struct sh_icon icon;
+    unsigned icon_serial;
     struct wl_listener title_changed, app_id_changed;
     struct wl_listener foreign_activate, foreign_close, foreign_maximize, foreign_minimize;
     struct wl_listener foreign_fullscreen;
@@ -1033,6 +1046,11 @@ bool toplevel_is_dialog(struct sh_toplevel *toplevel);
 void window_objects_changed(struct sh_server *server);
 void window_objects_forget(struct sh_toplevel *toplevel);
 void window_control_init(struct sh_server *server);
+
+/* window_icon.c */
+int icon_size_rank(uint32_t width, uint32_t height);
+void set_toplevel_icon(struct sh_toplevel *toplevel, struct sh_icon icon);
+void free_icon(struct sh_icon *icon);
 
 /* workspace.c */
 int output_slot(struct sh_server *server, const char *name);
