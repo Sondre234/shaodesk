@@ -289,6 +289,28 @@ machine: it starts faster and uses less memory, but cannot draw effects such as 
 nested session, applications that reuse an existing process or D-Bus service can open in the host
 session instead.
 
+### Application icons
+
+The shell finds the application a window belongs to by its app id, so that its button, dock icon,
+switcher entry and menu show the application's icon and name. Most windows give their desktop
+file's name, but many spell it otherwise, and the shell tries each way from the most exact down:
+the desktop file's name in any case, its `StartupWMClass` (as X11 programs, Electron apps and Wine
+give it), a Steam game's number (`steam_app_570` for the game's shortcut), the last part of a
+reverse-DNS name (`nautilus` for `org.gnome.Nautilus`), the name without what programs add to it
+(a version as in `gimp-2.10`, `-bin`, `-desktop`, `-browser`, an AppImage's architecture, NixOS's
+`.name-wrapped`), the program the entry runs (`gnome-calculator`, `obs`), the vendor's domain the
+entry lacks (`org.xfce.Thunar` for `thunar.desktop`), and the entry's name; a few programs whose
+windows name nothing like their entries (`steamwebhelper`, `soffice`) are known by name. A window
+whose program has an entry the menus leave out (a password prompt's, a portal's file dialog's)
+gets that entry's icon, and one with no entry an icon the theme has by a name guessed the same
+ways (`steam_icon_570`), else a generic one.
+
+Icons come from the icon theme the desktop names: Qt's platform theme's (qt6ct, KDE), else GNOME's
+`icon-theme` setting where it is set (GNOME Settings, `gsettings`, nwg-look), else
+`gtk-icon-theme-name` in GTK's `settings.ini`, else KDE's `kdeglobals`. After it the shell looks
+in Breeze, Adwaita or Papirus, whichever is installed, so that the generic icons applications and
+the shell name are found under any theme. A change of theme shows after the shell restarts.
+
 ### Taskbar menus
 
 Right-clicking a window's button opens its menu, headed by the application's icon and name (from
