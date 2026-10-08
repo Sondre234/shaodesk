@@ -9,8 +9,9 @@ import QtQuick.Layouts
 // be used now (`interactive` false, as tiling where it cannot be) is greyed out. A tile that only
 // tells something (`status`, as the network's) is no button at all: its icon sits on a disc in
 // the face's place, tinted with the accent colour while `checked` (connected), and it takes no
-// clicks. In the macOS style it is a module of Control Center instead, its round button beside the
-// label.
+// clicks. A tile that toggles and opens a list too (`split` with `expandable`, as Wi-Fi's) has its
+// chevron as a button of its own, which emits expandClicked(). In the macOS style it is a module of
+// Control Center instead, its round button beside the label.
 AbstractButton {
     id: tile
     property string glyph
@@ -19,6 +20,8 @@ AbstractButton {
     property string detail
     property bool expandable: false
     property bool expanded: false
+    property bool split: false
+    signal expandClicked()
     property bool interactive: true
     property bool status: false
     checkable: false
@@ -119,6 +122,35 @@ AbstractButton {
             color: tile.on ? Theme.textOnAccent : Theme.textMuted
             Behavior on rotation { NumberAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
         }
+        // Between the toggle and the chevron of a split tile.
+        Rectangle {
+            visible: tile.split && tile.expandable
+            x: parent.width - arrow.width; anchors.verticalCenter: parent.verticalCenter
+            width: 1; height: parent.height - 2 * Theme.spacingM
+            color: tile.on ? Theme.alpha(Theme.textOnAccent, 0.35) : Theme.border
+        }
+    }
+    // A split tile's chevron, which opens its list whether or not what it toggles is on.
+    AbstractButton {
+        id: arrow
+        objectName: tile.objectName + ":arrow"
+        visible: tile.split && tile.expandable
+        enabled: tile.interactive
+        x: tile.width - width
+        width: Theme.macos ? Theme.moduleButtonSize + Theme.spacingS : Theme.rowHeight - Theme.spacingS
+        height: Theme.macos ? tile.height : face.height
+        hoverEnabled: true
+        focusPolicy: Qt.NoFocus
+        Accessible.role: Accessible.Button
+        Accessible.name: tile.label + (tile.expanded ? ": hide the list" : ": show the list")
+        onClicked: tile.expandClicked()
+        background: Rectangle {
+            topRightRadius: Theme.macos ? Theme.moduleRadius : Theme.radiusMedium
+            bottomRightRadius: topRightRadius
+            color: arrow.pressed ? Theme.pressed : arrow.hovered ? Theme.hover : "transparent"
+            Behavior on color { ColorAnimation { duration: Theme.durationFast; easing.type: Theme.easing } }
+        }
+        contentItem: Item {}
     }
     Column {
         id: caption

@@ -24,6 +24,9 @@ PopupCard {
     readonly property var backlight: panel.backlightSource
     readonly property var media: panel.mediaSource
     readonly property var powerMode: panel.powerModeSource
+    readonly property var wifi: panel.wifiSource
+    // NetworkManager with a Wi-Fi device: its tile stands for the network's state.
+    readonly property bool wifiManaged: !!wifi && wifi.available && wifi.hasWifi
     readonly property var center: shell.notifications
     // A power-profiles-daemon profile's name and icon.
     function powerModeName(profile) {
@@ -33,8 +36,8 @@ PopupCard {
     function powerModeGlyph(profile) {
         return profile === "power-saver" ? "leaf" : profile === "performance" ? "zap" : "gauge"
     }
-    // Which list is open under its tile or row: "profiles", "outputs", "mixer", "powerMode", or ""
-    // for none.
+    // Which list is open under its tile or row: "profiles", "outputs", "mixer", "powerMode", "wifi",
+    // or "" for none.
     property string expanded: ""
     function toggle(list) { expanded = expanded === list ? "" : list }
     onOpened: expanded = ""
@@ -108,6 +111,7 @@ PopupCard {
         Module { section: mediaCard }
         Module { section: profileList }
         Module { section: powerModeList }
+        Module { section: wifiList }
         Module { section: brightness; heading: "Display" }
         Module { section: sound; heading: "Sound" }
         ColumnLayout {
@@ -137,6 +141,26 @@ PopupCard {
                 Layout.bottomMargin: -content.inset
                 columns: Theme.macos ? 2 : 3
                 columnSpacing: Theme.spacingM; rowSpacing: Theme.macos ? Theme.spacingM : Theme.spacingL
+                // Wi-Fi, as on Windows 11: the tile turns the radio on and off, its chevron lists
+                // the networks.
+                QuickTile {
+                    objectName: "quickTile:wifi"
+                    visible: quick.widgets.network === "quick" && quick.wifiManaged
+                    Layout.fillWidth: true; Layout.preferredWidth: 1
+                    readonly property int strength: quick.wifi.strength
+                    glyph: !quick.wifi.enabled ? "wifi-off" : quick.wifi.ssid === "" || strength >= 70 ? "wifi"
+                         : strength >= 45 ? "wifi-high" : strength >= 20 ? "wifi-low" : "wifi-zero"
+                    label: "Wi-Fi"
+                    detail: !quick.wifi.hardwareEnabled ? "Off by a switch" : !quick.wifi.enabled ? "Off"
+                          : quick.wifi.connecting !== "" ? "Connecting…"
+                          : quick.wifi.ssid !== "" ? quick.wifi.ssid : "Not connected"
+                    checked: quick.wifi.enabled
+                    interactive: quick.wifi.hardwareEnabled
+                    expandable: true; split: true
+                    expanded: quick.expanded === "wifi"
+                    onClicked: quick.wifi.setEnabled(!quick.wifi.enabled)
+                    onExpandClicked: quick.toggle("wifi")
+                }
                 QuickTile {
                     objectName: "quickTile:dnd"
                     visible: quick.widgets.notifications === "quick" && quick.center.serving
@@ -188,7 +212,7 @@ PopupCard {
                 }
                 QuickTile {
                     objectName: "quickTile:network"
-                    visible: quick.widgets.network === "quick" && quick.status.networkState !== "none"
+                    visible: quick.widgets.network === "quick" && quick.status.networkState !== "none" && !quick.wifiManaged
                     Layout.fillWidth: true; Layout.preferredWidth: 1
                     // Only the state: shaodesk does not manage connections.
                     status: true
@@ -196,7 +220,9 @@ PopupCard {
                         : quick.status.networkState === "wifi" ? "wifi" : "wifi-off"
                     label: quick.status.networkState === "ethernet" ? "Ethernet"
                          : quick.status.networkState === "wifi" ? "Wi-Fi" : "Disconnected"
-                    detail: quick.status.networkInterface
+                    // NetworkManager's name for the connection, where it runs.
+                    detail: !!quick.wifi && quick.wifi.available && quick.wifi.primaryName !== "" ? quick.wifi.primaryName
+                          : quick.status.networkInterface
                     checked: quick.status.networkState === "ethernet" || quick.status.networkState === "wifi"
                 }
                 QuickTile {
@@ -212,6 +238,16 @@ PopupCard {
                     expanded: quick.expanded === "powerMode"
                     onClicked: quick.toggle("powerMode")
                 }
+            }
+            // The Wi-Fi networks, under their tile.
+            WifiList {
+                id: wifiList
+                objectName: "quickWifiList"
+                visible: quick.expanded === "wifi" && quick.wifiManaged
+                shown: visible && quick.open
+                returnFocus: quick
+                Layout.fillWidth: true
+                wifi: quick.wifi
             }
             // The power modes, under their tile; performance says when the daemon holds it back.
             Column {

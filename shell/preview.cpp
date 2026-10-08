@@ -39,6 +39,14 @@ class PreviewPowerMode : public PowerMode {
   protected:
     void sendProfile(const QString &) override {}
 };
+// NetworkManager, taking every request and doing nothing with it.
+class PreviewWifi : public Wifi {
+  protected:
+    void sendEnabled(bool) override {}
+    void sendScan() override {}
+    void sendConnect(const QString &, const QString &, const QString &) override {}
+    void sendDisconnect() override {}
+};
 
 // A tray icon: a rounded square in `color` with a letter on it.
 QImage trayIcon(const QColor &color, const QString &letter) {
@@ -233,7 +241,8 @@ Notification notification(const QString &app, const QString &icon, const QString
 
 PreviewData::PreviewData(ShellController &controller)
     : QObject(&controller), controller_(controller), audio_(std::make_unique<PreviewAudio>()),
-      media_(std::make_unique<PreviewMedia>()), powerMode_(std::make_unique<PreviewPowerMode>()) {
+      media_(std::make_unique<PreviewMedia>()), powerMode_(std::make_unique<PreviewPowerMode>()),
+      wifi_(std::make_unique<PreviewWifi>()) {
     // Firefox plays from a child process of its window's, and the music player from the shell of
     // the first terminal, which has no window of its own (the processes are the stand-in tasks').
     audio_->update({"speakers",
@@ -350,6 +359,18 @@ PreviewData::PreviewData(ShellController &controller)
     media_->setPlayer(browser);
     media_->setPlayer(music);
     powerMode_->update({true, "balanced", {"power-saver", "balanced", "performance"}, ""});
+    // Connected to a home network among the neighbours', one open and one that needs a sign-in.
+    Wifi::State wifi;
+    wifi.available = wifi.hasWifi = wifi.enabled = true;
+    wifi.accessPoints = {{"Harbour View", 82, "wpa-psk"}, {"Harbour View 5G", 64, "sae"},
+                         {"Café Lumen", 51, "open"},      {"Ferry Office", 45, "enterprise"},
+                         {"Lighthouse", 33, "wpa-psk"},   {"Pier 7", 14, "wpa-psk"}};
+    wifi.known = {"Harbour View", "Café Lumen"};
+    wifi.ssid = "Harbour View";
+    wifi.strength = 82;
+    wifi.primaryType = "wifi";
+    wifi.primaryName = "Harbour View";
+    wifi_->update(wifi);
 
     // The start menu as on a desktop in use: two pages of pins, applications launched lately and
     // someone logged in; those of tools/shell_gallery.py that are installed show.
@@ -423,6 +444,8 @@ void PreviewData::fill(QQuickItem *panel) {
     panel->setProperty("mediaSource", QVariant::fromValue<QObject *>(media_.get()));
     QQmlEngine::setObjectOwnership(powerMode_.get(), QQmlEngine::CppOwnership);
     panel->setProperty("powerModeSource", QVariant::fromValue<QObject *>(powerMode_.get()));
+    QQmlEngine::setObjectOwnership(wifi_.get(), QQmlEngine::CppOwnership);
+    panel->setProperty("wifiSource", QVariant::fromValue<QObject *>(wifi_.get()));
     if (tasks_)
         panel->setProperty("taskSource", QVariant::fromValue(tasks_));
 }

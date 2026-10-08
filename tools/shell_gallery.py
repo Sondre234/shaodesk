@@ -41,7 +41,7 @@ POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switch
 # The start menu's other views and its menus.
 POPUPS += ["launcher-all", "launcher-search", "launcher-empty", "launcher-menu"]
 POPUPS += ["quick-settings", "quick-settings-mixer", "bar-all"]
-POPUPS += ["quick-settings-power"]
+POPUPS += ["quick-settings-power", "quick-settings-wifi", "wifi"]
 # The menus of the macOS style's menu bar, which only its themes picture.
 MACOS_POPUPS = ["system-menu", "app-menu", "window-menu", "window-submenu"]
 POPUPS += MACOS_POPUPS
@@ -62,6 +62,7 @@ VARIANTS = {
     "mixer": ("mixer", 'widgets = { volume = "bar" },'),
     "outputs": ("outputs", 'widgets = { volume = "bar" },'),
     "profiles": ("profiles", 'widgets = { profiles = "bar" },'),
+    "wifi": ("wifi", 'widgets = { network = "bar" },'),
     "bar-all": ("bar", 'widgets = { network = "bar", battery = "bar", volume = "bar", '
                        'tiling = "bar", profiles = "bar", notifications = "bar" },'),
 }

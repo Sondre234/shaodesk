@@ -40,6 +40,9 @@ Item {
     property var mediaSource: shell.media
     // The power mode, swapped the same way.
     property var powerModeSource: shell.powerMode
+    // Wi-Fi and the connection out (NetworkManager), swapped the same way. Its popup on the bar is
+    // "wifi", by the network widget.
+    property var wifiSource: shell.wifi
     property string audioPopup: ""
     // The middle of the item it opens by, and the item's width.
     property real audioPopupX: 0
@@ -631,13 +634,20 @@ Item {
         case "quick-settings":
         case "quick-settings-mixer":
         case "quick-settings-power":
-            // Quick Settings; with the applications' volumes open, or the power modes.
+        case "quick-settings-wifi":
+            // Quick Settings; with the applications' volumes open, the power modes or the networks.
             toggleAudioPopup("quick", quickButton)
             if (name === "quick-settings-mixer")
                 Qt.callLater(function() { quickSettingsLoader.item.expanded = "mixer" })
             if (name === "quick-settings-power")
                 Qt.callLater(function() { quickSettingsLoader.item.expanded = "powerMode" })
+            if (name === "quick-settings-wifi")
+                Qt.callLater(function() { quickSettingsLoader.item.expanded = "wifi" })
             return quickButton.visible
+        case "wifi":
+            // The network widget's networks, on the bar.
+            toggleAudioPopup("wifi", statusArea.network)
+            return statusArea.network.visible
         case "notifications":
             // The flyout with the mail application's notifications expanded.
             toggleAudioPopup("clock", clockButton)
@@ -976,6 +986,17 @@ Item {
                 property bool used: false
                 onLoaded: used = true
                 sourceComponent: Component { ProfileList { panel: root; barItem: root.statusBar } }
+            }
+
+            // The network widget's popup, where NetworkManager has Wi-Fi: the radio and the networks.
+            Loader {
+                id: wifiLoader
+                asynchronous: !(root.audioPopup === "wifi")
+                active: root.audioPopup === "wifi" || used
+                // Once made, a popup stays, so closing it never destroys the item its handler runs in.
+                property bool used: false
+                onLoaded: used = true
+                sourceComponent: Component { WifiPopup { panel: root; barItem: root.statusBar } }
             }
 
             // The wallpaper button: thumbnails of the pictures in shell.wallpapers, by subfolder, with

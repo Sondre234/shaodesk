@@ -16,17 +16,20 @@ option(SHAODESK_TRAY "Show applications' status icons (StatusNotifierItem) in th
 # Quick Settings' services on D-Bus; without QtDBus they are left out and their widgets never show.
 option(SHAODESK_MEDIA "Control media players (MPRIS) from Quick Settings and the media keys (needs Qt6 DBus)" ON)
 option(SHAODESK_POWER_PROFILES "Switch power-profiles-daemon's power mode from Quick Settings (needs Qt6 DBus)" ON)
+option(SHAODESK_NETWORKMANAGER "Manage Wi-Fi through NetworkManager from Quick Settings and the network widget (needs Qt6 DBus)" ON)
 set(SHAODESK_DBUS OFF)
 set(SHAODESK_TRAY_DBUS OFF)
 set(SHAODESK_MEDIA_DBUS OFF)
 set(SHAODESK_POWER_PROFILES_DBUS OFF)
-if(SHAODESK_NOTIFICATIONS OR SHAODESK_TRAY OR SHAODESK_MEDIA OR SHAODESK_POWER_PROFILES)
+set(SHAODESK_NETWORKMANAGER_DBUS OFF)
+if(SHAODESK_NOTIFICATIONS OR SHAODESK_TRAY OR SHAODESK_MEDIA OR SHAODESK_POWER_PROFILES OR SHAODESK_NETWORKMANAGER)
     find_package(Qt6 6.9 QUIET COMPONENTS DBus)
     if(Qt6DBus_FOUND)
         set(SHAODESK_DBUS ${SHAODESK_NOTIFICATIONS})
         set(SHAODESK_TRAY_DBUS ${SHAODESK_TRAY})
         set(SHAODESK_MEDIA_DBUS ${SHAODESK_MEDIA})
         set(SHAODESK_POWER_PROFILES_DBUS ${SHAODESK_POWER_PROFILES})
+        set(SHAODESK_NETWORKMANAGER_DBUS ${SHAODESK_NETWORKMANAGER})
     else()
         message(STATUS "Qt6 DBus not found: the notification daemon, the tray and Quick Settings' D-Bus services are left out")
     endif()
@@ -57,7 +60,7 @@ set(SHAODESK_START_SOURCES start_menu.cpp start_menu.hpp launch_history.cpp laun
 set(SHAODESK_AUTH_SOURCES authentication.cpp authentication.hpp)
 # The models of the services Quick Settings controls over D-Bus, in everything that builds the
 # controller; their D-Bus backends only in the shell.
-set(SHAODESK_SERVICE_SOURCES media.cpp media.hpp power_mode.cpp power_mode.hpp)
+set(SHAODESK_SERVICE_SOURCES media.cpp media.hpp power_mode.cpp power_mode.hpp wifi.cpp wifi.hpp)
 set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_images.cpp
     notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp tray.cpp tray.hpp
     tray_images.cpp tray_images.hpp)
@@ -117,7 +120,9 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     QuickSettings.qml
     QuickTile.qml
     BindingMode.qml
-    MediaCard.qml)
+    MediaCard.qml
+    WifiList.qml
+    WifiPopup.qml)
 # The protocols task_model.cpp and window_pictures.cpp speak, generated in the top-level build
 # directory.
 set(SHAODESK_TASK_PROTOCOL_SOURCES
@@ -176,6 +181,11 @@ if(SHAODESK_POWER_PROFILES_DBUS)
     target_sources(shaodesk-shell PRIVATE power_profiles_daemon.cpp power_profiles_daemon.hpp)
     target_link_libraries(shaodesk-shell PRIVATE Qt6::DBus)
     target_compile_definitions(shaodesk-shell PRIVATE SHAODESK_POWER_PROFILES=1)
+endif()
+if(SHAODESK_NETWORKMANAGER_DBUS)
+    target_sources(shaodesk-shell PRIVATE network_manager.cpp network_manager.hpp)
+    target_link_libraries(shaodesk-shell PRIVATE Qt6::DBus)
+    target_compile_definitions(shaodesk-shell PRIVATE SHAODESK_NETWORKMANAGER=1)
 endif()
 if(SHAODESK_PULSEAUDIO AND PULSE_FOUND)
     target_sources(shaodesk-shell PRIVATE pulse_audio.cpp)
@@ -434,6 +444,14 @@ if(BUILD_TESTING)
     target_compile_options(media_test PRIVATE -Wall -Wextra -Wpedantic)
     target_link_libraries(media_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME shell_media COMMAND media_test)
+    # Wi-Fi's model: how networks are secured and listed, and what the controls ask for.
+    add_executable(wifi_test ${PROJECT_SOURCE_DIR}/tests/wifi_test.cpp wifi.cpp wifi.hpp)
+    set_target_properties(wifi_test PROPERTIES AUTOMOC ON)
+    target_include_directories(wifi_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(wifi_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(wifi_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(wifi_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME shell_wifi COMMAND wifi_test)
     if(SHAODESK_MEDIA_DBUS)
         # The MPRIS backend against stand-in players on a bus of its own, the environment's made
         # unusable.
@@ -467,6 +485,19 @@ if(BUILD_TESTING)
         target_link_libraries(power_mode_dbus_test PRIVATE Qt6::Core Qt6::DBus Qt6::Test)
         add_test(NAME shell_power_mode_dbus COMMAND power_mode_dbus_test)
         set_tests_properties(shell_power_mode_dbus PROPERTIES TIMEOUT 60
+            ENVIRONMENT "DBUS_SESSION_BUS_ADDRESS=disabled:;DBUS_SYSTEM_BUS_ADDRESS=disabled:")
+    endif()
+    if(SHAODESK_NETWORKMANAGER_DBUS)
+        # Wi-Fi against a stand-in NetworkManager on a bus of its own.
+        add_executable(network_manager_dbus_test ${PROJECT_SOURCE_DIR}/tests/network_manager_dbus_test.cpp
+            ${PROJECT_SOURCE_DIR}/tests/fake_dbus.hpp wifi.cpp wifi.hpp network_manager.cpp network_manager.hpp)
+        set_target_properties(network_manager_dbus_test PROPERTIES AUTOMOC ON)
+        target_include_directories(network_manager_dbus_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+        target_compile_definitions(network_manager_dbus_test PRIVATE QT_NO_KEYWORDS SHAODESK_NETWORKMANAGER=1)
+        target_compile_options(network_manager_dbus_test PRIVATE -Wall -Wextra -Wpedantic)
+        target_link_libraries(network_manager_dbus_test PRIVATE Qt6::Core Qt6::DBus Qt6::Test)
+        add_test(NAME shell_network_manager_dbus COMMAND network_manager_dbus_test)
+        set_tests_properties(shell_network_manager_dbus PROPERTIES TIMEOUT 60
             ENVIRONMENT "DBUS_SESSION_BUS_ADDRESS=disabled:;DBUS_SYSTEM_BUS_ADDRESS=disabled:")
     endif()
     add_test(NAME shell_preview COMMAND ${Python3_EXECUTABLE}

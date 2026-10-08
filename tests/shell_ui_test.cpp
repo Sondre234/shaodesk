@@ -77,6 +77,20 @@ class FakePowerMode : public PowerMode {
     void sendProfile(const QString &profile) override { requests << profile; }
 };
 
+// Records what the panel asks of NetworkManager.
+class FakeWifi : public Wifi {
+  public:
+    QStringList requests;
+
+  protected:
+    void sendEnabled(bool enabled) override { requests << QString("enabled %1").arg(enabled); }
+    void sendScan() override { requests << "scan"; }
+    void sendConnect(const QString &ssid, const QString &security, const QString &password) override {
+        requests << QString("connect %1 %2 %3").arg(ssid, security, password).trimmed();
+    }
+    void sendDisconnect() override { requests << "disconnect"; }
+};
+
 // Pictures for the stand-in windows, image://test-windows/WIDTHxHEIGHT: that large, in one colour.
 class TestPictures : public QQuickImageProvider {
   public:
@@ -4825,6 +4839,157 @@ ListModel {
         if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
             return fail("Quick Settings did not close");
         view.rootObject()->setProperty("powerModeSource", QVariant::fromValue<QObject *>(controller.powerMode()));
+    }
+    // Wi-Fi through NetworkManager: the network widget names the network and lists the networks
+    // in range, where one is connected to (with a password where it needs one, asked again when
+    // refused) or disconnected from and the radio switched; in Quick Settings a tile turns the
+    // radio on and off and its chevron lists them. The state is put in the model by hand, as the
+    // NetworkManager backend puts it.
+    {
+        FakeWifi wifi;
+        QQmlEngine::setObjectOwnership(&wifi, QQmlEngine::CppOwnership);
+        Wifi::State state;
+        state.available = state.hasWifi = state.enabled = true;
+        state.accessPoints = {{"Home", 80, "wpa-psk"}, {"Office", 60, "sae"}, {"Cafe", 40, "open"},
+                              {"Corp", 70, "enterprise"}};
+        state.known = {"Home"};
+        state.ssid = "Home";
+        state.strength = 80;
+        state.primaryType = "wifi";
+        state.primaryName = "Home";
+        wifi.update(state);
+        view.rootObject()->setProperty("wifiSource", QVariant::fromValue<QObject *>(&wifi));
+        // On the bar (this test's configuration puts the network there).
+        auto *widget = find(view.rootObject(), "networkWidget");
+        if (!widget || !QTest::qWaitFor([&] { return widget->isVisible() && widget->x() > 0; }) ||
+            widget->property("description").toString() != "Wi-Fi: Home, signal 80%")
+            return fail("the network widget does not name the Wi-Fi network and its signal");
+        click(widget);
+        auto *popup = find(view.rootObject(), "wifiPopup");
+        if (!popup || !QTest::qWaitFor([&] { return inPopover(popup); }))
+            return fail("the network widget did not open the Wi-Fi networks");
+        if (wifi.requests != QStringList{"scan"})
+            return fail("opening the Wi-Fi networks did not look for networks");
+        auto row = [&](const QString &ssid) { return findNamed(popup, "wifiNetwork", ssid); };
+        // Every network has its own field and buttons, shown while it is open: the one shown.
+        std::function<QQuickItem *(QQuickItem *, const QString &)> visible =
+            [&](QQuickItem *parent, const QString &name) -> QQuickItem * {
+            for (auto *item : parent->childItems()) {
+                if (item->objectName() == name && item->isVisible())
+                    return item;
+                if (auto *found = visible(item, name))
+                    return found;
+            }
+            return nullptr;
+        };
+        auto shown = [&](const char *name) { return visible(popup, name) != nullptr; };
+        if (!row("Home") || !row("Office") || !row("Cafe") || !row("Corp") ||
+            row("Home")->mapToScene(QPointF()).y() > row("Corp")->mapToScene(QPointF()).y())
+            return fail("the Wi-Fi networks are not listed, the one connected first");
+        // A network that needs a password asks for it; Connect waits for eight characters.
+        wifi.requests.clear();
+        click(row("Office"));
+        QQuickItem *password = nullptr;
+        if (!QTest::qWaitFor([&] {
+                password = visible(popup, "wifiPassword");
+                return password && password->hasActiveFocus();
+            }))
+            return fail("a secured network did not ask for its password");
+        auto *connectButton = visible(popup, "wifiConnect");
+        for (char c : std::string("short"))
+            QTest::keyClick(popover, c);
+        if (!connectButton || connectButton->isEnabled())
+            return fail("Connect takes a password too short for WPA");
+        for (char c : std::string("-enough"))
+            QTest::keyClick(popover, c);
+        QTest::keyClick(popover, Qt::Key_Return);
+        // The card has the keyboard back, for Escape.
+        if (wifi.requests != QStringList{"connect Office sae short-enough"} ||
+            !QTest::qWaitFor([&] { return !password->isVisible() && popup->hasActiveFocus(); }))
+            return fail("the password did not connect to the network and give the keyboard back");
+        // Refused, it is asked for again.
+        wifi.connectionFailed("Office", "Could not connect to Office: the password may be wrong", true);
+        if (!QTest::qWaitFor([&] { return shown("wifiPassword") && shown("wifiPasswordRefused"); }))
+            return fail("a refused password was not asked for again");
+        QTest::qWait(50); // laid out
+        click(visible(popup, "wifiCancel"));
+        if (!QTest::qWaitFor([&] { return !shown("wifiPassword"); }))
+            return fail("Cancel did not close the password");
+        // An open network connects at a click on Connect; one that needs a sign-in cannot.
+        wifi.requests.clear();
+        click(row("Cafe"));
+        QQuickItem *cafeConnect = nullptr;
+        if (!QTest::qWaitFor([&] {
+                cafeConnect = visible(popup, "wifiConnect");
+                return cafeConnect && !shown("wifiPassword");
+            }))
+            return fail("an open network offered no Connect");
+        QTest::qWait(50); // laid out
+        click(cafeConnect);
+        if (wifi.requests != QStringList{"connect Cafe open"}) {
+            std::cerr << "Connect did not connect to the open network: "
+                      << wifi.requests.join(", ").toStdString() << '\n';
+            return 1;
+        }
+        click(row("Corp"));
+        QTest::qWait(50); // laid out
+        if (shown("wifiConnect"))
+            return fail("a network that needs a sign-in offered Connect");
+        // The one connected disconnects.
+        wifi.requests.clear();
+        click(row("Home"));
+        QQuickItem *disconnectButton = nullptr;
+        if (!QTest::qWaitFor([&] {
+                disconnectButton = visible(popup, "wifiDisconnect");
+                return disconnectButton != nullptr;
+            }))
+            return fail("the network connected to offered no Disconnect");
+        QTest::qWait(50); // laid out
+        click(disconnectButton);
+        if (wifi.requests != QStringList{"disconnect"})
+            return fail("Disconnect did not disconnect");
+        // The switch turns the radio off, and the list says so.
+        wifi.requests.clear();
+        click(find(popup, "wifiSwitch"));
+        if (wifi.requests != QStringList{"enabled 0"} || !QTest::qWaitFor([&] { return shown("wifiListEmpty"); }))
+            return fail("the Wi-Fi switch did not turn the radio off");
+        QTest::keyClick(popover, Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the Wi-Fi networks did not close");
+        // In Quick Settings: the tile in place of the network's state.
+        if (!rewrite(QString(lua).replace("network='bar',", "")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        auto *button = find(view.rootObject(), "quickSettingsButton");
+        if (!QTest::qWaitFor([&] { return !widget->isVisible() && button->isVisible(); }))
+            return fail("the network widget stayed on the bar");
+        click(button);
+        auto *quick = find(view.rootObject(), "quickSettings");
+        auto *tile = find(quick, "quickTile:wifi");
+        if (!tile || !QTest::qWaitFor([&] { return inPopover(quick) && tile->isVisible(); }) ||
+            find(quick, "quickTile:network")->isVisible() || tile->property("checked").toBool() ||
+            tile->property("detail").toString() != "Off")
+            return fail("Quick Settings has no Wi-Fi tile in place of the network's state");
+        wifi.requests.clear();
+        click(tile);
+        if (wifi.requests != QStringList{"enabled 1"} || !tile->property("checked").toBool())
+            return fail("the Wi-Fi tile did not turn the radio on");
+        auto *list = find(quick, "quickWifiList");
+        click(find(quick, "quickTile:wifi:arrow"));
+        if (!list || !QTest::qWaitFor([&] { return list->isVisible() && list->height() > 0; }) ||
+            wifi.requests != QStringList{"enabled 1", "scan"} || !findNamed(list, "wifiNetwork", "Office"))
+            return fail("the Wi-Fi tile's chevron did not list the networks");
+        // Without NetworkManager, the network's state as before.
+        wifi.update({});
+        if (!QTest::qWaitFor([&] { return !tile->isVisible() && !list->isVisible(); }))
+            return fail("the Wi-Fi tile stayed without NetworkManager");
+        QTest::keyClick(popover, Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("Quick Settings did not close");
+        if (!rewrite(lua))
+            return fail("could not restore the configuration");
+        controller.reload();
+        view.rootObject()->setProperty("wifiSource", QVariant::fromValue<QObject *>(controller.wifi()));
     }
     // The system tray: hidden while empty, a button for each item shown in the order they came,
     // and clicks and the wheel passed on to the item's application. The items are put in the

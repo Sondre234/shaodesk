@@ -185,6 +185,13 @@ shadows.
   Performance, listed under the tile, saying when the daemon holds performance back.
   `shell.widgets.power_mode = false` leaves it out and `-DSHAODESK_POWER_PROFILES=OFF` builds
   without it.
+- Wi-Fi through NetworkManager, as on Windows 11 and KDE: where it has a Wi-Fi device, Quick
+  Settings' Wi-Fi tile turns the radio on and off and its chevron lists the networks in range (the
+  connected one first, with their signal and a lock when secured); a click connects to a known or
+  open one, asks for the password of one secured with WPA, WPA2 or WPA3 Personal (asking again,
+  and forgetting the connection added for it, when refused), or disconnects. The network widget
+  names the network and its signal, and on the bar opens the same list under a switch. Without
+  NetworkManager nothing changes; `-DSHAODESK_NETWORKMANAGER=OFF` builds without it.
 
 ### Notifications and the overlays
 

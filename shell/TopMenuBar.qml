@@ -23,6 +23,7 @@ Rectangle {
     readonly property Item trayRow: tray
     readonly property Item clock: clockButton
     readonly property Item volume: audioWidget
+    readonly property Item network: networkWidget
     readonly property Item profiles: profilesButton
     readonly property Item wallpapers: wallpapersButton
     readonly property Item quickSettings: quickButton
@@ -163,7 +164,7 @@ Rectangle {
             }
         }
         NotificationBell { panel: menuBar.panel }
-        NetworkWidget { panel: menuBar.panel }
+        NetworkWidget { id: networkWidget; panel: menuBar.panel }
         BatteryWidget { panel: menuBar.panel }
         VolumeButton { id: audioWidget; panel: menuBar.panel }
         KeyboardLayout { panel: menuBar.panel }

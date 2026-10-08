@@ -225,11 +225,12 @@ mutes. Clicking it opens Quick Settings at the bar's right end: what is playing
 schedule, through the compositor), tiling on this monitor (greyed out where tiling is not
 available), the [power mode](#power-mode) while power-profiles-daemon runs, the appearance profile
 (listing the profiles under it) and the wallpaper (opening the same picker as the bar's button),
-and the network's state on a disc rather
-than a tile, as it is only shown (Wi-Fi, wired or down, and the interface; shaodesk does not
-manage connections); a brightness slider where the screen has a backlight (set through logind's
-`SetBrightness`, so no privileges are needed); the volume with its mute, the outputs to play
-through and each application's volume a click away; and the battery's charge along the foot.
+and [Wi-Fi](#wi-fi) where NetworkManager has a Wi-Fi device, else the network's state on a disc
+rather than a tile, as it is only shown (Wi-Fi, wired or down, and the interface, or
+NetworkManager's name for the connection); a brightness slider where the screen has a backlight
+(set through logind's `SetBrightness`, so no privileges are needed); the volume with its mute, the
+outputs to play through and each application's volume a click away; and the battery's charge
+along the foot.
 
 ### Media controls
 
@@ -265,6 +266,34 @@ without a password; a switch the daemon refuses is said across the panel and the
 profile in use again. Without the daemon the tile is not there, and `shell.widgets.power_mode =
 false` leaves it out; `-DSHAODESK_POWER_PROFILES=OFF` builds without it.
 
+### Wi-Fi
+
+Where NetworkManager runs and has a Wi-Fi device, the shell manages Wi-Fi as Windows 11 and KDE do,
+through NetworkManager's D-Bus API on the system bus. In Quick Settings (with
+`shell.widgets.network = "quick"`, the default) the Wi-Fi tile takes the network state's place:
+a click turns the radio on or off, and its chevron lists the networks in range under it. With the
+network on the bar (`"bar"`, as the macOS profiles have it), the network widget opens the same list
+under a switch for the radio, as macOS's Wi-Fi menu. The list shows one entry for each network
+name at its strongest access point: its signal in bars, a lock when it is secured, and whether it
+is connected; the one connected comes first, the one being connected to next, the others by
+signal, and the devices look for networks again as it opens. A click on a network opens it:
+
+- one NetworkManager knows, or an open one (Enhanced Open too), connects with Connect;
+- one secured with a key (WPA or WPA2 Personal, or WPA3 Personal) asks for its password first,
+  Connect waiting for the eight characters WPA takes; NetworkManager adds a connection for it
+  (`AddAndActivateConnection`) and keeps the password for the next time. A password it refuses
+  is asked for again, the connection added for it removed, and what went wrong said across the
+  panel;
+- the one connected disconnects with Disconnect, and NetworkManager does not connect again by
+  itself until asked;
+- one that needs an enterprise sign-in (802.1X) or WEP says so, to be set up with NetworkManager's
+  own tools.
+
+NetworkManager lets the active session's user do all of this without a password, as its polkit
+rules have it. A switch on the machine that holds the radio off (rfkill) greys the tile out. Hidden
+networks are not listed. Without NetworkManager everything stays as described above, read from
+`/sys/class/net`; `-DSHAODESK_NETWORKMANAGER=OFF` builds without it.
+
 ### Where the widgets go
 
 Each widget is switched off from Lua: `shell = { widgets = { battery = false, calendar = false } }`,
@@ -291,7 +320,10 @@ the charge of the first battery in `/sys/class/power_supply` (red when nearly em
 accent-coloured while charging) and is left out on machines without one; the network shows Wi-Fi,
 a wired link, or a dimmed struck-through icon when the interface is down, read from
 `/sys/class/net` (physical interfaces only, wired preferred), and is left out without any
-interface. Both follow the kernel's notices of changes as they come. With two or more
+interface. Both follow the kernel's notices of changes as they come. Where NetworkManager runs,
+the network shows the connection the machine goes out through instead, its bars following the
+Wi-Fi signal and its tip naming the network, and a click lists the [Wi-Fi](#wi-fi) networks. With
+two or more
 [keyboard layouts](#keyboard-layouts), the active one's short name (`us`, `no`) sits beside the
 clock, and clicking it switches every keyboard to the next.
 
