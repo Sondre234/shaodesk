@@ -768,6 +768,9 @@ struct sh_toplevel {
     /* The opacity the window rules gave for these inputs: matching regexes on every commit
      * would cost more than the commit, so it is redone only when one of them changes. */
     struct sh_opacity_rule opacity_rule;
+    /* The user was told the window took the keyboard's shortcuts (shortcuts_inhibit.c), which
+     * they hear once. */
+    bool shortcuts_told;
     struct wl_listener map;
     struct wl_listener unmap;
     struct wl_listener commit;

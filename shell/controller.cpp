@@ -697,6 +697,10 @@ void ShellController::subscribe() {
                 if (words.size() == 3)
                     setNightLight(words[1] == "on", words[2]);
                 continue;
+            } else if (line.startsWith("notice ")) {
+                const auto fields = line.sliced(7).split('\t');
+                notice(fields[0], fields.value(1));
+                continue;
             } else if (line.startsWith("dnd ")) {
                 handleDnd(line.sliced(4));
                 continue;
@@ -929,6 +933,16 @@ void ShellController::updateCards() {
         return;
     cardsOutput_ = next;
     Q_EMIT cardsOutputChanged();
+}
+void ShellController::notice(const QString &summary, const QString &body) {
+    Notification notification;
+    notification.app = "shaodesk";
+    notification.icon = "input-keyboard";
+    notification.summary = summary;
+    notification.body = body.toHtmlEscaped();
+    notifications_.notify(std::move(notification));
+    if (!notifications_.enabled() || notifications_.dnd())
+        osd_.show(overlayOutput(), summary, -1);
 }
 void ShellController::handleDnd(const QString &verb) {
     if (verb == "toggle")

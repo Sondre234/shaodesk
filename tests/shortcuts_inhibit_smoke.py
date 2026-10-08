@@ -3,7 +3,8 @@
 remote desktops ask for: while the window that asked has the keyboard, the keys the bindings take
 go to it instead, and the bindings work again as another window has it or the inhibitor goes.
 toggle_shortcuts_inhibit, whose binding still runs, turns the focused window's off and on again,
-which the on-screen display says. keyboard.shortcuts_inhibit = false and a window rule's
+which the on-screen display says; the shell hears once for each window that it took the keys, and
+which keys take them back. keyboard.shortcuts_inhibit = false and a window rule's
 shortcuts_inhibit = false refuse them, a reload applies a change to either, and an inhibitor
 taking effect leaves the binding mode in use. `get shortcuts` shows it all."""
 from pathlib import Path
@@ -92,6 +93,11 @@ with harness.Compositor(compositor, CONFIG % "true") as desktop:
     desktop.detail = lambda: f"shortcuts: {shortcuts()}, focused: {focused()}"
     msg("headless_keyboard", "add", "keys")
     assert shortcuts() == (False, []), shortcuts()
+    notices = Shell("notice ")
+
+    def told(*titles):
+        return [f"notice Shortcuts go to {title}\tSuper + Shift + Escape gives them back"
+                for title in titles]
 
     # The window that asks has the shortcuts while it has the keyboard: Super + T reaches it, and
     # tiling stays as it was.
@@ -104,6 +110,7 @@ with harness.Compositor(compositor, CONFIG % "true") as desktop:
                                                     f"key {T} released", f"key {SUPER} released"],
                      "Super + T in the window")
     assert not tiling()
+    desktop.wait_for(lambda: notices.heard() == told("VM"), "the user told")
 
     # Another window has the keyboard: the bindings are back, and its keys stay the compositor's.
     other = window("Other")
@@ -167,6 +174,8 @@ with harness.Compositor(compositor, CONFIG % "true") as desktop:
     desktop.wait_for(lambda: heard("VM", "shortcuts")[-2:] == ["shortcuts inactive",
                                                                "shortcuts active"],
                      "the window hearing both")
+    # The user heard of it once, however often it took the keys again.
+    assert notices.heard() == told("VM"), notices.heard()
 
     # The window gone, the bindings are back.
     vm.terminate()
@@ -207,6 +216,7 @@ with harness.Compositor(compositor, CONFIG % "true") as desktop:
     desktop.wait_for(lambda: heard("Asking", "shortcuts") == ["shortcuts active"],
                      "the inhibitor active once allowed")
     assert shortcuts() == (True, [("active", True, "Asking")]), shortcuts()
+    desktop.wait_for(lambda: notices.heard() == told("VM", "Asking"), "the user told again")
     desktop.reload(CONFIG % "false")
     desktop.wait_for(lambda: heard("Asking", "shortcuts") == ["shortcuts active",
                                                               "shortcuts inactive"],
@@ -218,4 +228,5 @@ with harness.Compositor(compositor, CONFIG % "true") as desktop:
     commands.stdin.flush()
     desktop.wait_for(lambda: shortcuts() == (False, []), "the inhibitor let go")
     commands.stdin.close()
+    assert notices.heard() == told("VM", "Asking"), notices.heard()
 print("Keyboard shortcuts inhibitors take the bindings' keys while focused, and are refused, passed")

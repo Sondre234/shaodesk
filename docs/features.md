@@ -1459,7 +1459,11 @@ another window has the keyboard, or the window lets go or closes, the bindings a
 binding that still runs is `toggle_shortcuts_inhibit`, Super + Shift + Escape: it takes the keys
 back from the focused window, which hears that its request is no longer honoured, and gives them
 to it again, the on-screen display saying which. A window turned off this way stays off until the
-binding turns it on again or it asks anew.
+binding turns it on again or it asks anew. The first time a window takes the keys, a notification
+says so and names the binding ("Shortcuts go to win11 on QEMU/KVM", "Super + Shift + Escape gives
+them back"); while notifications are off or do not disturb is on, the on-screen display says the
+first part. A window that asks again, as virt-manager does each time it grabs the keyboard, is not
+announced again.
 
 Switching virtual terminals (Ctrl + Alt + F1 to F12) and mouse button bindings work as ever, and
 so does the lock screen: the `locked` bindings run there whatever a window asked for. A binding

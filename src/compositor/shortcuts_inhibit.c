@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Keyboard shortcuts inhibitors (keyboard-shortcuts-inhibit-unstable-v1): a virtual machine, a
  * remote desktop or a game asks for the keys the compositor's bindings take, which then go to its
- * surface while it has the keyboard. toggle_shortcuts_inhibit turns the focused one off and on
- * again, its binding the one that still runs; keyboard.shortcuts_inhibit and a window rule's
- * shortcuts_inhibit = false refuse them. */
+ * surface while it has the keyboard, the user hearing so the first time. toggle_shortcuts_inhibit
+ * turns the focused one off and on again, its binding the one that still runs;
+ * keyboard.shortcuts_inhibit and a window rule's shortcuts_inhibit = false refuse them. */
 #include "server.h"
 
 struct sh_shortcuts_inhibitor {
@@ -14,6 +14,7 @@ struct sh_shortcuts_inhibitor {
     /* Refused by keyboard.shortcuts_inhibit or a window rule, as last worked out; turned off by
      * the user (toggle_shortcuts_inhibit) until they turn it on again. */
     bool refused, off;
+    bool told; // the user heard of it taking the keys, for a surface that is no window
     struct wl_listener destroy;
 };
 
@@ -74,24 +75,6 @@ bool shortcuts_inhibited(struct sh_server *server) {
     return !server->locked && inhibitor && inhibitor->wlr_inhibitor->active;
 }
 
-/* Notes which inhibitor takes the keys now. One that has just started to leaves the binding mode
- * in use, as locking does, so that the bindings outside any mode are the ones it holds. */
-static void shortcuts_changed(struct sh_server *server) {
-    struct sh_shortcuts_inhibitor *now = shortcuts_inhibited(server) ? focused_inhibitor(server)
-                                                                     : NULL;
-    if (now == server->shortcuts.effective)
-        return;
-    server->shortcuts.effective = now;
-    if (!now) {
-        wlr_log(WLR_INFO, "Shortcuts are the compositor's again");
-        return;
-    }
-    struct sh_toplevel *toplevel = surface_toplevel(server, now->surface);
-    const char *app_id = toplevel ? toplevel_app_id(toplevel) : NULL;
-    wlr_log(WLR_INFO, "Shortcuts go to %s", app_id && *app_id ? app_id : "a surface without a window");
-    set_binding_mode(server, 0);
-}
-
 /* The name the user knows the surface's window by, its title, else its app id, as a piece of a
  * line to the shell: at most `size` - 1 bytes, cut between characters, on one line. */
 static void surface_name(struct sh_server *server, struct wlr_surface *surface, char *name,
@@ -110,6 +93,51 @@ static void surface_name(struct sh_server *server, struct wlr_surface *surface, 
     for (char *c = name; *c; ++c)
         if (*c == '\n' || *c == '\r' || *c == '\t')
             *c = ' ';
+}
+
+/* Tells the user, once for each window, that it has the shortcuts now and which keys take them
+ * back: the shell hears "notice SUMMARY<tab>BODY" and shows a notification. */
+static void announce(struct sh_server *server, struct sh_shortcuts_inhibitor *inhibitor) {
+    struct sh_toplevel *toplevel = surface_toplevel(server, inhibitor->surface);
+    bool *told = toplevel ? &toplevel->shortcuts_told : &inhibitor->told;
+    if (*told)
+        return;
+    *told = true;
+    const struct sh_callbacks *callbacks = server->callbacks;
+    const char *keys = callbacks->binding_keys
+                           ? callbacks->binding_keys(callbacks->userdata,
+                                                     SH_TOGGLE_SHORTCUTS_INHIBIT)
+                           : NULL;
+    char name[160], line[384];
+    surface_name(server, inhibitor->surface, name, sizeof(name));
+    if (keys && *keys)
+        snprintf(line, sizeof(line), "notice Shortcuts go to %s\t%.64s gives them back\n", name,
+                 keys);
+    else
+        snprintf(line, sizeof(line),
+                 "notice Shortcuts go to %s\tThey come back as another window has the keyboard\n",
+                 name);
+    send_shell_line(server, line);
+}
+
+/* Notes which inhibitor takes the keys now. One that has just started to leaves the binding mode
+ * in use, as locking does, so that the bindings outside any mode are the ones it holds, and the
+ * user hears of it the first time. */
+static void shortcuts_changed(struct sh_server *server) {
+    struct sh_shortcuts_inhibitor *now = shortcuts_inhibited(server) ? focused_inhibitor(server)
+                                                                     : NULL;
+    if (now == server->shortcuts.effective)
+        return;
+    server->shortcuts.effective = now;
+    if (!now) {
+        wlr_log(WLR_INFO, "Shortcuts are the compositor's again");
+        return;
+    }
+    struct sh_toplevel *toplevel = surface_toplevel(server, now->surface);
+    const char *app_id = toplevel ? toplevel_app_id(toplevel) : NULL;
+    wlr_log(WLR_INFO, "Shortcuts go to %s", app_id && *app_id ? app_id : "a surface without a window");
+    set_binding_mode(server, 0);
+    announce(server, now);
 }
 
 /* toggle_shortcuts_inhibit: the focused surface's inhibitor turned off, which gives the bindings
