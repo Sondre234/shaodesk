@@ -144,8 +144,8 @@ return {
         -- Snapping: a floating window dropped with the pointer within distance pixels of the
         -- left or right edge fills that half, of a corner that quarter, of the top edge the
         -- screen; a preview of the slot (color: the focused border's, a quarter opaque) shows
-        -- while it would.
-        -- snap = { enabled = true, distance = 8, corners = true, preview = true },
+        -- while it would. assist: Snap Assist offers the other windows for the free part.
+        -- snap = { enabled = true, distance = 8, corners = true, preview = true, assist = true },
         -- Buttons of windows that draw their own (Firefox's tab strip, GTK apps), in GTK's
         -- button-layout format; "" keeps the desktop's setting. Applications started from
         -- shaodesk see it; restart to change:
