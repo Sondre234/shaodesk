@@ -354,6 +354,8 @@ struct sh_settings {
      * those that draw a shadow of their own. */
     bool round_always;
     float border_active[4], border_inactive[4]; /* premultiplied RGBA */
+    /* The same, or gradients of which those are the first colours. */
+    struct sh_gradient border_active_gradient, border_inactive_gradient;
     /* Pointer devices (libinput only). A negative value keeps the device's own default. */
     double pointer_speed; /* -1 to 1; used when pointer_speed_set */
     bool pointer_speed_set;

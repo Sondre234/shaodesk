@@ -897,6 +897,46 @@ void read_shadow(lua_State *L, Config &config) {
     }
     lua_pop(L, 1);
 }
+// A border's colours: `#RRGGBB[AA]`, or a gradient `{ "#RRGGBB[AA]", ..., angle = DEGREES }` of
+// 2 to SH_GRADIENT_STOPS colours, whose first colour is also `first`.
+void border_colors(lua_State *L, const char *key, float (&first)[4], sh_gradient &gradient) {
+    lua_getfield(L, -1, key);
+    if (lua_isnil(L, -1)) {
+        lua_pop(L, 1);
+        return;
+    }
+    std::string label = std::string("windows.") + key;
+    gradient = {};
+    if (lua_istable(L, -1)) {
+        auto message = label + " must be #RRGGBB, #RRGGBBAA, or a gradient { \"#RRGGBB\", "
+                               "\"#RRGGBB\", ..., angle = DEGREES } of 2 to " +
+                       std::to_string(SH_GRADIENT_STOPS) + " colours";
+        auto count = lua_rawlen(L, -1);
+        if (count < 2 || count > SH_GRADIENT_STOPS)
+            fail(message, key);
+        lua_pushnil(L);
+        while (lua_next(L, -2)) {
+            bool stop = lua_isinteger(L, -2) && lua_tointeger(L, -2) >= 1 &&
+                        static_cast<size_t>(lua_tointeger(L, -2)) <= count;
+            bool angle = lua_type(L, -2) == LUA_TSTRING && !std::strcmp(lua_tostring(L, -2), "angle");
+            if (!stop && !angle)
+                fail(message, key);
+            lua_pop(L, 1);
+        }
+        for (size_t i = 1; i <= count; ++i) {
+            lua_rawgeti(L, -1, static_cast<lua_Integer>(i));
+            premultiplied(string(L, -1, label.c_str()), label.c_str(), gradient.stops[i - 1]);
+            lua_pop(L, 1);
+        }
+        gradient.count = static_cast<int>(count);
+        gradient.angle = static_cast<float>(number(L, "angle", 0, -360, 360));
+    } else {
+        premultiplied(string(L, -1, key), key, gradient.stops[0]);
+        gradient.count = 1;
+    }
+    std::copy(std::begin(gradient.stops[0]), std::end(gradient.stops[0]), first);
+    lua_pop(L, 1);
+}
 void read_windows(lua_State *L, Config &config) {
     if (!section(L, "windows")) {
         lua_pop(L, 1);
@@ -912,13 +952,10 @@ void read_windows(lua_State *L, Config &config) {
         config.settings.round_always = name == "always";
     }
     lua_pop(L, 1);
-    for (auto [key, target] : {std::pair{"border_color", &config.settings.border_active},
-                               {"border_inactive_color", &config.settings.border_inactive}}) {
-        lua_getfield(L, -1, key);
-        if (!lua_isnil(L, -1))
-            premultiplied(string(L, -1, key), key, *target);
-        lua_pop(L, 1);
-    }
+    border_colors(L, "border_color", config.settings.border_active,
+                  config.settings.border_active_gradient);
+    border_colors(L, "border_inactive_color", config.settings.border_inactive,
+                  config.settings.border_inactive_gradient);
     config.opacity = static_cast<float>(number(L, "opacity", 1, 0.05, 1));
     config.inactive_opacity =
         static_cast<float>(number(L, "inactive_opacity", config.opacity, 0.05, 1));
