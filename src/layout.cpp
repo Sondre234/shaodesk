@@ -56,3 +56,50 @@ extern "C" sh_action sh_snap_zone(sh_rect area, double x, double y, int distance
         return left ? SH_SNAP_LEFT : SH_SNAP_RIGHT;
     return top ? SH_MAXIMIZE : SH_NONE;
 }
+
+extern "C" sh_snap_step sh_snap_cycle(sh_action from, sh_action direction, sh_action *to) {
+    *to = SH_NONE;
+    const bool left = direction == SH_SNAP_CYCLE_LEFT, right = direction == SH_SNAP_CYCLE_RIGHT;
+    const bool up = direction == SH_SNAP_CYCLE_UP, down = direction == SH_SNAP_CYCLE_DOWN;
+    if (!left && !right && !up && !down)
+        return SH_SNAP_STEP_STAY;
+    auto place = [&](sh_action arrangement, sh_snap_step step = SH_SNAP_STEP_PLACE) {
+        *to = arrangement;
+        return step;
+    };
+    switch (from) {
+    case SH_MAXIMIZE:
+        if (left || right)
+            return place(left ? SH_SNAP_LEFT : SH_SNAP_RIGHT);
+        return down ? SH_SNAP_STEP_RESTORE : SH_SNAP_STEP_STAY;
+    case SH_SNAP_LEFT:
+    case SH_SNAP_RIGHT: {
+        const bool on_left = from == SH_SNAP_LEFT;
+        if (up || down)
+            return place(on_left ? (up ? SH_SNAP_TOP_LEFT : SH_SNAP_BOTTOM_LEFT)
+                                 : (up ? SH_SNAP_TOP_RIGHT : SH_SNAP_BOTTOM_RIGHT));
+        if (left != on_left)
+            return SH_SNAP_STEP_RESTORE;
+        return place(on_left ? SH_SNAP_RIGHT : SH_SNAP_LEFT, SH_SNAP_STEP_NEXT_OUTPUT);
+    }
+    case SH_SNAP_TOP_LEFT:
+    case SH_SNAP_TOP_RIGHT:
+    case SH_SNAP_BOTTOM_LEFT:
+    case SH_SNAP_BOTTOM_RIGHT: {
+        const bool on_left = from == SH_SNAP_TOP_LEFT || from == SH_SNAP_BOTTOM_LEFT;
+        const bool top = from == SH_SNAP_TOP_LEFT || from == SH_SNAP_TOP_RIGHT;
+        if (up)
+            return place(top ? SH_MAXIMIZE : (on_left ? SH_SNAP_LEFT : SH_SNAP_RIGHT));
+        if (down)
+            return top ? place(on_left ? SH_SNAP_LEFT : SH_SNAP_RIGHT) : SH_SNAP_STEP_MINIMIZE;
+        const sh_action beside = top ? (on_left ? SH_SNAP_TOP_RIGHT : SH_SNAP_TOP_LEFT)
+                                     : (on_left ? SH_SNAP_BOTTOM_RIGHT : SH_SNAP_BOTTOM_LEFT);
+        // Toward its own side it goes on to the next output, into the quarter facing back.
+        return place(beside, left == on_left ? SH_SNAP_STEP_NEXT_OUTPUT : SH_SNAP_STEP_PLACE);
+    }
+    default:
+        if (left || right)
+            return place(left ? SH_SNAP_LEFT : SH_SNAP_RIGHT);
+        return up ? place(SH_MAXIMIZE) : SH_SNAP_STEP_MINIMIZE;
+    }
+}
