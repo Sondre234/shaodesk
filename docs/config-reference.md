@@ -40,6 +40,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `keyboard.file` | string | "" | - | An XKB keymap file, such as `xkbcli compile-keymap` writes or a hand-written `xkb_keymap { ... }`, used instead of the names above: absolute, starting with `~/`, or relative to this file. One that cannot be read or compiled is a configuration error; should it break while the session runs, the names above stand in for it. |
 | `keyboard.repeat_rate` | integer | 25 | 0 to 100 | Key repeats per second. |
 | `keyboard.repeat_delay` | integer | 600 | 0 to 5000 | Milliseconds a key is held before it repeats. |
+| `keyboard.shortcuts_inhibit` | boolean | true | - | Let applications that ask for it (virtual machines, remote desktops, some games) have the keys the bindings take while they have the keyboard; `toggle_shortcuts_inhibit` (Super + Shift + Escape) takes them back. `false` refuses every application, a window rule's `shortcuts_inhibit = false` one. |
 
 ## `mouse`
 

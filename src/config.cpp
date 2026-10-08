@@ -1582,6 +1582,8 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
         lua_pop(L, 1);
         config.settings.repeat_rate = integer(L, "repeat_rate", 25, 0, 100);
         config.settings.repeat_delay = integer(L, "repeat_delay", 600, 0, 5000);
+        boolean(L, "shortcuts_inhibit", "keyboard.shortcuts_inhibit",
+                config.settings.shortcuts_inhibit);
     }
     lua_pop(L, 1);
     current_section.clear();

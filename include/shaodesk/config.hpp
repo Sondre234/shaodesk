@@ -325,7 +325,8 @@ struct Config {
                          .idle = {.dim = 570000, .display_off = 600000, .lock = 0, .suspend = 0},
                          .idle_battery = {.dim = 570000, .display_off = 600000, .lock = 0,
                                           .suspend = 0},
-                         .lid = SH_LID_CLAMSHELL};
+                         .lid = SH_LID_CLAMSHELL,
+                         .shortcuts_inhibit = true};
     // layout.workspace_names: the label of workspace N is names[N - 1]; "" or past the end: none.
     std::vector<std::string> workspace_names;
     // hot_corners: what each corner runs, as a control request; "" for nothing.
