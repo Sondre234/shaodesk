@@ -3,6 +3,7 @@
 #include "app_match.hpp"
 #include "audio.hpp"
 #include "backlight.hpp"
+#include "media.hpp"
 #include "notifications.hpp"
 #include "osd.hpp"
 #include "palette.hpp"
@@ -76,8 +77,9 @@ class ShellController : public QObject {
     // features.sticky: whether a window can be shown on every workspace of its monitor.
     Q_PROPERTY(bool stickyWindows READ stickyWindows NOTIFY configChanged)
     // Which panel widgets Lua enables, and where: {workspaces, clock, calendar, keyboard_layout,
-    // power, tray} as booleans, and {battery, network, volume, tiling, profiles, wallpapers,
-    // notifications}, which can move, as "bar", "quick" (Quick Settings) or "" (hidden).
+    // power, tray, media} as booleans, and {battery, network, volume, tiling, profiles,
+    // wallpapers, notifications}, which can move, as "bar", "quick" (Quick Settings) or ""
+    // (hidden).
     Q_PROPERTY(QVariantMap widgets READ widgets NOTIFY configChanged)
     // The compositor's active keyboard layout: {number (from 1), count, short ("us"), name}, or
     // empty without a compositor.
@@ -102,6 +104,8 @@ class ShellController : public QObject {
     Q_PROPERTY(SystemStatus *status READ status CONSTANT)
     // The screen backlight, which Quick Settings sets.
     Q_PROPERTY(Backlight *backlight READ backlight CONSTANT)
+    // The media players (MPRIS), which Quick Settings and the media keys control.
+    Q_PROPERTY(Media *media READ media CONSTANT)
     // The notification daemon (cards, history, do-not-disturb) and the on-screen display.
     Q_PROPERTY(NotificationCenter *notifications READ notifications CONSTANT)
     Q_PROPERTY(Osd *osd READ osd CONSTANT)
@@ -231,6 +235,7 @@ class ShellController : public QObject {
     QQmlEngine *engine();
     SystemStatus *status() { return &status_; }
     Backlight *backlight() { return &backlight_; }
+    Media *media() { return media_.get(); }
     NotificationCenter *notifications() { return &notifications_; }
     Osd *osd() { return &osd_; }
     QString focusedOutput() const { return focusedOutput_; }
@@ -363,6 +368,7 @@ class ShellController : public QObject {
     // $SHAODESK_SYSFS names another sysfs tree, polled, for tests.
     Backlight backlight_{qEnvironmentVariable("SHAODESK_SYSFS", "/sys"), !qEnvironmentVariableIsSet("SHAODESK_SYSFS"),
                          qEnvironmentVariableIsSet("SHAODESK_SYSFS") ? 100 : 0};
+    std::unique_ptr<Media> media_ = makeMedia();
     QString focusedOutput_, cardsOutput_;
     QVariantMap keyboardLayout_;
     bool nightLight_ = false;

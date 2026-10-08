@@ -603,6 +603,9 @@ int main(int argc, char **argv) {
                 "shell widgets not parsed");
         require(shaodesk::parse_config("return {shell={}}").shell.widgets.battery != WidgetPlace::Hidden,
                 "widgets not on by default");
+        require(shaodesk::parse_config("return {shell={}}").shell.widgets.media &&
+                    !shaodesk::parse_config("return {shell={widgets={media=false}}}").shell.widgets.media,
+                "the media card is not on by default, or not switched off");
         // By default the status widgets, the profiles and do-not-disturb are in Quick Settings
         // and tiling and the wallpapers on the bar; `true` puts each there.
         const auto placed_by_default = shaodesk::parse_config("return {shell={}}").shell.widgets;

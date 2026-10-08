@@ -348,6 +348,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.widgets.power` | boolean | true | - | The power button in the application menu's bottom-right corner: lock, suspend, hibernate, restart, power off and log out, as far as `power.lock_command` and logind allow them. |
 | `shell.widgets.tray` | boolean | true | - | The system tray: applications' status icons (StatusNotifierItem), shown while there are any. `false` also leaves the tray's D-Bus names to another program. |
 | `shell.widgets.notifications` | boolean or string | true | - | Do-not-disturb and the unread notifications: `"bar"` (a bell that opens them, with their count; a right-click toggles do-not-disturb) or `"quick"` (a do-not-disturb tile). The clock does both either way. By default in Quick Settings. |
+| `shell.widgets.media` | boolean | true | - | The now-playing card at the top of Quick Settings: the cover, title and artist of the media player playing most lately (MPRIS), with previous, play or pause, next and the position; shown while a player is there. |
 | `shell.launchers` | list of tables | unset | - | Pinned commands for programs without a desktop file, at most 64. |
 | `shell.launchers[].name` | string | - | - | Label, 1 to 128 bytes. Required. |
 | `shell.launchers[].icon` | string | "application-x-executable" | - | Icon theme name. |
