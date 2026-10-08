@@ -502,6 +502,29 @@ static void get_window_peek(struct sh_server *server, int fd, const char *argume
     }
 }
 
+static void get_window_icons(struct sh_server *server, int fd, const char *arguments) {
+    // Per window, in the order of `get windows`: its number (0 before it is published), app_id,
+    // and the icon it supplies itself (window_icon.c): its name and the size of its pixels as
+    // WIDTHxHEIGHT, each "-" for none.
+    control_reply(fd, "ok\n");
+    struct sh_toplevel *toplevel;
+    wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
+        const struct sh_icon *icon = &toplevel->icon;
+        const char *raw_app_id = toplevel_app_id(toplevel);
+        char app_id[256], name[256], size[32], line[640];
+        snprintf(app_id, sizeof(app_id), "%s", raw_app_id ? raw_app_id : "");
+        one_field(app_id);
+        snprintf(name, sizeof(name), "%s", icon->name ? icon->name : "-");
+        one_field(name);
+        if (icon->pixels)
+            snprintf(size, sizeof(size), "%dx%d", icon->width, icon->height);
+        else
+            snprintf(size, sizeof(size), "-");
+        snprintf(line, sizeof(line), "%u\t%s\t%s\t%s\n", toplevel->id, app_id, name, size);
+        control_reply(fd, line);
+    }
+}
+
 /* `what`, then what `surface` belongs to as "KIND NAME", tab-separated, as one line: "window"
  * and its title, "layer" and its namespace, "other" (a popup, a lock surface) and "-", or "-"
  * and "-" for no surface. */
@@ -565,6 +588,7 @@ static const struct {
     {"dim", get_dim, false},
     {"peek", get_peek, false},
     {"window_peek", get_window_peek, false},
+    {"window_icons", get_window_icons, false},
     {"opacities", get_opacities, false},
     {"frames", get_frames, false},
     {"zoom", get_zoom, false},
