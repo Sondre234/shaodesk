@@ -225,6 +225,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/session.c
         src/compositor/swallow.c
         src/compositor/switcher.c
+        src/compositor/switches.c
         src/compositor/tiling.c
         src/compositor/toplevel.c
         src/compositor/window_control.c
@@ -241,6 +242,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         ${CAPTURE_SOURCE_PROTOCOL_SOURCES})
     target_sources(shaodesk PRIVATE src/overview_scene.c)
     target_sources(shaodesk PRIVATE src/power_supply.c)
+    target_sources(shaodesk PRIVATE src/lid.c)
     target_include_directories(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_compile_definitions(shaodesk PRIVATE WLR_USE_UNSTABLE)
     # version.h, for --version: the project version, and `git describe` in a git checkout.
@@ -466,6 +468,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:output_power_probe>
             $<TARGET_FILE:lock_probe> $<TARGET_FILE:pointer_probe>)
         set_tests_properties(output_power_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME lid_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/lid_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(lid_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME compositor_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/compositor_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>

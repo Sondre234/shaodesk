@@ -55,6 +55,7 @@ all. In short:
 | `output_power.c` | Monitors turned off and on in the layout: wlr-output-power-management. |
 | `layer_shell.c` | Panels and other layer surfaces. |
 | `group.c`, `scratchpad.c`, `swallow.c`, `switcher.c`, `overview.c`, `session.c` | One feature each. |
+| `switches.c` | Switch devices: the lid turning a laptop's panel off and on (clamshell), switches' bindings. |
 | `effects.c` | Dimming, peeking at the desktop or at one window, night light, magnifier, hot corners. |
 | `lock.c` | Session lock and idle/sleep inhibitors. |
 | `idle.c` | Power saving after a while without input: dimming, monitors off, locking, suspending. |

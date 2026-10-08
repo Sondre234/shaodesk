@@ -240,6 +240,10 @@ static void control_handle(struct sh_server *server, int fd, const char *request
         control_headless_keyboard(server, fd, request + (request[17] ? 18 : 17));
         return;
     }
+    if (!strncmp(request, "headless_switch", 15) && (!request[15] || request[15] == ' ')) {
+        control_headless_switch(server, fd, request + (request[15] ? 16 : 15));
+        return;
+    }
     if (!strncmp(request, "session", 7) && (!request[7] || request[7] == ' ')) {
         control_session(server, fd, request + 7);
         return;

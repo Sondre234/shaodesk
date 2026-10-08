@@ -217,6 +217,9 @@ void server_new_input(struct wl_listener *listener, void *data) {
     case WLR_INPUT_DEVICE_POINTER:
         server_new_pointer(server, device);
         break;
+    case WLR_INPUT_DEVICE_SWITCH:
+        server_new_switch(server, device);
+        break;
     default:
         break;
     }
