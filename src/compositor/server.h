@@ -1058,6 +1058,7 @@ const struct sh_monitor *output_monitor(const struct sh_settings *settings,
                                        const struct sh_output *output);
 void arrange_outputs(struct sh_server *server);
 void configure_output(struct sh_server *server, struct sh_output *output);
+void apply_output_settings(struct sh_server *server);
 void output_config_test(struct wl_listener *listener, void *data);
 void output_config_apply(struct wl_listener *listener, void *data);
 void server_new_output(struct wl_listener *listener, void *data);

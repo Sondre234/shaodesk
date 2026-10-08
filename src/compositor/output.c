@@ -523,6 +523,14 @@ void output_config_apply(struct wl_listener *listener, void *data) {
         head_monitor(server, output, &head->state, &output->override);
         output->has_override = true;
     }
+    apply_output_settings(server);
+    wlr_output_configuration_v1_send_succeeded(config);
+    wlr_output_configuration_v1_destroy(config);
+}
+
+/* Configures every output again after their settings changed while running (through
+ * wlr-output-management, or display_mode.c), and puts windows, workspaces and focus in order. */
+void apply_output_settings(struct sh_server *server) {
     // Enable outputs before disabling others, so a swap never leaves none on.
     struct sh_output *output, *temporary;
     wl_list_for_each_safe(output, temporary, &server->disabled_outputs, link)
@@ -541,8 +549,6 @@ void output_config_apply(struct wl_listener *listener, void *data) {
     }
     wl_list_for_each(toplevel, &server->toplevels, link) refresh_frame(toplevel);
     wl_list_for_each(output, &server->outputs, link) reflow_output(server, output->wlr_output);
-    wlr_output_configuration_v1_send_succeeded(config);
-    wlr_output_configuration_v1_destroy(config);
 }
 
 static void output_request_state(struct wl_listener *listener, void *data) {
