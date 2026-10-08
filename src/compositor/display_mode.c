@@ -178,7 +178,7 @@ static void step_popup(struct sh_server *server, int step) {
                  output->name);
     } else if (connected_outputs(server) >= 2) {
         int at = 0;
-        while (popup_order[at] != server->display_mode.shown)
+        while (at < 3 && (int)popup_order[at] != server->display_mode.shown)
             ++at;
         server->display_mode.shown = popup_order[(at + step + 4) % 4];
     }
