@@ -820,3 +820,44 @@ void ConfigErrorView::update() {
         hide();
     }
 }
+DisplaySettingsView::DisplaySettingsView(ShellController &controller, QScreen *screen)
+    : OverlayView(controller, screen, "display settings", true) {
+    setTitle("shaodesk display settings");
+    setResizeMode(QQuickView::SizeViewToRootObject);
+    setInitialProperties({{"screenSize", screen->geometry().size()}});
+#if SHAODESK_LAYER_SHELL
+    using W = LayerShellQt::Window;
+    layer_->setScope("shaodesk-display-settings");
+    layer_->setAnchors(W::Anchors());
+    layer_->setExclusiveZone(0);
+#endif
+    load("DisplaySettings.qml");
+    if (auto *root = rootObject())
+        followRoot(this, layer_, root);
+    connect(screen, &QScreen::geometryChanged, this, [this] {
+        if (rootObject())
+            rootObject()->setProperty("screenSize", outputScreen_->geometry().size());
+    });
+    connect(controller.displaySettings(), &DisplaySettings::openChanged, this, &DisplaySettingsView::update);
+    // Its output gone, as a trial may turn it off, the primary screen's view takes over.
+    connect(qGuiApp, &QGuiApplication::screenRemoved, this, &DisplaySettingsView::update,
+            Qt::QueuedConnection);
+    update();
+}
+void DisplaySettingsView::update() {
+    const auto *settings = controller_.displaySettings();
+    const auto screens = QGuiApplication::screens();
+    const bool known = std::any_of(screens.begin(), screens.end(), [settings](QScreen *screen) {
+        return screen->name() == settings->output();
+    });
+    const bool mine = settings->open() && (known ? settings->output() == outputScreen_->name()
+                                                 : outputScreen_ == QGuiApplication::primaryScreen());
+    if (!mine) {
+        dismiss();
+        return;
+    }
+    // Opened afresh, or again while it was going: the keyboard starts on the window.
+    const bool again = leaving();
+    if ((present() || again) && rootObject())
+        QMetaObject::invokeMethod(rootObject(), "reset");
+}

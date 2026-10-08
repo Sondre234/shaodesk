@@ -133,7 +133,8 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     WifiList.qml
     WifiPopup.qml
     BluetoothList.qml
-    DisplayMode.qml)
+    DisplayMode.qml
+    DisplaySettings.qml)
 # The protocols task_model.cpp and window_pictures.cpp speak, generated in the top-level build
 # directory.
 set(SHAODESK_TASK_PROTOCOL_SOURCES
