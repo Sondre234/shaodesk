@@ -368,6 +368,20 @@ void read_shell(lua_State *L, ShellConfig &shell) {
         lua_pop(L, 1);
         search.depth = integer(L, "depth", search.depth, 1, 10);
         search.max_files = integer(L, "max_files", search.max_files, 100, 200000);
+        // An engine's address, or false for none.
+        lua_getfield(L, -1, "web");
+        if (lua_isboolean(L, -1)) {
+            if (lua_toboolean(L, -1))
+                fail("shell.search.web must be an address with %s or false, not true", "web");
+            search.web.clear();
+        } else if (!lua_isnil(L, -1)) {
+            search.web = string(L, -1, "shell.search.web");
+            if ((!search.web.starts_with("https://") && !search.web.starts_with("http://")) ||
+                search.web.find("%s") == std::string::npos)
+                fail("shell.search.web must be an http or https address with %s where the words go",
+                     "web");
+        }
+        lua_pop(L, 1);
     }
     lua_pop(L, 1);
     current_section = "shell";
