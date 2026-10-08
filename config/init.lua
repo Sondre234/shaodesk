@@ -96,6 +96,8 @@ return {
     -- The monitor touchscreens map to; unset, the one the device names, else the built-in
     -- panel (eDP, LVDS, DSI), else every monitor:
     -- touch = { output = "eDP-1" },
+    -- The monitor a drawing tablet's area covers; unset, every monitor:
+    -- tablet = { output = "DP-1" },
     layout = {
         -- gap = 8, -- sets both; or gap_inner (between windows) and gap_outer (at the edges)
         -- smart_gaps = true, -- no gaps around a tiled window alone on its workspace
