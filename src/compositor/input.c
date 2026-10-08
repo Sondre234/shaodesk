@@ -452,12 +452,18 @@ static bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, ui
                 ? server->callbacks->key(server->callbacks->userdata, modifiers, sym,
                                          &bound_argument)
                 : SH_NONE;
-        if (bound == SH_OVERVIEW_TOGGLE || bound == SH_OVERVIEW_CONFIRM ||
-            bound == SH_OVERVIEW_CANCEL)
-            run_action(server, bound, bound_argument);
-        else
-            overview_key(server, modifiers, sym);
-        return true;
+        // Snap Assist gives way to any other binding, which then runs as usual.
+        if (server->overview.assist && bound != SH_NONE && bound != SH_OVERVIEW_CONFIRM &&
+            bound != SH_OVERVIEW_CANCEL) {
+            overview_close(server, NULL, -1);
+        } else {
+            if (bound == SH_OVERVIEW_TOGGLE || bound == SH_OVERVIEW_CONFIRM ||
+                bound == SH_OVERVIEW_CANCEL)
+                run_action(server, bound, bound_argument);
+            else
+                overview_key(server, modifiers, sym);
+            return true;
+        }
     }
     int argument = 0;
     enum sh_action action =

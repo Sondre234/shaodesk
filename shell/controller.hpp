@@ -150,6 +150,9 @@ class ShellController : public QObject {
     // What the panels leave of the output, as a rect in its coordinates.
     Q_PROPERTY(QRect overviewArea READ overviewArea NOTIFY overviewChanged)
     Q_PROPERTY(int overviewSelected READ overviewSelected NOTIFY overviewSelectedChanged)
+    // Snap Assist: the overview in the free slot beside a window just snapped, `overviewArea`
+    // being that slot; it has no strip and no search.
+    Q_PROPERTY(bool overviewAssist READ overviewAssist NOTIFY overviewChanged)
   public:
     explicit ShellController(std::filesystem::path path, QObject *parent = nullptr);
     ~ShellController() override;
@@ -279,6 +282,7 @@ class ShellController : public QObject {
     QString overviewFilter() const { return overviewFilter_; }
     QRect overviewArea() const { return overviewArea_; }
     int overviewSelected() const { return overviewSelected_; }
+    bool overviewAssist() const { return overviewAssist_; }
     Q_INVOKABLE bool launch(const QString &id);
     bool trashFull() const { return trashFull_; }
     // Opens the trash in the file manager, as `gio open trash:///` does, or its folder where
@@ -427,6 +431,7 @@ class ShellController : public QObject {
     int overviewSelected_ = 0, nextOverviewSelected_ = 0, overviewViewed_ = 1,
         nextOverviewViewed_ = 1, overviewPending_ = 0;
     QRect overviewArea_, nextOverviewArea_;
+    bool overviewAssist_ = false, nextOverviewAssist_ = false;
     void showOverview();
     void clearOverview();
     void subscribe();

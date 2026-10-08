@@ -42,6 +42,10 @@ bool launch_program(struct sh_server *server, enum sh_action action, char *error
 
 /* Shared by key bindings and the control socket. */
 void run_action(struct sh_server *server, enum sh_action action, int argument) {
+    // Snap Assist gives way to any action but those that pick from it or dismiss it.
+    if (server->overview.open && server->overview.assist && action != SH_NONE &&
+        action != SH_OVERVIEW_CONFIRM && action != SH_OVERVIEW_CANCEL)
+        overview_close(server, NULL, -1);
     int count = server_settings(server)->workspaces;
     struct sh_toplevel *current = current_toplevel(server);
     switch (action) {

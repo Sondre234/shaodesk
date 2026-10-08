@@ -727,3 +727,25 @@ the new actions with odd arguments. The Window menu sending `snap_left` is in `s
 Not checked: Super + Alt + arrows on a real keyboard (the keys reach the compositor as any other
 binding, and the keyboard layout may give Alt another meaning), and the cycle across real
 monitors arranged above one another, where left and right find no monitor beside.
+
+## Snap Assist
+
+Added 2026-10-08. `snap_assist_smoke` runs headless compositors with three probe windows, a
+headless keyboard and a virtual pointer: nothing offered beside a lone window; snapping to the
+left offers the other two in the right half, most recently used first, within the slot, and
+Return puts the selected one there and gives it the focus, after which, with both halves taken,
+it stays away; Escape, Super + Alt + Right, an action through the socket (which, snapping, brings
+it back for the new slot) and `overview_cancel` dismiss it; a click beside the slot dismisses it
+and reaches the window there, and a click on a thumbnail puts that window into the slot; quarters
+fill in turn until no window is left to offer; a window dropped at an edge with the pointer
+brings it up, and the snapped window closing takes it away; `assist = false` and a tiling monitor
+keep it away. `snap_assist_shell_smoke` runs the shell with it: the overlay shows, the titles are
+drawn in the slot and the search box is not (grim), and the pointer reaches the snapped window
+through the overlay, which it did not before the overlay was made to take no input (checked by
+running the test against the old view). It was looked at in screenshots of a headless compositor
+drawing through GLES2 with the shell, and in the gallery's `snap-assist` in all four themes.
+
+Not checked: Snap Assist on a real display (how the backdrop and the thumbnails look over real
+windows and at 144 or 200 Hz), with real applications' windows and their live contents, with a
+real keyboard and mouse, and across monitors of different scales.
+

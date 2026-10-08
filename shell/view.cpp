@@ -427,10 +427,16 @@ OverviewView::OverviewView(ShellController &controller, QScreen *screen)
     connect(&controller, &ShellController::overviewChanged, this, &OverviewView::update);
 }
 void OverviewView::update() {
-    if (controller_.overviewOutput() == outputScreen_->name())
+    if (controller_.overviewOutput() == outputScreen_->name()) {
+        // It takes no input: the compositor keeps the pointer and the keyboard while the
+        // overview is open, and Snap Assist leaves the rest of the screen to the windows
+        // under it. present() gives input back to a view it keeps as it goes.
+        setFlag(Qt::WindowTransparentForInput, true);
         present();
-    else
+        setFlag(Qt::WindowTransparentForInput, true);
+    } else {
         dismiss();
+    }
 }
 PowerView::PowerView(ShellController &controller, QScreen *screen)
     : OverlayView(controller, screen, "power dialog", true) {

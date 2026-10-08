@@ -239,6 +239,25 @@ else it is the pointer, the cursor following it and `server_cursor_button` heari
 buttons. Pads follow the keyboard's focus through a listener of their own; wlroots would send
 their buttons to the last surface they entered, so `pad_focused` checks it first.
 
+### Snapping
+
+Where a window dragged to an edge snaps (`sh_snap_zone`), a step of the Win+arrow cycle
+(`sh_snap_cycle`), the quarters an arrangement covers and the slot Snap Assist offers
+(`sh_snap_quarters`, `sh_snap_assist_slot`) are pure functions in `src/layout.cpp`, beside the
+halves' and quarters' geometry (`sh_placement`), with unit tests in `tests/layout_tests.cpp`.
+`snap.c` follows a move with the pointer (`snap_follow`, from `process_cursor_move`): the zone,
+the slot (`placed_slot`, `placement.c`) and the preview, a tree of two rectangles that sits in
+`windows` just under the dragged window while it shows and among the guides while it does not,
+easing through an `sh_tween` of five values (place, size, opacity). `finish_grab` asks
+`snap_drop` first; a drop that would take the window into a tiling (`drop_tiles`, `grab.c`)
+snaps nowhere but at the top. `place_by_hand_on` puts a window into a slot of a given output,
+and `snap_assist_offer` follows every snap into a half or a quarter. Snap Assist is the overview
+in a mode of its own (`overview_assist`, `overview.c`, with `assist` set): its area is the slot,
+it lists other windows, has no strip, draws its backdrop over the slot alone, leaves the pointer
+outside the slot to the rest of the compositor, closes at once, and puts the window picked into
+the slot. It announces itself as `overview-assist` rather than `overview`; the shell's
+`OverviewView` draws both, and takes no input for either.
+
 ## The shell (`shell/`)
 
 `ShellController` (`controller.cpp`) loads the configuration, keeps the compositor's state from
@@ -589,7 +608,7 @@ notifications, over the configured wallpaper (`--preview-popup` lists the names)
 style the dock and the menu bar, over the style's drawn wallpaper while none is set, with the
 menu bar's menus as `system-menu`, `app-menu`, `window-menu` and `window-submenu`. The overlay
 surfaces have names there too (`osd-volume`, `osd-text`, `cards`, `power-dialog`, `palette`,
-`palette-empty`, `switcher`, `overview`): `PreviewData` in `preview.cpp` shows one in a window of its own over the
+`palette-empty`, `switcher`, `overview`, `snap-assist`): `PreviewData` in `preview.cpp` shows one in a window of its own over the
 bar alone, with stand-ins for what the compositor would tell it, and the screenshot draws it where
 its layer surface would be (the overview over stand-ins for the compositor's thumbnails).
 `--preview --preview-desktop` draws the desktop instead (the gallery's `desktop`, without the

@@ -221,6 +221,13 @@ struct sh_overview {
     uint32_t pressed; /* buttons the overview took; their releases are its too */
     double scroll;    /* wheel motion not yet enough to change the workspace */
     bool in_corner;   /* the pointer is in the hot corner: it opens the overview on entering */
+    /* Snap Assist (overview_assist): the overview in the free slot beside a window just snapped,
+     * `assist_from`, listing the output's other windows to put into `assist_slot` (an
+     * arrangement); `area` is the slot, and its backdrop is rounded by `assist_radius`. */
+    bool assist;
+    enum sh_action assist_slot;
+    struct sh_toplevel *assist_from;
+    int assist_radius;
 };
 
 /* The power actions and what logind allows of them (power.c). One runs at a time, in steps. */
@@ -997,6 +1004,8 @@ void overview_select(struct sh_server *server, int index);
 void overview_touch(struct sh_server *server, bool relayout);
 void overview_forget(struct sh_toplevel *toplevel);
 void overview_open(struct sh_server *server);
+void overview_assist(struct sh_server *server, struct sh_toplevel *from, struct wlr_output *output,
+                     enum sh_action slot, struct sh_rect area, int radius);
 void overview_close(struct sh_server *server, struct sh_toplevel *chosen, int workspace);
 void overview_dismiss(struct sh_server *server);
 void overview_hold(struct sh_server *server, double progress);
@@ -1092,6 +1101,7 @@ void snap_follow(struct sh_server *server);
 bool snap_drop(struct sh_server *server);
 void snap_preview_hide(struct sh_server *server);
 void snap_cycle(struct sh_server *server, enum sh_action direction);
+void snap_assist_offer(struct sh_toplevel *toplevel);
 
 /* swallow.c */
 struct sh_toplevel *swallow_host(struct sh_toplevel *child, bool terminals_only);

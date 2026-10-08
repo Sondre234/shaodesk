@@ -4,7 +4,8 @@ import QtQuick
 // The text of the overview. The compositor draws the thumbnails, the workspace strip and the
 // selection; this sits over them in the output's coordinates with each window's title, the
 // strip's workspace labels, the search box and a hint. It takes no input: the compositor keeps
-// the keyboard and the pointer while the overview is open.
+// the keyboard and the pointer while the overview is open. Snap Assist is the overview in the
+// free slot beside a window just snapped (`area`): titles and a hint there, no search.
 Item {
     id: overview
     required property size screenSize
@@ -13,6 +14,7 @@ Item {
     property var strip: shell.overviewStrip
     property string filter: shell.overviewFilter
     property rect area: shell.overviewArea
+    property bool assist: shell.overviewAssist
     // The search box's text, held as it was while it goes: the controller forgets it as the
     // overview closes, before the view hears that it should go, so only an open overview's is
     // taken, and it starts afresh each time it shows.
@@ -54,6 +56,7 @@ Item {
     // strip.
     Rectangle {
         id: search
+        visible: !overview.assist
         anchors.horizontalCenter: parent.horizontalCenter
         y: overview.area.y + Theme.spacingS
         width: Math.min(460, overview.width - 2 * Theme.spacingXL); height: Theme.rowHeight
@@ -156,7 +159,7 @@ Item {
     // pill of the theme's surface.
     Rectangle {
         anchors.centerIn: parent
-        visible: overview.shown && overview.windows.length === 0
+        visible: overview.shown && overview.windows.length === 0 && !overview.assist
         width: empty.implicitWidth + 2 * Theme.spacingXL
         height: empty.implicitHeight + 2 * Theme.spacingM
         radius: height / 2
@@ -171,10 +174,11 @@ Item {
         }
     }
 
-    // How to work it, along the bottom in the gap below the thumbnails: each key or gesture,
-    // then what it does.
+    // How to work it, along the bottom in the gap below the thumbnails (of Snap Assist's slot):
+    // each key or gesture, then what it does.
     Rectangle {
-        anchors.horizontalCenter: parent.horizontalCenter
+        x: overview.assist ? overview.area.x + (overview.area.width - width) / 2
+                           : (overview.width - width) / 2
         y: overview.area.y + overview.area.height - height - Theme.spacingXS
         width: hints.implicitWidth + 2 * Theme.spacingL
         height: hints.implicitHeight + 2 * Theme.spacingXS
@@ -185,10 +189,13 @@ Item {
             anchors.centerIn: parent
             spacing: Theme.spacingL
             Repeater {
-                model: [{ "key": qsTr("Enter"), "does": qsTr("picks") },
-                        { "key": qsTr("Esc"), "does": qsTr("closes") },
-                        { "key": qsTr("Middle click"), "does": qsTr("closes a window") },
-                        { "key": qsTr("Drag"), "does": qsTr("a window onto a workspace to move it") }]
+                model: overview.assist
+                       ? [{ "key": qsTr("Enter"), "does": qsTr("puts the window here") },
+                          { "key": qsTr("Esc"), "does": qsTr("leaves it empty") }]
+                       : [{ "key": qsTr("Enter"), "does": qsTr("picks") },
+                          { "key": qsTr("Esc"), "does": qsTr("closes") },
+                          { "key": qsTr("Middle click"), "does": qsTr("closes a window") },
+                          { "key": qsTr("Drag"), "does": qsTr("a window onto a workspace to move it") }]
                 delegate: Text {
                     required property var modelData
                     text: "<b>" + modelData.key + "</b> " + modelData.does

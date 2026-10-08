@@ -261,6 +261,11 @@ const Option options[] = {
     {"windows.snap.color", "color", "`border_color`, a quarter opaque", "\"#7da8ff40\"", none,
      none,
      "The preview's fill, `#RRGGBBAA`; its outline is the same colour, more opaque."},
+    {"windows.snap.assist", "boolean", "true", "true", none, none,
+     "Snap Assist: after a window snaps into a half or a quarter, by dragging or from the "
+     "keyboard, the free part of the monitor beside it shows the monitor's other windows; "
+     "picking one puts it there. Escape or a click elsewhere dismisses it. Not on monitors that "
+     "tile."},
     {"windows.placement", "enum", "\"cascade\"", "\"smart\"", none, none,
      "Where a new floating window opens (tiles go where the layout puts them, and rules with a "
      "`position` win): `\"cascade\"` steps each one 32 pixels down and right, `\"center\"` "
