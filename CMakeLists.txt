@@ -39,8 +39,9 @@ target_compile_definitions(shaodesk_config PRIVATE
     SHAODESK_DEFAULT_CONFIG="${CMAKE_INSTALL_FULL_DATADIR}/shaodesk/init.lua"
     SHAODESK_SOURCE_CONFIG="${CMAKE_CURRENT_SOURCE_DIR}/config/init.lua")
 
-# Arithmetic of the desktop effects (fades, night light, corners, zoom); no wlroots.
-add_library(shaodesk_effects STATIC src/effects.c)
+# Arithmetic of the desktop effects (fades, night light, corners, zoom) and of touchpad swipes;
+# no wlroots.
+add_library(shaodesk_effects STATIC src/effects.c src/swipe.c)
 target_include_directories(shaodesk_effects PUBLIC include)
 target_link_libraries(shaodesk_effects PRIVATE m)
 target_compile_options(shaodesk_effects PRIVATE -Wall -Wextra -Wpedantic)
@@ -90,6 +91,9 @@ if(BUILD_TESTING)
     add_executable(effects_tests tests/effects_tests.cpp)
     target_link_libraries(effects_tests PRIVATE shaodesk_effects)
     add_test(NAME effects COMMAND effects_tests)
+    add_executable(swipe_tests tests/swipe_tests.cpp)
+    target_link_libraries(swipe_tests PRIVATE shaodesk_effects)
+    add_test(NAME swipe COMMAND swipe_tests)
     add_executable(effects_config_tests tests/effects_config_tests.cpp)
     target_link_libraries(effects_config_tests PRIVATE shaodesk_config)
     add_test(NAME effects_config COMMAND effects_config_tests)
