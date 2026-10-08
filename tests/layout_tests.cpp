@@ -50,7 +50,36 @@ int main() {
         require(left.width == 1 && left.height == 1);
         require(!sh_placement(SH_TILE, {0, 0, 1, 1}, 0, 1, 2, &left));
         require(!sh_placement(SH_TILE, area, 8, 0, 0, &left));
-        std::cout << "Tiling bounds, gaps, and non-overlap passed\n";
+
+        // Snap zones of a 1920 x 1080 output with a 40-pixel panel along the top: within 8
+        // pixels of a side, of the top (the panel included), or of two sides at once.
+        const sh_rect usable{0, 40, 1920, 1040};
+        auto zone = [&](double x, double y, bool corners = true, uint32_t shared = 0) {
+            return sh_snap_zone(usable, x, y, 8, corners, shared);
+        };
+        require(zone(960, 500) == SH_NONE);
+        require(zone(0, 500) == SH_SNAP_LEFT && zone(7.9, 500) == SH_SNAP_LEFT);
+        require(zone(8, 500) == SH_NONE);
+        require(zone(1919, 500) == SH_SNAP_RIGHT && zone(1912, 500) == SH_SNAP_RIGHT);
+        require(zone(1911.5, 500) == SH_NONE);
+        require(zone(960, 0) == SH_MAXIMIZE && zone(960, 47) == SH_MAXIMIZE);
+        require(zone(960, 48) == SH_NONE);
+        require(zone(960, 1079) == SH_NONE); // the bottom alone
+        require(zone(0, 0) == SH_SNAP_TOP_LEFT && zone(3, 45) == SH_SNAP_TOP_LEFT);
+        require(zone(1919, 10) == SH_SNAP_TOP_RIGHT);
+        require(zone(0, 1079) == SH_SNAP_BOTTOM_LEFT && zone(1919, 1075) == SH_SNAP_BOTTOM_RIGHT);
+        require(zone(0, 1060) == SH_SNAP_LEFT); // 19 pixels above the bottom
+        // Without corners the side wins; a shared edge snaps nothing, and leaves the other.
+        require(zone(0, 0, false) == SH_SNAP_LEFT && zone(1919, 1079, false) == SH_SNAP_RIGHT);
+        require(zone(0, 500, true, SH_EDGE_LEFT) == SH_NONE);
+        require(zone(0, 0, true, SH_EDGE_LEFT) == SH_MAXIMIZE);
+        require(zone(0, 0, true, SH_EDGE_TOP) == SH_SNAP_LEFT);
+        require(zone(960, 0, true, SH_EDGE_TOP) == SH_NONE);
+        require(zone(0, 1079, true, SH_EDGE_BOTTOM) == SH_SNAP_LEFT);
+        require(zone(1919, 500, true, SH_EDGE_LEFT) == SH_SNAP_RIGHT);
+        require(sh_snap_zone(usable, 0, 500, 0, true, 0) == SH_NONE);
+        require(sh_snap_zone({0, 0, 0, 0}, 0, 0, 8, true, 0) == SH_NONE);
+        std::cout << "Tiling bounds, gaps, non-overlap and snap zones passed\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';
         return 1;

@@ -445,6 +445,15 @@ struct sh_rect {
 };
 bool sh_placement(enum sh_action action, struct sh_rect area, int gap, int index, int count,
                   struct sh_rect *result);
+/* Where a window dragged with the pointer at (x, y) snaps when dropped there, `area` being the
+ * output less its panels (a panel along an edge counts as that edge): SH_SNAP_LEFT or
+ * SH_SNAP_RIGHT within `distance` pixels of that side, SH_MAXIMIZE of the top, and with
+ * `corners` a quarter (SH_SNAP_TOP_LEFT, ...) within `distance` of two sides at once, where
+ * without them the side wins. The bottom alone snaps nothing, and neither does an edge in
+ * `shared` (enum sh_edge bits), which leads on to another output. SH_NONE where nothing
+ * snaps. */
+enum sh_action sh_snap_zone(struct sh_rect area, double x, double y, int distance, bool corners,
+                            uint32_t shared);
 
 /* Where a new floating window of `width` x `height` opens in `area` (the output less its
  * panels), given the rectangles `others` of the windows already showing there. Cascade steps

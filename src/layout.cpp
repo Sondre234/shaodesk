@@ -40,3 +40,19 @@ extern "C" bool sh_placement(sh_action action, sh_rect area, int gap, int index,
                bottom - top};
     return true;
 }
+
+extern "C" sh_action sh_snap_zone(sh_rect area, double x, double y, int distance, bool corners,
+                                  uint32_t shared) {
+    if (area.width < 1 || area.height < 1 || distance < 1)
+        return SH_NONE;
+    const bool left = x < area.x + distance && !(shared & SH_EDGE_LEFT);
+    const bool right = !left && x >= area.x + area.width - distance && !(shared & SH_EDGE_RIGHT);
+    const bool top = y < area.y + distance && !(shared & SH_EDGE_TOP);
+    const bool bottom = !top && y >= area.y + area.height - distance && !(shared & SH_EDGE_BOTTOM);
+    if (corners && (left || right) && (top || bottom))
+        return top ? (left ? SH_SNAP_TOP_LEFT : SH_SNAP_TOP_RIGHT)
+                   : (left ? SH_SNAP_BOTTOM_LEFT : SH_SNAP_BOTTOM_RIGHT);
+    if (left || right)
+        return left ? SH_SNAP_LEFT : SH_SNAP_RIGHT;
+    return top ? SH_MAXIMIZE : SH_NONE;
+}
