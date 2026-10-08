@@ -418,10 +418,10 @@ it flips between two windows.
 
 ### Keeping windows above
 
-`toggle_above` keeps the focused window above the others, as KDE's Keep Above Others,
-Hyprland's pinned windows and PowerToys' Always on Top do: it stays over the floating windows and
-tiles of its monitor while they are focused and brought forward, and toggled again it goes back
-among them, in front. Windows kept above stack among themselves as focus raises them. A window
+`toggle_above` (Super + Ctrl + T, the keys of PowerToys' Always on Top) keeps the focused window
+above the others, as KDE's Keep Above Others, Hyprland's pinned windows and PowerToys do: it stays
+over the floating windows and tiles of its monitor while they are focused and brought forward,
+and toggled again it goes back among them, in front. Windows kept above stack among themselves as focus raises them. A window
 keeps it through workspace switches, snapping, tiling (a tile kept above stays a tile), being
 sticky, and window groups, whose windows share it as they share their slot: a window joining a
 group takes the group's, and toggling one toggles them all. A fullscreen window covers the

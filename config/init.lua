@@ -316,6 +316,7 @@ return {
         { mods = { mod }, key = "t", action = "tile" },
         { mods = { mod }, key = "s", action = "toggle_tiling" },
         { mods = { mod, "Shift" }, key = "p", action = "toggle_sticky" }, -- show on every workspace
+        { mods = { mod, "Ctrl" }, key = "t", action = "toggle_above" }, -- keep above the others
         -- The command palette: one search over windows, apps, workspaces, actions and sessions.
         { mods = { mod }, key = "p", action = "palette" },
         -- The taskbar (or the dock) from the keyboard, as Windows' Win+T: the arrows walk its
