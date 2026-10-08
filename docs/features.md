@@ -794,8 +794,31 @@ with a program copying and pasting through data-control.
 ## Emoji picker
 
 `emoji_picker` (Super + semicolon, or `shaodesk msg emoji_picker`) opens the shell's emoji picker,
-as Windows' Win + . and Win + ; do, on the monitor under the pointer; the emoji picked is typed
-into the window that had the keyboard.
+as Windows' Win + . and Win + ; do, on the monitor under the pointer: a card near the top of the
+screen, as the command palette's, in either style. Along its top are a search field, a tab for the
+emoji picked lately (once there are any; it opens on them) and one for each of Unicode's groups
+(Smileys & Emotion, People & Body, ..., Flags), and the skin tone; under them a grid of emoji and
+the name of the one chosen. Typing searches by name and by CLDR's English keywords, every word
+starting a word of either (`thumbs`, `lol`, `pizz`, `flag norway`), names first; an emoji pasted
+finds itself. The arrows move through the grid (Left and Right while the search is empty, or at
+its ends), Tab and Shift + Tab too, Page Down and Page Up change tabs, Ctrl + T or the hand at the
+end of the tabs changes the skin tone (none, then light to dark) of the emoji that take one, Enter
+or a click picks the emoji, and Escape clears the search, then closes.
+
+The emoji picked is typed into the window that had the keyboard, as Windows does: the picker
+closes, and once it has given the keyboard back the compositor types it (`shaodesk msg type`, see
+[Control socket](#control-socket)) on a keymap of its own, so that every emoji, a flag or a family
+of several characters joined too, arrives whole whatever the keyboard layout, in any program that
+takes typed text. When nothing has the keyboard to type it into, it is copied to the clipboard
+instead and the panel says so. The skin tone and the last 32 emoji picked are kept in
+`$XDG_STATE_HOME/shaodesk/emoji`.
+
+The emoji come from a table compiled into the shell, `vendor/emoji/emoji.tsv`: the 1906 emoji of
+Unicode's Emoji 16.0 (their names, groups and skin-tone forms, from `emoji-test.txt`) with CLDR 46's
+English keywords, under the Unicode License v3; `vendor/emoji/README.md` says how
+`tools/emoji_table.py` makes it again. They are drawn in the system's colour emoji font (Noto Color
+Emoji, say); without one some show as boxes. `tests/emoji_test.cpp` tests the table and the search,
+and `tests/emoji_shell_smoke.py` the picker typing into a window.
 
 ## Terminal
 

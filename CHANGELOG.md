@@ -185,6 +185,15 @@ shadows.
   keeps, whether pictures too, and turns it off.
 - The control socket's subscribers hear `locked on|off` as the session locks and unlocks.
 
+### The emoji picker
+
+- `emoji_picker` (Super + semicolon) opens an emoji picker, as Windows' Win + . does: a search by
+  name and keyword, a tab for the emoji picked lately and one per group, and a skin tone. The emoji
+  picked is typed into the window that had the keyboard, or copied when nothing has it. Its emoji
+  are Unicode's Emoji 16.0 with CLDR's English keywords, vendored in `vendor/emoji`.
+- `shaodesk msg type TEXT` types text into what has the keyboard, emoji and accents too, on a
+  keymap made for it, as wtype does.
+
 ### The clock and Quick Settings
 
 - The clock opens one flyout at the bar's right end, as on Windows 11: the notifications above

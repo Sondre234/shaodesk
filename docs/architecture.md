@@ -444,6 +444,19 @@ showing `ClipboardPicker.qml`, which filters the entries; `image://clipboard/ID/
 session's (connected) or was given a path, so tests and previews that make a controller never
 read or remove it.
 
+The emoji picker (`EmojiPicker`, `emoji.cpp`) reads `vendor/emoji/emoji.tsv`, which
+`shell/CMakeLists.txt` compiles into `shaodesk_shell_qml` as `:/shaodesk/emoji.tsv`, and gives
+`EmojiPicker.qml` a group's emoji, a search's, and the recent ones, each in the skin tone chosen.
+`emoji OUTPUT` from the `emoji_picker` action toggles it, in a `PickerView` as the clipboard's.
+`pick()` closes it and keeps the emoji as pending; the `PickerView`, once the overlay has given
+the keyboard back (its window deactivated while it goes), calls `keyboardReleased()`, or a timer
+does half a second on, and `typeRequested` has the controller send the compositor `type TEXT`,
+copying the emoji instead when the compositor answers an error. The compositor types in `type.c`:
+a keymap of up to 200 keys made for the text's characters (`xkb_utf32_to_keysym`), on a
+`wlr_keyboard` of its own set as the seat's keyboard for the keys, so that the focused client gets
+that keymap, each key pressed and released, and the seat's own keyboard, keymap and modifiers
+back after.
+
 ### Popups and menus
 
 A popup is a `PopupCard`; a menu is a `PopupMenu` of plain entries. Both place themselves beside
