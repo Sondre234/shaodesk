@@ -126,12 +126,25 @@ const struct sh_monitor *monitor_settings(const struct sh_settings *settings,
     return described;
 }
 
-/* The monitor settings in force for `output`: what an output-management client applied, else
- * what the configuration says. */
+/* The settings configured for `output`: its outputs.monitors entry, or what the display settings
+ * window kept for this monitor (display_settings.c) laid over it, all but `tiling`, which the
+ * window leaves to the configuration. NULL for neither. */
+const struct sh_monitor *configured_monitor(struct sh_output *output) {
+    const struct sh_monitor *monitor =
+        monitor_settings(server_settings(output->server), output->wlr_output);
+    const struct sh_output_saved *saved = saved_output(output);
+    if (!saved)
+        return monitor;
+    output->configured = saved->monitor;
+    output->configured.tiling = monitor ? monitor->tiling : -1;
+    return &output->configured;
+}
+
+/* The monitor settings in force for `output`: what an output-management client or display_mode
+ * applied, else what is configured. */
 const struct sh_monitor *output_monitor(const struct sh_settings *settings,
-                                       const struct sh_output *output) {
-    return output->has_override ? &output->override
-                                : monitor_settings(settings, output->wlr_output);
+                                       struct sh_output *output) {
+    return output->has_override ? &output->override : configured_monitor(output);
 }
 
 /* Tells output-management clients how the outputs are set up now. */
@@ -257,9 +270,10 @@ void arrange_outputs(struct sh_server *server) {
     wl_list_for_each(output, &server->outputs, link)
         layout_output(server, output->wlr_output, output->x - origin_x, output->y - origin_y);
     wl_list_for_each(output, &server->outputs, link) follow_moved_output(server, output);
-    struct wlr_output *primary = find_output(server, settings->primary_output);
+    const char *primary_name = primary_output_name(server);
+    struct wlr_output *primary = find_output(server, primary_name);
     struct wlr_box box;
-    if (primary && strcmp(server->placed_primary, settings->primary_output) != 0) {
+    if (primary && strcmp(server->placed_primary, primary_name) != 0) {
         wlr_output_layout_get_box(server->output_layout, primary, &box);
         wlr_cursor_warp(server->cursor, NULL, box.x + box.width / 2.0, box.y + box.height / 2.0);
     } else if (server->running && pointed &&
@@ -269,7 +283,7 @@ void arrange_outputs(struct sh_server *server) {
                         server->cursor->y + box.y - pointed_before.y);
     }
     snprintf(server->placed_primary, sizeof(server->placed_primary), "%s",
-             primary ? settings->primary_output : "");
+             primary ? primary_name : "");
     update_backgrounds(server);
     arrange_layers(server);
     refit_fullscreen(server);
@@ -478,9 +492,9 @@ struct sh_output *sh_output_for(struct sh_server *server, struct wlr_output *wlr
 }
 
 /* Settings a wlr-output-management head asks for, as the monitor entry they amount to. */
-static void head_monitor(struct sh_server *server, const struct sh_output *output,
+static void head_monitor(struct sh_server *server, struct sh_output *output,
                          const struct wlr_output_head_v1_state *head, struct sh_monitor *monitor) {
-    const struct sh_monitor *configured = monitor_settings(server_settings(server), output->wlr_output);
+    const struct sh_monitor *configured = configured_monitor(output);
     memset(monitor, 0, sizeof(*monitor));
     monitor->tiling = configured ? configured->tiling : -1;
     monitor->bit_depth = configured ? configured->bit_depth : 8; // no head state says it

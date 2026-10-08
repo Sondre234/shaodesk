@@ -8,19 +8,11 @@
 #include "server.h"
 #include <wlr/types/wlr_color_management_v1.h>
 
-/* Whether a monitor of the configuration asks for HDR. */
-static bool hdr_configured(const struct sh_settings *settings) {
-    for (int i = 0; i < settings->monitor_count; ++i) {
-        if (settings->monitors[i].hdr)
-            return true;
-    }
-    return false;
-}
-
-/* Offers color-management-v1 once a monitor asks for HDR and the renderer can convert colours,
- * and from then on; at startup and after each reload. */
+/* Offers color-management-v1 once a monitor asks for HDR (hdr_asked, display_settings.c) and
+ * the renderer can convert colours, and from then on; at startup, after each reload and as the
+ * display settings window applies its settings. */
 void color_management_update(struct sh_server *server) {
-    if (server->color_manager || !hdr_configured(server_settings(server)))
+    if (server->color_manager || !hdr_asked(server))
         return;
     struct wlr_renderer *renderer = server->renderer;
     if (!renderer->features.input_color_transform || !renderer->features.output_color_transform) {

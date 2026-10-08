@@ -68,6 +68,7 @@ all. In short:
 | `hdr.c` | HDR (`outputs.monitors`' `hdr`): monitors driven in BT.2020 with PQ where they, the renderer and the test allow, and color-management-v1 for applications' colours. |
 | `tearing.c` | Tearing (tearing-control-v1, `windows.allow_tearing`): which fullscreen window may have its frames shown at once, and the asynchronous page flips. |
 | `display_mode.c` | The display_mode action (Windows' Win+P): extend, duplicate, internal, external, and the popup that steps through them. |
+| `display_settings.c` | The display settings window's monitors: the settings it kept (`src/output_state.c`), laid over `outputs.monitors`, and the primary monitor. |
 | `layer_shell.c` | Panels and other layer surfaces. |
 | `group.c`, `scratchpad.c`, `swallow.c`, `switcher.c`, `overview.c`, `session.c` | One feature each. `session.c` also saves a login session as `last` as it ends (`session_save_last`, from the power actions and quit) and restores it after `startup` (`session_restore_last`, from `sh_run`), asking `sh_callbacks.started` which missing windows startup and autostart will open. |
 | `switches.c` | Switch devices: the lid turning a laptop's panel off and on (clamshell), switches' bindings. |

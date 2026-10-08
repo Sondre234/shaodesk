@@ -242,6 +242,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/control.c
         src/compositor/cursor.c
         src/compositor/display_mode.c
+        src/compositor/display_settings.c
         src/compositor/dynamic_rules.c
         src/compositor/effects.c
         src/compositor/focus.c
@@ -300,6 +301,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
     target_sources(shaodesk PRIVATE src/overview_scene.c)
     target_sources(shaodesk PRIVATE src/power_supply.c)
     target_sources(shaodesk PRIVATE src/lid.c)
+    target_sources(shaodesk PRIVATE src/output_state.c)
     target_sources(shaodesk PRIVATE src/dynamic_rule.c)
     target_sources(shaodesk PRIVATE src/border.c)
     target_include_directories(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
