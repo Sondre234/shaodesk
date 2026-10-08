@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
 /* Snapping a window dragged to an edge of its output (windows.snap), as Windows' Aero Snap and
  * KWin's quick tiling: the zone the pointer is in, the preview of where the window would go,
- * and the drop that puts it there. */
+ * and the drop that puts it there. Also Windows' Win+arrow cycle from the keyboard. */
 #include "server.h"
 #if WLR_HAS_GLES2_RENDERER
 #include <wlr/render/gles2.h>
@@ -262,4 +262,49 @@ bool snap_drop(struct sh_server *server) {
         toplevel->restore_box = before;
     wlr_log(WLR_DEBUG, "Snapped a dropped window: %s on %s", snap_zone_name(zone), output->name);
     return true;
+}
+
+/* One step of Windows' Win+arrow for the focused window (see sh_snap_cycle). A fullscreen
+ * window leaves fullscreen first; a tile counts as one at its own size, and floats as it snaps,
+ * as with snap_left. A window that goes on to the next output takes the pointer along, as
+ * move_left does. */
+void snap_cycle(struct sh_server *server, enum sh_action direction) {
+    struct sh_toplevel *toplevel = current_toplevel(server);
+    if (!toplevel || server->locked)
+        return;
+    if (server->grabbed_toplevel == toplevel)
+        reset_cursor_mode(server);
+    if (toplevel->fullscreen)
+        set_fullscreen(toplevel, false);
+    enum sh_action from = toplevel->arranged && !toplevel->tiled ? toplevel->arrangement : SH_NONE;
+    enum sh_action to;
+    struct wlr_output *output = toplevel_output(toplevel), *next;
+    switch (sh_snap_cycle(from, direction, &to)) {
+    case SH_SNAP_STEP_STAY:
+        break;
+    case SH_SNAP_STEP_PLACE:
+        if (output)
+            place_by_hand_on(toplevel, to, output);
+        break;
+    case SH_SNAP_STEP_NEXT_OUTPUT: {
+        struct wlr_box box = toplevel_box(toplevel);
+        next = output ? wlr_output_layout_adjacent_output(
+                            server->output_layout,
+                            direction == SH_SNAP_CYCLE_LEFT ? WLR_DIRECTION_LEFT
+                                                            : WLR_DIRECTION_RIGHT,
+                            output, box.x + box.width / 2.0, box.y + box.height / 2.0)
+                      : NULL;
+        if (!next)
+            break;
+        place_by_hand_on(toplevel, to, next);
+        pointer_follow(toplevel);
+        break;
+    }
+    case SH_SNAP_STEP_RESTORE:
+        restore_toplevel(toplevel);
+        break;
+    case SH_SNAP_STEP_MINIMIZE:
+        minimize_toplevel(toplevel);
+        break;
+    }
 }

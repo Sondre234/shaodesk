@@ -173,6 +173,12 @@ enum sh_action {
     SH_SNAP_TOP_RIGHT,
     SH_SNAP_BOTTOM_LEFT,
     SH_SNAP_BOTTOM_RIGHT,
+    /* Windows' Win+arrow: one step of the focused window through the halves, quarters and
+     * maximized state of its output, and on to the next output; see sh_snap_cycle. */
+    SH_SNAP_CYCLE_LEFT,
+    SH_SNAP_CYCLE_RIGHT,
+    SH_SNAP_CYCLE_UP,
+    SH_SNAP_CYCLE_DOWN,
 };
 
 enum sh_screenshot_mode {
@@ -508,6 +514,23 @@ bool sh_placement(enum sh_action action, struct sh_rect area, int gap, int index
  * snaps. */
 enum sh_action sh_snap_zone(struct sh_rect area, double x, double y, int distance, bool corners,
                             uint32_t shared);
+/* What one press of a snap_cycle action (`direction`, SH_SNAP_CYCLE_LEFT to _DOWN) does to a
+ * window arranged as `from`: SH_SNAP_LEFT, SH_SNAP_RIGHT, a quarter or SH_MAXIMIZE, anything else
+ * (SH_NONE) for one at its own size. As Windows' Win+arrow: left and right go to that half, from
+ * the other half back to its own size, and from that half on to the next output; up and down go
+ * from a half to its top or bottom quarter and back, up from a top quarter or at its own size to
+ * maximized, down from maximized to its own size, and from a bottom quarter or its own size to
+ * minimized. Quarters keep their row going sideways. Sets *to to the arrangement it is given
+ * (the one on the next output for SH_SNAP_STEP_NEXT_OUTPUT). */
+enum sh_snap_step {
+    SH_SNAP_STEP_STAY,
+    SH_SNAP_STEP_PLACE,       /* arrange it as *to on its output */
+    SH_SNAP_STEP_NEXT_OUTPUT, /* arrange it as *to on the next output that way */
+    SH_SNAP_STEP_RESTORE,     /* back to its own size and place */
+    SH_SNAP_STEP_MINIMIZE,
+};
+enum sh_snap_step sh_snap_cycle(enum sh_action from, enum sh_action direction,
+                                enum sh_action *to);
 
 /* Where a new floating window of `width` x `height` opens in `area` (the output less its
  * panels), given the rectangles `others` of the windows already showing there. Cascade steps

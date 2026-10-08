@@ -712,3 +712,18 @@ Not checked: the feel of the distance and the corners with a real mouse or touch
 refresh rates, the preview's easing on a real display at 144 or 200 Hz, snapping across real
 monitors with different scales or offsets, X11 windows dragged by their own title bars, and the
 preview on NVIDIA and with the Vulkan renderer.
+
+## Snapping from the keyboard
+
+Added 2026-10-08. `snap_keys_smoke` runs the quarter actions and the Win+arrow cycle through
+the control socket, as a binding or the macOS Window menu runs them, on two headless monitors of
+different sizes: every quarter and `restore`, left and right through the halves, back to the
+window's own size and on to the next monitor and back, none past the last one, up through a
+quarter to maximized and down to the window's own size, quarters keeping their row, down from a
+bottom quarter and from the window's own size minimizing, and a fullscreen window leaving
+fullscreen first. `layout_tests` checks every step of the cycle, and `control_fuzz_smoke` sends
+the new actions with odd arguments. The Window menu sending `snap_left` is in `shell_ui`.
+
+Not checked: Super + Alt + arrows on a real keyboard (the keys reach the compositor as any other
+binding, and the keyboard layout may give Alt another meaning), and the cycle across real
+monitors arranged above one another, where left and right find no monitor beside.

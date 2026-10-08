@@ -18,7 +18,9 @@ expel center_column promote focus_next
 focus_prev swap_next swap_prev master_grow master_shrink master_more master_less toggle_floating
 launcher focus_left focus_right focus_up focus_down move_left move_right move_up move_down
 move_to_scratchpad scratchpad_show toggle_sticky resize_left resize_right resize_up resize_down
-switcher switcher_prev switcher_confirm switcher_cancel get output subscribe""".split()
+switcher switcher_prev switcher_confirm switcher_cancel snap_top_left snap_top_right
+snap_bottom_left snap_bottom_right snap_cycle_left snap_cycle_right snap_cycle_up snap_cycle_down
+get output subscribe""".split()
 ARGUMENTS = ["", "0", "1", "-1", "4", "5", "99999999999999999999", "-99999999999999999999", "abc",
              "1 2", "1\t2", "0x10", "1e3", "%s%n", "'", "\"", "HEADLESS-1", "nonexistent",
              "workspaces", "windows", "outputs", "tiling", "animations", "x" * 400]

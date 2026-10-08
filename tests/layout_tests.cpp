@@ -79,7 +79,57 @@ int main() {
         require(zone(1919, 500, true, SH_EDGE_LEFT) == SH_SNAP_RIGHT);
         require(sh_snap_zone(usable, 0, 500, 0, true, 0) == SH_NONE);
         require(sh_snap_zone({0, 0, 0, 0}, 0, 0, 8, true, 0) == SH_NONE);
-        std::cout << "Tiling bounds, gaps, non-overlap and snap zones passed\n";
+
+        // The Win+arrow cycle: each arrangement and arrow, what it does and the arrangement.
+        struct Step {
+            sh_action from, direction;
+            sh_snap_step step;
+            sh_action to;
+        };
+        const sh_action L = SH_SNAP_CYCLE_LEFT, R = SH_SNAP_CYCLE_RIGHT, U = SH_SNAP_CYCLE_UP,
+                        D = SH_SNAP_CYCLE_DOWN;
+        const Step steps[] = {
+            {SH_NONE, L, SH_SNAP_STEP_PLACE, SH_SNAP_LEFT},
+            {SH_NONE, R, SH_SNAP_STEP_PLACE, SH_SNAP_RIGHT},
+            {SH_NONE, U, SH_SNAP_STEP_PLACE, SH_MAXIMIZE},
+            {SH_NONE, D, SH_SNAP_STEP_MINIMIZE, SH_NONE},
+            {SH_TILE, L, SH_SNAP_STEP_PLACE, SH_SNAP_LEFT}, // a grid's window is at its own size
+            {SH_MAXIMIZE, L, SH_SNAP_STEP_PLACE, SH_SNAP_LEFT},
+            {SH_MAXIMIZE, R, SH_SNAP_STEP_PLACE, SH_SNAP_RIGHT},
+            {SH_MAXIMIZE, U, SH_SNAP_STEP_STAY, SH_NONE},
+            {SH_MAXIMIZE, D, SH_SNAP_STEP_RESTORE, SH_NONE},
+            {SH_SNAP_LEFT, L, SH_SNAP_STEP_NEXT_OUTPUT, SH_SNAP_RIGHT},
+            {SH_SNAP_LEFT, R, SH_SNAP_STEP_RESTORE, SH_NONE},
+            {SH_SNAP_LEFT, U, SH_SNAP_STEP_PLACE, SH_SNAP_TOP_LEFT},
+            {SH_SNAP_LEFT, D, SH_SNAP_STEP_PLACE, SH_SNAP_BOTTOM_LEFT},
+            {SH_SNAP_RIGHT, L, SH_SNAP_STEP_RESTORE, SH_NONE},
+            {SH_SNAP_RIGHT, R, SH_SNAP_STEP_NEXT_OUTPUT, SH_SNAP_LEFT},
+            {SH_SNAP_RIGHT, U, SH_SNAP_STEP_PLACE, SH_SNAP_TOP_RIGHT},
+            {SH_SNAP_RIGHT, D, SH_SNAP_STEP_PLACE, SH_SNAP_BOTTOM_RIGHT},
+            {SH_SNAP_TOP_LEFT, L, SH_SNAP_STEP_NEXT_OUTPUT, SH_SNAP_TOP_RIGHT},
+            {SH_SNAP_TOP_LEFT, R, SH_SNAP_STEP_PLACE, SH_SNAP_TOP_RIGHT},
+            {SH_SNAP_TOP_LEFT, U, SH_SNAP_STEP_PLACE, SH_MAXIMIZE},
+            {SH_SNAP_TOP_LEFT, D, SH_SNAP_STEP_PLACE, SH_SNAP_LEFT},
+            {SH_SNAP_TOP_RIGHT, L, SH_SNAP_STEP_PLACE, SH_SNAP_TOP_LEFT},
+            {SH_SNAP_TOP_RIGHT, R, SH_SNAP_STEP_NEXT_OUTPUT, SH_SNAP_TOP_LEFT},
+            {SH_SNAP_TOP_RIGHT, U, SH_SNAP_STEP_PLACE, SH_MAXIMIZE},
+            {SH_SNAP_TOP_RIGHT, D, SH_SNAP_STEP_PLACE, SH_SNAP_RIGHT},
+            {SH_SNAP_BOTTOM_LEFT, L, SH_SNAP_STEP_NEXT_OUTPUT, SH_SNAP_BOTTOM_RIGHT},
+            {SH_SNAP_BOTTOM_LEFT, R, SH_SNAP_STEP_PLACE, SH_SNAP_BOTTOM_RIGHT},
+            {SH_SNAP_BOTTOM_LEFT, U, SH_SNAP_STEP_PLACE, SH_SNAP_LEFT},
+            {SH_SNAP_BOTTOM_LEFT, D, SH_SNAP_STEP_MINIMIZE, SH_NONE},
+            {SH_SNAP_BOTTOM_RIGHT, L, SH_SNAP_STEP_PLACE, SH_SNAP_BOTTOM_LEFT},
+            {SH_SNAP_BOTTOM_RIGHT, R, SH_SNAP_STEP_NEXT_OUTPUT, SH_SNAP_BOTTOM_LEFT},
+            {SH_SNAP_BOTTOM_RIGHT, U, SH_SNAP_STEP_PLACE, SH_SNAP_RIGHT},
+            {SH_SNAP_BOTTOM_RIGHT, D, SH_SNAP_STEP_MINIMIZE, SH_NONE},
+            {SH_NONE, SH_SNAP_LEFT, SH_SNAP_STEP_STAY, SH_NONE}, // not a cycle action
+        };
+        for (const auto &step : steps) {
+            sh_action to = SH_TILE;
+            require(sh_snap_cycle(step.from, step.direction, &to) == step.step);
+            require(to == step.to);
+        }
+        std::cout << "Tiling bounds, gaps, non-overlap, snap zones and the snap cycle passed\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';
         return 1;
