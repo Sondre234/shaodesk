@@ -4,6 +4,26 @@
  * active on all of them. */
 #include "server.h"
 
+/* The keymap in the file at `path`, read into memory first: xkbcommon maps a file it is handed,
+ * and one cut short while it reads (an editor saving it in place, as a reload follows the save)
+ * would end the compositor with SIGBUS. At most 4 MiB, as the configuration's check reads. */
+static struct xkb_keymap *keymap_from_path(struct xkb_context *context, const char *path) {
+    FILE *file = fopen(path, "r");
+    if (!file)
+        return NULL;
+    enum { limit = 4 << 20 };
+    char *text = malloc(limit);
+    size_t size = text ? fread(text, 1, limit, file) : 0;
+    bool whole = text && !ferror(file) && feof(file);
+    fclose(file);
+    struct xkb_keymap *keymap = NULL;
+    if (whole)
+        keymap = xkb_keymap_new_from_buffer(context, text, size, XKB_KEYMAP_FORMAT_TEXT_V1,
+                                            XKB_KEYMAP_COMPILE_NO_FLAGS);
+    free(text);
+    return keymap;
+}
+
 /* keyboard.file when it is set and compiles (the configuration checked it, but it may have
  * changed since), else the XKB names, else xkbcommon's defaults: never no keymap at all.
  * `from_file` says which. */
@@ -14,12 +34,7 @@ static struct xkb_keymap *compile_keymap(const struct sh_settings *settings, boo
     struct xkb_keymap *keymap = NULL;
     *from_file = false;
     if (settings->keyboard_file[0]) {
-        FILE *file = fopen(settings->keyboard_file, "r");
-        if (file) {
-            keymap = xkb_keymap_new_from_file(context, file, XKB_KEYMAP_FORMAT_TEXT_V1,
-                                              XKB_KEYMAP_COMPILE_NO_FLAGS);
-            fclose(file);
-        }
+        keymap = keymap_from_path(context, settings->keyboard_file);
         if (!keymap)
             wlr_log(WLR_ERROR, "Cannot compile the keymap %s; using keyboard.layout instead",
                     settings->keyboard_file);
