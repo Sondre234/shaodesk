@@ -14,21 +14,22 @@ import sys
 import harness
 
 compositor, probe, pointer_probe = (str(Path(p).resolve()) for p in sys.argv[1:4])
+grim = sys.argv[4] if len(sys.argv) > 4 else ""
 
 SCREEN = (1280, 720)
 PANEL = 48
 
 
-def config(snap="", tiling="false"):
+def config(snap="", tiling="false", animations="enabled = false", windows=""):
     return """return {
     xwayland = false,
-    animations = { enabled = false },
+    animations = { %s },
     layout = { tiling = %s, gap = 0 },
     outputs = { order = { "HEADLESS-1", "HEADLESS-2" },
                 monitors = { ["HEADLESS-1"] = { mode = "1280x720" },
                              ["HEADLESS-2"] = { mode = "800x600" } } },
-    windows = { magnet = { enabled = false }, snap = { %s } },
-}""" % (tiling, snap)
+    windows = { magnet = { enabled = false }, snap = { %s }, %s },
+}""" % (animations, tiling, snap, windows)
 
 
 def session(desktop, layout):
@@ -43,6 +44,13 @@ def session(desktop, layout):
         """The zone, its slot and whether a window is being moved."""
         row = next(r for r in desktop.rows("snap") if r[0] == "zone")
         return row[1], tuple(int(n) for n in row[2:6]), row[6] == "1"
+
+    def preview():
+        """Whether the preview shows, where it is drawn, how far it has faded in (of 1000) and
+        the radius of its corners."""
+        row = next(r for r in desktop.rows("snap") if r[0] == "preview")
+        return row[1] == "1", tuple(int(n) for n in row[2:6]), int(row[6]), int(row[7])
+    snap.preview = preview
 
     desktop.detail = lambda: f"windows: {windows()} snap: {snap()}"
     pointer = desktop.virtual_pointer(pointer_probe, *layout)
@@ -196,4 +204,55 @@ with harness.Compositor(compositor, config(tiling="true"),
     release()
     placed(right, (0, 0, 1280, 720))
     assert not windows()[right][4], windows()
-print("Windows dropped at the edges snap to halves, quarters and the whole monitor")
+
+# The preview, with animations slowed down to watch it: it eases out of the window into the slot,
+# glides along the edge to a corner, fades out as the pointer leaves the edge, and goes at once as
+# the window is dropped. Its corners are those of a window there.
+SLOW = "speed = 0.1, move = { duration = 300 }, close = { duration = 300 }"
+with harness.Compositor(compositor, config(animations=SLOW, windows='round = "always"'),
+                        env={"WLR_HEADLESS_OUTPUTS": "1"}) as desktop:
+    windows, snap, pointer, press, to, release, placed = session(desktop, SCREEN)
+    preview = snap.preview
+    desktop.spawn([probe, "--window-only"],
+                  env={"SHAODESK_PROBE_TITLE": "W", "SHAODESK_PROBE_MOVE": "1"})
+    desktop.wait_for(lambda: "W" in windows(), "window mapped")
+    assert preview()[0] is False, preview()
+    left = (0, 0, 640, 720)
+    press("W")
+    to(640, 360, "none")
+    assert preview()[0] is False, preview()
+    assert to(0, 360, "left") == left
+    desktop.wait_for(lambda: preview()[0], "the preview shows")
+    shown, drawn, opacity, radius = preview()
+    assert opacity < 1000 and drawn != left, preview()
+    desktop.wait_for(lambda: preview()[1:3] == (left, 1000), "the preview in the slot")
+    if grim:  # the preview tints the desktop it covers
+        tinted = harness.grab(grim, desktop.env).at(20, 700)
+    assert to(0, 0, "top_left") == (0, 0, 640, 360)
+    assert preview()[0] and preview()[2] == 1000, preview()
+    desktop.wait_for(lambda: preview()[1] == (0, 0, 640, 360), "the preview in the corner")
+    to(640, 360, "none")
+    desktop.wait_for(lambda: preview()[0] and preview()[2] < 1000, "the preview fading out")
+    assert preview()[1] == (0, 0, 640, 360), preview()
+    desktop.wait_for(lambda: not preview()[0], "the preview faded out")
+    if grim:
+        assert harness.grab(grim, desktop.env).at(20, 700) != tinted, tinted
+    to(0, 360, "left")
+    desktop.wait_for(lambda: preview()[1:3] == (left, 1000), "the preview in the slot again")
+    release()
+    assert not preview()[0], preview()
+    placed("W", left)
+    frames = {r[1]: int(r[5]) for r in desktop.rows("frames")}
+    assert radius == frames["W"], (radius, frames)
+    desktop.msg("restore")
+    desktop.wait_for(lambda: windows()["W"][2:4] == (320, 240), "W restored")
+
+    # Without the preview the zone still snaps.
+    desktop.reload(config(snap="preview = false", animations=SLOW))
+    press("W")
+    to(1279, 360, "right")
+    assert not preview()[0], preview()
+    release()
+    placed("W", (640, 0, 640, 720))
+print("Windows dropped at the edges snap to halves, quarters and the whole monitor, with a preview"
+      + ("" if grim else " (pixels not checked: grim missing)"))

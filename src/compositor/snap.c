@@ -1,7 +1,11 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
 /* Snapping a window dragged to an edge of its output (windows.snap), as Windows' Aero Snap and
- * KWin's quick tiling: the zone the pointer is in, and the drop that puts the window there. */
+ * KWin's quick tiling: the zone the pointer is in, the preview of where the window would go,
+ * and the drop that puts it there. */
 #include "server.h"
+#if WLR_HAS_GLES2_RENDERER
+#include <wlr/render/gles2.h>
+#endif
 
 const char *snap_zone_name(enum sh_action zone) {
     switch (zone) {
@@ -67,7 +71,153 @@ static enum sh_action snap_zone(struct sh_server *server, struct wlr_output **wh
     return zone;
 }
 
-/* Follows the pointer while a window is moved: the zone it is in, and the slot it stands for. */
+/* The preview: a translucent rectangle of the slot in windows.snap.color, outlined in the same
+ * colour more opaque and rounded as a window there is, just under the dragged window. It eases
+ * out of the window's frame into the slot as the pointer comes to an edge, from slot to slot as
+ * it goes along, and fades out where it is as the pointer leaves; the drop hides it at once. */
+static bool preview_create(struct sh_server *server) {
+    if (server->snap.preview)
+        return true;
+    struct wlr_scene_tree *tree = wlr_scene_tree_create(server->guide_layer);
+    if (!tree)
+        return false;
+    const float clear[4] = {0};
+    server->snap.fill = wlr_scene_rect_create(tree, 1, 1, clear);
+    server->snap.outline = wlr_scene_rect_create(tree, 1, 1, clear);
+    if (!server->snap.fill || !server->snap.outline) {
+        wlr_scene_node_destroy(&tree->node);
+        server->snap.fill = server->snap.outline = NULL;
+        return false;
+    }
+    wlr_scene_node_set_enabled(&tree->node, false);
+    server->snap.preview = tree;
+    return true;
+}
+
+/* Out of sight, among the guides, until the next drag shows it. */
+static void preview_put_away(struct sh_server *server) {
+    struct wlr_scene_node *node = &server->snap.preview->node;
+    wlr_scene_node_set_enabled(node, false);
+    if (node->parent != server->guide_layer)
+        wlr_scene_node_reparent(node, server->guide_layer);
+}
+
+/* Draws the preview as `drawn` says; once it has faded out, it goes. */
+static void preview_draw(struct sh_server *server) {
+    if (!server->snap.preview)
+        return;
+    const float *drawn = server->snap.drawn;
+    int width = (int)lround(drawn[2]), height = (int)lround(drawn[3]);
+    float alpha = fminf(1, drawn[4]);
+    if (alpha <= 0 || width < 1 || height < 1) {
+        if (!server->snap.tween.animator)
+            preview_put_away(server);
+        else
+            wlr_scene_node_set_enabled(&server->snap.preview->node, false);
+        return;
+    }
+    const float *color = server_settings(server)->snap_color;
+    float strong = color[3] > 0 ? fminf(1, color[3] * 2.5f) / color[3] : 0;
+    float fill[4], line[4];
+    for (int i = 0; i < 4; ++i) {
+        fill[i] = color[i] * alpha;
+        line[i] = color[i] * strong * alpha;
+    }
+    wlr_scene_node_set_position(&server->snap.preview->node, (int)lround(drawn[0]),
+                                (int)lround(drawn[1]));
+    wlr_scene_rect_set_size(server->snap.fill, width, height);
+    wlr_scene_rect_set_color(server->snap.fill, fill);
+    // The outline is a hollow rectangle, which only the GLES2 renderer cuts with the
+    // rounded-corners patch; the others draw it solid, so they go without.
+    bool outlined = false;
+#ifdef SHAODESK_ROUNDED_CORNERS
+    int radius = server->snap.radius;
+    if (radius > width / 2 || radius > height / 2)
+        radius = (width < height ? width : height) / 2;
+    wlr_scene_rect_set_rounding(server->snap.fill, radius, 0);
+#if WLR_HAS_GLES2_RENDERER
+    outlined = width > 8 && height > 8 && wlr_renderer_is_gles2(server->renderer);
+#endif
+    if (outlined) {
+        wlr_scene_rect_set_size(server->snap.outline, width, height);
+        wlr_scene_rect_set_color(server->snap.outline, line);
+        wlr_scene_rect_set_rounding(server->snap.outline, radius, 2);
+    }
+#endif
+    wlr_scene_node_set_enabled(&server->snap.outline->node, outlined);
+    wlr_scene_node_set_enabled(&server->snap.preview->node, true);
+}
+
+static void preview_update(void *data) {
+    struct sh_server *server = data;
+    memcpy(server->snap.drawn, server->snap.tween.value, sizeof(server->snap.drawn));
+    preview_draw(server);
+}
+
+/* Just under the dragged window, among the windows, or over them where it is not among them. */
+static void preview_stack(struct sh_server *server) {
+    struct wlr_scene_node *node = &server->snap.preview->node;
+    struct sh_toplevel *toplevel = server->grabbed_toplevel;
+    struct wlr_scene_node *window =
+        toplevel && toplevel->scene_tree ? &toplevel->scene_tree->node : NULL;
+    if (window && window->parent == server->windows) {
+        if (node->parent != server->windows)
+            wlr_scene_node_reparent(node, server->windows);
+        wlr_scene_node_place_below(node, window);
+    } else if (node->parent != server->guide_layer) {
+        wlr_scene_node_reparent(node, server->guide_layer);
+    }
+}
+
+/* The preview easing into `slot`, out of the dragged window's frame if it is not shown yet. */
+static void preview_show(struct sh_server *server, struct sh_rect slot) {
+    if (!preview_create(server))
+        return;
+    if (!server->snap.preview->node.enabled && !server->snap.tween.animator) {
+        int border = server_settings(server)->border_width;
+        struct wlr_box box = toplevel_box(server->grabbed_toplevel);
+        const float from[SH_TWEEN_VALUES] = {box.x - border, box.y - border,
+                                             box.width + 2 * border, box.height + 2 * border, 0};
+        sh_tween_track(server->animator, &server->snap.tween, SH_ANIM_MOVE, false, from,
+                       server->snap.drawn, preview_update, server);
+    }
+    const float to[SH_TWEEN_VALUES] = {slot.x, slot.y, slot.width, slot.height, 1};
+    sh_tween_track(server->animator, &server->snap.tween, SH_ANIM_MOVE, true, to,
+                   server->snap.drawn, preview_update, server);
+    preview_stack(server);
+    preview_draw(server);
+}
+
+/* The preview fading out where it is. */
+static void preview_fade(struct sh_server *server) {
+    if (!server->snap.preview || !server->snap.tween.valid || server->snap.tween.to[4] <= 0)
+        return;
+    float to[SH_TWEEN_VALUES];
+    memcpy(to, server->snap.tween.to, sizeof(to));
+    to[4] = 0;
+    sh_tween_track(server->animator, &server->snap.tween, SH_ANIM_CLOSE, true, to,
+                   server->snap.drawn, preview_update, server);
+    preview_stack(server);
+    preview_draw(server);
+}
+
+/* The corners of a window snapped there, as frame.c rounds them: windows on a monitor that
+ * tiles, and with windows.round = "always" the others, but for one maximized on a monitor
+ * that does not tile, which has no frame. */
+static int slot_radius(struct sh_server *server, enum sh_action zone, struct wlr_output *output) {
+#ifdef SHAODESK_ROUNDED_CORNERS
+    const struct sh_settings *settings = server_settings(server);
+    bool tiles = output_tiles(server, output);
+    if (zone == SH_MAXIMIZE && !tiles)
+        return 0;
+    return tiles || settings->round_always ? settings->corner_radius : 0;
+#else
+    return 0;
+#endif
+}
+
+/* Follows the pointer while a window is moved: the zone it is in, the slot it stands for, and
+ * the preview of it. */
 void snap_follow(struct sh_server *server) {
     struct wlr_output *output;
     enum sh_action zone = snap_zone(server, &output);
@@ -76,11 +226,22 @@ void snap_follow(struct sh_server *server) {
         zone = SH_NONE;
     server->snap.zone = zone;
     server->snap.slot = slot;
+    if (zone != SH_NONE && server_settings(server)->snap_preview) {
+        server->snap.radius = slot_radius(server, zone, output);
+        preview_show(server, slot);
+    } else {
+        preview_fade(server);
+    }
 }
 
+/* Forgets the zone and takes the preview away at once, as the drag ends. */
 void snap_preview_hide(struct sh_server *server) {
     server->snap.zone = SH_NONE;
     server->snap.slot = (struct sh_rect){0};
+    sh_tween_stop(&server->snap.tween);
+    memset(server->snap.drawn, 0, sizeof(server->snap.drawn));
+    if (server->snap.preview)
+        preview_put_away(server);
 }
 
 /* Snaps the grabbed window as it is dropped, when the pointer is in a zone. A window that

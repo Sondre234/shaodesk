@@ -321,12 +321,18 @@ struct sh_server {
     struct wlr_scene_tree *guide_layer;
     struct wlr_scene_rect *guides[2]; /* a vertical and a horizontal line */
     /* Snapping a dragged window at the edges of its output (snap.c): the zone the pointer is
-     * in (the arrangement a drop gives, SH_NONE for none) and its slot, and the window's
-     * floating box as the drag began. */
+     * in (the arrangement a drop gives, SH_NONE for none) and its slot, the window's floating
+     * box as the drag began, and the preview of the slot, which eases between places in `tween`
+     * (x, y, width, height, opacity), drawn now as `drawn`, with corners of `radius`. */
     struct {
         enum sh_action zone;
         struct sh_rect slot;
         struct wlr_box start;
+        struct wlr_scene_tree *preview;
+        struct wlr_scene_rect *fill, *outline;
+        struct sh_tween tween;
+        float drawn[SH_TWEEN_VALUES];
+        int radius;
     } snap;
 
     /* Windows a session restore launched and has yet to place: the first new window with the

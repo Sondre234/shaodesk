@@ -724,7 +724,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
         set_tests_properties(magnet_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME snap_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/snap_smoke.py
-            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>)
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>
+            "${GRIM_ARGUMENT}")
         set_tests_properties(snap_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME night_light_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/night_light_smoke.py
