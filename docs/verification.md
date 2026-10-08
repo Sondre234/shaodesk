@@ -570,3 +570,22 @@ back when opened as it fades, and that the switcher fades before its surface goe
 Not checked: any of the motion on a real display at 144 or 200 Hz (how it looks and what it costs
 on the GPU), the safe triangle with a real pointer's speed and jitter, and the overlays' exits
 over real applications.
+
+## Volume, microphone and brightness keys
+
+Added 2026-10-08. `volume_keys_smoke` types the six keys on a headless keyboard and sends the
+actions through `shaodesk msg` with stand-ins for `wpctl` and `brightnessctl` on `PATH`: without
+a shell the compositor runs them with the step asked for, every subscriber hears the line, a
+subscriber that says it is the shell gets the lines instead of the programs running, and they run
+again once it has gone. `volume_keys_shell_smoke` starts the real shell, whose sound server is out
+of reach, with a backlight in a made-up sysfs: the keys reach the shell, which sets the backlight
+and shows the on-screen display, and runs the stand-in `wpctl`. `shell_volume_keys` checks the
+shell's side on a stand-in sound server: the steps, their ends, unmuting as the volume changes,
+the microphone's mute, the backlight stopping at 1 %, the display, and `osd.volume` and
+`osd.brightness` turned off. The display's microphone was looked at in the preview
+(`osd-microphone`).
+
+Not checked: the keys on a real keyboard, a real backlight (this desktop has none), a real sound
+server's default input (PulseAudio's source and its mute through PipeWire's pulse server), a real
+`wpctl` and `brightnessctl` (their options `-l 1.0` and `--min-value=1` are from their manuals),
+and logind setting a real backlight from the keys.
