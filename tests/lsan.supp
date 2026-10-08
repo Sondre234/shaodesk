@@ -16,3 +16,7 @@ leak:libfontconfig.so
 # wlroots 0.20's tablet-v2 pad: wlr_tablet_pad_create allocates pad->groups and the pad's destroy
 # handler never frees it, a few bytes for every pad unplugged.
 leak:wlr_tablet_pad_create
+# Qt's Wayland client makes an xkbcommon compose state as the first key reaches a window and does
+# not free it as the program exits.
+leak:xkb_compose_state_new
+leak:xkb_compose_table_new_from_locale
