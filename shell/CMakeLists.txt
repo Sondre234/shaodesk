@@ -181,8 +181,9 @@ if(BUILD_TESTING)
     target_compile_options(start_menu_test PRIVATE -Wall -Wextra -Wpedantic)
     target_link_libraries(start_menu_test PRIVATE Qt6::Core Qt6::Test PkgConfig::GIO)
     add_test(NAME start_menu COMMAND start_menu_test)
-    # Applications' icons: the desktop's icon theme.
-    add_executable(app_icons_test ${PROJECT_SOURCE_DIR}/tests/app_icons_test.cpp icons.cpp icons.hpp)
+    # Applications' icons: the desktop's icon theme, and which entry a window belongs to.
+    add_executable(app_icons_test ${PROJECT_SOURCE_DIR}/tests/app_icons_test.cpp icons.cpp icons.hpp
+        app_match.cpp app_match.hpp)
     set_target_properties(app_icons_test PROPERTIES AUTOMOC ON)
     target_include_directories(app_icons_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_compile_definitions(app_icons_test PRIVATE QT_NO_KEYWORDS)

@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Applications' icons: the icon theme the desktop names.
+// Applications' icons: the icon theme the desktop names, and which desktop entry a window
+// belongs to by its app id.
+#include "app_match.hpp"
 #include "icons.hpp"
 #include <QDir>
 #include <QFile>
@@ -38,7 +40,8 @@ class AppIconsTest : public QObject {
     void themeFromTheDesktopsSettings() {
         const auto config = home.filePath("config");
         QCOMPARE(desktopIconTheme(), QString());
-        QVERIFY(write(config + "/kdeglobals", "[General]\nTheme=wrong\n[Icons]\nTheme=breeze-dark\n"));
+        QVERIFY(
+            write(config + "/kdeglobals", "[General]\nTheme=wrong\n[Icons]\nTheme=breeze-dark\n"));
         QCOMPARE(desktopIconTheme(), QString("breeze-dark"));
         QVERIFY(write(config + "/gtk-3.0/settings.ini",
                       "[Settings]\ngtk-theme-name=Adwaita\ngtk-icon-theme-name = Papirus\n"));
@@ -56,6 +59,52 @@ class AppIconsTest : public QObject {
         g_settings_reset(settings, "icon-theme");
         g_object_unref(settings);
         QCOMPARE(desktopIconTheme(), QString("Tela"));
+    }
+    void trimsWhatProgramsAdd() {
+        using app_match::trimmed;
+        QCOMPARE(trimmed("gimp-2.10"), QString("gimp"));
+        QCOMPARE(trimmed(".blueman-manager-wrapped"), QString("blueman-manager"));
+        QCOMPARE(trimmed("..foo-wrapped-wrapped"), QString("foo"));
+        QCOMPARE(trimmed("Firefox-bin"), QString("firefox"));
+        QCOMPARE(trimmed("signal-desktop"), QString("signal"));
+        QCOMPARE(trimmed("brave-browser-stable"), QString("brave"));
+        QCOMPARE(trimmed("code-url-handler"), QString("code"));
+        QCOMPARE(trimmed("Notepad++.exe"), QString("notepad++"));
+        QCOMPARE(trimmed("Obsidian-1.6.7-x86_64.AppImage"), QString("obsidian"));
+        QCOMPARE(trimmed("Minecraft 1.20.1"), QString("minecraft"));
+        QCOMPARE(trimmed("org.gnome.Nautilus.desktop"), QString("org.gnome.nautilus"));
+        // What is only a suffix or a number stays.
+        QCOMPARE(trimmed("-bin"), QString("-bin"));
+        QCOMPARE(trimmed("python3"), QString("python3"));
+        QCOMPARE(trimmed("2048"), QString("2048"));
+        QCOMPARE(trimmed(""), QString());
+    }
+    void foldsKeys() {
+        using app_match::key;
+        QCOMPARE(key("gnome-calculator"), key("GnomeCalculator"));
+        QCOMPARE(key("gnome_calculator"), QString("gnomecalculator"));
+        QCOMPARE(key("firefox-developer-edition"), QString("firefoxdeveloperedition"));
+        QCOMPARE(key("TelegramDesktop"), QString("telegramdesktop"));
+        QCOMPARE(key("Visual Studio Code"), QString("visualstudiocode"));
+    }
+    void findsTheProgram() {
+        using app_match::program;
+        QCOMPARE(program("gimp-2.10 %U"), QString("gimp-2.10"));
+        QCOMPARE(program("/usr/lib/firefox/firefox-bin %u"), QString("firefox-bin"));
+        QCOMPARE(program("\"/opt/My App/my-app\" --flag %F"), QString("my-app"));
+        QCOMPARE(program("env GDK_BACKEND=x11 BAMF_DESKTOP_FILE_HINT=x /snap/bin/spotify %U"),
+                 QString("spotify"));
+        QCOMPARE(program("FOO=1 nice -n 10 gamemoderun prime-run heroic"), QString("heroic"));
+        QCOMPARE(program("sh -c \"exec obs --startreplaybuffer\""), QString("obs"));
+        QCOMPARE(
+            program("/usr/bin/flatpak run --branch=stable --arch=x86_64 "
+                    "--command=telegram-desktop --file-forwarding org.telegram.desktop @@u %u @@"),
+            QString("telegram-desktop"));
+        QCOMPARE(program("/usr/bin/flatpak run --branch=stable org.gimp.GIMP @@ %F @@"),
+                 QString("org.gimp.GIMP"));
+        QCOMPARE(program("steam steam://rungameid/570"), QString("steam"));
+        QCOMPARE(program(""), QString());
+        QCOMPARE(program("env"), QString());
     }
 };
 
