@@ -6,6 +6,7 @@
 #include <QQuickItem>
 #include <QSGRendererInterface>
 #include <QScreen>
+#include <algorithm>
 #include <iostream>
 #if SHAODESK_LAYER_SHELL
 #include <LayerShellQt/Window>
@@ -446,6 +447,42 @@ PowerView::PowerView(ShellController &controller, QScreen *screen)
     connect(screen, &QScreen::geometryChanged, this,
             [this] { resize(outputScreen_->geometry().size()); });
     connect(controller.power(), &Power::pendingChanged, this, &PowerView::update);
+}
+AuthView::AuthView(ShellController &controller, QScreen *screen)
+    : OverlayView(controller, screen, "authentication dialog", true) {
+    setTitle("shaodesk authentication");
+    setResizeMode(QQuickView::SizeRootObjectToView);
+    resize(screen->geometry().size());
+#if SHAODESK_LAYER_SHELL
+    using W = LayerShellQt::Window;
+    layer_->setScope("shaodesk-authentication");
+    layer_->setAnchors(W::Anchors(W::AnchorTop | W::AnchorBottom | W::AnchorLeft | W::AnchorRight));
+    layer_->setExclusiveZone(-1);
+#endif
+    load("AuthDialog.qml");
+    connect(screen, &QScreen::geometryChanged, this,
+            [this] { resize(outputScreen_->geometry().size()); });
+    connect(controller.authentication(), &Authentication::changed, this, &AuthView::update);
+    update();
+}
+void AuthView::update() {
+    auto *auth = controller_.authentication();
+    const auto screens = QGuiApplication::screens();
+    const bool known = std::any_of(screens.begin(), screens.end(), [auth](QScreen *screen) {
+        return screen->name() == auth->output();
+    });
+    const bool mine = auth->open() && (known ? auth->output() == outputScreen_->name()
+                                             : outputScreen_ == QGuiApplication::primaryScreen());
+    if (!mine) {
+        dismiss();
+        return;
+    }
+    // A request that opened, here or again while it was going: an empty field with the keyboard.
+    const bool fresh = auth->serial() != serial_;
+    serial_ = auth->serial();
+    const bool again = leaving();
+    if ((present() || again || fresh) && rootObject())
+        QMetaObject::invokeMethod(rootObject(), "reset");
 }
 void PowerView::update() {
     auto *power = controller_.power();

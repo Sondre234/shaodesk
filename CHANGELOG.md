@@ -233,6 +233,12 @@ shadows.
   GNOME's setting turns off, and another notification daemon or tray watcher while the shell's
   is on. `autostart = { xdg = false }` turns it off, `autostart.exclude` leaves entries out by
   file name, and `shaodesk msg get autostart` lists what was started or skipped, and why.
+- The shell is the session's polkit authentication agent: `pkexec`, GParted, updaters and
+  logind's `challenge` ask for a password in a dialog over the focused monitor, in either style,
+  with a choice of user when several may answer, and another try after a wrong password. It
+  stays out of the way of an agent already serving the session, and only a standalone session's
+  shell is one. `shell.polkit_agent = false` turns it off; `-DSHAODESK_POLKIT=OFF` builds without
+  it, as does a system without libpolkit-agent-1.
 
 ### Working on the shell
 

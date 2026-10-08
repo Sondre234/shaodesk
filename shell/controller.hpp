@@ -2,6 +2,7 @@
 #pragma once
 #include "app_match.hpp"
 #include "audio.hpp"
+#include "authentication.hpp"
 #include "backlight.hpp"
 #include "notifications.hpp"
 #include "osd.hpp"
@@ -132,6 +133,8 @@ class ShellController : public QObject {
     Q_PROPERTY(Palette *palette READ palette CONSTANT)
     // The power menu: what may run of lock, suspend, hibernate and the rest.
     Q_PROPERTY(Power *power READ power CONSTANT)
+    // The polkit agent's requests, for the authentication dialog.
+    Q_PROPERTY(Authentication *authentication READ authentication CONSTANT)
     // The start menu's pins, launch history, applications by letter, search and user.
     Q_PROPERTY(StartMenu *startMenu READ startMenu CONSTANT)
     // The compositor's overview: the output showing it, empty while closed; its thumbnails as
@@ -221,6 +224,11 @@ class ShellController : public QObject {
     Audio *audio() { return audio_.get(); }
     Palette *palette() { return &palette_; }
     Power *power() { return &power_; }
+    Authentication *authentication() { return &authentication_; }
+    // Registers the shell as the session's polkit authentication agent when it is built in and
+    // shell.polkit_agent is on, unless another agent serves the session; later configuration
+    // reloads follow the setting. Returns whether it is the agent.
+    bool startPolkit();
     StartMenu *startMenu() { return &startMenu_; }
     // Sends the compositor a request (an action, or "session restore NAME"), as `shaodesk msg`
     // would; `done` gets its whole reply. Without a session, `done` is not called.
@@ -370,6 +378,11 @@ class ShellController : public QObject {
     QObject *notificationService_ = nullptr;
     TrayModel tray_;
     QObject *trayHost_ = nullptr;
+    Authentication authentication_;
+    QObject *polkitAgent_ = nullptr;
+    bool servePolkit_ = false;
+    QString polkitProblem_; // why the agent did not register, said once
+    void updatePolkitAgent();
     QFileSystemWatcher *trashWatcher_ = nullptr;
     bool trashFull_ = false;
     // Reads whether the trash holds anything and watches it for a change, from the first time

@@ -202,6 +202,19 @@ class PowerView : public OverlayView {
     void update();
 };
 
+// The polkit authentication dialog on one output: a dimmed cover with the dialog in its middle,
+// holding the keyboard while a request waits for its password on that output (the one overlays
+// belonged on as it opened, or the primary screen once that one is gone).
+class AuthView : public OverlayView {
+    Q_OBJECT
+  public:
+    AuthView(ShellController &controller, QScreen *screen);
+
+  private:
+    int serial_ = 0;
+    void update();
+};
+
 // The overview's overlay on one output: the text over the compositor's thumbnails (titles,
 // workspace labels, the search box), covering the output while the overview is open there.
 class OverviewView : public OverlayView {

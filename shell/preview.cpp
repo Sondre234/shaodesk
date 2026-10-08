@@ -15,6 +15,7 @@
 #include <QQuickItem>
 #include <QQuickView>
 #include <QScreen>
+#include <unistd.h>
 
 namespace {
 // A sound server that takes every request and does nothing with it.
@@ -363,7 +364,7 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
 
 QStringList PreviewData::surfaces() {
     return {"osd-volume", "osd-text", "cards",    "power-dialog",
-            "palette",    "switcher", "overview", "palette-empty"};
+            "palette",    "switcher", "overview", "palette-empty", "auth-dialog"};
 }
 
 bool PreviewData::showSurface(QScreen *screen, const QString &name) {
@@ -421,6 +422,28 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
         // Shown as its view shows it, as the palette, the switcher and the overview are below.
         properties = {{"shown", true}};
         controller_.power()->request("poweroff", output);
+    } else if (name == "auth-dialog") {
+        file = "AuthDialog.qml";
+        mode = QQuickView::SizeRootObjectToView;
+        properties = {{"shown", true}};
+        // pkexec asking to run GParted, which two users may allow; a stand-in for polkit's helper
+        // asks for the password.
+        class Helper : public AuthConversation {
+          public:
+            void start() override { Q_EMIT request("Password: ", false); }
+            void respond(const QString &) override {}
+            void cancel() override {}
+        };
+        auto *auth = controller_.authentication();
+        auth->setConversations([](const AuthIdentity &, const QString &) { return new Helper; });
+        auth->add({"org.freedesktop.policykit.exec",
+                   "Authentication is needed to run `/usr/bin/gparted' as the super user",
+                   "",
+                   {{"command_line", "/usr/bin/gparted /dev/nvme0n1"}},
+                   "preview",
+                   {{"unix-user:" + QString::number(getuid()), "ada", "Ada Lovelace", getuid()},
+                    {"unix-user:0", "root", "", 0}}},
+                  {});
     } else if (name == "palette" || name == "palette-empty") {
         file = "Palette.qml";
         properties = {{"screenSize", ShellView::previewSize()}, {"shown", true}};
@@ -483,7 +506,7 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
     if (file == "Palette.qml")
         QMetaObject::invokeMethod(surface_->rootObject(), "reset");
     surface_->show();
-    if (name == "power-dialog")
+    if (name == "power-dialog" || name == "auth-dialog")
         QMetaObject::invokeMethod(surface_->rootObject(), "reset");
     return true;
 }

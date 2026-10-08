@@ -586,3 +586,27 @@ Not checked: a real `--session` starting real applications' entries (Steam, Disc
 KeePassXC and the like) and the shell skipping a real dunst, mako or snixembed; applications that
 start before the shell's tray or notification daemon is on the bus and so miss it (they start
 right after the shell, which takes the names a moment later).
+
+## Polkit authentication agent
+
+Added 2026-10-08. `shell_authentication` checks the dialog's model with stand-ins for polkit's
+helper: the user chosen, answers typed before and after the helper asks, wrong answers, another
+user, a helper that asks twice (a second factor) or says something, Cancel, and requests waiting
+their turn or withdrawn. `shell_polkit_agent` runs the agent against `fake_polkitd` on a private
+bus started as the system bus: Qt's event loop is GLib's (a GLib idle source runs on it), the
+agent registers for a `unix-session` subject, polkit's `BeginAuthentication` reaches the model
+with its users (a group left out) and pkexec's details and is answered `ok`, dismissed
+(`org.freedesktop.PolicyKit1.Error.Cancelled`), withdrawn by `CancelAuthentication`, two at once
+in turn, and the agent going with one open unregisters and withdraws it; registering where
+another agent serves the session fails quietly, and so does a bus without polkitd.
+`shell_auth_dialog` drives the dialog in its view on the offscreen platform: typing and Enter, a
+wrong password, Up, Down and a click choosing the user, a click beside it, Escape, Cancel, one
+user named, the next request opening with an empty field. The gallery pictures it
+(`auth-dialog`) in all four themes.
+
+Not checked: the live agent, which needs a real `--session` and polkitd: `pkexec true` asking and
+running after the right password and again after a wrong one, Cancel making pkexec say the
+request was dismissed, GParted and an updater, logind's `challenge` for a power off while another
+user is logged in, polkit-agent-helper-1's PAM conversation (with pam_u2f or fprintd, whose
+messages the dialog shows), several administrators in `wheel` to choose from, the shell staying
+out of the way of a running polkit-gnome, and `shell.polkit_agent` turned off and on by a reload.
