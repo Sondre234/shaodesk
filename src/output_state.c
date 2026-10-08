@@ -98,8 +98,10 @@ static bool parse_mode(const char *text, struct sh_monitor *m) {
     return true;
 }
 
-/* One KEY=VALUE field of a monitor's line; false for a value it cannot take. */
-static bool parse_field(struct sh_output_saved *saved, const char *key, const char *value) {
+/* One KEY=VALUE field of a monitor's line; false for a value it cannot take, true for a key it
+ * does not know too, after setting `unknown`. */
+static bool parse_field(struct sh_output_saved *saved, const char *key, const char *value,
+                        bool *unknown) {
     struct sh_monitor *m = &saved->monitor;
     if (!strcmp(key, "description")) {
         snprintf(saved->description, sizeof(saved->description), "%s", value);
@@ -141,7 +143,16 @@ static bool parse_field(struct sh_output_saved *saved, const char *key, const ch
         return parse_switch(value, &m->hdr);
     if (!strcmp(key, "primary"))
         return parse_switch(value, &saved->primary);
-    return true; // a key of a newer shaodesk
+    *unknown = true;
+    return true;
+}
+
+enum sh_output_field sh_output_state_set(struct sh_output_saved *saved, const char *key,
+                                         const char *value) {
+    bool unknown = false;
+    if (!parse_field(saved, key, value, &unknown))
+        return SH_OUTPUT_FIELD_BAD;
+    return unknown ? SH_OUTPUT_FIELD_UNKNOWN : SH_OUTPUT_FIELD_SET;
 }
 
 /* A monitor's line, split at its tabs; false for one that cannot be read whole. */
@@ -167,7 +178,8 @@ static bool parse_line(char *line, struct sh_output_saved *saved) {
         if (!equals)
             return false;
         *equals = '\0';
-        if (!parse_field(saved, field, equals + 1))
+        // A key of a newer shaodesk is passed over.
+        if (sh_output_state_set(saved, field, equals + 1) == SH_OUTPUT_FIELD_BAD)
             return false;
     }
     return m->name[0] != '\0';

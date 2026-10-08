@@ -136,6 +136,19 @@ int main(void) {
               !mixed.outputs[1].primary,
           "HDMI-A-1, not primary after DP-1");
 
+    // The fields one by one, as `monitors apply` sets them.
+    struct sh_output_saved one = monitor("DP-1", "A");
+    CHECK(sh_output_state_set(&one, "scale", "1.75") == SH_OUTPUT_FIELD_SET &&
+              one.monitor.scale == 1.75f,
+          "scale");
+    CHECK(sh_output_state_set(&one, "mirror", "-") == SH_OUTPUT_FIELD_SET && !one.monitor.mirror[0],
+          "no mirror");
+    CHECK(sh_output_state_set(&one, "mirror", "DP-1") == SH_OUTPUT_FIELD_BAD, "itself");
+    CHECK(sh_output_state_set(&one, "enabled", "off") == SH_OUTPUT_FIELD_SET && !one.monitor.enabled,
+          "off");
+    CHECK(sh_output_state_set(&one, "sparkle", "yes") == SH_OUTPUT_FIELD_UNKNOWN, "unknown");
+    CHECK(sh_output_state_set(&one, "transform", "9") == SH_OUTPUT_FIELD_BAD, "transform 9");
+
     // A file without the header is not one; an empty one neither.
     CHECK(!read_text("DP-1\tdescription=A\n", &mixed), "no header");
     CHECK(!read_text("", &mixed), "empty");

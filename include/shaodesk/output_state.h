@@ -40,6 +40,18 @@ bool sh_output_state_write(const struct sh_output_state *state, FILE *file);
  * it does not know, so that a file edited by hand or written by a newer shaodesk gives what it
  * can. False, with the reason in `error`, for a file that is not one. */
 bool sh_output_state_read(struct sh_output_state *state, FILE *file, char *error, size_t error_size);
+/* What sh_output_state_set made of a KEY=VALUE field. */
+enum sh_output_field {
+    SH_OUTPUT_FIELD_SET,
+    SH_OUTPUT_FIELD_BAD,     /* a value the key cannot take */
+    SH_OUTPUT_FIELD_UNKNOWN, /* a key it does not know */
+};
+/* Sets one KEY=VALUE field of a monitor's line, as the file has them and `monitors apply` takes
+ * them: description, enabled (on or off), mode (as outputs.monitors' mode), scale, transform (0 to
+ * 7), position (X,Y), vrr, mirror (a connector name, or - for none), bit_depth (8 or 10), hdr and
+ * primary. */
+enum sh_output_field sh_output_state_set(struct sh_output_saved *saved, const char *key,
+                                         const char *value);
 /* The entry for the monitor on `connector` described as `description` (tabs and line breaks
  * counting as spaces, as they are written); NULL for none. */
 const struct sh_output_saved *sh_output_state_find(const struct sh_output_state *state,
