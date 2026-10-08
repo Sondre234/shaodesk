@@ -294,6 +294,17 @@ PreviewData::PreviewData(ShellController &controller)
                                            {"steam.desktop", 2, now.addDays(-3)},
                                            {"org.kde.kate.desktop", 5, now.addDays(-12)}});
     controller.startMenu()->setUser("Robin Lee", QUrl());
+    // Files a search finds, in the home folder's user folders, the first used lately; nothing is
+    // read from disk.
+    const auto home = QDir::homePath();
+    const auto lately = now.addSecs(-3600).toMSecsSinceEpoch();
+    controller.files()->preview(
+        {{home + "/Documents", home + "/Documents/Reports", home + "/Downloads", home + "/Pictures"},
+         {{1, "Quarterly report.pdf", "quarterly report.pdf", false, lately},
+          {0, "Field notes.md", "field notes.md", false, 0},
+          {0, "Reports", "reports", true, 0},
+          {2, "firmware-2.4.1.zip", "firmware-2.4.1.zip", false, 0},
+          {3, "Fireworks.jpg", "fireworks.jpg", false, 0}}});
 
     // The windows, as the tests' stand-in model: a ListModel with the roles TaskModel has. The
     // terminals' are stacked, with pictures of two and none yet of the third, and the first
@@ -364,8 +375,20 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
 QStringList PreviewData::surfaces() {
     return {"osd-volume", "osd-text", "cards",    "power-dialog",
             "palette",    "switcher", "overview", "palette-empty",
-            "palette-calculator"};
+            "palette-calculator", "palette-files"};
 }
+
+namespace {
+// The palette's previews and what each searches for: applications, actions and files, nothing
+// it finds, a calculation, and files alone.
+const QMap<QString, QString> &paletteQueries() {
+    static const QMap<QString, QString> queries{{"palette", "fi"},
+                                                {"palette-empty", "> nothing like this"},
+                                                {"palette-calculator", "2*(3+4)"},
+                                                {"palette-files", "/re"}};
+    return queries;
+}
+} // namespace
 
 bool PreviewData::showSurface(QScreen *screen, const QString &name) {
     // What each surface is, as the view in view.cpp that shows it on an output makes it.
@@ -422,15 +445,11 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
         // Shown as its view shows it, as the palette, the switcher and the overview are below.
         properties = {{"shown", true}};
         controller_.power()->request("poweroff", output);
-    } else if (name == "palette" || name == "palette-empty" || name == "palette-calculator") {
+    } else if (paletteQueries().contains(name)) {
         file = "Palette.qml";
         properties = {{"screenSize", ShellView::previewSize()}, {"shown", true}};
         controller_.palette()->open(output);
-        // A search that finds applications and actions both, one that finds nothing, or a
-        // calculation.
-        controller_.palette()->setQuery(name == "palette"         ? "fi"
-                                        : name == "palette-empty" ? "> nothing like this"
-                                                                  : "2*(3+4)");
+        controller_.palette()->setQuery(paletteQueries().value(name));
     } else if (name == "switcher") {
         file = "Switcher.qml";
         // The taskbar's stand-in windows, most recently focused first, the one before the
