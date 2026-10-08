@@ -13,6 +13,7 @@ struct sh_control_client {
     int fd;
     struct wl_event_source *source;
     bool subscribed; // "subscribe": stays open and receives the state after each change
+    bool shell;      // "subscribe shell": the desktop shell, which carries out what it is asked
     struct wl_list link;
     size_t length;
     char request[512];
@@ -540,6 +541,17 @@ void send_shell_line(struct sh_server *server, const char *line) {
     send_event(server, line, strlen(line));
 }
 
+/* Whether the desktop shell is subscribed ("subscribe shell"), to carry out what is asked of it
+ * that another subscriber would only hear of, such as the volume keys. */
+bool shell_listening(struct sh_server *server) {
+    struct sh_control_client *client;
+    wl_list_for_each(client, &server->subscribers, link) {
+        if (client->shell)
+            return true;
+    }
+    return false;
+}
+
 /* Tells the user what went wrong with something they no longer wait on: in the log, and across
  * the panel, which hears "EVENT TEXT" (such as "power-error Suspend failed: ..."). */
 void report_failure(struct sh_server *server, const char *event, const char *text) {
@@ -596,8 +608,10 @@ static int control_client_readable(int fd, uint32_t mask, void *data) {
         return 0;
     if (newline)
         *newline = '\0';
-    if (newline && !strcmp(client->request, "subscribe")) {
+    if (newline && (!strcmp(client->request, "subscribe") ||
+                    !strcmp(client->request, "subscribe shell"))) {
         client->subscribed = true;
+        client->shell = client->request[9] != '\0';
         wl_list_insert(&client->server->subscribers, &client->link);
         char state[sizeof(client->server->sent_state)];
         describe_state(client->server, state, sizeof(state));
