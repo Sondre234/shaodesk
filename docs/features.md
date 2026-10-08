@@ -1428,7 +1428,9 @@ opens or a listed window closes, `switcher-select N` as the selection moves (bot
 from 0), and `switcher-close`. ID is the window's number, which the compositor gives each window as
 it appears and never gives another; a taskbar gets the same number for its handle of the window
 from `shaodesk-window-control-v1` (version 4), and so finds the window the line means where two
-share a title. The state ends with `power ACTIONS`, the power actions that may
+share a title. The state tells whether the session is locked, `locked on|off`, again as it locks
+and unlocks (the shell's clipboard history records nothing meanwhile), and ends with
+`power ACTIONS`, the power actions that may
 run (`lock,suspend,reboot,poweroff,logout`, in the order menus list them, or `-`), a power
 action that fails or is cancelled after it was accepted sends `power-error MESSAGE`, a program
 that `spawn` or `terminal` could not start sends `spawn-error MESSAGE` (the panel shows either

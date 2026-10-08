@@ -91,6 +91,7 @@ static void lock_unlock(struct wl_listener *listener, void *data) {
         focus_previous(server);
     process_cursor_motion(server, 0);
     wlr_log(WLR_INFO, "Session unlocked");
+    notify_subscribers(server); // "locked off"
 }
 
 static void lock_destroy(struct wl_listener *listener, void *data) {
@@ -137,6 +138,7 @@ void server_new_lock(struct wl_listener *listener, void *data) {
         wlr_output_schedule_frame(output->wlr_output);
     }
     send_locked_if_presented(server);
+    notify_subscribers(server); // "locked on"
 }
 
 static void inhibitor_destroy(struct wl_listener *listener, void *data) {
