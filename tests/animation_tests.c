@@ -409,6 +409,117 @@ static void test_workspace_slide(void) {
     teardown(&rig);
 }
 
+/* A gesture holds a window part of the way through its slide, whatever the time, and lets it go
+ * on from there. */
+static void test_hold_and_slide_from(void) {
+    struct rig rig;
+    struct sh_animator_config c = config(100, SH_CURVE_LINEAR);
+    c.late_ms = 30;
+    setup(&rig, c);
+    sh_anim_hold(rig.animator, &rig.anim, rig.content, -40, 0, 0.5F);
+    CHECK(rig.content->node.x == -40 && rig.rect->node.x == 10 && rig.rect->width == 200,
+          "held offset: %d", rig.content->node.x);
+    CHECK(fabsf(rig.rect->color[3] - 0.5F) < 1e-6F && fabsf(rig.rect->color[0] - 0.1F) < 1e-6F,
+          "held faded: %f", rig.rect->color[3]);
+    CHECK(sh_animator_running(rig.animator) == 0, "a hold is not running");
+    advance(&rig, 500); // a late frame finishes what runs, not what is held
+    advance(&rig, 500);
+    CHECK(rig.content->node.x == -40 && fabsf(rig.rect->color[3] - 0.5F) < 1e-6F,
+          "time leaves it where it is held");
+    // A client redrawing its rectangle in another colour keeps the hold's opacity.
+    float green[4] = {0, 1, 0, 1};
+    wlr_scene_rect_set_color(rig.rect, green);
+    advance(&rig, 16);
+    CHECK(fabsf(rig.rect->color[1] - 0.5F) < 1e-6F, "a new colour held faded: %f",
+          rig.rect->color[1]);
+    // Held again, it moves at once.
+    sh_anim_hold(rig.animator, &rig.anim, rig.content, -60, 0, 0.25F);
+    CHECK(rig.content->node.x == -60 && fabsf(rig.rect->color[3] - 0.25F) < 1e-6F, "held further");
+    // Hit testing sees it at rest, and it is held again afterwards.
+    sh_animator_rest(rig.animator);
+    CHECK(rig.content->node.x == 0 && fabsf(rig.rect->color[3] - 1) < 1e-6F, "at rest for input");
+    sh_animator_resume(rig.animator);
+    CHECK(rig.content->node.x == -60, "held again");
+    // Let go, it slides back to rest in half the slide's time, from where it was held.
+    sh_anim_slide_from(rig.animator, &rig.anim, rig.content, -60, 0, 0.25F, 0.5);
+    CHECK(!rig.anim.held && sh_animator_running(rig.animator) == 1, "running from the hold");
+    CHECK(rig.content->node.x == -60 && fabsf(rig.rect->color[3] - 0.25F) < 0.01F,
+          "starts where it was held: %d %f", rig.content->node.x, rig.rect->color[3]);
+    advance(&rig, 25);
+    CHECK(rig.content->node.x == -30 && fabsf(rig.rect->color[3] - 0.625F) < 0.02F,
+          "half way: %d %f", rig.content->node.x, rig.rect->color[3]);
+    advance(&rig, 26);
+    CHECK(rig.content->node.x == 0 && fabsf(rig.rect->color[1] - 1) < 1e-6F &&
+              sh_animator_running(rig.animator) == 0,
+          "at rest");
+    // Finishing a hold puts the window back at rest at once.
+    sh_anim_hold(rig.animator, &rig.anim, rig.content, 25, 5, 0.1F);
+    sh_anim_finish(&rig.anim);
+    CHECK(rig.content->node.x == 0 && rig.content->node.y == 0 &&
+              fabsf(rig.rect->color[3] - 1) < 1e-6F && !rig.anim.held,
+          "finished from a hold");
+    // Holding over a running slide lands it first; turning animations off leaves the hold.
+    sh_anim_slide(rig.animator, &rig.anim, rig.content, 80, 0);
+    sh_anim_hold(rig.animator, &rig.anim, rig.content, 10, 0, 0.5F);
+    CHECK(rig.content->node.x == 10 && sh_animator_running(rig.animator) == 0 &&
+              fabsf(rig.rect->color[3] - 0.5F) < 1e-6F,
+          "held over a slide: %d %f", rig.content->node.x, rig.rect->color[3]);
+    struct sh_animator_config off = c;
+    off.enabled = false;
+    sh_animator_configure(rig.animator, &off);
+    CHECK(rig.content->node.x == 10, "still held with animations off");
+    // Without animations, letting go lands at once.
+    sh_anim_slide_from(rig.animator, &rig.anim, rig.content, 10, 0, 0.5F, 1);
+    CHECK(rig.content->node.x == 0 && fabsf(rig.rect->color[3] - 1) < 1e-6F &&
+              sh_animator_running(rig.animator) == 0,
+          "lands at once without animations");
+    teardown(&rig);
+}
+
+/* A hidden window comes into view as a held copy, which slides away and goes. */
+static void test_hold_copy(void) {
+    struct rig rig;
+    setup(&rig, config(100, SH_CURVE_LINEAR));
+    wlr_scene_node_set_position(&rig.window->node, 500, 40);
+    wlr_scene_node_set_enabled(&rig.window->node, false);
+    int before = wl_list_length(&rig.scene->tree.children);
+    struct sh_anim *copy = sh_anim_hold_copy(rig.animator, &rig.window->node, rig.content, 70, 0,
+                                             0.2F);
+    CHECK(copy && wl_list_length(&rig.scene->tree.children) == before + 1, "a copy appears");
+    CHECK(copy->tree->node.enabled && copy->tree->node.x == 570 && copy->tree->node.y == 40,
+          "held 70 from the hidden window: %d", copy->tree->node.x);
+    struct wlr_scene_rect *shown = wl_container_of(copy->tree->children.next, shown, node.link);
+    CHECK(fabsf(shown->color[3] - 0.2F) < 1e-6F && shown->node.x == 10, "a faded copy");
+    sh_anim_hold(rig.animator, copy, copy->tree, 35, 0, 0.6F);
+    CHECK(copy->tree->node.x == 535 && fabsf(shown->color[3] - 0.6F) < 1e-6F, "held nearer");
+    advance(&rig, 1000);
+    CHECK(copy->tree->node.x == 535, "a held copy stays");
+    sh_animator_rest(rig.animator);
+    CHECK(!copy->tree->node.enabled, "no copy in the way of input");
+    sh_animator_resume(rig.animator);
+    CHECK(copy->tree->node.enabled && copy->tree->node.x == 535, "back");
+    // Let go, it slides on to 80 from the window, fading out, and goes.
+    sh_anim_slide_away(rig.animator, copy, 80, 0, 0, 1);
+    CHECK(copy->tree->node.x == 535 && fabsf(shown->color[3] - 0.6F) < 0.01F,
+          "starts where it was held: %d", copy->tree->node.x);
+    advance(&rig, 50);
+    CHECK(abs(copy->tree->node.x - 558) <= 1 && fabsf(shown->color[3] - 0.3F) < 0.02F,
+          "half way: %d %f", copy->tree->node.x, shown->color[3]);
+    advance(&rig, 60);
+    CHECK(wl_list_length(&rig.scene->tree.children) == before, "the copy is gone");
+    // Finished, a held copy goes at once; nothing to copy, no copy.
+    copy = sh_anim_hold_copy(rig.animator, &rig.window->node, rig.content, 0, 0, 1);
+    sh_anim_finish(copy);
+    CHECK(wl_list_length(&rig.scene->tree.children) == before, "a finished copy is gone");
+    wlr_scene_node_set_enabled(&rig.rect->node, false);
+    CHECK(!sh_anim_hold_copy(rig.animator, &rig.window->node, rig.content, 0, 0, 1),
+          "nothing to copy");
+    wlr_scene_node_set_enabled(&rig.rect->node, true);
+    // A copy still held when the animator goes goes with it.
+    sh_anim_hold_copy(rig.animator, &rig.window->node, rig.content, 5, 0, 1);
+    teardown(&rig);
+}
+
 static void test_finish_all(void) {
     struct rig rig;
     setup(&rig, config(300, SH_CURVE_EASE_OUT));
@@ -434,6 +545,8 @@ int main(void) {
     test_rest_at_point();
     test_tween_follows_target();
     test_workspace_slide();
+    test_hold_and_slide_from();
+    test_hold_copy();
     test_finish_all();
     if (!failures)
         puts("Animator timing, retargeting, speed, disabling, and late frames passed");

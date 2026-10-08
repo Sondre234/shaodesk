@@ -38,6 +38,11 @@ struct sh_anim {
      * ends at 0, 0. A retargeted glide starts from the velocity the last one had. */
     double glide_x, glide_y, glide_vx, glide_vy;
     int base_x, base_y; // where the tree rests: 0, 0, except a snapshot sliding away
+    /* Held by a gesture (sh_anim_hold): the tree's offset from where it rests and the factor of
+     * its nodes' opacity, which stay as they are whatever the time. */
+    bool held;
+    double held_x, held_y;
+    float held_alpha;
     struct sh_anim_record *records;
     size_t count, capacity;
 };
@@ -118,6 +123,28 @@ void sh_anim_slide(struct sh_animator *animator, struct sh_anim *anim, struct wl
  * (dx, dy) and fades out, just above `window`, which the caller hides. */
 void sh_anim_slide_out(struct sh_animator *animator, struct wlr_scene_node *window,
                        struct wlr_scene_tree *content, int dx, int dy);
+/* Gestures: a workspace slide held part of the way while fingers move it. A held animation stays
+ * where it is put until it is held elsewhere, slid on from there or finished; neither the clock,
+ * a late frame nor turning animations off moves it. Holds `tree` offset by (dx, dy) from where
+ * it rests, its nodes' opacity multiplied by `alpha`. Whatever ran on `anim` lands first. */
+void sh_anim_hold(struct sh_animator *animator, struct sh_anim *anim, struct wlr_scene_tree *tree,
+                  double dx, double dy, float alpha);
+/* A copy of what is visible under `content` just above `window`, held as sh_anim_hold holds a
+ * window, (dx, dy) from where the window is: a hidden window coming into view with a gesture.
+ * NULL when there is nothing to copy. sh_anim_hold moves it (with its own tree), and it goes
+ * with sh_anim_finish or at the end of sh_anim_slide_away. */
+struct sh_anim *sh_anim_hold_copy(struct sh_animator *animator, struct wlr_scene_node *window,
+                                  struct wlr_scene_tree *content, double dx, double dy,
+                                  float alpha);
+/* As sh_anim_slide, from part of the way: `tree` starts offset by (dx, dy) with its opacity
+ * multiplied by `alpha`, and comes to rest in `share` (a quarter to all) of the workspace
+ * slide's time. A hold on `anim` ends there. */
+void sh_anim_slide_from(struct sh_animator *animator, struct sh_anim *anim,
+                        struct wlr_scene_tree *tree, int dx, int dy, float alpha, double share);
+/* A copy from sh_anim_hold_copy slides on from where it is held to (dx, dy) from its window,
+ * its opacity to `alpha`, in `share` of the slide's time, then goes. */
+void sh_anim_slide_away(struct sh_animator *animator, struct sh_anim *anim, int dx, int dy,
+                        float alpha, double share);
 /* Jumps to the end: every node gets its resting values and the tree its resting position. */
 void sh_anim_finish(struct sh_anim *anim);
 /* Copies the visible buffers and rectangles under `content` into a new tree just above
