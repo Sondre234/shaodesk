@@ -68,6 +68,7 @@ all. In short:
 | `window_control.c` | The shell's window menu, window pictures and windows' own icons: shaodesk-window-control-v1, which names a window by its taskbar handle. |
 | `scaled_capture.c` | The capture source for a window's picture: the window scaled down to fit a size on the renderer, smoothly. |
 | `window_icon.c` | The icons windows supply themselves (xdg-toplevel-icon-v1; X11 windows' from `xwayland.c`), kept for the window control to send the shell. |
+| `volume.c` | The volume, microphone and brightness actions, which the shell carries out. |
 
 A function used by one file is `static`; one used by several is declared in `server.h` under
 the file that defines it. The build warns (`-Wmissing-prototypes`) about one that is neither.
@@ -607,8 +608,8 @@ renders the taskbar offscreen with one popup open, on stand-in windows, sound, t
 notifications, over the configured wallpaper (`--preview-popup` lists the names); in the macOS
 style the dock and the menu bar, over the style's drawn wallpaper while none is set, with the
 menu bar's menus as `system-menu`, `app-menu`, `window-menu` and `window-submenu`. The overlay
-surfaces have names there too (`osd-volume`, `osd-text`, `cards`, `power-dialog`, `palette`,
-`palette-empty`, `switcher`, `overview`, `snap-assist`): `PreviewData` in `preview.cpp` shows one in a window of its own over the
+surfaces have names there too (`osd-volume`, `osd-text`, `osd-microphone`, `cards`,
+`power-dialog`, `palette`, `palette-empty`, `switcher`, `overview`, `snap-assist`): `PreviewData` in `preview.cpp` shows one in a window of its own over the
 bar alone, with stand-ins for what the compositor would tell it, and the screenshot draws it where
 its layer surface would be (the overview over stand-ins for the compositor's thumbnails).
 `--preview --preview-desktop` draws the desktop instead (the gallery's `desktop`, without the

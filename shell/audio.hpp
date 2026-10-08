@@ -45,7 +45,8 @@ class AudioStreams : public QAbstractListModel {
 };
 
 // The sound server as the panel shows it: the default output's volume, the outputs to choose
-// from, and the applications playing. Volumes are percentages. A backend delivers the state
+// from, the applications playing, and whether the default input (the microphone) is muted.
+// Volumes are percentages. A backend delivers the state
 // through update() and carries out the send*() requests; changes show at once, before the
 // server confirms them, so successive wheel steps build on each other.
 class Audio : public QObject {
@@ -57,6 +58,9 @@ class Audio : public QObject {
     // [{name, description}], in the server's order.
     Q_PROPERTY(QVariantList outputs READ outputs NOTIFY changed)
     Q_PROPERTY(AudioStreams *streams READ streams CONSTANT)
+    // Whether there is a default input, and whether it is muted.
+    Q_PROPERTY(bool hasInput READ hasInput NOTIFY changed)
+    Q_PROPERTY(bool inputMuted READ inputMuted NOTIFY changed)
   public:
     struct Output {
         QString name, description;
@@ -67,6 +71,9 @@ class Audio : public QObject {
         QString output;
         std::vector<Output> outputs;
         std::vector<AudioStreams::Stream> streams;
+        // The default input and the inputs there are, monitors of outputs left out.
+        QString input = {};
+        std::vector<Output> inputs = {};
     };
     static constexpr int maxVolume = 100;
     explicit Audio(QObject *parent = nullptr) : QObject(parent), streams_(this) {}
@@ -76,6 +83,8 @@ class Audio : public QObject {
     QString output() const { return state_.output; }
     QVariantList outputs() const;
     AudioStreams *streams() { return &streams_; }
+    bool hasInput() const { return currentInput() != nullptr; }
+    bool inputMuted() const;
     void update(State state);
     void setUnavailable();
     Q_INVOKABLE void setVolume(int percent);
@@ -87,6 +96,8 @@ class Audio : public QObject {
     Q_INVOKABLE void setStreamVolume(int id, int percent);
     Q_INVOKABLE void setStreamMuted(int id, bool muted);
     Q_INVOKABLE void toggleStreamMute(int id);
+    // Mutes the default input, or unmutes it.
+    Q_INVOKABLE void toggleInputMute();
   Q_SIGNALS:
     void changed();
 
@@ -96,6 +107,11 @@ class Audio : public QObject {
     virtual void sendOutput(const QString &output, const std::vector<uint32_t> &streams) = 0;
     virtual void sendStreamVolume(uint32_t id, int percent) = 0;
     virtual void sendStreamMute(uint32_t id, bool muted) = 0;
+    // A backend that has no inputs ignores it.
+    virtual void sendInputMute(const QString &input, bool muted) {
+        (void)input;
+        (void)muted;
+    }
 
   private:
     bool available_ = false;
@@ -103,6 +119,8 @@ class Audio : public QObject {
     AudioStreams streams_;
     Output *current();
     const Output *current() const;
+    Output *currentInput();
+    const Output *currentInput() const;
 };
 
 // The PulseAudio (or PipeWire's pulse) backend, or one that stays unavailable when shaodesk was

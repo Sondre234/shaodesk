@@ -24,7 +24,14 @@ int main(int argc, char **argv) {
     try {
         require(argc == 2, "example config path required");
         auto config = shaodesk::load_config(argv[1]);
-        require(config.bindings.size() == 70, "example shortcuts missing");
+        require(config.bindings.size() == 76, "example shortcuts missing");
+        auto *louder = config.binding(0, XKB_KEY_XF86AudioRaiseVolume);
+        auto *microphone = config.binding(0, XKB_KEY_XF86AudioMicMute);
+        auto *dimmer = config.binding(0, XKB_KEY_XF86MonBrightnessDown);
+        require(louder && louder->action == SH_VOLUME_UP && louder->amount == 5 && microphone &&
+                    microphone->action == SH_MIC_MUTE && dimmer &&
+                    dimmer->action == SH_BRIGHTNESS_DOWN,
+                "example volume, microphone and brightness keys missing");
         require(config.binding(SH_ALT, XKB_KEY_Tab)->action == SH_SWITCHER_NEXT &&
                     config.binding(SH_ALT | SH_SHIFT, XKB_KEY_Tab)->action == SH_SWITCHER_PREV,
                 "example window switcher bindings missing");
@@ -107,6 +114,30 @@ int main(int argc, char **argv) {
         rejects("return {bindings={{key='l',action='close',amount=10}}}");
         rejects("return {bindings={{key='l',action='resize_up',amount=0}}}");
         rejects("return {bindings={{key='l',action='resize_up',amount=1.5}}}");
+        {
+            // The volume and brightness steps take `amount` in percent, 5 unless given.
+            auto steps = shaodesk::parse_config(
+                "return {bindings={{key='XF86AudioRaiseVolume',action='volume_up'},"
+                "{key='XF86AudioLowerVolume',action='volume_down',amount=2},"
+                "{key='XF86MonBrightnessUp',action='brightness_up',amount=100},"
+                "{key='XF86AudioMute',action='volume_mute'},"
+                "{key='XF86AudioMicMute',action='mic_mute'}}}");
+            require(steps.bindings.size() == 5 && steps.bindings[0].action == SH_VOLUME_UP &&
+                        steps.bindings[0].amount == shaodesk::default_step_percent &&
+                        steps.bindings[1].action == SH_VOLUME_DOWN && steps.bindings[1].amount == 2 &&
+                        steps.bindings[2].action == SH_BRIGHTNESS_UP &&
+                        steps.bindings[2].amount == 100 && steps.bindings[3].action == SH_VOLUME_MUTE &&
+                        steps.bindings[4].action == SH_MIC_MUTE,
+                    "volume and brightness bindings not parsed");
+            require(shaodesk::parse_action("brightness_down") == SH_BRIGHTNESS_DOWN &&
+                        shaodesk::default_amount(SH_RESIZE_UP) == shaodesk::default_resize_amount &&
+                        shaodesk::max_amount(SH_VOLUME_UP) == 100,
+                    "volume and brightness actions missing");
+            rejects("return {bindings={{key='l',action='volume_up',amount=101}}}");
+            rejects("return {bindings={{key='l',action='brightness_down',amount=0}}}");
+            rejects("return {bindings={{key='l',action='volume_mute',amount=5}}}");
+            rejects("return {bindings={{key='l',action='mic_mute',amount=5}}}");
+        }
         auto *launcher = config.binding(SH_LOGO, XKB_KEY_r);
         require(launcher && launcher->action == SH_LAUNCHER, "launcher binding missing");
         require(shaodesk::parse_action("toggle_floating") == SH_TOGGLE_FLOATING,
@@ -645,7 +676,7 @@ int main(int argc, char **argv) {
         // A configuration extending the defaults holds only its changes.
         setenv("SHAODESK_DEFAULT_CONFIG", argv[1], 1);
         auto bare = shaodesk::parse_config("return {extends='default'}");
-        require(bare.bindings.size() == 70 && bare.shell.launchers.empty() &&
+        require(bare.bindings.size() == 76 && bare.shell.launchers.empty() &&
                     bare.settings.workspaces == 4,
                 "extends did not supply the defaults");
         auto layered = shaodesk::parse_config(
@@ -655,7 +686,7 @@ int main(int argc, char **argv) {
             "{mods={'Super'}, key='e', action='spawn', command={'dolphin'}}}}");
         require(layered.settings.gap_inner == 3 && layered.settings.workspaces == 4,
                 "extending configuration settings not layered over the defaults");
-        require(layered.bindings.size() == 70 && !layered.binding(SH_LOGO, XKB_KEY_v),
+        require(layered.bindings.size() == 76 && !layered.binding(SH_LOGO, XKB_KEY_v),
                 "action none did not remove a default binding");
         require(layered.binding(SH_LOGO, XKB_KEY_q)->command == shaodesk::Command{"foot"} &&
                     layered.binding(SH_LOGO, XKB_KEY_e)->command == shaodesk::Command{"dolphin"},

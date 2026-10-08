@@ -816,6 +816,7 @@ void notify_subscribers(struct sh_server *server);
 void send_event(struct sh_server *server, const char *text, size_t length);
 void request_shell(struct sh_server *server, const char *what);
 void send_shell_line(struct sh_server *server, const char *line);
+bool shell_listening(struct sh_server *server);
 void report_failure(struct sh_server *server, const char *event, const char *text);
 void request_launcher(struct sh_server *server);
 void request_palette(struct sh_server *server);
@@ -1191,6 +1192,9 @@ struct wlr_box fullscreen_box(struct sh_toplevel *toplevel, struct wlr_output *o
 struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel);
 pid_t toplevel_pid(struct sh_toplevel *toplevel);
 bool toplevel_is_dialog(struct sh_toplevel *toplevel);
+
+/* volume.c */
+void volume_action(struct sh_server *server, enum sh_action action, int percent);
 
 /* window_control.c */
 void window_objects_changed(struct sh_server *server);

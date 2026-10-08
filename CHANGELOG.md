@@ -224,6 +224,13 @@ shadows.
   elsewhere or any other binding dismisses it, and `windows.snap.assist = false` turns it off.
   It is the overview in that part alone, so the overview's overlay in the shell now takes no
   input at all.
+- The keyboard's volume, microphone and brightness keys work without setup: the shipped
+  configuration binds them to the new actions `volume_up`, `volume_down`, `volume_mute`,
+  `mic_mute`, `brightness_up` and `brightness_down` (the steps take `amount` in percent, 5 unless
+  given). The shell carries them out on the default sound output and input and the backlight and
+  shows the on-screen display, at the ends of the range too, with a microphone for the
+  microphone's mute; without a shell the compositor runs `wpctl` and `brightnessctl`. The shell
+  subscribes with `subscribe shell` to say it is there.
 - `windows.controls = "traffic_lights"` draws the controls of the windows shaodesk decorates as
   red, yellow and green circles at their top-left, as macOS does: grey while the window has no
   focus, their symbols shown while the pointer is on one, darker while pressed.

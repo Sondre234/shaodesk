@@ -69,7 +69,8 @@ Item {
             anchors.rightMargin: Theme.spacingXL + Theme.spacingXS
             spacing: Theme.spacingL
             // What it is about: the loudspeaker for the volume, as the bar draws it, a sun for
-            // the brightness, the bell for notifications, else a mark for a message.
+            // the brightness, a microphone, the bell for notifications, else a mark for a
+            // message.
             Item {
                 id: glyph
                 readonly property string kind: osd.model.kind
@@ -85,7 +86,9 @@ Item {
                     visible: !glyph.speaker
                     size: Theme.iconSizeLarge
                     name: glyph.kind === "brightness" ? "sun" : glyph.kind === "dnd" ? "bell-off"
-                          : glyph.kind === "notifications" ? "bell" : "info"
+                          : glyph.kind === "notifications" ? "bell"
+                          : glyph.kind === "microphone" ? "mic"
+                          : glyph.kind === "microphone-muted" ? "mic-off" : "info"
                 }
             }
             Text {

@@ -1442,6 +1442,40 @@ The tests start a dbus-daemon of their own on a private address and never touch 
 that bus), `notifications_smoke` (a headless compositor and shell: cards, a click, expiry, hover,
 do-not-disturb, the display and the history), and the configuration tests.
 
+### Volume and brightness keys
+
+The keyboard's volume, microphone and brightness keys work without setup, as on Windows and KDE:
+the shipped configuration binds XF86AudioRaiseVolume, XF86AudioLowerVolume, XF86AudioMute,
+XF86AudioMicMute, XF86MonBrightnessUp and XF86MonBrightnessDown, and a configuration with
+`extends = "default"` gets them unless it binds those keys itself (one without `extends` has only
+its own bindings). Their actions:
+
+- `volume_up` and `volume_down` change the default sound output's volume by `amount` percent (5
+  unless the binding, or `shaodesk msg volume_up 10`, gives another, up to 100), no further than
+  0 and 100 %, and unmute it.
+- `volume_mute` mutes the default output, or unmutes it; `mic_mute` does the same for the default
+  input, the microphone.
+- `brightness_up` and `brightness_down` change the backlight by `amount` percent, stopping at 1 %
+  on the way down, since a backlight at 0 is off on some screens.
+
+The compositor hands them to the shell, which changes the sound through the sound server, as the
+panel's volume control does, and the backlight through logind, as Quick Settings' slider does,
+and shows the on-screen display: the volume, `Muted`, `Microphone muted` or `Microphone on` (with
+`osd.volume`), or the brightness (with `osd.brightness`), also when the level is at 0 or 100 %
+already. While the shell cannot reach the sound server it runs `wpctl` for the sound instead.
+While no shell listens (`shell.enabled = false`, or the shell has exited), the compositor runs
+`wpctl` (WirePlumber's, keeping the volume at 100 % at most) and `brightnessctl` itself, where
+they are installed; without them the keys do nothing but say why in the log. A step of 2 %:
+
+```lua
+{ mods = {}, key = "XF86AudioRaiseVolume", action = "volume_up", amount = 2 },
+{ mods = {}, key = "XF86AudioLowerVolume", action = "volume_down", amount = 2 },
+```
+
+`volume_keys_smoke` checks the compositor's side with stand-ins for `wpctl` and `brightnessctl`,
+`volume_keys_shell_smoke` the keys reaching the shell, and `shell_volume_keys` what the shell does
+with them, on a stand-in sound server and a backlight in a made-up sysfs.
+
 ## System tray
 
 The panel shows the status icons applications put in a system tray, on every monitor's bar, in the order they appeared. These are StatusNotifierItems, the kind KDE and Qt
@@ -1636,7 +1670,11 @@ action that fails or is cancelled after it was accepted sends `power-error MESSA
 that `spawn` or `terminal` could not start sends `spawn-error MESSAGE` (the panel shows either
 across itself for eight seconds), `power_menu` sends `power-menu OUTPUT`, and `taskbar_focus`
 sends `taskbar OUTPUT` for the focused monitor, whose panel takes the keyboard to walk its
-buttons, or gives it back. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
+buttons, or gives it back. The shell subscribes with `subscribe shell`, saying it carries out
+the volume, microphone and brightness actions, which send `volume up PERCENT`, `volume down
+PERCENT`, `volume mute`, `microphone mute`, `brightness up PERCENT` or `brightness down PERCENT`
+to every subscriber; while no client subscribed that way, the compositor runs `wpctl` and
+`brightnessctl` for them itself. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
 refused while the session is locked.
 
 ## Screen locking and idle

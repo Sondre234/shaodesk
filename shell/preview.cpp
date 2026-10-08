@@ -382,7 +382,8 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
 
 QStringList PreviewData::surfaces() {
     return {"osd-volume", "osd-text", "cards",    "power-dialog",
-            "palette",    "switcher", "overview", "palette-empty", "auth-dialog", "snap-assist"};
+            "palette",    "switcher", "overview", "palette-empty", "auth-dialog", "snap-assist",
+            "osd-microphone"};
 }
 
 bool PreviewData::showSurface(QScreen *screen, const QString &name) {
@@ -401,6 +402,8 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
         controller_.osd()->configure(config);
         if (name == "osd-volume")
             controller_.osd()->show(output, "Volume", 64, "volume");
+        else if (name == "osd-microphone")
+            controller_.osd()->show(output, "Microphone muted", -1, "microphone-muted");
         else
             controller_.osd()->show(output, "Do not disturb", -1, "dnd");
     } else if (name == "cards") {

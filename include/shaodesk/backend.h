@@ -179,6 +179,16 @@ enum sh_action {
     SH_SNAP_CYCLE_RIGHT,
     SH_SNAP_CYCLE_UP,
     SH_SNAP_CYCLE_DOWN,
+    /* The keyboard's volume, microphone and brightness keys: the default sound output's volume
+     * up or down (argument: percent), its mute and the default input's, the backlight up or down
+     * (argument: percent). The shell carries them out and shows them; without one, wpctl and
+     * brightnessctl do. */
+    SH_VOLUME_UP,
+    SH_VOLUME_DOWN,
+    SH_VOLUME_MUTE,
+    SH_MIC_MUTE,
+    SH_BRIGHTNESS_UP,
+    SH_BRIGHTNESS_DOWN,
 };
 
 enum sh_screenshot_mode {

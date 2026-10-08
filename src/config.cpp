@@ -1629,8 +1629,9 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
             bool has_amount = !lua_isnil(L, -1);
             lua_pop(L, 1);
             if (has_amount && !action_takes_amount(binding.action))
-                fail("amount is only valid with resize actions");
-            binding.amount = integer(L, "amount", binding.amount, 1, max_resize_amount);
+                fail("amount is only valid with resize, volume and brightness actions");
+            binding.amount = integer(L, "amount", default_amount(binding.action), 1,
+                                     max_amount(binding.action));
             // Bindings past `own` come from the defaults a configuration extends; its own
             // bindings, "none" included, take their keys first.
             // Button bindings may share a button: the first whose target matches wins.
@@ -1782,6 +1783,12 @@ constexpr std::pair<std::string_view, sh_action> action_table[] = {
         {"toggle_floating", SH_TOGGLE_FLOATING},
         {"launcher", SH_LAUNCHER},
         {"taskbar_focus", SH_TASKBAR_FOCUS},
+        {"volume_up", SH_VOLUME_UP},
+        {"volume_down", SH_VOLUME_DOWN},
+        {"volume_mute", SH_VOLUME_MUTE},
+        {"mic_mute", SH_MIC_MUTE},
+        {"brightness_up", SH_BRIGHTNESS_UP},
+        {"brightness_down", SH_BRIGHTNESS_DOWN},
         {"focus_left", SH_FOCUS_LEFT},
         {"focus_right", SH_FOCUS_RIGHT},
         {"focus_up", SH_FOCUS_UP},
@@ -1876,7 +1883,23 @@ bool valid_output_target(const std::string &target) {
 
 bool action_takes_amount(sh_action action) {
     return action == SH_RESIZE_LEFT || action == SH_RESIZE_RIGHT || action == SH_RESIZE_UP ||
-           action == SH_RESIZE_DOWN;
+           action == SH_RESIZE_DOWN || action == SH_VOLUME_UP || action == SH_VOLUME_DOWN ||
+           action == SH_BRIGHTNESS_UP || action == SH_BRIGHTNESS_DOWN;
+}
+
+namespace {
+bool takes_percent(sh_action action) {
+    return action == SH_VOLUME_UP || action == SH_VOLUME_DOWN || action == SH_BRIGHTNESS_UP ||
+           action == SH_BRIGHTNESS_DOWN;
+}
+} // namespace
+
+int default_amount(sh_action action) {
+    return takes_percent(action) ? default_step_percent : default_resize_amount;
+}
+
+int max_amount(sh_action action) {
+    return takes_percent(action) ? 100 : max_resize_amount;
 }
 
 int parse_layout_choice(const std::string &word) {

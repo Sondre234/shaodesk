@@ -77,8 +77,8 @@ int main(int argc, char **argv) {
                       "profiles, wallpapers, notifications, "
                       "quick-settings or quick-settings-mixer; in the macOS style system-menu, "
                       "app-menu, window-menu or window-submenu too; or an overlay over the bar: "
-                      "osd-volume, osd-text, cards, power-dialog, auth-dialog, palette, "
-                      "palette-empty, switcher, overview or snap-assist",
+                      "osd-volume, osd-text, osd-microphone, cards, power-dialog, auth-dialog, "
+                      "palette, palette-empty, switcher, overview or snap-assist",
                       "name"});
     parser.addOption(
         {"quit-after",

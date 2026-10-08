@@ -607,7 +607,8 @@ void ShellController::subscribe() {
     if (path.isEmpty())
         return;
     state_ = new QLocalSocket(this);
-    connect(state_, &QLocalSocket::connected, this, [this] { state_->write("subscribe\n"); });
+    // As the shell, which carries out the volume keys the compositor would otherwise hand to wpctl.
+    connect(state_, &QLocalSocket::connected, this, [this] { state_->write("subscribe shell\n"); });
     connect(state_, &QLocalSocket::readyRead, this, [this] {
         bool outputs = false, urgentSeen = false;
         while (state_->canReadLine()) {
@@ -694,6 +695,10 @@ void ShellController::subscribe() {
                 continue;
             } else if (line.startsWith("dnd ")) {
                 handleDnd(line.sliced(4));
+                continue;
+            } else if (line.startsWith("volume ") || line.startsWith("microphone ") ||
+                       line.startsWith("brightness ")) {
+                volumeKeys_.handle(line);
                 continue;
             } else if (line.startsWith("osd ")) {
                 // osd OUTPUT PERCENT TEXT

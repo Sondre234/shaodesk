@@ -362,7 +362,8 @@ struct Runtime {
         return binding->action;
     }
     /* Control requests: "<action> [workspace]", "screenshot [region|output|window]",
-     * "resize_<direction> [pixels]", "switcher_confirm [N]", "switch_layout [next|prev|N]",
+     * "resize_<direction> [pixels]", "volume_up|volume_down|brightness_up|brightness_down
+     * [percent]", "switcher_confirm [N]", "switch_layout [next|prev|N]",
      * "profile NAME|next|prev", or "spawn PROGRAM [ARGS...]". */
     static sh_action command(void *data, const char *request, int *argument, char *error,
                              size_t error_size) {
@@ -412,17 +413,21 @@ struct Runtime {
                                               : SH_SCREENSHOT_REGION;
             } else if (shaodesk::action_takes_amount(action)) {
                 std::size_t used = 0;
-                int amount = shaodesk::default_resize_amount;
+                int amount = shaodesk::default_amount(action);
                 try {
                     if (words.size() == 2)
                         amount = std::stoi(words[1], &used);
                 } catch (const std::logic_error &) {
                     amount = 0;
                 }
+                int most = shaodesk::max_amount(action);
                 if (words.size() > 2 || (words.size() == 2 && used != words[1].size()) ||
-                    amount < 1 || amount > shaodesk::max_resize_amount)
-                    throw std::runtime_error(words[0] + " takes a size in pixels, from 1 to " +
-                                             std::to_string(shaodesk::max_resize_amount));
+                    amount < 1 || amount > most)
+                    throw std::runtime_error(
+                        words[0] +
+                        (most == 100 ? " takes a step in percent, from 1 to "
+                                     : " takes a size in pixels, from 1 to ") +
+                        std::to_string(most));
                 *argument = amount;
             } else if (action == SH_SWITCH_LAYOUT) {
                 try {

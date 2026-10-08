@@ -72,6 +72,12 @@ class PulseAudio : public Audio {
         if (ready())
             run(pa_context_set_sink_input_mute(context_, id, muted, nullptr, nullptr));
     }
+    void sendInputMute(const QString &input, bool muted) override {
+        Locked lock(loop_);
+        if (ready())
+            run(pa_context_set_source_mute_by_name(context_, input.toUtf8().constData(), muted,
+                                                   nullptr, nullptr));
+    }
 
   private:
     struct Locked {
@@ -152,6 +158,7 @@ class PulseAudio : public Audio {
             run(pa_context_subscribe(context,
                                      pa_subscription_mask_t(PA_SUBSCRIPTION_MASK_SINK |
                                                             PA_SUBSCRIPTION_MASK_SINK_INPUT |
+                                                            PA_SUBSCRIPTION_MASK_SOURCE |
                                                             PA_SUBSCRIPTION_MASK_SERVER),
                                      nullptr, nullptr));
             self->refresh();
@@ -174,9 +181,10 @@ class PulseAudio : public Audio {
             return;
         }
         pending_ = {};
-        outstanding_ = 4;
+        outstanding_ = 5;
         run(pa_context_get_server_info(context_, &PulseAudio::onServer, this));
         run(pa_context_get_sink_info_list(context_, &PulseAudio::onSink, this));
+        run(pa_context_get_source_info_list(context_, &PulseAudio::onSource, this));
         run(pa_context_get_sink_input_info_list(context_, &PulseAudio::onStream, this));
         run(pa_context_get_client_info_list(context_, &PulseAudio::onClient, this));
     }
@@ -184,6 +192,8 @@ class PulseAudio : public Audio {
         auto *self = static_cast<PulseAudio *>(data);
         if (info && info->default_sink_name)
             self->pending_.state.output = QString::fromUtf8(info->default_sink_name);
+        if (info && info->default_source_name)
+            self->pending_.state.input = QString::fromUtf8(info->default_source_name);
         self->finish();
     }
     static void onSink(pa_context *, const pa_sink_info *info, int end, void *data) {
@@ -196,6 +206,19 @@ class PulseAudio : public Audio {
                                                 QString::fromUtf8(info->description),
                                                 percent(info->volume), bool(info->mute)});
         self->pending_.sinkVolumes[info->name] = info->volume;
+    }
+    // The inputs, such as microphones; an output's monitor is none.
+    static void onSource(pa_context *, const pa_source_info *info, int end, void *data) {
+        auto *self = static_cast<PulseAudio *>(data);
+        if (end) {
+            self->finish();
+            return;
+        }
+        if (info->monitor_of_sink != PA_INVALID_INDEX)
+            return;
+        self->pending_.state.inputs.push_back({QString::fromUtf8(info->name),
+                                               QString::fromUtf8(info->description),
+                                               percent(info->volume), bool(info->mute)});
     }
     static void onStream(pa_context *, const pa_sink_input_info *info, int end, void *data) {
         auto *self = static_cast<PulseAudio *>(data);

@@ -401,5 +401,14 @@ return {
         { mods = {}, key = "Print", action = "screenshot", mode = "region" },
         { mods = { "Shift" }, key = "Print", action = "screenshot", mode = "output" },
         { mods = { mod }, key = "Print", action = "screenshot", mode = "window" },
+        -- The keyboard's volume, microphone and brightness keys, 5 % a press (`amount = N` for
+        -- another step). The shell carries them out and shows them; without it, wpctl and
+        -- brightnessctl do.
+        { mods = {}, key = "XF86AudioRaiseVolume", action = "volume_up" },
+        { mods = {}, key = "XF86AudioLowerVolume", action = "volume_down" },
+        { mods = {}, key = "XF86AudioMute", action = "volume_mute" },
+        { mods = {}, key = "XF86AudioMicMute", action = "mic_mute" },
+        { mods = {}, key = "XF86MonBrightnessUp", action = "brightness_up" },
+        { mods = {}, key = "XF86MonBrightnessDown", action = "brightness_down" },
     },
 }
