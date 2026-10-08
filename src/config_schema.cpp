@@ -355,6 +355,10 @@ const Option options[] = {
      "`keyboard.shortcuts_inhibit`)."},
     {"windows.rules[].above", "boolean", "unset", "", none, none,
      "Keep above the other windows, as `toggle_above` does."},
+    {"windows.rules[].dynamic", "boolean", "false", "", none, none,
+     "Hold the window to the rule's `above`, `floating` and `sticky` while its title and app ID "
+     "match, as they change, and give back what it had once they no longer do; its other "
+     "actions still act once, as the window opens."},
 
     {"peek", "table", "", "", none, none,
      "Peek: `peek` (hold a key) and `peek_toggle` make every window nearly transparent to show "

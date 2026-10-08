@@ -672,6 +672,39 @@ int main(int argc, char **argv) {
         rejects("return {windows={rules={{app_id='x',sticky='yes'}}}}");
         rejects("return {windows={rules={{app_id='x',shortcuts_inhibit=0}}}}");
         rejects("return {windows={rules={{app_id='x',above=1}}}}");
+        rejects("return {windows={rules={{app_id='x',dynamic='yes'}}}}");
+        // Dynamic rules hold above, floating and sticky while they match, later ones winning;
+        // their other actions act once, as the window opens, and static rules take no part.
+        auto dynamic = shaodesk::parse_config(
+            "return {windows={rules={"
+            "{title='Meeting',dynamic=true,above=true,floating=true,workspace=2,opacity=0.9},"
+            "{app_id='^zoom$',dynamic=true,floating=false},"
+            "{title='^Share',dynamic=true,sticky=true},"
+            "{title='Video',above=true},"
+            "{app_id='^zoom$',dynamic=true}}}}");
+        auto meeting = dynamic.dynamic_actions("zoom", "Meeting with Robin");
+        require(meeting.above == true && meeting.floating == false && !meeting.sticky &&
+                    !meeting.workspace && !meeting.size,
+                "dynamic rules did not merge what they hold in order");
+        require(dynamic.dynamic_actions("firefox", "Meeting").floating == true &&
+                    dynamic.dynamic_actions("firefox", "Share screen").sticky == true &&
+                    dynamic.dynamic_actions("firefox", "Share screen").above == std::nullopt,
+                "a dynamic rule matched the wrong window");
+        require(dynamic.dynamic_actions("firefox", "Video").empty() &&
+                    dynamic.dynamic_actions("firefox", "Inbox").empty(),
+                "a static rule took part in the dynamic ones");
+        auto opening = dynamic.window_actions("firefox", "Meeting");
+        require(opening.workspace == 2 && !opening.above && !opening.floating && !opening.sticky,
+                "a dynamic rule's state acted once as the window opened, or its workspace did not");
+        require(dynamic.window_actions("firefox", "Video").above == true,
+                "a static rule's state did not act as the window opened");
+        require(dynamic.window_opacity("firefox", "Meeting", true) == 0.9F,
+                "a dynamic rule's opacity does not count");
+        auto dynamic_off = shaodesk::parse_config(
+            "return {features={window_rules=false},windows={rules={"
+            "{title='Meeting',dynamic=true,above=true}}}}");
+        require(dynamic_off.dynamic_actions("x", "Meeting").empty(),
+                "features.window_rules = false left the dynamic rules on");
         // A rule that only keeps a window above takes no part in the opacity.
         auto kept = shaodesk::parse_config(
             "return {windows={rules={{app_id='^mpv$',above=true},{app_id='mpv',opacity=0.5}}}}");

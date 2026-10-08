@@ -503,6 +503,12 @@ struct sh_window_rule {
     bool above;  /* kept above the other windows */
 };
 
+/* What the dynamic window rules (`dynamic = true`) matching a window decide now, as its title
+ * and app ID change: each -1 when none decides it, else 0 or 1. */
+struct sh_dynamic_rule {
+    int floating, sticky, above;
+};
+
 /* What a key binding asks for besides its action (sh_callbacks.binding_flags). */
 enum sh_binding_flag {
     SH_BINDING_LOCKED = 1,  /* it runs while the session is locked too */
@@ -575,6 +581,10 @@ struct sh_callbacks {
     /* The keys of the first key binding of `action` outside any mode, as "Super + Shift +
      * Escape"; "" when no key is bound to it. Valid until the next call. */
     const char *(*binding_keys)(void *, enum sh_action action);
+    /* What the dynamic rules matching a window with this app ID and title (either may be "")
+     * decide now; every field -1 when none matches. */
+    void (*dynamic_rule)(void *, const char *app_id, const char *title,
+                         struct sh_dynamic_rule *rule);
 };
 
 enum sh_backend_mode { SH_BACKEND_NESTED, SH_BACKEND_HEADLESS, SH_BACKEND_SESSION };

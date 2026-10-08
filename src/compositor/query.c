@@ -162,6 +162,10 @@ static void get_stacking(struct sh_server *server, int fd, const char *arguments
     describe_stacking(server, fd);
 }
 
+static void get_dynamic_rules(struct sh_server *server, int fd, const char *arguments) {
+    describe_dynamic_rules(server, fd);
+}
+
 static void get_pid_at(struct sh_server *server, int fd, const char *arguments) {
     // The process of the window drawn at layout point X Y, or no line when there is none.
     double x, y;
@@ -703,6 +707,7 @@ static const struct {
     {"urgent", get_urgent, false},
     {"windows", get_windows, false},
     {"stacking", get_stacking, false},
+    {"dynamic_rules", get_dynamic_rules, false},
     {"pid_at", get_pid_at, true},
     {"swallow", get_swallow, false},
     {"guides", get_guides, false},

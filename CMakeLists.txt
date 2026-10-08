@@ -139,6 +139,10 @@ if(BUILD_TESTING)
     target_include_directories(lid_tests PRIVATE include)
     target_compile_options(lid_tests PRIVATE -Wall -Wextra)
     add_test(NAME lid COMMAND lid_tests)
+    add_executable(dynamic_rule_tests tests/dynamic_rule_tests.c src/dynamic_rule.c)
+    target_include_directories(dynamic_rule_tests PRIVATE include)
+    target_compile_options(dynamic_rule_tests PRIVATE -Wall -Wextra)
+    add_test(NAME dynamic_rule COMMAND dynamic_rule_tests)
 endif()
 option(SHAODESK_BUILD_COMPOSITOR "Build the wlroots compositor" ON)
 if(SHAODESK_BUILD_COMPOSITOR)
@@ -225,6 +229,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/binding_mode.c
         src/compositor/control.c
         src/compositor/cursor.c
+        src/compositor/dynamic_rules.c
         src/compositor/effects.c
         src/compositor/focus.c
         src/compositor/foreign_toplevel.c
@@ -278,6 +283,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
     target_sources(shaodesk PRIVATE src/overview_scene.c)
     target_sources(shaodesk PRIVATE src/power_supply.c)
     target_sources(shaodesk PRIVATE src/lid.c)
+    target_sources(shaodesk PRIVATE src/dynamic_rule.c)
     target_include_directories(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_compile_definitions(shaodesk PRIVATE WLR_USE_UNSTABLE)
     # version.h, for --version: the project version, and `git describe` in a git checkout.
@@ -636,6 +642,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(sticky_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME dynamic_rules_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/dynamic_rules_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(dynamic_rules_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME stacking_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/stacking_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)

@@ -306,6 +306,11 @@ shadows.
   it is; the window rule `above = true` keeps a window above as it opens. `shaodesk msg get
   windows` says which are in a sixteenth column, and `get stacking` lists the windows front to
   back. shaodesk-window-control-v1 is at version 6 for it.
+- Window rules with `dynamic = true` follow a window's title and app ID as they change, as
+  Hyprland's dynamic rules do: while they match, they hold the window to their `floating`,
+  `sticky` and `above`, and once they no longer do the window gets back what it had, keeping
+  what was changed by hand meanwhile. Their other actions still act once, as the window opens.
+  `shaodesk msg get dynamic_rules` tells what they hold each window to.
 - `layout.floating_above_tiles = true` keeps floating windows over the tiles, as sway and Hyprland
   do. It is off by default: as before, the window brought forward last is in front, tile or not.
 - A fullscreen window stays in front of its monitor while another monitor has the focus, as
