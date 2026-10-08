@@ -56,6 +56,7 @@ void reload_config(struct sh_server *server) {
     ++server->config_generation;
     configure_animations(server);
     night_light_update(server);
+    color_management_update(server);
     if (!server_settings(server)->overview)
         overview_dismiss(server);
     update_keymap(server);
@@ -333,6 +334,8 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
                  server_new_decoration);
     // Windows' tearing hints, which windows.allow_tearing follows (tearing.c).
     server.tearing_control = wlr_tearing_control_manager_v1_create(server.wl_display, 1);
+    // Applications' colours, once a monitor asks for HDR (hdr.c).
+    color_management_update(&server);
     // Windows' own icons, for the taskbar (window_icon.c). Clients are told the sizes taskbars
     // and switchers commonly draw, up to the 256 pixels the shell is sent at most.
     struct wlr_xdg_toplevel_icon_manager_v1 *icons =

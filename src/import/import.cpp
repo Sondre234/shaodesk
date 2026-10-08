@@ -547,9 +547,21 @@ class Translator {
             else
                 report_.skip(files_, item.origin, name + ": bitdepth " + depth + " is not 8 or 10");
         }
+        // Hyprland's cm: hdr (or hdredid) drives the monitor in HDR, as shaodesk's hdr does;
+        // auto and srgb are what it does anyway.
+        if (auto cm = field("cm"); !cm.empty()) {
+            if (cm == "hdr" || cm == "hdredid")
+                theme_.set(at("hdr"), "true", item.origin);
+            else if (cm != "auto" && cm != "srgb")
+                report_.skip(files_, item.origin,
+                             name + ": cm " + cm + " is not supported; only hdr is");
+        }
         for (const auto &[key, value] : item.fields)
-            if (key == "cm" || key == "sdrbrightness" ||
-                key == "sdrsaturation" || key == "reserved")
+            if (key == "sdrbrightness" || key == "sdrsaturation")
+                report_.skip(files_, item.origin,
+                             name + ": " + key + " is not supported: wlroots 0.20 has no setting "
+                                                 "for SDR content on an HDR monitor");
+            else if (key == "reserved")
                 report_.skip(files_, item.origin, name + ": " + key + " is not supported yet");
     }
     void order() {

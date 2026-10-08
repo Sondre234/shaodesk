@@ -88,6 +88,8 @@ shaodesk before it can be imported, **won't** = deliberately not carried over.
 | Variable refresh rate | `vrr` | `outputs.monitors[NAME].vrr` | done (untested on hardware) | yes |
 | Mirroring | `mirror, NAME` | `outputs.monitors[NAME].mirror` | done (untested on hardware) | yes |
 | 10-bit color | `bitdepth, 10` | `outputs.monitors[NAME].bit_depth` | done (untested on hardware) | yes |
+| HDR | `cm, hdr` (or `hdredid`) | `outputs.monitors[NAME].hdr` (Vulkan renderer only) | done (untested on hardware) | yes |
+| Wide gamut, SDR brightness and saturation | `cm, wide` / `edid`, `sdrbrightness`, `sdrsaturation` | — (wlroots 0.20 has no setting for them) | blocked | no |
 
 ### Colors and wallpaper
 

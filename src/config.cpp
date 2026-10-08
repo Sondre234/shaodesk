@@ -667,6 +667,7 @@ void read_monitors(lua_State *L, sh_settings &settings) {
         monitor.scale = static_cast<float>(number(L, "scale", 0, 0.25, 10));
         monitor.transform = integer(L, "transform", 0, 0, 7);
         boolean(L, "vrr", "vrr", monitor.vrr);
+        boolean(L, "hdr", "hdr", monitor.hdr);
         monitor.bit_depth = integer(L, "bit_depth", 8, 8, 10);
         if (monitor.bit_depth != 8 && monitor.bit_depth != 10)
             fail("bit_depth must be 8 or 10");

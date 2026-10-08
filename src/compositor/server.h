@@ -283,6 +283,7 @@ struct sh_idle {
 
 struct sh_window_object; // a shaodesk_window_v1 (window_control.c)
 struct sh_mirror;        // what a mirroring output shows (mirror.c)
+struct wlr_color_manager_v1;
 
 /* A workspace slide a touchpad swipe drives (workspace.c, for gestures.c): the output, the
  * workspace it showed as the swipe began and the one the fingers head for (out of range past
@@ -501,6 +502,10 @@ struct sh_server {
     struct wl_listener new_capture_request;
     struct wl_listener set_xdg_icon; // a Wayland window giving its icon (window_icon.c)
     struct wlr_tearing_control_manager_v1 *tearing_control; // windows' tearing hints (tearing.c)
+    /* color-management-v1 (hdr.c), offered once a monitor asks for HDR with a renderer that can
+     * convert colours; whether that was refused already, said once. */
+    struct wlr_color_manager_v1 *color_manager;
+    bool color_manager_refused;
 
     /* Session lock: `locked` outlives a crashed locker so the screen stays covered. */
     bool locked;
@@ -693,6 +698,7 @@ struct sh_output {
     /* Out of the layout, showing another output's picture (mirror.c); NULL otherwise. */
     struct sh_mirror *mirror;
     struct sh_tearing tearing;
+    const char *hdr_refused; // why it stays SDR though asked for HDR, as last logged (hdr.c)
     struct wl_list link;
     struct sh_server *server;
     struct wlr_output *wlr_output;
@@ -1089,6 +1095,13 @@ void group_cycle(struct sh_server *server, struct sh_toplevel *current, int step
 void ungroup(struct sh_server *server, struct sh_toplevel *current);
 void group_merge(struct sh_server *server, enum sh_action action);
 void dissolve_groups(struct sh_server *server);
+
+/* hdr.c */
+void color_management_update(struct sh_server *server);
+bool output_want_hdr(struct sh_output *output, const struct sh_monitor *monitor, bool mirrors,
+                     struct wlr_output_state *state);
+void output_drop_hdr(struct sh_output *output, struct wlr_output_state *state);
+bool output_is_hdr(const struct sh_output *output);
 
 /* headless_input.c */
 void control_headless_pointer(struct sh_server *server, int fd, const char *arguments);

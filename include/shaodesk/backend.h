@@ -253,6 +253,7 @@ struct sh_monitor {
     char mirror[64];
     int bit_depth; /* bits per colour channel it is drawn in: 8, or 10 where the output and the
                     * renderer allow it; 0: 8 */
+    bool hdr; /* driven in BT.2020 with PQ where the monitor, the renderer and the test allow */
 };
 
 /* layout.outputs: defaults for the workspaces of the outputs matching `name` (as sh_monitor's

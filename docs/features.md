@@ -1363,6 +1363,40 @@ drawn in 10 bits; it stays at 8`. `shaodesk msg get outputs` ends each line with
 monitor is drawn in, 8 or 10. A 10-bit format does not by itself mean the monitor receives 10 bits:
 that is up to the driver and the link. A wlr-output-management change keeps the configured depth.
 
+### HDR
+
+`hdr = true` in a monitor's entry drives it in HDR, BT.2020 colours with the PQ curve, as
+Hyprland's `cm = hdr` does, and draws it in 10 bits where it can be:
+
+```lua
+outputs = { monitors = { ["DP-3"] = { hdr = true } } },
+```
+
+It takes three things, and without any of them the monitor stays SDR and the log says which:
+the monitor's EDID offering BT.2020 and PQ (with the driver's colour space and HDR metadata
+properties on its connector); a renderer that converts colours, which in wlroots 0.20 is the
+Vulkan renderer alone (`WLR_RENDERER=vulkan` in the session's environment; GLES, the usual one,
+and pixman cannot); and the test of the monitor's settings passing. Switching it on or off may
+blank the monitor for a moment, as a mode change does. `shaodesk msg get outputs` ends each line
+with `hdr` or `sdr`.
+
+Once a monitor asks for HDR, and only with the Vulkan renderer, applications may describe their
+own colours through color-management-v1 (mpv and games run through Proton can):
+parametric descriptions with the gamma 2.2, PQ, linear, BT.1886 and power 2.4 curves, sRGB
+and BT.2020 primaries, and the mastering display's primaries and luminances, with the perceptual
+render intent. Each window is converted from what it says into what its monitor shows, SDR
+windows into HDR on an HDR monitor and HDR video into SDR on another. Without `hdr` on any
+monitor nothing is offered, and applications draw as before.
+
+What wlroots 0.20 does not do: SDR windows on an HDR monitor are shown with a reference white of
+203 cd/m², which no setting changes (Hyprland's `sdrbrightness` and `sdrsaturation` have no
+counterpart), and wide-gamut SDR (`cm = wide`) is not offered; ICC profiles are not taken.
+Night light leaves an HDR monitor alone. A mirror of an HDR monitor shows its picture converted
+to SDR, and a mirror is itself never HDR. Screenshots of an HDR monitor hold its PQ-encoded
+pixels, which look dark and washed out to programs that take them for sRGB.
+
+### Mirroring
+
 A monitor can show another's picture, as Windows' Duplicate and KDE's display mirroring do:
 
 ```lua
@@ -1383,7 +1417,7 @@ the monitor it mirrors is not in the layout (unplugged, `enabled = false`, or be
 lid), it joins the layout as any other monitor does, and leaves it again when that one comes
 back, its windows moving as when a monitor is unplugged. It turns off and on with the monitor it
 mirrors (see [Turning monitors off](#turning-monitors-off)), and `shaodesk msg get outputs` names
-that monitor in its last column. One mirroring a monitor that mirrors another shows that other
+that monitor in a column of its own. One mirroring a monitor that mirrors another shows that other
 one. wlr-output-management clients list it as enabled, at the place of the monitor it mirrors:
 left there, it goes on mirroring; moved elsewhere, it joins the layout there.
 
@@ -2099,8 +2133,8 @@ workspaces holding windows, such as `1,3`, or `-`, and tiling, `on` or `off`),
 `shaodesk msg get tiling` prints `on` or `off` for the focused monitor, `shaodesk msg get outputs` prints one tab-separated line per monitor (name,
 enabled, x, y, logical width and height, scale, transform, mode, "make model serial",
 whether it shows a picture, `on`, or is [turned off](#turning-monitors-off) or disabled, `off`,
-the monitor it [mirrors](#mirroring), or `-`, and the bits per channel it is [drawn
-in](#colour-depth), 8 or 10), and
+the monitor it [mirrors](#mirroring), or `-`, the bits per channel it is [drawn
+in](#colour-depth), 8 or 10, and whether it is driven in [HDR](#hdr), `hdr` or `sdr`), and
 `shaodesk msg get windows` prints one tab-separated line per window:
 workspace, focused, minimized, tiled, x, y, width, height, app ID, title, monitor,
 visible, scratchpad (a window hidden there is also minimized), sticky, its window group

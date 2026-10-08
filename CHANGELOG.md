@@ -405,6 +405,11 @@ shadows.
 - `outputs.monitors[NAME].bit_depth = 10` draws a monitor in 10 bits per channel where the monitor
   and the renderer take it, staying at 8 where they do not; `shaodesk import` carries Hyprland's
   `bitdepth` over, and `shaodesk msg get outputs` ends each line with the depth.
+- HDR: `outputs.monitors[NAME].hdr = true` drives a monitor in BT.2020 with PQ, in 10 bits, where
+  its EDID offers them, the renderer converts colours (Vulkan alone in wlroots 0.20) and the test of
+  its settings passes, and leaves it SDR with the reason in the log otherwise. Applications may
+  then describe their colours through color-management-v1, offered only then. Off by default;
+  `shaodesk import` carries Hyprland's `cm, hdr` over.
 - Tearing for games: with `windows.allow_tearing = true`, a fullscreen window that asks for it
   through tearing-control-v1, or that a rule's `allow_tearing` names (as an X11 game cannot ask),
   has its frames shown at once rather than at the next refresh while nothing else is drawn on its

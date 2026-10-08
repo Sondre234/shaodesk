@@ -1090,3 +1090,22 @@ asynchronous atomic flips late), the kernel refusing one at commit rather than a
 game asking through tearing-control-v1 (Proton, SDL, mpv's `--vo=gpu-next` with
 `wayland-present-mode`), an X11 game through a rule, the interplay with adaptive sync (`vrr`),
 and the hardware cursor over a tearing output.
+
+## HDR
+
+Added 2026-10-08. `hdr_smoke` on headless outputs with pixman: without `hdr` nothing is offered and
+nothing logged; a monitor asking for HDR without it in its EDID stays SDR and says so, and one whose
+EDID would offer it (`SHAODESK_TEST_HDR`) stays SDR for the renderer, which cannot convert colours.
+With `SHAODESK_TEST_VULKAN=1` it ran here on the Vulkan renderer of an NVIDIA RTX 4090 (driver
+595.99.02): color-management-v1 was offered, the headless backend's test refused the colour space,
+and the monitor stayed SDR and drawn as before, its mirror's picture the background's colour, and
+SDR after a reload without `hdr`. The headless backend takes no colour space, so nothing here drove
+a monitor in HDR. `output_config` reads the setting and `import` Hyprland's `cm`.
+
+Not checked, for want of an HDR monitor here: a real one driven in BT.2020 with PQ through DRM (the
+connector's colour space and HDR metadata, how long the switch blanks it, on AMD, Intel and
+NVIDIA); SDR windows' brightness on it; mpv (`--vo=gpu-next --target-colorspace-hint`), a game
+through Proton and Gamescope describing their colours through color-management-v1, and how the
+scene converts them; direct scan-out of an HDR video; the hardware cursor's colours; night light
+left off it; a mirror of it converting the picture to SDR; screenshots and screen sharing of it;
+and the Vulkan renderer as a daily one (wlroots calls it experimental).

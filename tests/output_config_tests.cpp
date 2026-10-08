@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Configuration of what a monitor shows: mirroring another one, the display_mode action, the bits
-// per channel it is drawn in, and tearing.
+// per channel it is drawn in, HDR, and tearing.
 #include "shaodesk/config.hpp"
 #include <iostream>
 #include <stdexcept>
@@ -72,6 +72,14 @@ int main() {
         rejects("return {outputs={monitors={X={bit_depth=12}}}}");
         rejects("return {outputs={monitors={X={bit_depth='10'}}}}");
         rejects("return {outputs={monitors={X={bit_depth=10.5}}}}");
+
+        // HDR is off unless a monitor asks for it.
+        auto hdr = shaodesk::parse_config(
+            "return {outputs={monitors={['DP-1']={hdr=true},['DP-2']={hdr=false},['DP-3']={}}}}");
+        require(monitor(hdr, "DP-1").hdr && !monitor(hdr, "DP-2").hdr && !monitor(hdr, "DP-3").hdr,
+                "hdr not parsed");
+        rejects("return {outputs={monitors={X={hdr='on'}}}}");
+        rejects("return {outputs={monitors={X={hdr=1}}}}");
 
         // Tearing is off unless allowed, and a rule may let a window tear that does not ask.
         require(!shaodesk::parse_config("return {}").settings.allow_tearing,
