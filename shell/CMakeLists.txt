@@ -37,6 +37,9 @@ set(SHAODESK_START_SOURCES start_menu.cpp start_menu.hpp launch_history.cpp laun
 set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_images.cpp
     notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp tray.cpp tray.hpp
     tray_images.cpp tray_images.hpp)
+# What the compositor passes on from the volume, microphone and brightness keys, which feeds the
+# on-screen display too.
+list(APPEND SHAODESK_NOTIFY_SOURCES volume_keys.cpp volume_keys.hpp)
 # The QML is compiled ahead of time into the binary (qmlcachegen), so starting the shell parses
 # and compiles none of it. It lives at qrc:/shell/ShaodeskShell/*.qml.
 qt_add_library(shaodesk_shell_qml STATIC)
@@ -296,6 +299,18 @@ if(BUILD_TESTING)
     target_link_libraries(system_status_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME shell_system_status COMMAND system_status_test)
     set_tests_properties(shell_system_status PROPERTIES TIMEOUT 90)
+    # The volume, microphone and brightness keys, on stand-ins for the sound server, a backlight
+    # and wpctl.
+    add_executable(volume_keys_test ${PROJECT_SOURCE_DIR}/tests/volume_keys_test.cpp
+        volume_keys.cpp volume_keys.hpp audio.cpp audio.hpp backlight.cpp backlight.hpp osd.cpp
+        osd.hpp)
+    set_target_properties(volume_keys_test PROPERTIES AUTOMOC ON)
+    target_include_directories(volume_keys_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(volume_keys_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(volume_keys_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(volume_keys_test PRIVATE shaodesk_config Qt6::Core Qt6::Test)
+    add_test(NAME shell_volume_keys COMMAND volume_keys_test)
+    set_tests_properties(shell_volume_keys PROPERTIES TIMEOUT 30)
     # Which window's process plays a stream of the sound server, on a made-up procfs and the real
     # one.
     add_executable(window_sound_test ${PROJECT_SOURCE_DIR}/tests/window_sound_test.cpp
