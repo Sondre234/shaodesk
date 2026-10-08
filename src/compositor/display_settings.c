@@ -301,8 +301,9 @@ static void apply_saved(struct sh_server *server, const struct sh_output_state *
     if (!server->display_settings.trial) {
         server->display_settings.kept = server->display_settings.saved;
         for (int i = 0; i < count; ++i) {
-            snprintf(server->display_settings.before[i].name, sizeof(server->display_settings.before[i].name),
-                     "%s", outputs[i]->wlr_output->name);
+            char *name = server->display_settings.before[i].name;
+            snprintf(name, sizeof(server->display_settings.before[i].name), "%s",
+                     outputs[i]->wlr_output->name);
             server->display_settings.before[i].has_override = outputs[i]->has_override;
             server->display_settings.before[i].override = outputs[i]->override;
         }
@@ -357,6 +358,14 @@ static int trial_over(void *data) {
  * the time to keep them starts. False, with why, when nothing is on trial. */
 static bool start_trial(struct sh_server *server, const struct sh_output_state *next, char *error,
                         size_t error_size) {
+    // Nothing changes that could not go back by itself.
+    if (!server->display_settings.timer)
+        server->display_settings.timer = wl_event_loop_add_timer(
+            wl_display_get_event_loop(server->wl_display), trial_over, server);
+    if (!server->display_settings.timer) {
+        snprintf(error, error_size, "no timer to take the settings back; nothing changed");
+        return false;
+    }
     struct sh_output *outputs[SH_OUTPUT_STATE_MAX];
     int count = connected_outputs(server, outputs);
     for (int i = 0; i < count; ++i) {
@@ -387,11 +396,7 @@ static bool start_trial(struct sh_server *server, const struct sh_output_state *
         return false;
     }
     int ms = trial_ms(server);
-    if (!server->display_settings.timer)
-        server->display_settings.timer = wl_event_loop_add_timer(
-            wl_display_get_event_loop(server->wl_display), trial_over, server);
-    if (server->display_settings.timer)
-        wl_event_source_timer_update(server->display_settings.timer, ms);
+    wl_event_source_timer_update(server->display_settings.timer, ms);
     server->display_settings.trial_ends = now_ms() + ms;
     char line[64];
     snprintf(line, sizeof(line), "monitors-trial %d\n", ms);
