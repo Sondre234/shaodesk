@@ -383,6 +383,10 @@ struct sh_settings {
      * back as the next starts. */
     int session_restore;
     struct sh_gesture_settings gestures;
+    /* touch.output: the output touchscreens are mapped to, by connector name or "desc:" and the
+     * start of its description; "" for the one the device names, else a built-in panel, else
+     * the whole layout. */
+    char touch_output[128];
 };
 
 /* What a login session keeps of the last one: nothing; where its windows were, for those that open

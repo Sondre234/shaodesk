@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /* A window that prints the input it gets, a line per event, for the input tests: the pointer
- * entering, moving and pressing buttons over it, and touchpad gestures through
- * pointer-gestures-unstable-v1. It prints "ready" once it has drawn, and runs until it is ended.
+ * entering, moving and pressing buttons over it, touchpad gestures through
+ * pointer-gestures-unstable-v1, and fingers on a touchscreen through wl_touch. It prints "ready"
+ * once it has drawn, and runs until it is ended.
  *   pointer enter X Y | pointer leave | pointer motion X Y | pointer button CODE pressed|released
  *   swipe begin FINGERS | swipe update DX DY | swipe end CANCELLED
  *   pinch begin FINGERS | pinch update DX DY SCALE ROTATION | pinch end CANCELLED
  *   hold begin FINGERS | hold end CANCELLED
- * Usage: input_probe [--no-gestures] [TITLE]: without the gestures it never binds them, as most
- * applications. */
+ *   touch down ID X Y | touch motion ID X Y | touch up ID | touch frame | touch cancel
+ * Usage: input_probe [--no-gestures] [--no-touch] [--layer] [TITLE]: without the gestures or
+ * touch it never binds them, as most applications; with --layer it is a panel along the bottom
+ * of the output, 60 pixels high, rather than a window. */
 #define _GNU_SOURCE
 #include "pointer-gestures-unstable-v1-client-protocol.h"
+#include "wlr-layer-shell-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 #include <stdarg.h>
 #include <stdbool.h>
@@ -35,6 +39,10 @@ struct probe {
     struct zwp_pointer_gestures_v1 *gestures;
     uint32_t gestures_version;
     bool want_gestures;
+    struct wl_touch *touch;
+    bool want_touch;
+    struct zwlr_layer_shell_v1 *layer_shell;
+    struct zwlr_layer_surface_v1 *layer;
     struct wl_surface *surface;
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *toplevel;
@@ -136,8 +144,39 @@ static void hold_end(void *data, struct zwp_pointer_gesture_hold_v1 *hold, uint3
 static const struct zwp_pointer_gesture_hold_v1_listener hold_listener = {.begin = hold_begin,
                                                                           .end = hold_end};
 
+static void touch_down(void *data, struct wl_touch *touch, uint32_t serial, uint32_t time,
+                       struct wl_surface *surface, int32_t id, wl_fixed_t x, wl_fixed_t y) {
+    say("touch down %d %.0f %.0f", id, wl_fixed_to_double(x), wl_fixed_to_double(y));
+}
+static void touch_up(void *data, struct wl_touch *touch, uint32_t serial, uint32_t time,
+                     int32_t id) {
+    say("touch up %d", id);
+}
+static void touch_motion(void *data, struct wl_touch *touch, uint32_t time, int32_t id,
+                         wl_fixed_t x, wl_fixed_t y) {
+    say("touch motion %d %.0f %.0f", id, wl_fixed_to_double(x), wl_fixed_to_double(y));
+}
+static void touch_frame(void *data, struct wl_touch *touch) {
+    say("touch frame");
+}
+static void touch_cancel(void *data, struct wl_touch *touch) {
+    say("touch cancel");
+}
+static const struct wl_touch_listener touch_listener = {.down = touch_down,
+                                                        .up = touch_up,
+                                                        .motion = touch_motion,
+                                                        .frame = touch_frame,
+                                                        .cancel = touch_cancel};
+
 static void seat_capabilities(void *data, struct wl_seat *seat, uint32_t capabilities) {
     struct probe *probe = data;
+    if ((capabilities & WL_SEAT_CAPABILITY_TOUCH) && !probe->touch && probe->want_touch) {
+        probe->touch = wl_seat_get_touch(seat);
+        wl_touch_add_listener(probe->touch, &touch_listener, probe);
+    } else if (!(capabilities & WL_SEAT_CAPABILITY_TOUCH) && probe->touch) {
+        wl_touch_release(probe->touch);
+        probe->touch = NULL;
+    }
     if ((capabilities & WL_SEAT_CAPABILITY_POINTER) && !probe->pointer) {
         probe->pointer = wl_seat_get_pointer(seat);
         wl_pointer_add_listener(probe->pointer, &pointer_listener, probe);
@@ -177,6 +216,8 @@ static void global(void *data, struct wl_registry *registry, uint32_t name, cons
     } else if (!strcmp(interface, wl_seat_interface.name) && !probe->seat) {
         probe->seat = wl_registry_bind(registry, name, &wl_seat_interface, version < 5 ? version : 5);
         wl_seat_add_listener(probe->seat, &seat_listener, probe);
+    } else if (!strcmp(interface, zwlr_layer_shell_v1_interface.name)) {
+        probe->layer_shell = wl_registry_bind(registry, name, &zwlr_layer_shell_v1_interface, 1);
     } else if (!strcmp(interface, zwp_pointer_gestures_v1_interface.name)) {
         probe->gestures_version = version < 3 ? version : 3;
         probe->gestures = wl_registry_bind(registry, name, &zwp_pointer_gestures_v1_interface,
@@ -237,12 +278,33 @@ static void toplevel_close(void *data, struct xdg_toplevel *toplevel) { exit(0);
 static const struct xdg_toplevel_listener toplevel_listener = {.configure = toplevel_configure,
                                                                .close = toplevel_close};
 
+static void layer_configure(void *data, struct zwlr_layer_surface_v1 *layer, uint32_t serial,
+                            uint32_t width, uint32_t height) {
+    struct probe *probe = data;
+    zwlr_layer_surface_v1_ack_configure(layer, serial);
+    probe->width = width > 0 && width <= 8192 ? (int)width : 400;
+    probe->height = height > 0 && height <= 8192 ? (int)height : 60;
+    wl_surface_attach(probe->surface, make_buffer(probe), 0, 0);
+    wl_surface_damage_buffer(probe->surface, 0, 0, probe->width, probe->height);
+    if (!probe->ready)
+        wl_callback_add_listener(wl_surface_frame(probe->surface), &frame_listener, probe);
+    wl_surface_commit(probe->surface);
+}
+static void layer_closed(void *data, struct zwlr_layer_surface_v1 *layer) { exit(0); }
+static const struct zwlr_layer_surface_v1_listener layer_listener = {.configure = layer_configure,
+                                                                     .closed = layer_closed};
+
 int main(int argc, char **argv) {
-    struct probe probe = {.want_gestures = true, .width = 400, .height = 300};
+    struct probe probe = {.want_gestures = true, .want_touch = true, .width = 400, .height = 300};
     const char *title = "input probe";
+    bool layer = false;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--no-gestures"))
             probe.want_gestures = false;
+        else if (!strcmp(argv[i], "--no-touch"))
+            probe.want_touch = false;
+        else if (!strcmp(argv[i], "--layer"))
+            layer = true;
         else
             title = argv[i];
     }
@@ -258,12 +320,25 @@ int main(int argc, char **argv) {
     if (probe.want_gestures && !probe.gestures)
         die("zwp_pointer_gestures_v1 is not offered");
     probe.surface = wl_compositor_create_surface(probe.compositor);
-    probe.xdg_surface = xdg_wm_base_get_xdg_surface(probe.shell, probe.surface);
-    xdg_surface_add_listener(probe.xdg_surface, &surface_listener, &probe);
-    probe.toplevel = xdg_surface_get_toplevel(probe.xdg_surface);
-    xdg_toplevel_add_listener(probe.toplevel, &toplevel_listener, &probe);
-    xdg_toplevel_set_title(probe.toplevel, title);
-    xdg_toplevel_set_app_id(probe.toplevel, "input-probe");
+    if (layer) {
+        if (!probe.layer_shell)
+            die("zwlr_layer_shell_v1 is not offered");
+        probe.layer = zwlr_layer_shell_v1_get_layer_surface(
+            probe.layer_shell, probe.surface, NULL, ZWLR_LAYER_SHELL_V1_LAYER_TOP, title);
+        zwlr_layer_surface_v1_add_listener(probe.layer, &layer_listener, &probe);
+        zwlr_layer_surface_v1_set_size(probe.layer, 0, 60);
+        zwlr_layer_surface_v1_set_anchor(probe.layer, ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM |
+                                                          ZWLR_LAYER_SURFACE_V1_ANCHOR_LEFT |
+                                                          ZWLR_LAYER_SURFACE_V1_ANCHOR_RIGHT);
+        zwlr_layer_surface_v1_set_exclusive_zone(probe.layer, 60);
+    } else {
+        probe.xdg_surface = xdg_wm_base_get_xdg_surface(probe.shell, probe.surface);
+        xdg_surface_add_listener(probe.xdg_surface, &surface_listener, &probe);
+        probe.toplevel = xdg_surface_get_toplevel(probe.xdg_surface);
+        xdg_toplevel_add_listener(probe.toplevel, &toplevel_listener, &probe);
+        xdg_toplevel_set_title(probe.toplevel, title);
+        xdg_toplevel_set_app_id(probe.toplevel, "input-probe");
+    }
     wl_surface_commit(probe.surface);
     while (wl_display_dispatch(display) >= 0)
         ;

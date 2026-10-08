@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
 /* Input devices without hardware, for tests under --headless, as headless keyboards are
  * (input.c): pointers that move and make touchpad gestures, which no virtual-pointer client can
- * send. They are devices like any other once plugged in. */
+ * send, and touchscreens. They are devices like any other once plugged in. */
 #include "server.h"
 #include <wlr/interfaces/wlr_pointer.h>
+#include <wlr/interfaces/wlr_touch.h>
 
 /* Splits `arguments` into at most `size` words in `words`, each at most 63 bytes; returns how
  * many there were, or size + 1 when there were more. */
@@ -218,8 +219,135 @@ void control_headless_pointer(struct sh_server *server, int fd, const char *argu
     control_reply(fd, usage);
 }
 
+/* Touchscreens: "headless_touch add NAME [OUTPUT]" (OUTPUT: the output the device names, as
+ * libinput's WL_OUTPUT does), "headless_touch remove NAME", and fingers, at the place on the
+ * screen from 0 to 1 across and down as libinput gives it, each with an optional event time last:
+ *   headless_touch down|motion NAME ID X Y [TIME]
+ *   headless_touch up|cancel NAME ID [TIME]
+ *   headless_touch frame NAME */
+struct sh_headless_touch {
+    struct wlr_touch touch;
+    struct wl_list link; // sh_server.headless_touches
+};
+static const struct wlr_touch_impl headless_touch_impl = {.name = "headless-touch"};
+
+static struct sh_headless_touch *find_headless_touch(struct sh_server *server, const char *name) {
+    struct sh_headless_touch *touch;
+    wl_list_for_each(touch, &server->headless_touches, link) {
+        if (!strcmp(touch->touch.base.name, name))
+            return touch;
+    }
+    return NULL;
+}
+
+static void remove_headless_touch(struct sh_headless_touch *touch) {
+    wl_list_remove(&touch->link);
+    wlr_touch_finish(&touch->touch); // unplugs it, and frees its output's name
+    free(touch);
+}
+
+/* Runs a finger's command (words from the verb on); false when it is not a valid one. */
+static bool headless_finger(struct sh_headless_touch *headless, char words[][64], int count) {
+    struct wlr_touch *touch = &headless->touch;
+    const char *verb = words[0];
+    uint32_t time = 0;
+    if (!strcmp(verb, "frame")) {
+        if (count != 2)
+            return false;
+        wl_signal_emit_mutable(&touch->events.frame, NULL);
+        return true;
+    }
+    char *end = NULL;
+    long id = count >= 3 ? strtol(words[2], &end, 10) : -1;
+    if (count < 3 || end == words[2] || *end || id < 0 || id > INT32_MAX)
+        return false;
+    if (!strcmp(verb, "up") || !strcmp(verb, "cancel")) {
+        if (!event_time(words, count, 3, &time))
+            return false;
+        if (!strcmp(verb, "up")) {
+            struct wlr_touch_up_event event = {touch, time, (int32_t)id};
+            wl_signal_emit_mutable(&touch->events.up, &event);
+        } else {
+            struct wlr_touch_cancel_event event = {touch, time, (int32_t)id};
+            wl_signal_emit_mutable(&touch->events.cancel, &event);
+        }
+        return true;
+    }
+    double x, y;
+    if (count < 5 || !parse_double(words[3], &x) || !parse_double(words[4], &y) || x < 0 ||
+        x > 1 || y < 0 || y > 1 || !event_time(words, count, 5, &time))
+        return false;
+    if (!strcmp(verb, "down")) {
+        struct wlr_touch_down_event event = {touch, time, (int32_t)id, x, y};
+        wl_signal_emit_mutable(&touch->events.down, &event);
+    } else {
+        struct wlr_touch_motion_event event = {touch, time, (int32_t)id, x, y};
+        wl_signal_emit_mutable(&touch->events.motion, &event);
+    }
+    return true;
+}
+
+void control_headless_touch(struct sh_server *server, int fd, const char *arguments) {
+    static const char *usage =
+        "error: usage: headless_touch add NAME [OUTPUT] | remove NAME | down|motion NAME ID X Y "
+        "[TIME] | up|cancel NAME ID [TIME] | frame NAME\n";
+    if (!headless_backend(server)) {
+        control_reply(fd, "error: headless_touch needs --headless\n");
+        return;
+    }
+    char words[8][64];
+    int count = split_words(arguments, words, 8);
+    if (count < 2 || count > 8) {
+        control_reply(fd, usage);
+        return;
+    }
+    const char *verb = words[0], *name = words[1];
+    struct sh_headless_touch *touch = find_headless_touch(server, name);
+    if (!strcmp(verb, "add") && count <= 3) {
+        if (touch) {
+            control_reply(fd, "error: a touchscreen with that name exists\n");
+            return;
+        }
+        touch = calloc(1, sizeof(*touch));
+        if (!touch) {
+            control_reply(fd, "error: out of memory\n");
+            return;
+        }
+        wlr_touch_init(&touch->touch, &headless_touch_impl, name);
+        if (count == 3)
+            touch->touch.output_name = strdup(words[2]);
+        wl_list_insert(&server->headless_touches, &touch->link);
+        server_new_input(&server->new_input, &touch->touch.base);
+        control_reply(fd, "ok\n");
+        return;
+    }
+    bool known = !strcmp(verb, "remove") || !strcmp(verb, "down") || !strcmp(verb, "motion") ||
+                 !strcmp(verb, "up") || !strcmp(verb, "cancel") || !strcmp(verb, "frame");
+    if (!known) {
+        control_reply(fd, usage);
+        return;
+    }
+    if (!touch) {
+        control_reply(fd, "error: no such touchscreen\n");
+        return;
+    }
+    if (!strcmp(verb, "remove") && count == 2) {
+        remove_headless_touch(touch);
+        control_reply(fd, "ok\n");
+        return;
+    }
+    if (strcmp(verb, "remove") && headless_finger(touch, words, count)) {
+        control_reply(fd, "ok\n");
+        return;
+    }
+    control_reply(fd, usage);
+}
+
 void destroy_headless_inputs(struct sh_server *server) {
     struct sh_headless_pointer *pointer, *temporary;
     wl_list_for_each_safe(pointer, temporary, &server->headless_pointers, link)
         remove_headless_pointer(pointer);
+    struct sh_headless_touch *touch, *next;
+    wl_list_for_each_safe(touch, next, &server->headless_touches, link)
+        remove_headless_touch(touch);
 }

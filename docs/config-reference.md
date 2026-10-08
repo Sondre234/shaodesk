@@ -60,6 +60,13 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `touchpad.tap_to_click` | boolean | unset | - | Tap to click; unset keeps the device default. |
 | `touchpad.disable_while_typing` | boolean | unset | - | Ignore the touchpad while typing; unset keeps the device default. |
 
+## `touch`
+
+| Setting | Type | Default | Range | Description |
+| --- | --- | --- | --- | --- |
+| `touch` | table | - | - | Touchscreens (standalone sessions): each finger goes to what is under it. |
+| `touch.output` | string | unset | - | The monitor touchscreens are mapped to, by connector name or `"desc:"` and the start of its description as in `outputs.monitors`. Unset, a touchscreen goes to the monitor its device names, else to the built-in panel (eDP, LVDS or DSI), else across every monitor. |
+
 ## `layout`
 
 | Setting | Type | Default | Range | Description |

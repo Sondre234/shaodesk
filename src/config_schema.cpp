@@ -85,6 +85,13 @@ const Option options[] = {
     {"touchpad.disable_while_typing", "boolean", "unset", "true", none, none,
      "Ignore the touchpad while typing; unset keeps the device default."},
 
+    {"touch", "table", "", "", none, none,
+     "Touchscreens (standalone sessions): each finger goes to what is under it."},
+    {"touch.output", "string", "unset", "\"eDP-1\"", none, none,
+     "The monitor touchscreens are mapped to, by connector name or `\"desc:\"` and the start of its "
+     "description as in `outputs.monitors`. Unset, a touchscreen goes to the monitor its device "
+     "names, else to the built-in panel (eDP, LVDS or DSI), else across every monitor."},
+
     {"layout", "table", "", "", none, none, "Gaps, workspaces, and tiling."},
     {"layout.gap", "integer", "8", "8", 0, 100,
      "Pixels between windows and at the screen edges; `gap_inner` and `gap_outer` override it."},

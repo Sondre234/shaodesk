@@ -282,6 +282,27 @@ static struct sh_toplevel *tabs_at(struct sh_server *server, double x, double y,
     return *index < 0 ? NULL : toplevel;
 }
 
+/* The client surface a press at (x, y) reaches, at (*sx, *sy) on it, and the window or panel it
+ * belongs to in *owner (NULL for a popup or an unmanaged X11 window); NULL where the compositor
+ * takes the press itself (window controls and their corner, tab strips, a window's drag strip,
+ * resize bands) or there is only the desktop. touch.c gives such a surface a finger and the rest
+ * to the pointer. */
+struct wlr_surface *press_target_at(struct sh_server *server, double x, double y, double *sx,
+                                    double *sy, struct sh_node **owner) {
+    enum sh_deco_part part;
+    int tab;
+    if (deco_at(server, x, y, &part) || tabs_at(server, x, y, &tab))
+        return NULL;
+    struct wlr_surface *surface = NULL;
+    struct sh_node *node = desktop_node_at(server, x, y, &surface, sx, sy);
+    struct sh_toplevel *toplevel = node && node->kind == SH_NODE_TOPLEVEL ? node->owner : NULL;
+    if (!surface || drag_strip_at(toplevel, surface, y) ||
+        (toplevel && toplevel->deco && in_deco_corner(toplevel, x, y)))
+        return NULL;
+    *owner = node;
+    return surface;
+}
+
 static void set_tabs_hovered(struct sh_server *server, struct sh_toplevel *toplevel, int index) {
     struct sh_toplevel *old = server->tabs_hovered;
     if (old == toplevel && server->tabs_hovered_index == index)

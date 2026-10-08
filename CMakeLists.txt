@@ -225,6 +225,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/swallow.c
         src/compositor/switcher.c
         src/compositor/tiling.c
+        src/compositor/touch.c
         src/compositor/toplevel.c
         src/compositor/window_control.c
         src/compositor/window_icon.c
@@ -392,6 +393,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
         add_executable(input_probe tests/input_probe.c
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.c
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-layer-shell-unstable-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-layer-shell-unstable-v1-protocol.c
             ${CMAKE_CURRENT_BINARY_DIR}/pointer-gestures-unstable-v1-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/pointer-gestures-unstable-v1-protocol.c)
         target_include_directories(input_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
@@ -639,6 +642,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/touchpad_gestures_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:input_probe>)
         set_tests_properties(touchpad_gestures_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME touchscreen_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/touchscreen_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:input_probe> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(touchscreen_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME spawn_at_pointer_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/spawn_at_pointer_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>)

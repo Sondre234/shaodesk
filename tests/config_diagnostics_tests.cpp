@@ -170,13 +170,13 @@ void schema_matches_parser() {
     // Each top-level key the parser knows is in the schema and the other way around.
     for (const char *name : {"version", "extends", "theme", "appearance", "keyboard", "mouse",
                              "touchpad", "layout", "outputs", "windows", "animations", "bindings",
-                             "startup", "shell", "xwayland", "screenshots", "features", "overview", "peek", "night_light", "hot_corners", "zoom", "notifications", "osd", "profile", "profiles", "auto_reload", "power", "terminal", "autostart", "session", "gestures"}) {
+                             "startup", "shell", "xwayland", "screenshots", "features", "overview", "peek", "night_light", "hot_corners", "zoom", "notifications", "osd", "profile", "profiles", "auto_reload", "power", "terminal", "autostart", "session", "gestures", "touch"}) {
         bool found = false;
         for (const auto *child : shaodesk::config_children(""))
             found = found || std::string(child->path) == name;
         require(found, std::string(name) + " missing from the schema");
     }
-    require(shaodesk::config_children("").size() == 32, "the schema has an unknown top-level key");
+    require(shaodesk::config_children("").size() == 33, "the schema has an unknown top-level key");
     // A key that is in the schema is accepted by keys(), however deeply nested.
     require(accepted("return {windows={rules={{app_id='x',sticky=true,focus=false}}}}"),
             "rule keys rejected");

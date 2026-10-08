@@ -96,6 +96,7 @@
 #include <wlr/types/wlr_session_lock_v1.h>
 #include <wlr/types/wlr_single_pixel_buffer_v1.h>
 #include <wlr/types/wlr_subcompositor.h>
+#include <wlr/types/wlr_touch.h>
 #include <wlr/types/wlr_viewporter.h>
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/types/wlr_xdg_activation_v1.h>
@@ -260,6 +261,19 @@ struct sh_workspace_swipe {
     double shown;
     struct sh_anim *copies[64];
     int copy_count;
+};
+
+/* Touchscreens (touch.c): the devices, the finger standing in for the pointer (-1 for none),
+ * and where the surface each other finger is on was in the layout as the finger came down. */
+struct sh_touch_point {
+    int32_t id;
+    bool used;
+    double origin_x, origin_y;
+};
+struct sh_touch {
+    struct wl_list devices; // struct sh_touch_device
+    int32_t pointer_id;
+    struct sh_touch_point points[16];
 };
 
 /* The touchpad swipe under way (gestures.c). */
@@ -441,6 +455,8 @@ struct sh_server {
     struct wl_listener pinch_begin, pinch_update, pinch_end;
     struct wl_listener hold_begin, hold_end;
     struct sh_gesture gesture;
+    struct sh_touch touch;
+    struct wl_listener touch_down, touch_motion, touch_up, touch_cancel, touch_frame;
 
     struct wlr_seat *seat;
     struct wl_listener new_input;
@@ -470,6 +486,7 @@ struct sh_server {
     bool syncing_keyboards;
     struct wl_list headless_keyboards; // added by tests with "headless_keyboard add"
     struct wl_list headless_pointers;  // and "headless_pointer add" (headless_input.c)
+    struct wl_list headless_touches;   // and "headless_touch add"
     struct wl_list pointers; /* struct sh_pointer */
     enum sh_cursor_mode cursor_mode;
     struct sh_toplevel *grabbed_toplevel;
@@ -784,6 +801,8 @@ void server_cursor_frame(struct wl_listener *listener, void *data);
 void seat_request_cursor(struct wl_listener *listener, void *data);
 void set_default_cursor(struct sh_server *server);
 struct sh_toplevel *toplevel_at(struct sh_server *server, double x, double y);
+struct wlr_surface *press_target_at(struct sh_server *server, double x, double y, double *sx,
+                                    double *sy, struct sh_node **owner);
 void seat_pointer_focus_change(struct wl_listener *listener, void *data);
 
 /* effects.c */
@@ -881,6 +900,7 @@ void dissolve_groups(struct sh_server *server);
 
 /* headless_input.c */
 void control_headless_pointer(struct sh_server *server, int fd, const char *arguments);
+void control_headless_touch(struct sh_server *server, int fd, const char *arguments);
 void destroy_headless_inputs(struct sh_server *server);
 
 /* input.c */
@@ -1072,6 +1092,13 @@ void configure_layouts(struct sh_server *server);
 void apply_output_layout(struct sh_server *server, const struct wlr_output *output);
 void reconfigure_tiling(struct sh_server *server);
 void layout_action(struct sh_server *server, enum sh_action action);
+
+/* touch.c */
+void map_touchscreens(struct sh_server *server);
+void server_new_touch(struct sh_server *server, struct wlr_input_device *input);
+void describe_touch(struct sh_server *server, int fd);
+void touch_init(struct sh_server *server);
+void touch_finish(struct sh_server *server);
 
 /* toplevel.c */
 struct wlr_surface *toplevel_surface(struct sh_toplevel *toplevel);

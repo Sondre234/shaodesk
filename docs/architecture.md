@@ -42,11 +42,12 @@ all. In short:
 | `actions.c` | `run_action`: one `case` per action, handing it to the module that does it. |
 | `control.c` | The control socket: reading requests, commands that are not actions, subscribers and shell events. |
 | `query.c` | `shaodesk msg get ...`: one function per query, and the table that names them. |
-| `headless_input.c` | Input devices without hardware for tests under `--headless`: pointers that move and make touchpad gestures. |
+| `headless_input.c` | Input devices without hardware for tests under `--headless`: pointers that move and make touchpad gestures, and touchscreens. |
 | `input.c` | Keyboards, key bindings, pointers' libinput settings, virtual devices, selection and drag-and-drop. |
 | `keymap.c` | The keymap from the keyboard settings, given to every keyboard but virtual ones. |
 | `cursor.c` | What is under the pointer, focus on hover, button bindings, scrolling, the cursor image. |
 | `gestures.c` | Touchpad gestures: the swipes `gestures` takes (workspaces and the overview following the fingers, requests), and the rest passed on to the surface under the pointer (pointer-gestures-unstable-v1). |
+| `touch.c` | Touchscreens: fingers to the surfaces under them (wl_touch), the pointer for clients without touch and the compositor's own controls, and the output each screen is mapped to. |
 | `grab.c` | Moving and resizing with the pointer, magnetic edges, dropping. |
 | `focus.c` | Keyboard focus and urgent windows. |
 | `toplevel.c` | Windows: xdg-shell toplevels and popups, opening by window rules, maximize, fullscreen, minimize. |
@@ -216,6 +217,18 @@ from their copies with `sh_anim_slide_from`, each in what remains of the slide's
 everything back. The overview follows them through `overview_hold` and `overview_release`, which
 set its `progress` in place of its timer's. `tests/touchpad_gestures_smoke.py` drives all of it
 with a headless pointer, at the event times it gives.
+
+### Touchscreens
+
+`touch.c` hears the cursor's touch events. A finger coming down asks `press_target_at`
+(`cursor.c`) what a press there reaches: a client's surface, or nothing where the compositor takes
+presses itself (window controls and their corner, tab strips, drag strips, resize bands) or there
+is only the desktop. A surface whose client bound wl_touch (`wlr_surface_accepts_touch`) gets the
+finger through the seat, and where the surface was in the layout is kept, so that the finger's
+motion stays in its coordinates when it leaves it. Anything else gets the first finger as the
+pointer: the cursor warps to it and `server_cursor_button` hears a left button as from a mouse, so
+the controls, the drag strip, button bindings and the overview take it as a click.
+`map_touchscreens`, which `arrange_outputs` calls, maps each device to its output.
 
 ## The shell (`shell/`)
 
@@ -649,11 +662,14 @@ them in `shell/controller.cpp`.
   `SHAODESK_BUILD_COMPOSITOR` in `CMakeLists.txt`. A temporary directory's prefix stays at 26
   characters or fewer: the control socket goes in it, a Unix socket's path is limited to about
   107 bytes, and a Gentoo package build runs the tests in a `TMPDIR` of 43 characters or more.
-  Under `--headless`, `shaodesk msg headless_output`, `headless_keyboard` and `headless_pointer`
-  plug in outputs, keyboards and pointers (`headless_keyboard key NAME CODE press` types on one,
-  see `keymap_smoke.py`; `headless_pointer swipe NAME update DX DY [TIME]` moves a touchpad
-  gesture's fingers, at a given time in milliseconds; see `pointer_gestures_smoke.py`, whose
-  `input_probe` window prints the input it gets, a line per event), and `wayland_probe --keymap` prints the keymap an application gets. A `wayland_probe` window with
+  Under `--headless`, `shaodesk msg headless_output`, `headless_keyboard`, `headless_pointer`
+  and `headless_touch` plug in outputs, keyboards, pointers and touchscreens
+  (`headless_keyboard key NAME CODE press` types on one, see `keymap_smoke.py`;
+  `headless_pointer swipe NAME update DX DY [TIME]` moves a touchpad gesture's fingers, at a given
+  time in milliseconds, see `pointer_gestures_smoke.py`; `headless_touch down NAME ID X Y` puts a
+  finger on a screen, see `touchscreen_smoke.py`). The `input_probe` window (or panel, with
+  `--layer`) prints the input it gets, a line per event, and `wayland_probe --keymap` prints the
+  keymap an application gets. A `wayland_probe` window with
   `SHAODESK_PROBE_DRAG=source` drags a line of text on a button press of `pointer_probe`'s, and
   one with `=target` takes it, each printing what it hears; `get seat` says where the drag is
   (see `drag_focus_smoke.py`). `SHAODESK_PROBE_ICON` gives a `wayland_probe` window an icon

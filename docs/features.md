@@ -1183,6 +1183,33 @@ GTK 3 and 4 applications get their swipes and pinches. The pointer stays where i
 fingers move, and the window it is on gets the gesture whether it has focus or not; a window that
 never asked for gestures gets none. Two fingers scroll, as before.
 
+### Touchscreens
+
+A touchscreen's fingers go to what is under them, as on sway: each to the window, panel or popup
+it comes down on, through wl_touch, several at once on one window or on several, and the window
+(or a panel that takes the keyboard) a finger comes down on takes focus as it would from a click.
+A finger keeps the surface it came down on until it lifts, wherever it moves. GTK, Qt, Firefox and
+Chromium take touch themselves, the shell's panels and menus too, and X11 applications through
+Xwayland. An application that never asks for touch gets the first finger as the pointer and its
+left button instead, and so do the window controls (a tap on one acts as a click), a window's
+drag strip (a finger on it drags the window), the overview and the bare desktop; one finger at a
+time stands in for the pointer, which follows it.
+
+A touchscreen covers the monitor `touch.output` names, by connector or `desc:` as
+`outputs.monitors` does; else the monitor its device names (udev's `WL_OUTPUT`); else the
+built-in panel, a connector whose name starts with eDP, LVDS or DSI; else every monitor at once.
+Plugging a monitor in or out, or a reload, maps it again:
+
+```lua
+touch = { output = "eDP-1" },
+```
+
+Applications see a touch capability only while a touchscreen is plugged in, so that none binds
+wl_touch on a desktop without one. `shaodesk msg get touch` lists each touchscreen and the
+monitor it is mapped to (`-` for every one), the finger standing in for the pointer (`pointer
+ID`), and each other finger down with the surface it went to (`point ID`, as `get seat` names
+surfaces).
+
 ### Nested sessions
 
 The host compositor can consume shortcuts before the nested compositor receives

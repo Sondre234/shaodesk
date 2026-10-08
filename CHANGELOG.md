@@ -256,6 +256,12 @@ shadows.
   sets the swipes the compositor takes (fingers and direction to a request, as hot corners take),
   the distance of a step and inversion; every other gesture still reaches the window.
   `shaodesk msg get gesture` says what the swipe under way does.
+- Touchscreens: each finger goes to the window, panel or popup under it through wl_touch, several
+  at once, and focuses it as a click would. An application without touch support, the window
+  controls, a window's drag strip (which a finger drags the window by), the overview and the
+  desktop get the first finger as the pointer and its left button. `touch.output` names the
+  monitor a touchscreen covers; unset, it is the one the device names, else the built-in panel,
+  else every monitor. `shaodesk msg get touch` lists the touchscreens and the fingers down.
 
 ### Working on the shell
 
