@@ -61,6 +61,7 @@ all. In short:
 | `window_control.c` | The shell's window menu, window pictures and windows' own icons: shaodesk-window-control-v1, which names a window by its taskbar handle. |
 | `scaled_capture.c` | The capture source for a window's picture: the window scaled down to fit a size on the renderer, smoothly. |
 | `window_icon.c` | The icons windows supply themselves (xdg-toplevel-icon-v1; X11 windows' from `xwayland.c`), kept for the window control to send the shell. |
+| `volume.c` | The volume, microphone and brightness actions, which the shell carries out. |
 
 A function used by one file is `static`; one used by several is declared in `server.h` under
 the file that defines it. The build warns (`-Wmissing-prototypes`) about one that is neither.

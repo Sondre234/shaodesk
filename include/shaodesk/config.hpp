@@ -14,6 +14,8 @@ using Command = std::vector<std::string>;
 // Pixels a resize_* action moves an edge by, unless its binding or request gives `amount`.
 constexpr int default_resize_amount = 40;
 constexpr int max_resize_amount = 4000;
+// Percent a volume or brightness step changes by, unless its binding or request gives `amount`.
+constexpr int default_step_percent = 5;
 // The most layouts a keymap has (xkbcommon's limit), for switch_layout's number.
 constexpr int max_layouts = 32;
 
@@ -31,7 +33,7 @@ struct Binding {
     Command command;
     int workspace = 0; // for workspace and move_to_workspace, from 1
     sh_screenshot_mode screenshot = SH_SCREENSHOT_REGION; // for screenshot
-    int amount = default_resize_amount; // for resize_*, in pixels
+    int amount = default_resize_amount; // for resize_*, in pixels; volume and brightness steps, in percent
     int layout = 0; // for switch_layout: 0 the next layout, -1 the previous, N the Nth from 1
     std::string output; // for move_workspace_to_output and swap_workspaces: the target
 };
@@ -325,7 +327,12 @@ struct Config {
 // Maps a Lua/control-socket action name; throws for unknown names.
 sh_action parse_action(const std::string &name);
 bool action_takes_workspace(sh_action action);
-bool action_takes_amount(sh_action action); // resize_*: pixels, 1 to max_resize_amount
+// resize_*: pixels, 1 to max_resize_amount; volume_up, volume_down, brightness_up and
+// brightness_down: percent, 1 to 100.
+bool action_takes_amount(sh_action action);
+// The amount such an action takes when none is given, and the most it takes.
+int default_amount(sh_action action);
+int max_amount(sh_action action);
 // move_workspace_to_output and swap_workspaces: an output target, "left", "right", "next",
 // "prev", a connector name, or "desc:..."
 bool action_takes_output(sh_action action);

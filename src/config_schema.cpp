@@ -446,8 +446,9 @@ const Option options[] = {
      "a connector name or `\"desc:\"` description as in `outputs.monitors`."},
     {"bindings[].mode", "enum", "\"region\"", "", none, none,
      "With `screenshot` only: `\"region\"`, `\"output\"`, or `\"window\"`."},
-    {"bindings[].amount", "integer", "40", "", 1, 4000,
-     "With `resize_*` only: pixels moved per press."},
+    {"bindings[].amount", "integer", "40; 5 for volume and brightness", "", 1, 4000,
+     "With `resize_*`: pixels moved per press. With `volume_up`, `volume_down`, `brightness_up` "
+     "and `brightness_down`: percent per press, up to 100."},
     {"bindings[].layout", "string or integer", "\"next\"", "", none, none,
      "With `switch_layout` only: `\"next\"` or `\"prev\"` (wrapping), or a layout's number "
      "from 1, in the order of `keyboard.layout`."},
@@ -771,7 +772,8 @@ std::string config_reference_markdown() {
         first = false;
     }
     out << "\n\n`spawn` needs `command`; `workspace` and `move_to_workspace` need `workspace`; "
-           "`screenshot` takes `mode`; `resize_*` take `amount`.\n\n"
+           "`screenshot` takes `mode`; `resize_*`, `volume_up`, `volume_down`, `brightness_up` and "
+           "`brightness_down` take `amount`.\n\n"
            "Modifiers: ";
     first = true;
     for (const auto &name : config_modifier_names()) {

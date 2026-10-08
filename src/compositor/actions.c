@@ -305,6 +305,14 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
         if (current)
             set_floating(current, current->tiled, true);
         break;
+    case SH_VOLUME_UP:
+    case SH_VOLUME_DOWN:
+    case SH_VOLUME_MUTE:
+    case SH_MIC_MUTE:
+    case SH_BRIGHTNESS_UP:
+    case SH_BRIGHTNESS_DOWN:
+        volume_action(server, action, argument);
+        break;
     default:
         arrange_windows(server, action);
         break;

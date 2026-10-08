@@ -168,6 +168,16 @@ enum sh_action {
     /* Asks the shell to give the keyboard to the taskbar (or the dock) on the focused output, to
      * walk its buttons and their windows with the arrows, as Windows' Win+T; again, to leave. */
     SH_TASKBAR_FOCUS,
+    /* The keyboard's volume, microphone and brightness keys: the default sound output's volume
+     * up or down (argument: percent), its mute and the default input's, the backlight up or down
+     * (argument: percent). The shell carries them out and shows them; without one, wpctl and
+     * brightnessctl do. */
+    SH_VOLUME_UP,
+    SH_VOLUME_DOWN,
+    SH_VOLUME_MUTE,
+    SH_MIC_MUTE,
+    SH_BRIGHTNESS_UP,
+    SH_BRIGHTNESS_DOWN,
 };
 
 enum sh_screenshot_mode {

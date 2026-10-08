@@ -1248,6 +1248,14 @@ The tests start a dbus-daemon of their own on a private address and never touch 
 that bus), `notifications_smoke` (a headless compositor and shell: cards, a click, expiry, hover,
 do-not-disturb, the display and the history), and the configuration tests.
 
+### Volume and brightness keys
+
+The actions `volume_up` and `volume_down` change the default sound output's volume by `amount`
+percent (5 unless the binding or `shaodesk msg volume_up 10` gives another, up to 100),
+`volume_mute` mutes or unmutes it, `mic_mute` does the same for the default input (the
+microphone), and `brightness_up` and `brightness_down` change the backlight by `amount` percent.
+The compositor hands them to the shell, which carries them out.
+
 ## System tray
 
 The panel shows the status icons applications put in a system tray, on every monitor's bar, in the order they appeared. These are StatusNotifierItems, the kind KDE and Qt

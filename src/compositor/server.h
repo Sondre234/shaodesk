@@ -1044,6 +1044,9 @@ struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel);
 pid_t toplevel_pid(struct sh_toplevel *toplevel);
 bool toplevel_is_dialog(struct sh_toplevel *toplevel);
 
+/* volume.c */
+void volume_action(struct sh_server *server, enum sh_action action, int percent);
+
 /* window_control.c */
 void window_objects_changed(struct sh_server *server);
 void window_objects_forget(struct sh_toplevel *toplevel);
