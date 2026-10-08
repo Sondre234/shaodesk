@@ -258,6 +258,8 @@ Edit them in [config/init.lua](config/init.lua).
 | Super + Shift + 1–4 | Move the focused window to workspace 1–4 |
 | Super + Ctrl + Left / Right | Previous / next workspace |
 | Super + Tab | Back to the workspace shown before |
+| Three fingers left / right on a touchpad | Next / previous workspace, the windows following the fingers ([gestures](docs/features.md#touchpad-gestures)) |
+| Three fingers up / down on a touchpad | Open / close the overview |
 | Super + Ctrl + comma / period | Send the workspace to the monitor on the left / right ([details](docs/features.md#workspaces-between-monitors)) |
 | Super + G | Make the focused window a [tab group](docs/features.md#window-groups), or dissolve it |
 | Super + Shift + G | Take the focused window out of its group |
