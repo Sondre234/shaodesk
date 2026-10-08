@@ -7,6 +7,14 @@
 static bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, uint32_t modifiers,
                               xkb_keysym_t sym);
 
+/* Input from the user: idle daemons hear of it (ext-idle-notify-v1), and with `wakes` (a key or
+ * button pressed, the pointer moved or scrolled) it turns the monitors on when every one is off
+ * (output_power.c). True when it did, so that a key that woke them goes no further. */
+bool input_activity(struct sh_server *server, bool wakes) {
+    wlr_idle_notifier_v1_notify_activity(server->idle_notifier, server->seat);
+    return wakes && wake_displays(server);
+}
+
 static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) {
     struct sh_keyboard *keyboard = wl_container_of(listener, keyboard, modifiers);
     if (keyboard->server->syncing_keyboards)
@@ -45,14 +53,16 @@ static void keyboard_handle_key(struct wl_listener *listener, void *data) {
     const xkb_keysym_t *syms;
     int nsyms = xkb_state_key_get_syms(keyboard->wlr_keyboard->xkb_state, keycode, &syms);
 
+    bool woke = input_activity(server, event->state == WL_KEYBOARD_KEY_STATE_PRESSED);
     bool handled = false;
-    wlr_idle_notifier_v1_notify_activity(server->idle_notifier, seat);
     uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
     // Any key pressed or the repeating one released stops the repeat.
     if (keyboard->repeat_timer && (event->state == WL_KEYBOARD_KEY_STATE_PRESSED ||
                                    event->keycode == keyboard->repeat_keycode))
         wl_event_source_timer_update(keyboard->repeat_timer, 0);
     if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+        // A key that woke the monitors does nothing else: nobody saw what it would do.
+        handled = woke;
         for (int i = 0; i < nsyms && !handled; ++i)
             handled = handle_keybinding(keyboard, event->keycode, modifiers, syms[i]);
         if (!handled) {

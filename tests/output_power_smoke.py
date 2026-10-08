@@ -3,21 +3,23 @@
 turns one off and on; it keeps its place, windows, workspace and panel, `get outputs` says it is
 off, it draws no frames while off, and a lock does not wait for it. The display_off, display_on
 and display_toggle actions do the same from the control socket and bindings, and clients hear
-of it."""
+of it. Input turns every monitor on once all of them are off."""
 from pathlib import Path
 import subprocess
 import sys
 
 import harness
 
-compositor, probe, power_probe, lock_probe = (str(Path(p).resolve()) for p in sys.argv[1:5])
+compositor, probe, power_probe, lock_probe, pointer_probe = (str(Path(p).resolve())
+                                                              for p in sys.argv[1:6])
 
-LEFTMETA, F1 = 125, 59  # evdev key codes
+LEFTMETA, A, F1, F2 = 125, 30, 59, 60  # evdev key codes
 
 CONFIG = """return {
     xwayland = false,
     animations = { enabled = false },
-    bindings = { { mods = { "Super" }, key = "F1", action = "display_toggle", output = "HEADLESS-1" } },
+    bindings = { { mods = { "Super" }, key = "F1", action = "display_toggle", output = "HEADLESS-1" },
+                 { key = "F2", action = "display_toggle", output = "HEADLESS-1" } },
     outputs = { monitors = { ["HEADLESS-1"] = { mode = "1280x720" },
                              ["HEADLESS-2"] = { mode = "1280x720" } } },
 }"""
@@ -125,6 +127,35 @@ with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) a
     msg("display_on")
     watcher.terminate()
     desktop.reap(watcher)
+
+    # With every monitor off, input turns them all on, whoever turned them off: a key press,
+    # which does nothing else, or the pointer; a key coming up does not. Just after an action
+    # turned them off, input leaves them off a moment, while the keys that did it come up.
+    def key(code, state="press"):
+        msg("headless_keyboard", "key", "keys", str(code), state)
+
+    def all_off():
+        return set(power_of().values()) == {"off"}
+
+    msg("display_off")
+    key(A)
+    key(A, "release")
+    desktop.stays(all_off, "input turned the monitors on at once", duration=1.1)
+    key(F2)
+    assert power_of() == {"HEADLESS-1": "on", "HEADLESS-2": "on"}, outputs()
+    key(F2, "release")
+    key(F2)  # now the binding runs
+    key(F2, "release")
+    assert power_of() == {"HEADLESS-1": "off", "HEADLESS-2": "on"}, outputs()
+    assert power("set", "HEADLESS-2", "off") == ["off"]
+    desktop.stays(all_off, "input turned the monitors on at once", duration=1.1)
+    key(A, "release")
+    desktop.stays(all_off, "a key coming up turned the monitors on")
+    pointer = desktop.virtual_pointer(pointer_probe, 2560, 720)
+    pointer("move 100 100")
+    wait_for(lambda: power_of() == {"HEADLESS-1": "on", "HEADLESS-2": "on"},
+             "the pointer turned the monitors on")
+    assert "Input turned the monitors on" in desktop.log.read_text()
 
     # A monitor out of the layout is off, and no client can turn it on. (The probe's panel goes
     # with it, and the probe with its panel.)

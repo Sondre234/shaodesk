@@ -1,9 +1,13 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Turning monitors off and on without taking them out of the layout: wlr-output-power-management
- * clients (wlopm, idle daemons), and the display_off, display_on and display_toggle actions. A
- * monitor that is off keeps its windows, workspaces and panels; its wlr_output is disabled, so it
- * neither scans out nor draws frames. */
+ * clients (wlopm, idle daemons), the display_off, display_on and display_toggle actions, and
+ * input turning them on once every one is off. A monitor that is off keeps its windows,
+ * workspaces and panels; its wlr_output is disabled, so it neither scans out nor draws frames. */
 #include "server.h"
+
+/* How long after an action turned monitors off input leaves them off: the keys that did it
+ * coming back up, or a mouse nudged on the way, would otherwise bring them straight back. */
+#define WAKE_GRACE_MS 1000
 
 /* Turns a monitor in the layout off or on. On, it is configured as outputs.monitors says, which
  * a reload while it was off may have changed. False when it is not in the layout or the
@@ -26,7 +30,6 @@ bool set_output_power(struct sh_output *output, bool on) {
             return false;
         }
         output->powered_off = true;
-        server->displays_off_at = now_ms();
         wlr_log(WLR_INFO, "Turned %s off", wlr_output->name);
         // Nothing shows on it, so a lock waits for it no longer.
         send_locked_if_presented(server);
@@ -75,6 +78,8 @@ bool display_power(struct sh_server *server, enum sh_action action, char *error,
         return false;
     }
     bool on = action == SH_DISPLAY_ON || (action == SH_DISPLAY_TOGGLE && !any_on), done = true;
+    if (!on)
+        server->displays_off_at = now_ms();
     wl_list_for_each_safe(output, temporary, &server->outputs, link) {
         if (named[0] && !output_key_matches(named, output->wlr_output))
             continue;
@@ -85,6 +90,21 @@ bool display_power(struct sh_server *server, enum sh_action action, char *error,
         }
     }
     return done;
+}
+
+/* Input with every monitor in the layout off turns them all on, whoever turned them off: nobody
+ * could see to turn them on otherwise. True when it did. */
+bool wake_displays(struct sh_server *server) {
+    if (wl_list_empty(&server->outputs) || now_ms() - server->displays_off_at < WAKE_GRACE_MS)
+        return false;
+    struct sh_output *output, *temporary;
+    wl_list_for_each(output, &server->outputs, link) {
+        if (!output->powered_off)
+            return false;
+    }
+    wlr_log(WLR_INFO, "Input turned the monitors on");
+    wl_list_for_each_safe(output, temporary, &server->outputs, link) set_output_power(output, true);
+    return true;
 }
 
 /* A wlr-output-power-management client sets a monitor's mode. A monitor out of the layout

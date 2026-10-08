@@ -433,7 +433,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         add_test(NAME output_power_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_power_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:output_power_probe>
-            $<TARGET_FILE:lock_probe>)
+            $<TARGET_FILE:lock_probe> $<TARGET_FILE:pointer_probe>)
         set_tests_properties(output_power_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME compositor_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/compositor_smoke.py

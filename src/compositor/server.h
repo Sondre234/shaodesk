@@ -369,7 +369,8 @@ struct sh_server {
     struct wlr_idle_notifier_v1 *idle_notifier;
     struct wlr_output_manager_v1 *output_manager;
     struct wl_listener output_apply, output_test;
-    /* wlr-output-power-management (output_power.c), and when a monitor last went off. */
+    /* wlr-output-power-management (output_power.c), and when an action last turned monitors
+     * off, which input does not undo for a moment. */
     struct wl_listener output_power_set_mode;
     int64_t displays_off_at;
     struct wl_listener new_inhibitor;
@@ -835,6 +836,7 @@ void group_merge(struct sh_server *server, enum sh_action action);
 void dissolve_groups(struct sh_server *server);
 
 /* input.c */
+bool input_activity(struct sh_server *server, bool wakes);
 void control_headless_keyboard(struct sh_server *server, int fd, const char *arguments);
 void destroy_headless_keyboards(struct sh_server *server);
 void configure_pointer(struct sh_server *server, struct wlr_input_device *device);
@@ -900,6 +902,7 @@ void output_power_set_mode(struct wl_listener *listener, void *data);
 bool display_action(enum sh_action action);
 bool display_power(struct sh_server *server, enum sh_action action, char *error,
                    size_t error_size);
+bool wake_displays(struct sh_server *server);
 
 /* overview.c */
 size_t overview_describe(struct sh_server *server, char *text, size_t size);

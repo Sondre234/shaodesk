@@ -1083,6 +1083,13 @@ bindings = {
 },
 ```
 
+Once every monitor is off, whoever turned them off, a key press, a click, a scroll or the
+pointer moving turns them all on again, as on KDE and Windows; the key that does it does nothing
+else, since nobody saw what it would do. For a second after an action turned them off input
+leaves them off, so that the keys that did it, coming up, or a mouse nudged on the way do not
+bring them straight back. A monitor turned off while another stays on stays off until it is
+turned on.
+
 A monitor that is off draws no frames, so the windows on it alone are not asked to draw
 either, and `shaodesk msg get outputs` ends its line with `off`. wlr-output-management clients
 still list it as enabled, as sway does, and a reload or `wlr-randr` leaves it off: turned on
