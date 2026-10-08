@@ -368,6 +368,24 @@ if(SHAODESK_BUILD_COMPOSITOR)
         target_include_directories(wayland_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
         target_link_libraries(wayland_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
         target_compile_options(wayland_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        # A window printing the input it gets, for the tests of gestures.
+        set(GESTURES_XML ${PROTOCOL_DIR}/unstable/pointer-gestures/pointer-gestures-unstable-v1.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pointer-gestures-unstable-v1-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header ${GESTURES_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/pointer-gestures-unstable-v1-client-protocol.h
+            DEPENDS ${GESTURES_XML})
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pointer-gestures-unstable-v1-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code ${GESTURES_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/pointer-gestures-unstable-v1-protocol.c
+            DEPENDS ${GESTURES_XML})
+        add_executable(input_probe tests/input_probe.c
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.c
+            ${CMAKE_CURRENT_BINARY_DIR}/pointer-gestures-unstable-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/pointer-gestures-unstable-v1-protocol.c)
+        target_include_directories(input_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        target_link_libraries(input_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
+        target_compile_options(input_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
         set(VPTR_XML ${CMAKE_CURRENT_SOURCE_DIR}/protocols/wlr-virtual-pointer-unstable-v1.xml)
         add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/wlr-virtual-pointer-client-protocol.h
             COMMAND ${WAYLAND_SCANNER} client-header ${VPTR_XML}
@@ -595,6 +613,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>
             $<TARGET_FILE:pointer_probe>)
         set_tests_properties(drag_focus_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME pointer_gestures_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/pointer_gestures_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:input_probe>)
+        set_tests_properties(pointer_gestures_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME spawn_at_pointer_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/spawn_at_pointer_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>)

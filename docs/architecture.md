@@ -610,7 +610,8 @@ them in `shell/controller.cpp`.
   Under `--headless`, `shaodesk msg headless_output`, `headless_keyboard` and `headless_pointer`
   plug in outputs, keyboards and pointers (`headless_keyboard key NAME CODE press` types on one,
   see `keymap_smoke.py`; `headless_pointer swipe NAME update DX DY [TIME]` moves a touchpad
-  gesture's fingers, at a given time in milliseconds), and `wayland_probe --keymap` prints the keymap an application gets. A `wayland_probe` window with
+  gesture's fingers, at a given time in milliseconds; see `pointer_gestures_smoke.py`, whose
+  `input_probe` window prints the input it gets, a line per event), and `wayland_probe --keymap` prints the keymap an application gets. A `wayland_probe` window with
   `SHAODESK_PROBE_DRAG=source` drags a line of text on a button press of `pointer_probe`'s, and
   one with `=target` takes it, each printing what it hears; `get seat` says where the drag is
   (see `drag_focus_smoke.py`). `SHAODESK_PROBE_ICON` gives a `wayland_probe` window an icon
