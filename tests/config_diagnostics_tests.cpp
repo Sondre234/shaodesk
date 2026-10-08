@@ -74,6 +74,10 @@ void unknown_settings() {
            "mode 'resize' has no binding with action = \"mode\" to leave it");
     expect("return {modes={resize={{button='side',action='mode',mode='default'}}}}",
            "a mode's bindings take a key, not a button");
+    expect("return {modes={resize={{switch='lid',state='close',action='mode',mode='default'}}}}",
+           "a mode's bindings take a key, not a switch");
+    expect("return {bindings={{switch='lid',state='close',action='lock',locked=true}}}",
+           "locked is only valid with a key");
     expect("return {modes={default={{key='Escape',action='mode',mode='default'}}}}",
            "mode name 'default' must be");
     expect("return {bindings={{key='r',action='mode'}}}",
