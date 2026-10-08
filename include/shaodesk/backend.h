@@ -242,6 +242,13 @@ struct sh_idle_steps {
     int suspend;     /* the machine suspends, locking first */
 };
 
+/* Lua outputs.lid: what closing a laptop's lid does. CLAMSHELL turns its built-in panel off
+ * while another monitor shows the desktop, as unplugging the panel would, and back on as the lid
+ * opens; IGNORE leaves the panel on. */
+enum sh_lid_mode { SH_LID_CLAMSHELL, SH_LID_IGNORE };
+/* The switches bindings act on: a laptop's lid (on: closed) and tablet mode (on: folded). */
+enum sh_switch { SH_SWITCH_LID, SH_SWITCH_TABLET };
+
 struct sh_settings {
     float background[4];
     uint32_t mouse_modifier;
