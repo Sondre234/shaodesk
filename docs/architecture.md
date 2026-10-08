@@ -43,6 +43,7 @@ all. In short:
 | `input.c` | Keyboards, key bindings, pointers' libinput settings, virtual devices, selection and drag-and-drop. |
 | `keymap.c` | The keymap from the keyboard settings, given to every keyboard but virtual ones. |
 | `cursor.c` | What is under the pointer, focus on hover, button bindings, scrolling, the cursor image. |
+| `gestures.c` | Touchpad gestures: swipes, pinches and holds passed on to the surface under the pointer (pointer-gestures-unstable-v1). |
 | `grab.c` | Moving and resizing with the pointer, magnetic edges, dropping. |
 | `focus.c` | Keyboard focus and urgent windows. |
 | `toplevel.c` | Windows: xdg-shell toplevels and popups, opening by window rules, maximize, fullscreen, minimize. |

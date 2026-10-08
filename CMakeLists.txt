@@ -194,6 +194,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/focus.c
         src/compositor/foreign_toplevel.c
         src/compositor/frame.c
+        src/compositor/gestures.c
         src/compositor/grab.c
         src/compositor/group.c
         src/compositor/input.c
