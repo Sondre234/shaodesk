@@ -409,6 +409,30 @@ behind that window and shows the panels again.
 Limitations: window placement during interactive resize is immediate, without waiting for the
 client's next buffer.
 
+### Tearing
+
+A game can ask to have its frames shown as soon as it draws them instead of at the monitor's next
+refresh (tearing-control-v1), for the least latency, as Hyprland's `allow_tearing` and its
+`immediate` window rule allow. shaodesk does so only with `windows.allow_tearing = true`, and then
+only while the window is fullscreen and nothing else is drawn on its monitor: no panel over it
+(a fullscreen the game asked for itself covers them), no notification, menu, on-screen display,
+overview, switcher or other window, the screen not locked and not magnified. The picture may tear
+then, a line where one frame meets the next. A rule's `allow_tearing = true` does the same for a
+window that does not ask, as an X11 game run through Wine or Proton cannot:
+
+```lua
+windows = {
+    allow_tearing = true,
+    rules = { { app_id = "^cs2$", allow_tearing = true } },
+},
+```
+
+Where the GPU or its driver refuses an asynchronous page flip, the frames go out at the refresh
+as before, and the log says so once. `shaodesk msg get tearing` prints a line per monitor: what
+its frames do (`tearing`, `refused`, or why not: `off`, `no fullscreen window`, `not asked`,
+`covered`, `overlay`, `locked`, `magnified`), how many were flipped at once and refused, and the
+window's title.
+
 Actions without a section of their own: `quit` ends the session (Super + M), and `snap_left` and
 `snap_right` fill half of the monitor with the focused window (no default binding; see
 [Snapping](#snapping) for the quarters and Super + Alt + arrows). `focus_last` (Super + `) focuses the window focused before this one, on any workspace; repeated,
@@ -468,6 +492,7 @@ windows = {
 | `maximize = true` | Opens it maximized, floating over the tiles. |
 | `focus = false` | Leaves the focus where it was. A fullscreen window on the current workspace still takes it. |
 | `sticky = true` | Opens it sticky (see below) on its monitor's current workspace, whatever `workspace` says. Ignored with `features = { sticky = false }`. |
+| `allow_tearing = true` | With `windows.allow_tearing`, shows its frames at once while it is fullscreen and alone on its monitor, whether or not it asks for that (see [Tearing](#tearing)). |
 
 Every matching rule applies, in order; where two set the same action, the later one wins. A
 tiled window keeps `size` and `position` as the place it floats to when toggled. Rules see the
@@ -1853,7 +1878,8 @@ dragged, what the drag is over: a line each, `keyboard`, `pointer` or `drag`, fo
 or `-` twice for nothing; during a drag the pointer is on nothing. `shaodesk msg get gesture`,
 `get touch` and `get tablet` say what a touchpad's swipe, a touchscreen's fingers and a drawing
 tablet's tools are doing (see [Touchpad gestures](#touchpad-gestures),
-[Touchscreens](#touchscreens) and [Drawing tablets](#drawing-tablets)). A client
+[Touchscreens](#touchscreens) and [Drawing tablets](#drawing-tablets)), and `get tearing` what
+each monitor's frames do (see [Tearing](#tearing)). A client
 that sends `subscribe` keeps its connection and receives `tiling on|off` and
 `workspace N` (the focused monitor's), one `output NAME N USED TILING` line per monitor
 (as in `get workspaces`), and `keyboard-layout N COUNT SHORT NAME` (the active
@@ -2051,7 +2077,8 @@ Browsers and Electron applications (Firefox, Chromium, Discord) get the protocol
 look for: GPU buffers through linux-dmabuf with explicit sync where the driver supports it,
 viewporter, fractional scaling, presentation timing, xdg-output, middle-click paste
 (primary selection), clipboard managers (`wl-clipboard`, data-control), drag-and-drop,
-pointer lock and relative motion for games, and xdg-foreign for portal dialogs.
+pointer lock and relative motion for games, tearing-control for games that want their frames
+shown at once (see [Tearing](#tearing)), and xdg-foreign for portal dialogs.
 xdg-activation lets an application raise itself, so a link clicked in a chat brings the
 browser forward; shaodesk honours every valid token and does not prevent focus stealing.
 Popup menus are kept on the output of their window.
