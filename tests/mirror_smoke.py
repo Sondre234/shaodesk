@@ -3,16 +3,19 @@
 workspaces, windows or panels of its own) and shows its source's picture scaled to fit, with black
 bars where the shapes differ, rotated with either of them, the cursor included; it follows its
 source's power, joins the layout while its source is gone and leaves it again as it comes back,
-holds a lock up as the others do, and a reload without mirror brings it into the layout. The
+holds a lock up as the others do, goes on mirroring when a wlr-output-management client applies
+it where it is listed (on its source) and joins the layout moved elsewhere, and a reload without
+mirror brings it into the layout. The
 pictures are read with `headless_output capture`, and the source's with grim when it is
 installed."""
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 
 import harness
 
-compositor, probe, lock_probe = (str(Path(p).resolve()) for p in sys.argv[1:4])
+compositor, probe, lock_probe, randr_probe = (str(Path(p).resolve()) for p in sys.argv[1:5])
 grim = shutil.which("grim")
 
 CONFIG = """return {{
@@ -108,6 +111,25 @@ with harness.Compositor(compositor, config(), env={"WLR_HEADLESS_OUTPUTS": "2"})
     locker.terminate()
     assert desktop.reap(locker) == 0
     wait_for(mirrored, "the mirror shows the window once unlocked")
+
+    # A wlr-output-management client lists the mirror on at its source's place; applied there, as
+    # wdisplays applies every head, it goes on mirroring, and moved elsewhere it joins the layout.
+    def randr(*args):
+        result = subprocess.run([randr_probe, *args], env=desktop.env, capture_output=True,
+                                text=True, timeout=30)
+        assert result.returncode == 0, result.stderr
+        return result.stdout.split("\n")[:-1]
+    heads = {line.split()[0]: line.split()[1:4] for line in randr("list")}
+    assert heads["HEADLESS-3"] == ["1", "0", "0"], heads
+    assert randr("apply", "HEADLESS-3", "enabled=1", "x=0", "y=0") == ["succeeded"]
+    assert outputs()["HEADLESS-3"] == (False, 0, 0, "on", "HEADLESS-1"), outputs()
+    assert randr("apply", "HEADLESS-3", "enabled=1", "x=2560", "y=0") == ["succeeded"]
+    wait_for(lambda: outputs()["HEADLESS-3"] == (True, 1024, 768, "on", "-"),
+             "moved away, the mirror joined the layout")
+    desktop.reload()
+    wait_for(lambda: outputs()["HEADLESS-3"] == (False, 0, 0, "on", "HEADLESS-1"),
+             "a reload made it a mirror again")
+    wait_for(mirrored, "the mirror shows the window after the reload")
 
     # The source gone, the mirror joins the layout, with workspaces of its own; back, the mirror
     # leaves the layout again.
