@@ -43,8 +43,9 @@ Where settings come from, lowest precedence first:
 1. Palette: HyDE's wallbash (`~/.cache/hyde/wallbash/gtk.css`: `pry1` background and panel,
    `txt1` text, `1xa6` accent), else pywal (`wal/colors.json`: background, foreground,
    `color4` accent). `~/.cache` is read only when DIR is a `.config` directory.
-2. Hyprland: `hypr/hyprland.lua` when it exists, else `hypr/hyprland.conf`. The active
-   border's first color also becomes the accent.
+2. Hyprland: `hypr/hyprland.lua` when it exists, else `hypr/hyprland.conf`. A border's
+   gradient is carried over with its angle (its first 10 colors), and the active border's first
+   color also becomes the accent.
 3. Waybar: `waybar/config.jsonc` (first bar only) and `waybar/style.css` with its imports.
    HyDE-style bars that paint `window#waybar > box` over a transparent window are handled.
 4. Wallpaper: HyDE's `~/.cache/hyde/wall.set`, else pywal's `~/.cache/wal/wal`, else
@@ -115,7 +116,7 @@ shaodesk before it can be imported, **won't** = deliberately not carried over.
 | Inner gap | `general:gaps_in` (×2: Hyprland adds it on both sides) | `layout.gap_inner` | done | yes |
 | Border width | `general:border_size` | `windows.border_width` | done | yes |
 | Border colors (active/inactive) | `col.active_border`, `col.inactive_border` | `windows.border_color`, `border_inactive_color` | done | yes |
-| Gradient borders | `rgba(…) rgba(…) 45deg` | — (the importer takes the first color) | missing | first color |
+| Gradient borders | `rgba(…) rgba(…) 45deg`, Lua `{ colors, angle }` | `windows.border_color = { "#…", "#…", angle = 45 }` (up to 10 colors) | done | yes |
 | Corner rounding | `decoration:rounding` | — | blocked: needs scenefx or a custom renderer | no |
 | Active / inactive opacity | `decoration:active_opacity`, `inactive_opacity` | `windows.opacity`, `inactive_opacity` | done | yes |
 | Per-app opacity | `windowrule = opacity A B, class:…` | `windows.rules` (`app_id` regex) | done | yes |

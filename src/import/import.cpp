@@ -118,18 +118,34 @@ std::optional<Color> hypr_color(std::string_view token) {
     return Color{static_cast<uint8_t>(argb >> 16), static_cast<uint8_t>(argb >> 8),
                  static_cast<uint8_t>(argb), static_cast<uint8_t>(argb >> 24)};
 }
-// The first color of "rgba(...) rgba(...) 45deg"; `gradient` says whether there were more.
-std::optional<Color> first_color(std::string_view text, bool &gradient) {
-    std::optional<Color> result;
-    int colors = 0;
-    for (const auto &token : split(text, ' '))
-        if (auto color = hypr_color(token)) {
-            if (!result)
-                result = color;
-            ++colors;
-        }
-    gradient = colors > 1;
+// The colors of "rgba(...) rgba(...) 45deg", one or more, and its angle in degrees (0 without
+// one), as Hyprland's borders take them.
+struct Gradient {
+    std::vector<Color> colors;
+    double angle = 0;
+};
+Gradient gradient_colors(std::string_view text) {
+    Gradient result;
+    for (const auto &token : split(text, ' ')) {
+        if (auto color = hypr_color(token))
+            result.colors.push_back(*color);
+        else if (token.ends_with("deg"))
+            if (auto angle = parse_number(std::string_view(token).substr(0, token.size() - 3)))
+                result.angle = std::fmod(*angle, 360);
+    }
     return result;
+}
+// The Lua value of a border's colors: the color, or a gradient's table of at most
+// SH_GRADIENT_STOPS of them with its angle.
+std::string border_value(const Gradient &gradient) {
+    if (gradient.colors.size() == 1)
+        return quote(hex(gradient.colors[0]));
+    std::string value = "{ ";
+    for (size_t i = 0; i < gradient.colors.size() && i < SH_GRADIENT_STOPS; ++i)
+        value += quote(hex(gradient.colors[i])) + ", ";
+    char angle[32];
+    std::snprintf(angle, sizeof(angle), "%g", gradient.angle);
+    return value + "angle = " + angle + " }";
 }
 
 class Translator {
@@ -206,19 +222,23 @@ class Translator {
         for (auto [name, key] : {std::pair{"general:col.active_border", "border_color"},
                                  {"general:col.inactive_border", "border_inactive_color"}})
             if (auto *value = option(name)) {
-                bool gradient = false;
-                auto color = first_color(value->text, gradient);
-                if (!color) {
+                auto gradient = gradient_colors(value->text);
+                if (gradient.colors.empty()) {
                     report_.skip(files_, value->origin,
                                  std::string(name) + ": cannot read the color " + value->text);
                     continue;
                 }
-                auto note = gradient ? "first color of a gradient" : "";
-                theme_.set({"windows", key}, quote(hex(*color)), value->origin, note);
+                auto note = gradient.colors.size() > SH_GRADIENT_STOPS
+                                ? "a gradient, its first " + std::to_string(SH_GRADIENT_STOPS) +
+                                      " colors"
+                                : std::string();
+                theme_.set({"windows", key}, border_value(gradient), value->origin, note);
                 if (key == std::string("border_color")) {
-                    color->a = 255;
-                    theme_.set({"shell", "accent"}, quote(hex(*color, false)), value->origin,
-                               "the active border color");
+                    auto color = gradient.colors[0];
+                    color.a = 255;
+                    theme_.set({"shell", "accent"}, quote(hex(color, false)), value->origin,
+                               gradient.colors.size() > 1 ? "the active border's first color"
+                                                          : "the active border color");
                 }
             }
         fraction("decoration:active_opacity", {"windows", "opacity"}, 0.05, 1);
