@@ -285,8 +285,8 @@ shaodesk msg get windows
 ```
 
 A client that sends `subscribe` receives a line for every change of workspaces, tiling, the
-switcher, the overview, urgent windows, the keyboard layout and the power actions that may
-run. See [Control socket](docs/features.md#control-socket) for the queries and events.
+switcher, the overview, urgent windows, the keyboard layout, the binding mode and the power
+actions that may run. See [Control socket](docs/features.md#control-socket) for the queries and events.
 
 ## Development
 

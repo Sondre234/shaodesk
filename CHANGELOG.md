@@ -212,6 +212,13 @@ shadows.
   and one with `repeats = true` runs again while its key is held, as Hyprland's `binde` (keyboard
   resizing did alone before, and still does unless `repeats = false`). The shipped volume,
   microphone and brightness keys work on the lock screen, and the steps repeat while held.
+- Binding modes, as sway's modes and Hyprland's submaps: `modes` holds named lists of key bindings,
+  and a binding with `action = "mode", mode = "NAME"` (or `shaodesk msg mode NAME`) puts one in
+  use, its bindings taking the place of the others until `mode = "default"`. The taskbar and the
+  macOS menu bar show the mode in use on a pill, which a click leaves; `shaodesk msg get mode`
+  prints it, and subscribers hear `mode NAME`. A reload and locking the session leave it. The
+  shipped configuration has a resize mode, commented out. An unknown mode, or one with no binding
+  that leaves it, is refused with its line.
 - `windows.controls = "traffic_lights"` draws the controls of the windows shaodesk decorates as
   red, yellow and green circles at their top-left, as macOS does: grey while the window has no
   focus, their symbols shown while the pointer is on one, darker while pressed.
