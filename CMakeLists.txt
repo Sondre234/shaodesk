@@ -215,6 +215,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/switcher.c
         src/compositor/tiling.c
         src/compositor/toplevel.c
+        src/compositor/type.c
         src/compositor/window_control.c
         src/compositor/window_icon.c
         src/compositor/workspace.c
@@ -366,7 +367,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-protocol.c
             ${WLR_CLIENT_PROTOCOL_SOURCES})
         target_include_directories(wayland_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-        target_link_libraries(wayland_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
+        target_link_libraries(wayland_probe PRIVATE PkgConfig::WAYLAND_CLIENT PkgConfig::XKB)
         target_compile_options(wayland_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
         set(VPTR_XML ${CMAKE_CURRENT_SOURCE_DIR}/protocols/wlr-virtual-pointer-unstable-v1.xml)
         add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/wlr-virtual-pointer-client-protocol.h
@@ -652,6 +653,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(keymap_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME type_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/type_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(type_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME keyboard_layout_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/keyboard_layout_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:pointer_probe>)

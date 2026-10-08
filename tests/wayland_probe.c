@@ -17,6 +17,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <wayland-client.h>
+#include <xkbcommon/xkbcommon.h>
 
 /* A real xdg-shell client: map pixels, wait for a frame, maximize, restore. */
 #ifdef __SANITIZE_ADDRESS__
@@ -73,6 +74,11 @@ struct probe {
     struct wl_data_device *data_device;
     struct wl_data_offer *offer; // the drag's offer while it is over the window
     struct xdg_toplevel_icon_manager_v1 *icons; // for SHAODESK_PROBE_ICON and "icon" commands
+    // SHAODESK_PROBE_TYPED=PATH: what is typed into the window, as text, appended to PATH.
+    FILE *typed;
+    struct xkb_context *xkb;
+    struct xkb_keymap *typed_keymap;
+    struct xkb_state *typed_state;
 };
 static void die(const char *message) {
     fprintf(stderr, "wayland probe: %s\n", message);
@@ -479,6 +485,48 @@ static void keyboard_repeat_info(void *data, struct wl_keyboard *keyboard, int32
 static const struct wl_keyboard_listener keyboard_listener = {
     .keymap = keyboard_keymap, .enter = keyboard_enter, .leave = keyboard_leave,
     .key = keyboard_key, .modifiers = keyboard_modifiers, .repeat_info = keyboard_repeat_info};
+/* SHAODESK_PROBE_TYPED: each key pressed in the window, as the text it types under the keymap the
+ * window has then (Return as a new line), appended to the file; every new keymap is read. */
+static void typed_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int32_t fd,
+                         uint32_t size) {
+    struct probe *probe = data;
+    char *text = format == WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1 && size
+                     ? mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0)
+                     : MAP_FAILED;
+    close(fd);
+    if (text == MAP_FAILED)
+        return;
+    struct xkb_keymap *keymap = xkb_keymap_new_from_string(
+        probe->xkb, text, XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS);
+    munmap(text, size);
+    if (!keymap)
+        return;
+    xkb_state_unref(probe->typed_state);
+    xkb_keymap_unref(probe->typed_keymap);
+    probe->typed_keymap = keymap;
+    probe->typed_state = xkb_state_new(keymap);
+}
+static void typed_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t time,
+                      uint32_t key, uint32_t state) {
+    struct probe *probe = data;
+    if (state != WL_KEYBOARD_KEY_STATE_PRESSED || !probe->typed_state)
+        return;
+    const xkb_keysym_t keysym = xkb_state_key_get_one_sym(probe->typed_state, key + 8);
+    char text[16] = "\n";
+    if (keysym != XKB_KEY_Return && xkb_keysym_to_utf8(keysym, text, sizeof(text)) <= 0)
+        return;
+    fputs(text, probe->typed);
+    fflush(probe->typed);
+}
+static void typed_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial,
+                            uint32_t depressed, uint32_t latched, uint32_t locked, uint32_t group) {
+    struct probe *probe = data;
+    if (probe->typed_state)
+        xkb_state_update_mask(probe->typed_state, depressed, latched, locked, 0, 0, group);
+}
+static const struct wl_keyboard_listener typed_listener = {
+    .keymap = typed_keymap, .enter = keyboard_enter, .leave = keyboard_leave,
+    .key = typed_key, .modifiers = typed_modifiers, .repeat_info = keyboard_repeat_info};
 static void frame_done(void *data, struct wl_callback *callback, uint32_t time) {
     struct probe *probe = data;
     wl_callback_destroy(callback);
@@ -739,6 +787,14 @@ int main(int argc, char **argv) {
         die("required globals missing");
     if (!probe.layer_shell || !probe.manager || !probe.seat || !probe.output)
         die("desktop protocols missing");
+    const char *typed = getenv("SHAODESK_PROBE_TYPED");
+    if (typed) {
+        probe.typed = fopen(typed, "a");
+        probe.xkb = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+        if (!probe.typed || !probe.xkb)
+            die("cannot follow what is typed");
+        wl_keyboard_add_listener(wl_seat_get_keyboard(probe.seat), &typed_listener, &probe);
+    }
     if (probe.close_app_id) {
         // Close, activate, or maximize another client's window through the taskbar protocol.
         if (wl_display_roundtrip(display) < 0)

@@ -1423,7 +1423,11 @@ A control socket runs any Lua action from scripts or other tools:
 `shaodesk msg workspace 2`, `shaodesk msg toggle_tiling`, `shaodesk msg spawn foot`,
 `shaodesk msg screenshot window`, `shaodesk msg resize_left 80`. Prefixing
 `output NAME` makes workspace and tiling actions switch that monitor instead of the focused
-one: `shaodesk msg output HDMI-A-1 workspace_next`. The query
+one: `shaodesk msg output HDMI-A-1 workspace_next`. `shaodesk msg type TEXT` types TEXT into
+what has the keyboard, as wtype does: each character on a key of a keymap made for it (200 to a
+keymap; a longer text takes several), the window's own keymap back after, so that accents, emoji
+and their sequences come out as they are whatever the keyboard layout; the request is a line of at
+most 512 bytes, and it says when nothing has the keyboard. The query
 `shaodesk msg get workspace` prints the focused monitor's workspace, `shaodesk msg get workspaces`
 prints one tab-separated line per monitor (name, current workspace, focused, the
 workspaces holding windows, such as `1,3`, or `-`, and tiling, `on` or `off`),

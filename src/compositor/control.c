@@ -261,6 +261,17 @@ static void control_handle(struct sh_server *server, int fd, const char *request
         control_osd(server, fd, request[3] ? request + 4 : "");
         return;
     }
+    if (!strncmp(request, "type", 4) && (!request[4] || request[4] == ' ')) {
+        // "type TEXT": types TEXT into what has the keyboard (type.c).
+        char error[128], line[160];
+        if (type_text(server, request[4] ? request + 5 : "", error, sizeof(error))) {
+            control_reply(fd, "ok\n");
+        } else {
+            snprintf(line, sizeof(line), "error: %s\n", error);
+            control_reply(fd, line);
+        }
+        return;
+    }
     if (!strncmp(request, "overview ", 9) || !strcmp(request, "overview")) {
         // "overview filter [TEXT]", "overview select N" and "overview view N" (from 1) drive
         // the open overview, as typing, arrows and the strip do.
