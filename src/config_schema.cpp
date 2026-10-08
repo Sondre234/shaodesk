@@ -92,6 +92,13 @@ const Option options[] = {
      "description as in `outputs.monitors`. Unset, a touchscreen goes to the monitor its device "
      "names, else to the built-in panel (eDP, LVDS or DSI), else across every monitor."},
 
+    {"tablet", "table", "", "", none, none,
+     "Drawing tablets (standalone sessions): pens with pressure and tilt, and their pads."},
+    {"tablet.output", "string", "unset", "\"DP-1\"", none, none,
+     "The monitor a tablet's area is mapped to, by connector name or `\"desc:\"` and the start of "
+     "its description as in `outputs.monitors`. Unset, or naming none that is plugged in, the "
+     "tablet spans every monitor."},
+
     {"layout", "table", "", "", none, none, "Gaps, workspaces, and tiling."},
     {"layout.gap", "integer", "8", "8", 0, 100,
      "Pixels between windows and at the screen edges; `gap_inner` and `gap_outer` override it."},

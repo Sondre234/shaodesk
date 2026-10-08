@@ -288,7 +288,8 @@ struct Config {
                                                  {3, SH_SWIPE_UP, SH_OVERVIEW_TOGGLE, "toggle_overview"},
                                                  {3, SH_SWIPE_DOWN, SH_OVERVIEW_CANCEL, "overview_cancel"}},
                                       .swipe_count = 4},
-                         .touch_output = ""};
+                         .touch_output = "",
+                         .tablet_output = ""};
     // layout.workspace_names: the label of workspace N is names[N - 1]; "" or past the end: none.
     std::vector<std::string> workspace_names;
     // hot_corners: what each corner runs, as a control request; "" for nothing.

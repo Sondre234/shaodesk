@@ -384,6 +384,9 @@ struct sh_settings {
      * start of its description; "" for the one the device names, else a built-in panel, else
      * the whole layout. */
     char touch_output[128];
+    /* tablet.output: the output drawing tablets are mapped to, as touch_output names one; ""
+     * for the whole layout. */
+    char tablet_output[128];
 };
 
 /* What a mouse button was pressed over. */
