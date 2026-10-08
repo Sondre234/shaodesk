@@ -94,6 +94,8 @@ void reload_config(struct sh_server *server) {
     if (!server_settings(server)->groups)
         dissolve_groups(server);
     restack_windows(server); // layout.floating_above_tiles may have changed
+    struct sh_toplevel *next;
+    wl_list_for_each_safe(toplevel, next, &server->toplevels, link) follow_dynamic_rules(toplevel);
     show_workspaces(server);
     if (server->focused_toplevel && !toplevel_visible(server->focused_toplevel)) {
         deactivate_toplevel(server);

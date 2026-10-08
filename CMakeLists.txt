@@ -218,6 +218,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/binding_mode.c
         src/compositor/control.c
         src/compositor/cursor.c
+        src/compositor/dynamic_rules.c
         src/compositor/effects.c
         src/compositor/focus.c
         src/compositor/foreign_toplevel.c
@@ -575,6 +576,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(sticky_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME dynamic_rules_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/dynamic_rules_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(dynamic_rules_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME stacking_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/stacking_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)

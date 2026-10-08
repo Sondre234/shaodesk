@@ -277,6 +277,7 @@ void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool maximized)
     struct sh_window_rule rule;
     bool ruled = window_rule(toplevel, &rule);
     ruled = session_claim(server, toplevel, &rule, ruled);
+    ruled = open_dynamic_rules(toplevel, &rule, ruled);
     struct wlr_output *output = new_window_output(toplevel);
     if (ruled && rule.output[0]) {
         struct wlr_output *named = rule_output(server, rule.output);

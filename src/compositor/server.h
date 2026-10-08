@@ -20,6 +20,7 @@
 #include "shaodesk/sleep.h"
 #include "shaodesk/login1.h"
 #include "shaodesk/swipe.h"
+#include "shaodesk/dynamic_rule.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -704,6 +705,9 @@ struct sh_toplevel {
     /* Kept above the other windows (stacking.c): drawn in above_windows while not fullscreen in
      * front. */
     bool above;
+    /* What the dynamic window rules hold the window to, and what it gets back as they stop
+     * (dynamic_rules.c). */
+    struct sh_held_value held_floating, held_sticky, held_above;
     /* Asked for attention while it had no focus; cleared when it is focused or unmapped.
      * urgent_order says which asked first, urgent_since (milliseconds) when it began pulsing. */
     bool urgent;
@@ -892,6 +896,11 @@ struct sh_toplevel *toplevel_at(struct sh_server *server, double x, double y);
 struct wlr_surface *press_target_at(struct sh_server *server, double x, double y, double *sx,
                                     double *sy, struct sh_node **owner);
 void seat_pointer_focus_change(struct wl_listener *listener, void *data);
+
+/* dynamic_rules.c */
+bool open_dynamic_rules(struct sh_toplevel *toplevel, struct sh_window_rule *rule, bool ruled);
+void follow_dynamic_rules(struct sh_toplevel *toplevel);
+void describe_dynamic_rules(struct sh_server *server, int fd);
 
 /* effects.c */
 void update_dim(struct sh_toplevel *toplevel);
