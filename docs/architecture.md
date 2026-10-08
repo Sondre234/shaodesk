@@ -274,6 +274,7 @@ what was there.
 The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `task_filter.cpp`
 (the taskbar's slots and groups), `audio.cpp` with `pulse_audio.cpp`, `system_status.cpp`
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
+`volume_keys.cpp` (what the compositor passes on from the volume, microphone and brightness keys),
 `power.cpp`, `palette.cpp`. `preview.cpp` has stand-ins for all of them for
 `--preview-popup`.
 
@@ -590,7 +591,9 @@ client header and code for the shell and the test probes), its global made with
 `send_event` (`control.c`) sends a line to every subscriber; `send_shell_line` and
 `request_shell` are the shell-specific forms, and `report_failure` logs a failure the user no
 longer waits on and shows it across the panel (`power-error`, `spawn-error`). The shell reads
-them in `shell/controller.cpp`.
+them in `shell/controller.cpp`. It subscribes with `subscribe shell`, and `shell_listening` says
+whether it has, for something the compositor does another way without it, as the volume keys run
+`wpctl` (`volume.c`).
 
 ### A new test
 
