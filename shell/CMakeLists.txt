@@ -15,15 +15,18 @@ option(SHAODESK_NOTIFICATIONS "Serve org.freedesktop.Notifications from the shel
 option(SHAODESK_TRAY "Show applications' status icons (StatusNotifierItem) in the panel (needs Qt6 DBus)" ON)
 # Quick Settings' services on D-Bus; without QtDBus they are left out and their widgets never show.
 option(SHAODESK_MEDIA "Control media players (MPRIS) from Quick Settings and the media keys (needs Qt6 DBus)" ON)
+option(SHAODESK_POWER_PROFILES "Switch power-profiles-daemon's power mode from Quick Settings (needs Qt6 DBus)" ON)
 set(SHAODESK_DBUS OFF)
 set(SHAODESK_TRAY_DBUS OFF)
 set(SHAODESK_MEDIA_DBUS OFF)
-if(SHAODESK_NOTIFICATIONS OR SHAODESK_TRAY OR SHAODESK_MEDIA)
+set(SHAODESK_POWER_PROFILES_DBUS OFF)
+if(SHAODESK_NOTIFICATIONS OR SHAODESK_TRAY OR SHAODESK_MEDIA OR SHAODESK_POWER_PROFILES)
     find_package(Qt6 6.9 QUIET COMPONENTS DBus)
     if(Qt6DBus_FOUND)
         set(SHAODESK_DBUS ${SHAODESK_NOTIFICATIONS})
         set(SHAODESK_TRAY_DBUS ${SHAODESK_TRAY})
         set(SHAODESK_MEDIA_DBUS ${SHAODESK_MEDIA})
+        set(SHAODESK_POWER_PROFILES_DBUS ${SHAODESK_POWER_PROFILES})
     else()
         message(STATUS "Qt6 DBus not found: the notification daemon, the tray and Quick Settings' D-Bus services are left out")
     endif()
@@ -40,7 +43,7 @@ endif()
 set(SHAODESK_START_SOURCES start_menu.cpp start_menu.hpp launch_history.cpp launch_history.hpp)
 # The models of the services Quick Settings controls over D-Bus, in everything that builds the
 # controller; their D-Bus backends only in the shell.
-set(SHAODESK_SERVICE_SOURCES media.cpp media.hpp)
+set(SHAODESK_SERVICE_SOURCES media.cpp media.hpp power_mode.cpp power_mode.hpp)
 set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_images.cpp
     notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp tray.cpp tray.hpp
     tray_images.cpp tray_images.hpp)
@@ -131,6 +134,11 @@ if(SHAODESK_MEDIA_DBUS)
     target_sources(shaodesk-shell PRIVATE mpris.cpp mpris.hpp)
     target_link_libraries(shaodesk-shell PRIVATE Qt6::DBus)
     target_compile_definitions(shaodesk-shell PRIVATE SHAODESK_MEDIA=1)
+endif()
+if(SHAODESK_POWER_PROFILES_DBUS)
+    target_sources(shaodesk-shell PRIVATE power_profiles_daemon.cpp power_profiles_daemon.hpp)
+    target_link_libraries(shaodesk-shell PRIVATE Qt6::DBus)
+    target_compile_definitions(shaodesk-shell PRIVATE SHAODESK_POWER_PROFILES=1)
 endif()
 if(SHAODESK_PULSEAUDIO AND PULSE_FOUND)
     target_sources(shaodesk-shell PRIVATE pulse_audio.cpp)
@@ -351,6 +359,20 @@ if(BUILD_TESTING)
         target_compile_definitions(mpris_probe PRIVATE QT_NO_KEYWORDS)
         target_compile_options(mpris_probe PRIVATE -Wall -Wextra -Wpedantic)
         target_link_libraries(mpris_probe PRIVATE Qt6::Core Qt6::DBus)
+    endif()
+    if(SHAODESK_POWER_PROFILES_DBUS)
+        # The power mode against a stand-in power-profiles-daemon on a bus of its own.
+        add_executable(power_mode_dbus_test ${PROJECT_SOURCE_DIR}/tests/power_mode_dbus_test.cpp
+            ${PROJECT_SOURCE_DIR}/tests/fake_dbus.hpp power_mode.cpp power_mode.hpp
+            power_profiles_daemon.cpp power_profiles_daemon.hpp)
+        set_target_properties(power_mode_dbus_test PROPERTIES AUTOMOC ON)
+        target_include_directories(power_mode_dbus_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+        target_compile_definitions(power_mode_dbus_test PRIVATE QT_NO_KEYWORDS SHAODESK_POWER_PROFILES=1)
+        target_compile_options(power_mode_dbus_test PRIVATE -Wall -Wextra -Wpedantic)
+        target_link_libraries(power_mode_dbus_test PRIVATE Qt6::Core Qt6::DBus Qt6::Test)
+        add_test(NAME shell_power_mode_dbus COMMAND power_mode_dbus_test)
+        set_tests_properties(shell_power_mode_dbus PROPERTIES TIMEOUT 60
+            ENVIRONMENT "DBUS_SESSION_BUS_ADDRESS=disabled:;DBUS_SYSTEM_BUS_ADDRESS=disabled:")
     endif()
     add_test(NAME shell_preview COMMAND ${Python3_EXECUTABLE}
         ${PROJECT_SOURCE_DIR}/tests/shell_preview.py $<TARGET_FILE:shaodesk-shell>
