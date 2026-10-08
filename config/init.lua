@@ -93,6 +93,9 @@ return {
         -- speed = 0.0 (-1 to 1), acceleration = "flat" or "adaptive", natural_scroll = false
     },
     -- touchpad = { natural_scroll = true, tap_to_click = true, disable_while_typing = true },
+    -- The monitor touchscreens map to; unset, the one the device names, else the built-in
+    -- panel (eDP, LVDS, DSI), else every monitor:
+    -- touch = { output = "eDP-1" },
     layout = {
         -- gap = 8, -- sets both; or gap_inner (between windows) and gap_outer (at the edges)
         -- smart_gaps = true, -- no gaps around a tiled window alone on its workspace

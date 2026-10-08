@@ -598,3 +598,20 @@ Not checked: a real touchpad through libinput (its units and speeds, against the
 of 300 and the flick at 0.5 a millisecond), how the slide held under the fingers looks on a real
 display at 144 or 200 Hz, and real applications' use of the gestures (pinch-zoom in Firefox and
 Chromium, a hold stopping kinetic scrolling, GTK's gestures).
+
+Touchscreens are `headless_touch` devices (`headless_input.c`), which put fingers down at a place
+on the screen from 0 to 1 as libinput gives it. `touchscreen_smoke` checks with `input_probe`
+windows and a panel that fingers reach the surface under them with surface coordinates, several
+at once, past the window's edge, with frames and cancel, and focus the window but not a panel
+without the keyboard; that a window without wl_touch gets the pointer and its left button from
+one finger at a time, beside a finger on another window; that a tap on a traffic light closes a
+window, a finger on the drag strip drags it, and a tap on the desktop leaves the pointer on
+nothing; and the mapping: every output, then a built-in panel plugged in (`eDP-1`), the output a
+device names, and `touch.output` by connector and by a description that matches nothing.
+`touch_shell_smoke` checks that the Qt shell binds wl_touch and opens and closes the launcher on
+taps, the fingers going to its layer surfaces by wl_touch.
+
+Not checked: a real touchscreen through libinput (its device's `WL_OUTPUT`, a rotated or scaled
+built-in panel, which libinput's calibration matrix from udev must match, palm rejection's
+cancels), GTK, Firefox and Chromium windows and X11 applications under real fingers, and how
+the cursor jumping to a finger that stands in for the pointer looks.
