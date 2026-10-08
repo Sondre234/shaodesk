@@ -822,5 +822,11 @@ if(SHAODESK_BUILD_COMPOSITOR)
         else()
             message(STATUS "XWayland test skipped: needs an Xwayland binary and wlroots X support")
         endif()
+        # Windows' own icons; an X11 window's only where the X11 probe is built.
+        add_test(NAME window_icon_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_icon_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>
+            $<$<TARGET_EXISTS:x11_probe>:$<TARGET_FILE:x11_probe>>)
+        set_tests_properties(window_icon_smoke PROPERTIES TIMEOUT 60)
     endif()
 endif()
