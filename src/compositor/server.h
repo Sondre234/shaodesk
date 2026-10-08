@@ -249,6 +249,18 @@ struct sh_power {
 
 struct sh_window_object; // a shaodesk_window_v1 (window_control.c)
 
+/* A workspace slide a touchpad swipe drives (workspace.c, for gestures.c): the output, the
+ * workspace it showed as the swipe began and the one the fingers head for (out of range past
+ * the first or last, `from` when they head nowhere), how far the slide is held, and held copies
+ * of the windows coming in. */
+struct sh_workspace_swipe {
+    char output[64];
+    int from, target;
+    double shown;
+    struct sh_anim *copies[64];
+    int copy_count;
+};
+
 struct sh_server {
     const struct sh_callbacks *callbacks;
     bool running;
@@ -1084,6 +1096,11 @@ void set_toplevel_output(struct sh_toplevel *toplevel, struct wlr_output *output
 void follow_output(struct sh_toplevel *toplevel);
 void set_toplevel_workspace(struct sh_toplevel *toplevel, int workspace);
 void switch_workspace(struct sh_server *server, struct wlr_output *output, int workspace);
+void workspace_swipe_begin(struct sh_server *server, struct sh_workspace_swipe *swipe,
+                           struct wlr_output *output);
+void workspace_swipe_hold(struct sh_server *server, struct sh_workspace_swipe *swipe, int target,
+                          double t);
+void workspace_swipe_end(struct sh_server *server, struct sh_workspace_swipe *swipe, bool finish);
 void set_sticky(struct sh_toplevel *toplevel, bool sticky, bool retile);
 void move_toplevel_to_workspace(struct sh_server *server, struct sh_toplevel *toplevel,
                                 int workspace);
