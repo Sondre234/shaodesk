@@ -189,6 +189,15 @@ if(BUILD_TESTING)
     target_compile_options(start_menu_test PRIVATE -Wall -Wextra -Wpedantic)
     target_link_libraries(start_menu_test PRIVATE Qt6::Core Qt6::Test PkgConfig::GIO)
     add_test(NAME start_menu COMMAND start_menu_test)
+    # The authentication dialog's model, with stand-ins for polkit's helper.
+    add_executable(authentication_test ${PROJECT_SOURCE_DIR}/tests/authentication_test.cpp
+        authentication.cpp authentication.hpp)
+    set_target_properties(authentication_test PROPERTIES AUTOMOC ON)
+    target_include_directories(authentication_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(authentication_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(authentication_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(authentication_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME shell_authentication COMMAND authentication_test)
     # Applications' icons: the desktop's icon theme, and which entry a window belongs to.
     add_executable(app_icons_test ${PROJECT_SOURCE_DIR}/tests/app_icons_test.cpp icons.cpp icons.hpp
         app_match.cpp app_match.hpp)
