@@ -181,6 +181,10 @@ shadows.
   bound to the new actions `media_play_pause`, `media_next`, `media_previous` and `media_stop`,
   which the shell sends to the same player. `shell.widgets.media = false` leaves the card out and
   `-DSHAODESK_MEDIA=OFF` builds without them.
+- A power mode tile in Quick Settings while power-profiles-daemon runs: Power saver, Balanced or
+  Performance, listed under the tile, saying when the daemon holds performance back.
+  `shell.widgets.power_mode = false` leaves it out and `-DSHAODESK_POWER_PROFILES=OFF` builds
+  without it.
 
 ### Notifications and the overlays
 
