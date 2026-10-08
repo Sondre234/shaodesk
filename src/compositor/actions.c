@@ -310,6 +310,12 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
             wlr_log(WLR_ERROR, "%s", error);
         break;
     }
+    case SH_DISPLAY_MODE: {
+        char error[128];
+        if (!display_mode_choose(server, argument, error, sizeof(error)))
+            wlr_log(WLR_ERROR, "%s", error);
+        break;
+    }
     case SH_TOGGLE_STICKY:
         if (current && server_settings(server)->sticky)
             set_sticky(current, !current->sticky, true);

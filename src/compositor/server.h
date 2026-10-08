@@ -473,6 +473,14 @@ struct sh_server {
     struct wlr_idle_notifier_v1 *idle_notifier;
     struct wlr_output_manager_v1 *output_manager;
     struct wl_listener output_apply, output_test;
+    /* The display mode popup (display_mode.c): whether it is open, on which output, the choice
+     * it shows (enum sh_display_mode), and the timer that takes it once the key has rested. */
+    struct {
+        bool open;
+        int shown;
+        char output[64];
+        struct wl_event_source *timer;
+    } display_mode;
     /* wlr-output-power-management (output_power.c), and when an action last turned monitors
      * off, which input does not undo for a moment. */
     struct wl_listener output_power_set_mode;
@@ -889,6 +897,12 @@ struct sh_toplevel *toplevel_at(struct sh_server *server, double x, double y);
 struct wlr_surface *press_target_at(struct sh_server *server, double x, double y, double *sx,
                                     double *sy, struct sh_node **owner);
 void seat_pointer_focus_change(struct wl_listener *listener, void *data);
+
+/* display_mode.c */
+bool display_mode_choose(struct sh_server *server, int mode, char *error, size_t error_size);
+bool display_mode_key(struct sh_server *server, xkb_keysym_t sym);
+void describe_display_mode(struct sh_server *server, int fd);
+void display_mode_finish(struct sh_server *server);
 
 /* effects.c */
 void update_dim(struct sh_toplevel *toplevel);

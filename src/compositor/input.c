@@ -512,6 +512,9 @@ static bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, ui
             return true;
         }
     }
+    // The display mode popup takes the arrows, Return and Escape while it is open.
+    if (display_mode_key(server, sym))
+        return true;
     int argument = 0;
     enum sh_action action =
         server->callbacks->key(server->callbacks->userdata, modifiers, sym, &argument);

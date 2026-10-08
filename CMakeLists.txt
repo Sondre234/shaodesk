@@ -217,6 +217,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/binding_mode.c
         src/compositor/control.c
         src/compositor/cursor.c
+        src/compositor/display_mode.c
         src/compositor/effects.c
         src/compositor/focus.c
         src/compositor/foreign_toplevel.c

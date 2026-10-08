@@ -101,6 +101,10 @@ static void get_outputs(struct sh_server *server, int fd, const char *arguments)
         control_describe_output(server, fd, output);
 }
 
+static void get_display_mode(struct sh_server *server, int fd, const char *arguments) {
+    describe_display_mode(server, fd);
+}
+
 static void get_workspace(struct sh_server *server, int fd, const char *arguments) {
     char reply[32];
     snprintf(reply, sizeof(reply), "ok\n%d\n", focused_workspace(server));
@@ -679,6 +683,7 @@ static const struct {
     bool arguments;
 } queries[] = {
     {"outputs", get_outputs, false},
+    {"display_mode", get_display_mode, false},
     {"workspace", get_workspace, false},
     {"workspaces", get_workspaces, false},
     {"layout", get_layout, true},

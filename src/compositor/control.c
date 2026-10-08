@@ -385,6 +385,14 @@ static void control_handle(struct sh_server *server, int fd, const char *request
         control_reply(fd, "ok\n");
         return;
     }
+    if (action == SH_DISPLAY_MODE) {
+        // The caller hears of a choice that cannot be had, such as one monitor alone.
+        bool done = display_mode_choose(server, argument, error, sizeof(error));
+        char reply[300];
+        snprintf(reply, sizeof(reply), done ? "ok\n" : "error: %s\n", error);
+        control_reply(fd, reply);
+        return;
+    }
     if (display_action(action)) {
         // The caller hears of a monitor that is not there.
         server->target_output = target;
