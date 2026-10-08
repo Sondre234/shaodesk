@@ -344,6 +344,13 @@ if(BUILD_TESTING)
         add_test(NAME shell_media_dbus COMMAND media_dbus_test)
         set_tests_properties(shell_media_dbus PROPERTIES TIMEOUT 60
             ENVIRONMENT "DBUS_SESSION_BUS_ADDRESS=disabled:;DBUS_SYSTEM_BUS_ADDRESS=disabled:")
+        # A media player for the end-to-end test (media_smoke), as a program of its own.
+        add_executable(mpris_probe ${PROJECT_SOURCE_DIR}/tests/mpris_probe.cpp
+            ${PROJECT_SOURCE_DIR}/tests/fake_dbus.hpp)
+        set_target_properties(mpris_probe PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
+        target_compile_definitions(mpris_probe PRIVATE QT_NO_KEYWORDS)
+        target_compile_options(mpris_probe PRIVATE -Wall -Wextra -Wpedantic)
+        target_link_libraries(mpris_probe PRIVATE Qt6::Core Qt6::DBus)
     endif()
     add_test(NAME shell_preview COMMAND ${Python3_EXECUTABLE}
         ${PROJECT_SOURCE_DIR}/tests/shell_preview.py $<TARGET_FILE:shaodesk-shell>
@@ -421,6 +428,12 @@ if(BUILD_TESTING)
                 ${PROJECT_SOURCE_DIR}/tests/notifications_smoke.py $<TARGET_FILE:shaodesk>
                 $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:notify_probe> $<TARGET_FILE:pointer_probe>)
             set_tests_properties(notifications_smoke PROPERTIES TIMEOUT 90)
+        endif()
+        if(SHAODESK_MEDIA_DBUS)
+            add_test(NAME media_smoke COMMAND ${Python3_EXECUTABLE}
+                ${PROJECT_SOURCE_DIR}/tests/media_smoke.py $<TARGET_FILE:shaodesk>
+                $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:mpris_probe>)
+            set_tests_properties(media_smoke PROPERTIES TIMEOUT 90)
         endif()
         if(SHAODESK_TRAY_DBUS)
             add_test(NAME tray_smoke COMMAND ${Python3_EXECUTABLE}

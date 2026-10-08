@@ -92,6 +92,10 @@ class Object : public QDBusVirtualObject {
     // Whether a Set from the bus is taken, which then changes the property and announces it;
     // false refuses it with an error. Unset, every one is taken.
     std::function<bool(const QString &interface, const QString &name, const QVariant &value)> setter;
+    // Told of each Get and GetAll ("" for the name), after the answer is sent.
+    std::function<void(const QString &interface, const QString &name)> read;
+    // Told of each call recorded in `calls`, as it is recorded.
+    std::function<void(const QString &call)> called;
     // Changes properties of one interface and announces them in one PropertiesChanged.
     void set(const QString &interface, const QVariantMap &changes) {
         for (auto it = changes.constBegin(); it != changes.constEnd(); ++it)
@@ -122,21 +126,24 @@ class Object : public QDBusVirtualObject {
             const auto interface = arguments.value(0).toString();
             if (message.member() == "GetAll") {
                 bus.send(message.createReply(QVariant(properties.value(interface))));
+                if (read)
+                    read(interface, QString());
                 return true;
             }
             if (message.member() == "Get") {
                 const auto name = arguments.value(1).toString();
-                if (!properties.value(interface).contains(name)) {
+                if (!properties.value(interface).contains(name))
                     bus.send(message.createErrorReply("org.freedesktop.DBus.Error.UnknownProperty", name));
-                    return true;
-                }
-                bus.send(message.createReply(QVariant::fromValue(QDBusVariant(properties[interface][name]))));
+                else
+                    bus.send(message.createReply(QVariant::fromValue(QDBusVariant(properties[interface][name]))));
+                if (read)
+                    read(interface, name);
                 return true;
             }
             if (message.member() == "Set") {
                 const auto name = arguments.value(1).toString();
                 const auto value = arguments.value(2).value<QDBusVariant>().variant();
-                calls << "Set " + interface + "." + name + " " + value.toString();
+                record("Set " + interface + "." + name + " " + text(value));
                 if (setter && !setter(interface, name, value)) {
                     bus.send(message.createErrorReply("org.freedesktop.DBus.Error.AccessDenied", name));
                     return true;
@@ -149,7 +156,7 @@ class Object : public QDBusVirtualObject {
         QStringList words{message.member()};
         for (const auto &argument : arguments)
             words << text(argument);
-        calls << words.join(' ');
+        record(words.join(' '));
         if (methods && methods(message, bus))
             return true;
         bus.send(message.createErrorReply("org.freedesktop.DBus.Error.UnknownMethod", message.member()));
@@ -157,6 +164,11 @@ class Object : public QDBusVirtualObject {
     }
 
   private:
+    void record(const QString &call) {
+        calls << call;
+        if (called)
+            called(call);
+    }
     QDBusConnection bus_;
     QString path_;
 };
