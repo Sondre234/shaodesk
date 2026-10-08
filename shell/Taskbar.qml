@@ -19,6 +19,7 @@ Item {
     readonly property Item trayRow: tray
     readonly property Item clock: clockButton
     readonly property Item volume: audioWidget
+    readonly property Item network: networkWidget
     readonly property Item profiles: profilesButton
     readonly property Item wallpapers: wallpapersButton
     readonly property Item quickSettings: quickButton
@@ -108,7 +109,7 @@ Item {
                 }
             }
             NotificationBell { id: bell; panel: taskbar.panel }
-            NetworkWidget { panel: taskbar.panel }
+            NetworkWidget { id: networkWidget; panel: taskbar.panel }
             BatteryWidget { panel: taskbar.panel }
             VolumeButton { id: audioWidget; panel: taskbar.panel }
             KeyboardLayout { panel: taskbar.panel }

@@ -101,7 +101,9 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     MenuBarMenu.qml
     QuickSettings.qml
     QuickTile.qml
-    MediaCard.qml)
+    MediaCard.qml
+    WifiList.qml
+    WifiPopup.qml)
 # The protocols task_model.cpp and window_pictures.cpp speak, generated in the top-level build
 # directory.
 set(SHAODESK_TASK_PROTOCOL_SOURCES
