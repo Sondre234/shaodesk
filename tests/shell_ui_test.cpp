@@ -5098,6 +5098,24 @@ ListModel {
         controller.reload();
         if (!QTest::qWaitFor([&] { return controller.style() == "macos"; }))
             return fail("the configuration's macOS style was not read");
+        // Spotlight lists what it finds by kind after the top hit, each kind once (but for
+        // searching the web and saving a session at the end), files among them.
+        {
+            auto *palette = controller.palette();
+            palette->open(output);
+            palette->setQuery("a");
+            QStringList runs;
+            for (const auto &item : palette->results().mid(1)) {
+                const auto map = item.toMap();
+                if (map["kind"] == "web" || map["title"].toString().startsWith("Save session as"))
+                    continue;
+                if (runs.isEmpty() || runs.last() != map["kind"].toString())
+                    runs << map["kind"].toString();
+            }
+            palette->close();
+            if (!runs.contains("file") || !runs.contains("app") || runs.removeDuplicates() > 0)
+                return fail(("Spotlight does not list its results by kind: " + runs.join(' ').toStdString()).c_str());
+        }
         if (!token("macos").toBool() || token("menuRowHeight").toInt() != 24 ||
             token("menuHighlight") != token("accent") ||
             token("textOnAccentFill").value<QColor>() != QColor(Qt::white))
