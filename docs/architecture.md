@@ -635,11 +635,14 @@ them in `shell/controller.cpp`.
   `SHAODESK_BUILD_COMPOSITOR` in `CMakeLists.txt`. A temporary directory's prefix stays at 26
   characters or fewer: the control socket goes in it, a Unix socket's path is limited to about
   107 bytes, and a Gentoo package build runs the tests in a `TMPDIR` of 43 characters or more.
-  Under `--headless`, `shaodesk msg headless_output`, `headless_keyboard` and `headless_pointer`
-  plug in outputs, keyboards and pointers (`headless_keyboard key NAME CODE press` types on one,
-  see `keymap_smoke.py`; `headless_pointer swipe NAME update DX DY [TIME]` moves a touchpad
-  gesture's fingers, at a given time in milliseconds; see `pointer_gestures_smoke.py`, whose
-  `input_probe` window prints the input it gets, a line per event), and `wayland_probe --keymap` prints the keymap an application gets. A `wayland_probe` window with
+  Under `--headless`, `shaodesk msg headless_output`, `headless_keyboard`, `headless_pointer`
+  and `headless_touch` plug in outputs, keyboards, pointers and touchscreens
+  (`headless_keyboard key NAME CODE press` types on one, see `keymap_smoke.py`;
+  `headless_pointer swipe NAME update DX DY [TIME]` moves a touchpad gesture's fingers, at a given
+  time in milliseconds, see `pointer_gestures_smoke.py`; `headless_touch down NAME ID X Y` puts a
+  finger on a screen, see `touchscreen_smoke.py`). The `input_probe` window (or panel, with
+  `--layer`) prints the input it gets, a line per event, and `wayland_probe --keymap` prints the
+  keymap an application gets. A `wayland_probe` window with
   `SHAODESK_PROBE_DRAG=source` drags a line of text on a button press of `pointer_probe`'s, and
   one with `=target` takes it, each printing what it hears; `get seat` says where the drag is
   (see `drag_focus_smoke.py`). `SHAODESK_PROBE_ICON` gives a `wayland_probe` window an icon
