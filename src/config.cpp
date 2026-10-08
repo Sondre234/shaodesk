@@ -350,6 +350,27 @@ void read_shell(lua_State *L, ShellConfig &shell) {
     }
     lua_pop(L, 1);
     current_section = "shell";
+    if (section(L, "search", "shell.search")) {
+        auto &search = shell.search;
+        boolean(L, "files", "shell.search.files", search.files);
+        lua_getfield(L, -1, "directories");
+        if (!lua_isnil(L, -1)) {
+            auto size = array_size(L, -1, 32);
+            for (size_t i = 1; i <= size; ++i) {
+                lua_rawgeti(L, -1, static_cast<lua_Integer>(i));
+                auto folder = string(L, -1, "shell.search.directories");
+                lua_pop(L, 1);
+                if (!folder.starts_with('/') && !folder.starts_with("~/") && folder != "~")
+                    fail("shell.search.directories must be absolute or start with ~/");
+                search.directories.push_back(std::move(folder));
+            }
+        }
+        lua_pop(L, 1);
+        search.depth = integer(L, "depth", search.depth, 1, 10);
+        search.max_files = integer(L, "max_files", search.max_files, 100, 200000);
+    }
+    lua_pop(L, 1);
+    current_section = "shell";
     if (section(L, "widgets", "shell.widgets")) {
         for (auto [key, target] : {std::pair{"workspaces", &shell.widgets.workspaces},
                                    {"clock", &shell.widgets.clock},

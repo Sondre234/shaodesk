@@ -581,6 +581,26 @@ int main(int argc, char **argv) {
         rejects("return {shell={thumbnails={size=119}}}");
         rejects("return {shell={thumbnails={live='yes'}}}");
         rejects("return {shell={thumbnails={width=240}}}");
+        // What the search finds besides applications: files, by default in the home and user
+        // folders, four levels down and 20000 names at most.
+        require(even.shell.search.files && even.shell.search.directories.empty() &&
+                    even.shell.search.depth == 4 && even.shell.search.max_files == 20000,
+                "the search's files do not default to on, the user folders, 4 levels and 20000");
+        auto search = shaodesk::parse_config(
+            "return {shell={search={files=false,directories={'~/Documents','/srv/share','~'},"
+            "depth=2,max_files=500}}}");
+        require(!search.shell.search.files &&
+                    search.shell.search.directories ==
+                        std::vector<std::string>{"~/Documents", "/srv/share", "~"} &&
+                    search.shell.search.depth == 2 && search.shell.search.max_files == 500,
+                "shell.search not parsed");
+        rejects("return {shell={search=true}}");
+        rejects("return {shell={search={files='yes'}}}");
+        rejects("return {shell={search={directories={'Documents'}}}}");
+        rejects("return {shell={search={directories='~/Documents'}}}");
+        rejects("return {shell={search={depth=0}}}");
+        rejects("return {shell={search={max_files=200001}}}");
+        rejects("return {shell={search={folders={'~'}}}}");
         using shaodesk::WidgetPlace;
         auto widgets = shaodesk::parse_config(
             "return {shell={widgets={battery=false,calendar=false,workspaces=false}}}");

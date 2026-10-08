@@ -100,6 +100,16 @@ struct ShellThumbnails {
     bool live = true; // pictures follow the windows while shown; false: one just before the card opens
 };
 
+// Lua `shell.search`: what the command palette's and the start menu's search find besides
+// applications, windows and actions.
+struct ShellSearch {
+    bool files = true; // recent files, and the names in the folders below
+    // Absolute or "~/..."; empty: the home folder and the XDG user folders.
+    std::vector<std::string> directories;
+    int depth = 4;         // levels of folders read below each
+    int max_files = 20000; // names read at most
+};
+
 struct ShellConfig {
     bool enabled = true;
     bool macos_style = false;           // style = "macos": a menu bar and a dock
@@ -113,6 +123,7 @@ struct ShellConfig {
     bool software_renderer = false; // renderer = "software": Qt Quick without the GPU, faster to start
     bool group_windows = true; // one taskbar button per application, its windows listed on hover
     ShellThumbnails thumbnails;
+    ShellSearch search;
     int workspaces_shown = 0;  // the workspace indicator shows this many, around the current; 0: all
     std::string accent = "#7da8ff";
     std::string panel_color = "#151e2c";
