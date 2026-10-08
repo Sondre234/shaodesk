@@ -9,6 +9,7 @@
 class Audio;
 class Backlight;
 class Media;
+class PowerMode;
 class QQuickItem;
 class QQuickView;
 class QScreen;
@@ -19,7 +20,8 @@ class SystemStatus;
 // a session bus: windows (one application's three of them stacked, with stand-in pictures, one
 // minimized, one asking for attention), sound outputs and applications playing, a battery and
 // Wi-Fi, a backlight, tray items (one with a menu), a few notifications, every power action,
-// night light on, and a music player playing with a browser paused behind it. The controller's own models take the tray, the notifications and the power
+// night light on, a music player playing with a browser paused behind it, and power-profiles-daemon
+// in its balanced mode. The controller's own models take the tray, the notifications and the power
 // actions; the panel's sources, which the tests swap the same way, take the rest.
 class PreviewData : public QObject {
     Q_OBJECT
@@ -54,6 +56,7 @@ class PreviewData : public QObject {
     std::unique_ptr<SystemStatus> status_;
     std::unique_ptr<Backlight> backlight_;
     std::unique_ptr<Media> media_;
+    std::unique_ptr<PowerMode> powerMode_;
     QObject *tasks_ = nullptr;
 };
 

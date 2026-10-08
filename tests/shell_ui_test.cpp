@@ -68,6 +68,15 @@ class FakeMedia : public Media {
     void queryPosition(const QString &) override {}
 };
 
+// Records the profiles the panel asks power-profiles-daemon for.
+class FakePowerMode : public PowerMode {
+  public:
+    QStringList requests;
+
+  protected:
+    void sendProfile(const QString &profile) override { requests << profile; }
+};
+
 // Pictures for the stand-in windows, image://test-windows/WIDTHxHEIGHT: that large, in one colour.
 class TestPictures : public QQuickImageProvider {
   public:
@@ -4737,6 +4746,64 @@ ListModel {
         if (card->isVisible() || media.available())
             return fail("the media card stayed without players");
         view.rootObject()->setProperty("mediaSource", QVariant::fromValue<QObject *>(controller.media()));
+    }
+    // Quick Settings' power mode: a tile while power-profiles-daemon runs, its profiles listed
+    // under it, the one picked asked for; none with shell.widgets.power_mode off.
+    {
+        FakePowerMode mode;
+        QQmlEngine::setObjectOwnership(&mode, QQmlEngine::CppOwnership);
+        view.rootObject()->setProperty("powerModeSource", QVariant::fromValue<QObject *>(&mode));
+        if (!rewrite(QString(lua).replace("widgets={", "widgets={notifications=false,")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        auto *button = find(view.rootObject(), "quickSettingsButton");
+        if (!QTest::qWaitFor([&] { return !button->isVisible(); }))
+            return fail("the Quick Settings button shows with nothing placed in it and no daemon");
+        mode.update({true, "balanced", {"power-saver", "balanced", "performance"}, ""});
+        if (!QTest::qWaitFor([&] { return button->isVisible() && button->x() > 0; }))
+            return fail("the Quick Settings button did not show for the power mode");
+        click(button);
+        auto *quick = find(view.rootObject(), "quickSettings");
+        auto *tile = find(quick, "quickTile:powerMode");
+        if (!tile || !QTest::qWaitFor([&] { return inPopover(quick) && tile->isVisible(); }) ||
+            tile->property("detail").toString() != "Balanced" || tile->property("checked").toBool())
+            return fail("Quick Settings has no power mode tile showing the profile");
+        click(tile);
+        auto *list = find(quick, "quickPowerModes");
+        if (!list || !QTest::qWaitFor([&] { return list->isVisible() && list->height() > 0; }))
+            return fail("the power mode tile did not list the profiles");
+        QTest::qWait(50); // laid out
+        click(findNamed(list, "quickPowerModeItem", "Power saver"));
+        if (mode.requests != QStringList{"power-saver"} ||
+            !QTest::qWaitFor([&] {
+                return tile->property("detail").toString() == "Power saver" && tile->property("checked").toBool();
+            }))
+            return fail("picking a power mode did not ask the daemon for it");
+        // Performance held back says why.
+        mode.update({true, "power-saver", {"power-saver", "balanced", "performance"}, "lap-detected"});
+        auto *performance = findNamed(list, "quickPowerModeItem", "Performance");
+        if (!performance || !QTest::qWaitFor([&] {
+                return performance->property("modelData").toMap().value("secondary").toString() == "Limited on a lap";
+            }))
+            return fail("the power modes do not say performance is held back");
+        if (!rewrite(QString(lua).replace("widgets={", "widgets={power_mode=false,")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return !tile->isVisible(); }))
+            return fail("the power mode tile stayed with shell.widgets.power_mode off");
+        if (!rewrite(lua))
+            return fail("could not restore the configuration");
+        controller.reload();
+        // Gone with the daemon, its list too.
+        if (!QTest::qWaitFor([&] { return tile->isVisible(); }))
+            return fail("the power mode tile did not come back");
+        mode.update({});
+        if (!QTest::qWaitFor([&] { return !tile->isVisible() && !list->isVisible(); }))
+            return fail("the power mode tile stayed without the daemon");
+        QTest::keyClick(popover, Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("Quick Settings did not close");
+        view.rootObject()->setProperty("powerModeSource", QVariant::fromValue<QObject *>(controller.powerMode()));
     }
     // The system tray: hidden while empty, a button for each item shown in the order they came,
     // and clicks and the wheel passed on to the item's application. The items are put in the
