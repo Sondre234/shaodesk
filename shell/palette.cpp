@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "palette.hpp"
+#include "calculator.hpp"
 #include "controller.hpp"
 #include "fuzzy.hpp"
+#include <QClipboard>
+#include <QGuiApplication>
 
 namespace {
 struct Action {
@@ -49,6 +52,14 @@ QVariantMap entry(const QString &kind, const QString &title, const QString &subt
 }
 
 } // namespace
+
+QVariantMap Palette::calculation(const QString &query) {
+    const auto answer = calculator::answer(query);
+    if (!answer)
+        return {};
+    return entry("calc", answer->text(), "Calculator · Enter copies the result",
+                 "accessories-calculator", answer->number);
+}
 
 Palette::Palette(ShellController &controller) : QObject(&controller), controller_(controller) {}
 
@@ -179,7 +190,11 @@ QVariantList Palette::entries(QObject *windows) const {
 }
 
 void Palette::refreshResults() {
-    results_ = fuzzy::rank(entries_, query_);
+    // A calculation's value comes first; a leading = asks for nothing else.
+    const auto calc = calculation(query_);
+    results_ = query_.trimmed().startsWith('=') ? QVariantList() : fuzzy::rank(entries_, query_);
+    if (!calc.isEmpty())
+        results_.prepend(calc);
     // Saving the arrangement under the name typed is offered last, once the text can be a name.
     const auto typed = query_.trimmed();
     if (fuzzy::validSessionName(typed) && !typed.startsWith('>') && !typed.startsWith('@') &&
@@ -231,6 +246,8 @@ void Palette::run(const QVariantMap &item, const QString &output) {
     if (kind == "window") {
         if (item["number"].toInt() == 0) // the focused one would minimize on a second click
             controller_.tasks()->activate(target.toInt());
+    } else if (kind == "calc") {
+        QGuiApplication::clipboard()->setText(target);
     } else if (item["power"].toBool()) {
         controller_.power()->request(target, output);
     } else if (kind == "app") {

@@ -4,6 +4,7 @@
 #include "system_status.hpp"
 #include "view.hpp"
 #include <QAbstractItemModel>
+#include <QClipboard>
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QElapsedTimer>
@@ -3479,6 +3480,30 @@ ListModel {
             std::cerr << "switching workspace from the palette failed: " << switches.join("|").toStdString() << '\n';
             return 1;
         }
+        // A calculation's value comes first, and Enter copies it; = asks for nothing else.
+        requests.clear();
+        QGuiApplication::clipboard()->clear();
+        openPalette();
+        type("2*(3+4)");
+        if (!QTest::qWaitFor([&] { return titlesNow().value(0) == "14"; }) ||
+            palette->results().value(0).toMap()["kind"] != "calc")
+            return fail("the palette did not calculate");
+        QTest::keyClick(&paletteView, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return QGuiApplication::clipboard()->text() == "14"; }) ||
+            !QTest::qWaitFor([&] { return !paletteView.isVisible(); }) || !requests.isEmpty())
+            return fail("the palette did not copy a calculation's value");
+        openPalette();
+        type("=pi");
+        if (!QTest::qWaitFor([&] { return titlesNow() == QStringList{"3.14159265359"}; }))
+            return fail("= did not narrow the palette to the calculator");
+        palette->setQuery("5 km in mi");
+        if (titlesNow().value(0) != "3.10685596119 mi" ||
+            palette->results().value(0).toMap()["target"] != "3.10685596119")
+            return fail("the palette did not convert units");
+        palette->setQuery("e");
+        if (palette->results().value(0).toMap()["kind"] == "calc")
+            return fail("the palette calculated a lone constant");
+        palette->close();
         // Escape closes without running anything, and so does losing the keyboard.
         requests.clear();
         openPalette();

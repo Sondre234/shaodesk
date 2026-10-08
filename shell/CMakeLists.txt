@@ -32,8 +32,9 @@ if(NOT SHAODESK_SHELL_PREVIEW_ONLY)
 endif()
 
 # The start menu's model (its pins, the launch history and its search), in everything that builds
-# the controller.
-set(SHAODESK_START_SOURCES start_menu.cpp start_menu.hpp launch_history.cpp launch_history.hpp)
+# the controller, and the calculator its search and the palette's share.
+set(SHAODESK_START_SOURCES start_menu.cpp start_menu.hpp launch_history.cpp launch_history.hpp
+    calculator.cpp calculator.hpp)
 set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_images.cpp
     notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp tray.cpp tray.hpp
     tray_images.cpp tray_images.hpp)

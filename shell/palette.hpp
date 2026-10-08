@@ -9,9 +9,10 @@ class ShellController;
 
 // The command palette (Super + P): one search box over open windows, installed applications,
 // workspaces, compositor actions (the power actions among them), appearance profiles and saved
-// sessions. Entries are {kind, title, subtitle, icon,
-// target}; `kind` is window, app, workspace, action or session, and a power action, which runs
-// as the power menu runs it, also has `power` set.
+// sessions, with a calculator. Entries are {kind, title, subtitle, icon,
+// target}; `kind` is window, app, workspace, action, session or calc, and a power action, which
+// runs as the power menu runs it, also has `power` set. A calculation's target is its number,
+// which running it copies to the clipboard.
 class Palette : public QObject {
     Q_OBJECT
     // The output showing the palette, empty while it is closed.
@@ -39,6 +40,9 @@ class Palette : public QObject {
     Q_INVOKABLE QVariantList entries(QObject *windows) const;
     // Runs one of its entries as choosing it here does, on monitor `output`.
     Q_INVOKABLE void run(const QVariantMap &entry, const QString &output);
+    // The entry of the calculator's value for `query` (see calculator::answer), or an empty map
+    // when it is no calculation.
+    static QVariantMap calculation(const QString &query);
   Q_SIGNALS:
     void openChanged();
     void queryChanged();
