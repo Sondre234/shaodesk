@@ -129,7 +129,29 @@ int main() {
             require(sh_snap_cycle(step.from, step.direction, &to) == step.step);
             require(to == step.to);
         }
-        std::cout << "Tiling bounds, gaps, non-overlap, snap zones and the snap cycle passed\n";
+
+        // Snap Assist's slot beside a snapped window, as other snapped windows fill the rest.
+        require(sh_snap_quarters(SH_SNAP_LEFT) == 5 && sh_snap_quarters(SH_SNAP_RIGHT) == 10 &&
+                sh_snap_quarters(SH_SNAP_BOTTOM_RIGHT) == 8 && sh_snap_quarters(SH_MAXIMIZE) == 0 &&
+                sh_snap_quarters(SH_NONE) == 0);
+        require(sh_snap_assist_slot(SH_SNAP_LEFT, 5) == SH_SNAP_RIGHT);
+        require(sh_snap_assist_slot(SH_SNAP_LEFT, 5 | 2) == SH_SNAP_BOTTOM_RIGHT);
+        require(sh_snap_assist_slot(SH_SNAP_LEFT, 5 | 8) == SH_SNAP_TOP_RIGHT);
+        require(sh_snap_assist_slot(SH_SNAP_LEFT, 15) == SH_NONE);
+        require(sh_snap_assist_slot(SH_SNAP_RIGHT, 10) == SH_SNAP_LEFT);
+        require(sh_snap_assist_slot(SH_SNAP_RIGHT, 10 | 1) == SH_SNAP_BOTTOM_LEFT);
+        // Four quarters fill in turn: beside, then below, then across.
+        require(sh_snap_assist_slot(SH_SNAP_TOP_LEFT, 1) == SH_SNAP_TOP_RIGHT);
+        require(sh_snap_assist_slot(SH_SNAP_TOP_RIGHT, 1 | 2) == SH_SNAP_BOTTOM_RIGHT);
+        require(sh_snap_assist_slot(SH_SNAP_BOTTOM_RIGHT, 1 | 2 | 8) == SH_SNAP_BOTTOM_LEFT);
+        require(sh_snap_assist_slot(SH_SNAP_BOTTOM_LEFT, 15) == SH_NONE);
+        require(sh_snap_assist_slot(SH_SNAP_TOP_LEFT, 1 | 10) == SH_SNAP_BOTTOM_LEFT);
+        require(sh_snap_assist_slot(SH_SNAP_BOTTOM_LEFT, 4 | 8 | 1) == SH_SNAP_TOP_RIGHT);
+        require(sh_snap_assist_slot(SH_SNAP_BOTTOM_RIGHT, 8) == SH_SNAP_BOTTOM_LEFT);
+        require(sh_snap_assist_slot(SH_MAXIMIZE, 0) == SH_NONE);
+        require(sh_snap_assist_slot(SH_NONE, 0) == SH_NONE);
+        std::cout << "Tiling bounds, gaps, non-overlap, snap zones, the snap cycle and Snap Assist's "
+                     "slots passed\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';
         return 1;

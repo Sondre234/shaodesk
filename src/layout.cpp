@@ -103,3 +103,58 @@ extern "C" sh_snap_step sh_snap_cycle(sh_action from, sh_action direction, sh_ac
         return up ? place(SH_MAXIMIZE) : SH_SNAP_STEP_MINIMIZE;
     }
 }
+
+extern "C" unsigned sh_snap_quarters(sh_action arrangement) {
+    switch (arrangement) {
+    case SH_SNAP_LEFT:
+        return 1 | 4;
+    case SH_SNAP_RIGHT:
+        return 2 | 8;
+    case SH_SNAP_TOP_LEFT:
+        return 1;
+    case SH_SNAP_TOP_RIGHT:
+        return 2;
+    case SH_SNAP_BOTTOM_LEFT:
+        return 4;
+    case SH_SNAP_BOTTOM_RIGHT:
+        return 8;
+    default:
+        return 0;
+    }
+}
+
+extern "C" sh_action sh_snap_assist_slot(sh_action snapped, unsigned taken) {
+    sh_action candidates[3] = {SH_NONE, SH_NONE, SH_NONE};
+    switch (snapped) {
+    case SH_SNAP_LEFT:
+        candidates[0] = SH_SNAP_RIGHT, candidates[1] = SH_SNAP_TOP_RIGHT;
+        candidates[2] = SH_SNAP_BOTTOM_RIGHT;
+        break;
+    case SH_SNAP_RIGHT:
+        candidates[0] = SH_SNAP_LEFT, candidates[1] = SH_SNAP_TOP_LEFT;
+        candidates[2] = SH_SNAP_BOTTOM_LEFT;
+        break;
+    case SH_SNAP_TOP_LEFT:
+        candidates[0] = SH_SNAP_TOP_RIGHT, candidates[1] = SH_SNAP_BOTTOM_LEFT;
+        candidates[2] = SH_SNAP_BOTTOM_RIGHT;
+        break;
+    case SH_SNAP_TOP_RIGHT:
+        candidates[0] = SH_SNAP_TOP_LEFT, candidates[1] = SH_SNAP_BOTTOM_RIGHT;
+        candidates[2] = SH_SNAP_BOTTOM_LEFT;
+        break;
+    case SH_SNAP_BOTTOM_LEFT:
+        candidates[0] = SH_SNAP_BOTTOM_RIGHT, candidates[1] = SH_SNAP_TOP_LEFT;
+        candidates[2] = SH_SNAP_TOP_RIGHT;
+        break;
+    case SH_SNAP_BOTTOM_RIGHT:
+        candidates[0] = SH_SNAP_BOTTOM_LEFT, candidates[1] = SH_SNAP_TOP_RIGHT;
+        candidates[2] = SH_SNAP_TOP_LEFT;
+        break;
+    default:
+        return SH_NONE;
+    }
+    for (sh_action candidate : candidates)
+        if (!(sh_snap_quarters(candidate) & taken))
+            return candidate;
+    return SH_NONE;
+}

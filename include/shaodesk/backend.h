@@ -486,6 +486,16 @@ enum sh_snap_step {
 };
 enum sh_snap_step sh_snap_cycle(enum sh_action from, enum sh_action direction,
                                 enum sh_action *to);
+/* The quarters of its output an arrangement covers, a bit each: 1 top-left, 2 top-right,
+ * 4 bottom-left, 8 bottom-right; both of its side for a half, and none for anything else
+ * (maximized included). */
+unsigned sh_snap_quarters(enum sh_action arrangement);
+/* The slot Snap Assist offers beside a window just snapped as `snapped` (a half or a quarter),
+ * when the quarters in `taken` (sh_snap_quarters bits) hold windows snapped there: for a half,
+ * the other half, else its top quarter, else its bottom one; for a quarter, the quarter beside
+ * it in its row, else the one above or below it, else the one across. SH_NONE when every one of
+ * those is taken, or `snapped` is not a half or a quarter. */
+enum sh_action sh_snap_assist_slot(enum sh_action snapped, unsigned taken);
 
 /* Where a new floating window of `width` x `height` opens in `area` (the output less its
  * panels), given the rectangles `others` of the windows already showing there. Cascade steps
