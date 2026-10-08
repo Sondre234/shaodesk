@@ -288,6 +288,10 @@ struct Runtime {
                 if (const char *vendor = std::getenv("__GLX_VENDOR_LIBRARY_NAME"))
                     extra_env.push_back(std::string("SHAODESK_GLX_VENDOR=") + vendor);
             }
+            // The shell of a login session speaks for it to polkit; a nested one leaves that to
+            // the host's agent.
+            if (login)
+                extra_env.push_back("SHAODESK_POLKIT_AGENT=1");
             shell_pid = spawn(
                 {binary.string(), "-platform", "wayland", "--config", path.string()}, extra_env);
         } catch (const std::exception &error) {

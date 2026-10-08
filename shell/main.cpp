@@ -45,6 +45,10 @@ int main(int argc, char **argv) {
             unsetenv("__GLX_VENDOR_LIBRARY_NAME");
         unsetenv("SHAODESK_GLX_VENDOR");
     }
+    // The compositor of a login session asks its shell to be the session's polkit agent; the
+    // applications it launches do not see that.
+    const bool polkitAgent = qgetenv("SHAODESK_POLKIT_AGENT") == "1";
+    unsetenv("SHAODESK_POLKIT_AGENT");
     // Answered before Qt connects to a display, so that it works from a text console too.
     for (int i = 1; i < argc; ++i)
         if (std::string_view(argv[i]) == "--version" || std::string_view(argv[i]) == "-v") {
@@ -292,7 +296,8 @@ int main(int argc, char **argv) {
         if (!preview || qEnvironmentVariableIsSet("SHAODESK_PREVIEW_DBUS")) {
             controller.startNotifications();
             controller.startTray();
-            controller.startPolkit();
+            if (polkitAgent)
+                controller.startPolkit();
         }
         QObject::connect(&app, &QGuiApplication::screenAdded, &app, [&](QScreen *screen) {
             if (preview)
