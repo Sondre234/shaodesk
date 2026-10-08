@@ -385,6 +385,15 @@ void read_shell(lua_State *L, ShellConfig &shell) {
     }
     lua_pop(L, 1);
     current_section = "shell";
+    if (section(L, "clipboard", "shell.clipboard")) {
+        auto &clipboard = shell.clipboard;
+        boolean(L, "enabled", "shell.clipboard.enabled", clipboard.enabled);
+        clipboard.max_entries = integer(L, "max_entries", clipboard.max_entries, 1, 500);
+        boolean(L, "images", "shell.clipboard.images", clipboard.images);
+        boolean(L, "persist", "shell.clipboard.persist", clipboard.persist);
+    }
+    lua_pop(L, 1);
+    current_section = "shell";
     if (section(L, "widgets", "shell.widgets")) {
         for (auto [key, target] : {std::pair{"workspaces", &shell.widgets.workspaces},
                                    {"clock", &shell.widgets.clock},

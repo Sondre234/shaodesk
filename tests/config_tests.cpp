@@ -612,6 +612,20 @@ int main(int argc, char **argv) {
         rejects("return {shell={search={web='https://example.org/search'}}}");
         rejects("return {shell={search={web='file:///etc/%s'}}}");
         rejects("return {shell={search={web=1}}}");
+        // The clipboard history: on, 50 entries, pictures too, in memory only by default.
+        require(even.shell.clipboard.enabled && even.shell.clipboard.max_entries == 50 &&
+                    even.shell.clipboard.images && !even.shell.clipboard.persist,
+                "the clipboard history does not default to on, 50 entries, pictures, in memory");
+        auto clipboard = shaodesk::parse_config(
+            "return {shell={clipboard={enabled=false,max_entries=500,images=false,persist=true}}}");
+        require(!clipboard.shell.clipboard.enabled && clipboard.shell.clipboard.max_entries == 500 &&
+                    !clipboard.shell.clipboard.images && clipboard.shell.clipboard.persist,
+                "shell.clipboard not parsed");
+        rejects("return {shell={clipboard=true}}");
+        rejects("return {shell={clipboard={max_entries=0}}}");
+        rejects("return {shell={clipboard={max_entries=501}}}");
+        rejects("return {shell={clipboard={persist='yes'}}}");
+        rejects("return {shell={clipboard={size=10}}}");
         using shaodesk::WidgetPlace;
         auto widgets = shaodesk::parse_config(
             "return {shell={widgets={battery=false,calendar=false,workspaces=false}}}");

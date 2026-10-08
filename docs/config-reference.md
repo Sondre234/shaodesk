@@ -334,6 +334,11 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.search.depth` | integer | 4 | 1 to 10 | How many levels of folders below each of `directories` are read. |
 | `shell.search.max_files` | integer | 20000 | 100 to 200000 | How many names are read at most, the folders nearest the top first. |
 | `shell.search.web` | string or false | "https://duckduckgo.com/?q=%s" | - | The search engine of the last result, Search the web for “…”, which opens the default browser at this http or https address, `%s` replaced by the words typed (URL-encoded); `false` leaves it out. |
+| `shell.clipboard` | table | - | - | The history of what is copied, which `clipboard_history` (Super + Shift + V) opens, as Windows' Win + V does. |
+| `shell.clipboard.enabled` | boolean | true | - | Keep the history, as a client of the compositor's data-control protocol. What a password manager marks as secret (`x-kde-passwordManagerHint`), and anything copied while the session is locked, is never kept; `false` keeps nothing. |
+| `shell.clipboard.max_entries` | integer | 50 | 1 to 500 | How many entries are kept besides the pinned ones, the oldest going first. |
+| `shell.clipboard.images` | boolean | true | - | Keep pictures copied too (PNG, JPEG and the like, up to 16 MB), not only text. |
+| `shell.clipboard.persist` | boolean | false | - | Keep the history across sessions in `$XDG_STATE_HOME/shaodesk/clipboard`, readable by the user alone; `false` keeps it in memory only, and removes that file. |
 | `shell.workspaces_shown` | integer | 0 | 0 to 10 | How many of the monitor's workspaces the workspace indicator shows, the current one in the middle: `3` shows it with the one before and the one after, or the first or last three at either end. 0 shows them all. Scrolling still reaches every workspace. |
 | `shell.accent` | color | "#7da8ff" | - | Accent color, `#RRGGBB` or `#RRGGBBAA`. |
 | `shell.panel_color` | color | "#151e2c" | - | Panel color; `#RRGGBBAA` makes it translucent. |

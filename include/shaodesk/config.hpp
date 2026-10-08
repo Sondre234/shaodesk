@@ -113,6 +113,14 @@ struct ShellSearch {
     std::string web = "https://duckduckgo.com/?q=%s";
 };
 
+// Lua `shell.clipboard`: the history of what is copied, as Windows' Win + V keeps it.
+struct ShellClipboard {
+    bool enabled = true;
+    int max_entries = 50; // kept besides the pinned ones, the oldest going first
+    bool images = true;   // pictures copied too, not only text
+    bool persist = false; // kept across sessions in $XDG_STATE_HOME/shaodesk/clipboard
+};
+
 struct ShellConfig {
     bool enabled = true;
     bool macos_style = false;           // style = "macos": a menu bar and a dock
@@ -127,6 +135,7 @@ struct ShellConfig {
     bool group_windows = true; // one taskbar button per application, its windows listed on hover
     ShellThumbnails thumbnails;
     ShellSearch search;
+    ShellClipboard clipboard;
     int workspaces_shown = 0;  // the workspace indicator shows this many, around the current; 0: all
     std::string accent = "#7da8ff";
     std::string panel_color = "#151e2c";
