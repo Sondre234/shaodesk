@@ -12,7 +12,8 @@
  * sleep: every delay inhibitor released, or 5 seconds passed), and "wake" (PrepareForSleep
  * false sent). ANSWERS is read at every call: "CanSuspend na" sets an answer (unlisted ones
  * are "yes"), and "fail Hibernate" makes that call fail as if logind had refused it. SIGUSR1
- * starts a suspend as if another program had asked for one. */
+ * starts a suspend as if another program had asked for one. The LidClosed property is true while
+ * ANSWERS has the line "LidClosed yes"; SIGUSR2 says it changed ("lid" in LOG). */
 #define _GNU_SOURCE // pipe2
 #if SHAODESK_SDBUS_SYSTEMD
 #include <systemd/sd-bus.h>
@@ -178,8 +179,17 @@ static int inhibit(sd_bus_message *message, void *data, sd_bus_error *error) {
     return r;
 }
 
+static int lid_closed(sd_bus *unused, const char *path, const char *interface,
+                      const char *property, sd_bus_message *reply, void *data,
+                      sd_bus_error *error) {
+    char value[16];
+    const char *answer = answer_for("LidClosed", value, sizeof(value));
+    return sd_bus_message_append(reply, "b", answer && !strcmp(answer, "yes"));
+}
+
 static const sd_bus_vtable manager[] = {
     SD_BUS_VTABLE_START(0),
+    SD_BUS_PROPERTY("LidClosed", "b", lid_closed, 0, SD_BUS_VTABLE_PROPERTY_EMITS_CHANGE),
     SD_BUS_METHOD("CanPowerOff", "", "s", can, 0),
     SD_BUS_METHOD("CanReboot", "", "s", can, 0),
     SD_BUS_METHOD("CanSuspend", "", "s", can, 0),
@@ -203,6 +213,7 @@ int main(int argc, char **argv) {
     sigset_t signals;
     sigemptyset(&signals);
     sigaddset(&signals, SIGUSR1);
+    sigaddset(&signals, SIGUSR2);
     sigaddset(&signals, SIGTERM);
     sigaddset(&signals, SIGINT);
     sigprocmask(SIG_BLOCK, &signals, NULL);
@@ -244,6 +255,13 @@ int main(int argc, char **argv) {
         if (fds[1].revents & POLLIN) {
             struct signalfd_siginfo info;
             if (read(signal_fd, &info, sizeof(info)) == sizeof(info)) {
+                if (info.ssi_signo == SIGUSR2) {
+                    sd_bus_emit_properties_changed(bus, "/org/freedesktop/login1",
+                                                   "org.freedesktop.login1.Manager", "LidClosed",
+                                                   NULL);
+                    record("lid");
+                    continue;
+                }
                 if (info.ssi_signo != SIGUSR1)
                     break;
                 record("external suspend");

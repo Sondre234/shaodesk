@@ -2,8 +2,9 @@
 #pragma once
 /* logind (org.freedesktop.login1, from systemd-logind or elogind) for the power actions: which
  * of them it allows, the actions themselves, and a delay inhibitor that holds off sleep until
- * the screen is locked. Nothing blocks: each call returns at once, and its answer reaches the
- * handler from sh_login1_dispatch, which the caller runs when the descriptor is ready. */
+ * the screen is locked; and whether the lid is closed. Nothing blocks: each call returns at
+ * once, and its answer reaches the handler from sh_login1_dispatch, which the caller runs when
+ * the descriptor is ready. */
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -32,6 +33,8 @@ struct sh_login1_handler {
     void (*inhibited)(void *data, int fd, const char *error);
     /* PrepareForSleep: `before` just before the machine sleeps, false once it has woken. */
     void (*sleep)(void *data, bool before);
+    /* LidClosed, as logind reads it from the lid switch: when asked, and as it changes. */
+    void (*lid)(void *data, bool closed);
 };
 
 struct sh_login1;
@@ -57,6 +60,9 @@ bool sh_login1_ask(struct sh_login1 *login1, enum sh_login1_method method);
 bool sh_login1_call(struct sh_login1 *login1, enum sh_login1_method method);
 /* Asks for a "sleep" delay inhibitor, given `why`; the handler gets its descriptor. */
 bool sh_login1_inhibit_sleep(struct sh_login1 *login1, const char *why);
+/* Asks whether the lid is closed (logind's LidClosed); the answer goes to the handler, and so
+ * does every change from then on. */
+bool sh_login1_ask_lid(struct sh_login1 *login1);
 /* "PowerOff", "Reboot", "Suspend" or "Hibernate". */
 const char *sh_login1_method_name(enum sh_login1_method method);
 

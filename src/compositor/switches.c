@@ -58,7 +58,7 @@ void apply_lid(struct sh_server *server) {
 }
 
 static void update_lid(struct sh_server *server) {
-    bool closed = false;
+    bool closed = server->logind_lid_closed;
     struct sh_switch_device *device;
     wl_list_for_each(device, &server->switches, link) closed |= device->lid_closed;
     if (closed == server->lid_closed)
@@ -66,6 +66,14 @@ static void update_lid(struct sh_server *server) {
     server->lid_closed = closed;
     wlr_log(WLR_INFO, "The lid is %s", closed ? "closed" : "open");
     apply_lid(server);
+}
+
+/* logind says whether the lid is closed: as shaodesk starts, which libinput tells only of a lid
+ * it knows to be reliable, and as that changes. It counts as one more lid switch. */
+void lid_from_logind(struct sh_server *server, bool closed) {
+    server->logind_lid_closed = closed;
+    if (server->running)
+        update_lid(server);
 }
 
 static void switch_toggle(struct wl_listener *listener, void *data) {

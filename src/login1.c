@@ -44,8 +44,8 @@ struct pending {
 struct sh_login1 {
     sd_bus *bus;
     struct sh_login1_handler handler;
-    struct pending asks[SH_LOGIN1_METHODS], calls[SH_LOGIN1_METHODS], inhibit;
-    sd_bus_slot *sleep_match;
+    struct pending asks[SH_LOGIN1_METHODS], calls[SH_LOGIN1_METHODS], inhibit, lid;
+    sd_bus_slot *sleep_match, *lid_match;
 };
 
 /* The reason a reply carries, or NULL when it is not an error. */
@@ -106,6 +106,48 @@ static int prepare_for_sleep(sd_bus_message *message, void *data, sd_bus_error *
     return 0;
 }
 
+/* Hands LidClosed's value, a variant holding a boolean, to the handler. */
+static void report_lid(struct sh_login1 *login1, sd_bus_message *message) {
+    int closed = 0;
+    if (sd_bus_message_read(message, "v", "b", &closed) >= 0 && login1->handler.lid)
+        login1->handler.lid(login1->handler.data, closed);
+}
+
+static int got_lid(sd_bus_message *reply, void *data, sd_bus_error *unused) {
+    struct pending *pending = data;
+    pending->slot = sd_bus_slot_unref(pending->slot);
+    if (!reply_error(reply))
+        report_lid(pending->login1, reply);
+    return 0;
+}
+
+/* PropertiesChanged of the manager: LidClosed's new value, or only its name when it was left out,
+ * which asks for it again. */
+static int properties_changed(sd_bus_message *message, void *data, sd_bus_error *unused) {
+    struct sh_login1 *login1 = data;
+    const char *interface = NULL, *name = NULL;
+    if (sd_bus_message_read(message, "s", &interface) < 0 || strcmp(interface, LOGIN1_MANAGER) ||
+        sd_bus_message_enter_container(message, 'a', "{sv}") < 0)
+        return 0;
+    while (sd_bus_message_enter_container(message, 'e', "sv") > 0) {
+        if (sd_bus_message_read(message, "s", &name) < 0)
+            return 0;
+        if (!strcmp(name, "LidClosed"))
+            report_lid(login1, message);
+        else if (sd_bus_message_skip(message, "v") < 0)
+            return 0;
+        if (sd_bus_message_exit_container(message) < 0)
+            return 0;
+    }
+    if (sd_bus_message_exit_container(message) < 0 ||
+        sd_bus_message_enter_container(message, 'a', "s") < 0)
+        return 0;
+    while (sd_bus_message_read(message, "s", &name) > 0)
+        if (!strcmp(name, "LidClosed"))
+            sh_login1_ask_lid(login1);
+    return 0;
+}
+
 struct sh_login1 *sh_login1_connect(const char *address, const struct sh_login1_handler *handler,
                                     char *error, size_t error_size) {
     struct sh_login1 *login1 = calloc(1, sizeof(*login1));
@@ -132,10 +174,15 @@ struct sh_login1 *sh_login1_connect(const char *address, const struct sh_login1_
     if (r >= 0)
         r = sd_bus_match_signal(login1->bus, &login1->sleep_match, LOGIN1, LOGIN1_PATH,
                                 LOGIN1_MANAGER, "PrepareForSleep", prepare_for_sleep, login1);
+    if (r >= 0)
+        r = sd_bus_match_signal(login1->bus, &login1->lid_match, LOGIN1, LOGIN1_PATH,
+                                "org.freedesktop.DBus.Properties", "PropertiesChanged",
+                                properties_changed, login1);
     if (r < 0) {
         snprintf(error, error_size, "cannot connect to %s: %s",
                  address ? address : "the system bus", strerror(-r));
         sd_bus_slot_unref(login1->sleep_match);
+        sd_bus_slot_unref(login1->lid_match);
         sd_bus_flush_close_unref(login1->bus);
         free(login1);
         return NULL;
@@ -145,6 +192,7 @@ struct sh_login1 *sh_login1_connect(const char *address, const struct sh_login1_
         login1->calls[i] = (struct pending){login1, (enum sh_login1_method)i, NULL};
     }
     login1->inhibit.login1 = login1;
+    login1->lid.login1 = login1;
     return login1;
 }
 
@@ -157,7 +205,9 @@ void sh_login1_destroy(struct sh_login1 *login1) {
         sd_bus_slot_unref(login1->calls[i].slot);
     }
     sd_bus_slot_unref(login1->inhibit.slot);
+    sd_bus_slot_unref(login1->lid.slot);
     sd_bus_slot_unref(login1->sleep_match);
+    sd_bus_slot_unref(login1->lid_match);
     sd_bus_flush_close_unref(login1->bus);
     free(login1);
 }
@@ -223,6 +273,15 @@ bool sh_login1_inhibit_sleep(struct sh_login1 *login1, const char *why) {
                                     LOGIN1_MANAGER, "Inhibit", inhibited, pending, "ssss",
                                     "sleep", "shaodesk", why, "delay") >= 0;
 }
+
+bool sh_login1_ask_lid(struct sh_login1 *login1) {
+    struct pending *pending = &login1->lid;
+    if (pending->slot) // the answer on its way will do
+        return true;
+    return sd_bus_call_method_async(login1->bus, &pending->slot, LOGIN1, LOGIN1_PATH,
+                                    "org.freedesktop.DBus.Properties", "Get", got_lid, pending,
+                                    "ss", LOGIN1_MANAGER, "LidClosed") >= 0;
+}
 #else
 struct sh_login1 *sh_login1_connect(const char *address, const struct sh_login1_handler *handler,
                                     char *error, size_t error_size) {
@@ -263,6 +322,10 @@ bool sh_login1_call(struct sh_login1 *login1, enum sh_login1_method method) {
 bool sh_login1_inhibit_sleep(struct sh_login1 *login1, const char *why) {
     (void)login1;
     (void)why;
+    return false;
+}
+bool sh_login1_ask_lid(struct sh_login1 *login1) {
+    (void)login1;
     return false;
 }
 #endif

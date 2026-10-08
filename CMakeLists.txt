@@ -845,6 +845,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/idle_suspend_smoke.py
                 $<TARGET_FILE:shaodesk> $<TARGET_FILE:fake_login1> $<TARGET_FILE:lock_probe>)
             set_tests_properties(idle_suspend_smoke PROPERTIES TIMEOUT 60)
+            add_test(NAME lid_logind_smoke COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/lid_logind_smoke.py
+                $<TARGET_FILE:shaodesk> $<TARGET_FILE:fake_login1>)
+            set_tests_properties(lid_logind_smoke PROPERTIES TIMEOUT 60)
         endif()
         # The compositor benchmark (tools/bench/bench.py); see docs/performance.md.
         add_executable(shaodesk-bench-client tools/bench/bench_client.c

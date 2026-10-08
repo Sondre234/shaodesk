@@ -448,6 +448,7 @@ struct sh_server {
      * add with "headless_switch add". */
     struct wl_list switches;
     bool lid_closed;
+    bool logind_lid_closed; // logind's LidClosed, which counts as one more switch
     struct wl_list headless_switches;
     struct wl_list pointers; /* struct sh_pointer */
     enum sh_cursor_mode cursor_mode;
@@ -1044,6 +1045,7 @@ void swallow_toggle(struct sh_server *server, struct sh_toplevel *current);
 bool lid_holds_off(struct sh_server *server, struct sh_output *output);
 void apply_lid(struct sh_server *server);
 void server_new_switch(struct sh_server *server, struct wlr_input_device *input);
+void lid_from_logind(struct sh_server *server, bool closed);
 void control_headless_switch(struct sh_server *server, int fd, const char *arguments);
 void destroy_headless_switches(struct sh_server *server);
 
