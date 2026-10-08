@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Keyboard shortcuts inhibitors (keyboard-shortcuts-inhibit-unstable-v1): a virtual machine, a
  * remote desktop or a game asks for the keys the compositor's bindings take, which then go to its
- * surface while it has the keyboard. keyboard.shortcuts_inhibit and a window rule's
+ * surface while it has the keyboard. toggle_shortcuts_inhibit turns the focused one off and on
+ * again, its binding the one that still runs; keyboard.shortcuts_inhibit and a window rule's
  * shortcuts_inhibit = false refuse them. */
 #include "server.h"
 
@@ -10,8 +11,9 @@ struct sh_shortcuts_inhibitor {
     struct sh_server *server;
     struct wlr_keyboard_shortcuts_inhibitor_v1 *wlr_inhibitor;
     struct wlr_surface *surface;
-    /* Refused by keyboard.shortcuts_inhibit or a window rule, as last worked out. */
-    bool refused;
+    /* Refused by keyboard.shortcuts_inhibit or a window rule, as last worked out; turned off by
+     * the user (toggle_shortcuts_inhibit) until they turn it on again. */
+    bool refused, off;
     struct wl_listener destroy;
 };
 
@@ -42,11 +44,11 @@ static bool refused(struct sh_shortcuts_inhibitor *inhibitor) {
            rule.no_shortcuts_inhibit;
 }
 
-/* Honours the inhibitor, or stops honouring it, as the settings say; its client hears of each
- * change (active, inactive). */
+/* Honours the inhibitor, or stops honouring it, as the settings and the user say; its client
+ * hears of each change (active, inactive). */
 static void apply(struct sh_shortcuts_inhibitor *inhibitor) {
     inhibitor->refused = refused(inhibitor);
-    bool active = !inhibitor->refused;
+    bool active = !inhibitor->refused && !inhibitor->off;
     if (active && !inhibitor->wlr_inhibitor->active)
         wlr_keyboard_shortcuts_inhibitor_v1_activate(inhibitor->wlr_inhibitor);
     else if (!active && inhibitor->wlr_inhibitor->active)
@@ -88,6 +90,56 @@ static void shortcuts_changed(struct sh_server *server) {
     const char *app_id = toplevel ? toplevel_app_id(toplevel) : NULL;
     wlr_log(WLR_INFO, "Shortcuts go to %s", app_id && *app_id ? app_id : "a surface without a window");
     set_binding_mode(server, 0);
+}
+
+/* The name the user knows the surface's window by, its title, else its app id, as a piece of a
+ * line to the shell: at most `size` - 1 bytes, cut between characters, on one line. */
+static void surface_name(struct sh_server *server, struct wlr_surface *surface, char *name,
+                         size_t size) {
+    struct sh_toplevel *toplevel = surface_toplevel(server, surface);
+    const char *title = toplevel ? toplevel_title(toplevel) : NULL;
+    const char *app_id = toplevel ? toplevel_app_id(toplevel) : NULL;
+    snprintf(name, size, "%s", title && *title ? title : app_id && *app_id ? app_id : "the window");
+    // A character snprintf cut short at the end goes.
+    size_t length = strlen(name), start = length;
+    while (start > 0 && ((unsigned char)name[start - 1] & 0xC0) == 0x80)
+        --start;
+    unsigned char lead = start > 0 ? (unsigned char)name[start - 1] : 0;
+    if (length - start < (lead >= 0xF0 ? 3u : lead >= 0xE0 ? 2u : lead >= 0xC0 ? 1u : 0u))
+        name[start - 1] = '\0';
+    for (char *c = name; *c; ++c)
+        if (*c == '\n' || *c == '\r' || *c == '\t')
+            *c = ' ';
+}
+
+/* toggle_shortcuts_inhibit: the focused surface's inhibitor turned off, which gives the bindings
+ * their keys back, or on again, which the on-screen display says. One the settings refuse stays
+ * refused. */
+void toggle_shortcuts_inhibit(struct sh_server *server) {
+    struct sh_shortcuts_inhibitor *inhibitor = focused_inhibitor(server);
+    if (!inhibitor) {
+        wlr_log(WLR_INFO, "The focused surface asks for no shortcuts");
+        return;
+    }
+    apply(inhibitor);
+    if (inhibitor->refused) {
+        wlr_log(WLR_INFO, "The focused surface's shortcuts inhibitor is refused "
+                          "(keyboard.shortcuts_inhibit or a window rule)");
+        return;
+    }
+    inhibitor->off = !inhibitor->off;
+    apply(inhibitor);
+    shortcuts_changed(server);
+    struct wlr_output *output = focused_output(server);
+    char name[160], line[256];
+    surface_name(server, inhibitor->surface, name, sizeof(name));
+    if (inhibitor->off)
+        snprintf(line, sizeof(line), "osd %s -1 Shortcuts back to the desktop\n",
+                 output ? output->name : "-");
+    else
+        snprintf(line, sizeof(line), "osd %s -1 Shortcuts go to %s\n", output ? output->name : "-",
+                 name);
+    send_shell_line(server, line);
 }
 
 static void inhibitor_destroy(struct wl_listener *listener, void *data) {
@@ -136,8 +188,9 @@ void shortcuts_reload(struct sh_server *server) {
 }
 
 /* For `get shortcuts`: "inhibited 1" while the keys go to the focused surface (else 0), then a
- * line per inhibitor: "inhibitor", whether it is honoured ("active") or not ("refused"),
- * whether its surface has the keyboard, and the surface as `surface` describes it. */
+ * line per inhibitor: "inhibitor", whether it is honoured ("active"), turned off by the user
+ * ("off") or refused ("refused"), whether its surface has the keyboard, and the surface as
+ * `surface` describes it. */
 void describe_shortcuts_inhibitors(struct sh_server *server, int fd,
                                    void (*surface)(struct sh_server *, int, const char *,
                                                    struct wlr_surface *)) {
@@ -148,7 +201,9 @@ void describe_shortcuts_inhibitors(struct sh_server *server, int fd,
     struct sh_shortcuts_inhibitor *inhibitor;
     wl_list_for_each_reverse(inhibitor, &server->shortcuts.inhibitors, link) {
         snprintf(line, sizeof(line), "inhibitor\t%s\t%d",
-                 inhibitor->wlr_inhibitor->active ? "active" : "refused",
+                 inhibitor->wlr_inhibitor->active ? "active"
+                 : inhibitor->refused             ? "refused"
+                                                  : "off",
                  focus && inhibitor->surface == focus);
         surface(server, fd, line, inhibitor->surface);
     }

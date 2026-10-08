@@ -2,10 +2,12 @@
 """Keyboard shortcuts inhibitors (keyboard-shortcuts-inhibit-unstable-v1), as virtual machines and
 remote desktops ask for: while the window that asked has the keyboard, the keys the bindings take
 go to it instead, and the bindings work again as another window has it or the inhibitor goes.
-keyboard.shortcuts_inhibit = false and a window rule's shortcuts_inhibit = false refuse them, a
-reload applies a change to either, and an inhibitor taking effect leaves the binding mode in use.
-`get shortcuts` shows it all."""
+toggle_shortcuts_inhibit, whose binding still runs, turns the focused window's off and on again,
+which the on-screen display says. keyboard.shortcuts_inhibit = false and a window rule's
+shortcuts_inhibit = false refuse them, a reload applies a change to either, and an inhibitor
+taking effect leaves the binding mode in use. `get shortcuts` shows it all."""
 from pathlib import Path
+import socket
 import subprocess
 import sys
 
@@ -23,10 +25,11 @@ CONFIG = """return {
     bindings = {
         { mods = { "Super" }, key = "t", action = "toggle_tiling" },
         { mods = { "Super" }, key = "grave", action = "focus_last" },
+        { mods = { "Super", "Shift" }, key = "Escape", action = "toggle_shortcuts_inhibit" },
     },
 }"""
 # evdev's codes
-SUPER, T, GRAVE = 125, 20, 41
+SUPER, SHIFT, ESCAPE, T, GRAVE = 125, 42, 1, 20, 41
 
 with harness.Compositor(compositor, CONFIG % "true") as desktop:
     msg = desktop.msg
@@ -56,6 +59,28 @@ with harness.Compositor(compositor, CONFIG % "true") as desktop:
             msg("headless_keyboard", "key", "keys", str(code), "press")
         for code in reversed(codes):
             msg("headless_keyboard", "key", "keys", str(code), "release")
+
+    class Shell:
+        """The lines a subscriber hears that start with `prefix`."""
+
+        def __init__(self, prefix):
+            self.prefix = prefix.encode()
+            self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.sock.connect(desktop.env["SHAODESK_SOCKET"])
+            self.sock.sendall(b"subscribe\n")
+            self.sock.settimeout(0.05)
+            self.buffer = b""
+            self.lines = []
+
+        def heard(self):
+            try:
+                while data := self.sock.recv(65536):
+                    self.buffer += data
+            except socket.timeout:
+                pass
+            *complete, self.buffer = self.buffer.split(b"\n")
+            self.lines += [line.decode() for line in complete if line.startswith(self.prefix)]
+            return self.lines
 
     def window(title, *options, **spawn):
         process = desktop.spawn([probe, "--keys", "--no-gestures", "--no-tablet", *options,
@@ -105,6 +130,44 @@ with harness.Compositor(compositor, CONFIG % "true") as desktop:
     desktop.wait_for(lambda: msg("get", "mode").strip() == "default", "the mode left")
     assert shortcuts()[0] and focused() == "VM", shortcuts()
 
+    # Its binding still runs: it turns the inhibitor off, which the window hears, and the bindings
+    # are back; the on-screen display says so. Escape does not reach the window.
+    osd = Shell("osd ")
+    press(SUPER, SHIFT, ESCAPE)
+    desktop.wait_for(lambda: heard("VM", "shortcuts")[-1] == "shortcuts inactive",
+                     "the inhibitor turned off")
+    assert shortcuts() == (False, [("off", True, "VM")]), shortcuts()
+    assert f"key {ESCAPE} pressed" not in log("VM"), log("VM")
+    desktop.wait_for(lambda: osd.heard() == ["osd HEADLESS-1 -1 Shortcuts back to the desktop"],
+                     "the on-screen display saying so")
+    press(SUPER, T)
+    desktop.wait_for(tiling, "Super + T with the inhibitor off")
+    msg("toggle_tiling")
+    # It stays off as the window loses the keyboard and gets it back, until turned on again.
+    msg("focus_last")
+    msg("focus_last")
+    desktop.wait_for(lambda: focused() == "VM", "VM focused again")
+    assert shortcuts() == (False, [("off", True, "VM")]), shortcuts()
+    press(SUPER, SHIFT, ESCAPE)
+    desktop.wait_for(lambda: heard("VM", "shortcuts")[-1] == "shortcuts active",
+                     "the inhibitor turned on again")
+    assert shortcuts() == (True, [("active", True, "VM")]), shortcuts()
+    desktop.wait_for(lambda: osd.heard()[1:] == ["osd HEADLESS-1 -1 Shortcuts go to VM"],
+                     "the on-screen display naming the window")
+    press(SUPER, T)
+    desktop.wait_for(lambda: heard("VM", f"key {T}")[-2:] == [f"key {T} pressed",
+                                                              f"key {T} released"],
+                     "Super + T in the window once more")
+    assert not tiling()
+    # The control socket's action does the same.
+    msg("toggle_shortcuts_inhibit")
+    assert shortcuts() == (False, [("off", True, "VM")]), shortcuts()
+    msg("toggle_shortcuts_inhibit")
+    assert shortcuts() == (True, [("active", True, "VM")]), shortcuts()
+    desktop.wait_for(lambda: heard("VM", "shortcuts")[-2:] == ["shortcuts inactive",
+                                                               "shortcuts active"],
+                     "the window hearing both")
+
     # The window gone, the bindings are back.
     vm.terminate()
     desktop.reap(vm)
@@ -113,13 +176,17 @@ with harness.Compositor(compositor, CONFIG % "true") as desktop:
     desktop.wait_for(tiling, "Super + T once the window is gone")
     msg("toggle_tiling")
 
-    # A window rule refuses a window: its client never hears it is active.
+    # A window rule refuses a window: its client never hears it is active, and the binding does
+    # not turn it on.
     refused = window("Refused", "--inhibit")
     desktop.wait_for(lambda: shortcuts() == (False, [("refused", True, "Refused")]),
                      "the rule refusing the inhibitor")
     press(SUPER, T)
     desktop.wait_for(tiling, "Super + T in a refused window")
     msg("toggle_tiling")
+    press(SUPER, SHIFT, ESCAPE)
+    msg("toggle_shortcuts_inhibit")
+    assert shortcuts() == (False, [("refused", True, "Refused")]), shortcuts()
     assert heard("Refused", "shortcuts") == [], log("Refused")
     assert f"key {T} pressed" not in log("Refused"), log("Refused")
     refused.terminate()

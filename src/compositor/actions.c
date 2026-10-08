@@ -335,6 +335,9 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
     case SH_MODE:
         set_binding_mode(server, argument);
         break;
+    case SH_TOGGLE_SHORTCUTS_INHIBIT:
+        toggle_shortcuts_inhibit(server);
+        break;
     default:
         arrange_windows(server, action);
         break;

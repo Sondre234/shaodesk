@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
     try {
         require(argc == 2, "example config path required");
         auto config = shaodesk::load_config(argv[1]);
-        require(config.bindings.size() == 76, "example shortcuts missing");
+        require(config.bindings.size() == 77, "example shortcuts missing");
         auto *louder = config.binding(0, XKB_KEY_XF86AudioRaiseVolume);
         auto *microphone = config.binding(0, XKB_KEY_XF86AudioMicMute);
         auto *dimmer = config.binding(0, XKB_KEY_XF86MonBrightnessDown);
@@ -46,6 +46,7 @@ int main(int argc, char **argv) {
                     config.binding_keys(SH_SWITCHER_PREV) == "Alt + Shift + Tab" &&
                     config.binding_keys(SH_RESIZE_LEFT) == "Super + Ctrl + Shift + Left" &&
                     config.binding_keys(SH_POWER_MENU) == "Super + Escape" &&
+                    config.binding_keys(SH_TOGGLE_SHORTCUTS_INHIBIT) == "Super + Shift + Escape" &&
                     config.binding_keys(SH_VOLUME_MUTE) == "XF86AudioMute" &&
                     config.binding_keys(SH_ZOOM_IN).empty(),
                 "binding_keys mismatch");
@@ -786,7 +787,7 @@ int main(int argc, char **argv) {
         // A configuration extending the defaults holds only its changes.
         setenv("SHAODESK_DEFAULT_CONFIG", argv[1], 1);
         auto bare = shaodesk::parse_config("return {extends='default'}");
-        require(bare.bindings.size() == 76 && bare.shell.launchers.empty() &&
+        require(bare.bindings.size() == 77 && bare.shell.launchers.empty() &&
                     bare.settings.workspaces == 4,
                 "extends did not supply the defaults");
         auto layered = shaodesk::parse_config(
@@ -796,7 +797,7 @@ int main(int argc, char **argv) {
             "{mods={'Super'}, key='e', action='spawn', command={'dolphin'}}}}");
         require(layered.settings.gap_inner == 3 && layered.settings.workspaces == 4,
                 "extending configuration settings not layered over the defaults");
-        require(layered.bindings.size() == 76 && !layered.binding(SH_LOGO, XKB_KEY_v),
+        require(layered.bindings.size() == 77 && !layered.binding(SH_LOGO, XKB_KEY_v),
                 "action none did not remove a default binding");
         require(layered.binding(SH_LOGO, XKB_KEY_q)->command == shaodesk::Command{"foot"} &&
                     layered.binding(SH_LOGO, XKB_KEY_e)->command == shaodesk::Command{"dolphin"},

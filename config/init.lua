@@ -388,9 +388,13 @@ return {
         -- { mods = { mod, "Ctrl" }, key = "Escape", action = "suspend" },
         { mods = { mod, "Shift" }, key = "l", action = "lock" },
         { mods = { mod }, key = "Escape", action = "power_menu" },
+        -- A virtual machine, a remote desktop or a game may ask for the keys bound here while it
+        -- has the keyboard (keyboard.shortcuts_inhibit). This binding still runs: it takes them
+        -- back, and gives them to it again.
+        { mods = { mod, "Shift" }, key = "Escape", action = "toggle_shortcuts_inhibit" },
         -- Turn every monitor off until a key or the mouse wakes it (display_on and
         -- display_toggle too; output = "HDMI-A-1" picks one monitor), e.g.:
-        -- { mods = { mod, "Shift" }, key = "Escape", action = "display_off" },
+        -- { mods = { mod, "Alt" }, key = "Escape", action = "display_off" },
         -- Switches act too: the lid ("close", "open") and tablet mode ("on", "off"), e.g.:
         -- { switch = "lid", state = "close", action = "lock" },
         { mods = { mod }, key = "1", action = "workspace", workspace = 1 },

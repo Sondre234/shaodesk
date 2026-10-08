@@ -198,6 +198,10 @@ enum sh_action {
     SH_DISPLAY_OFF,
     SH_DISPLAY_ON,
     SH_DISPLAY_TOGGLE,
+    /* Turns off the focused surface's keyboard shortcuts inhibitor, which gives the compositor's
+     * bindings their keys back, or on again. Its binding runs while the inhibitor holds every
+     * other one. */
+    SH_TOGGLE_SHORTCUTS_INHIBIT,
 };
 
 enum sh_screenshot_mode {

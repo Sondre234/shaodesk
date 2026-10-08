@@ -1998,6 +1998,7 @@ constexpr std::pair<std::string_view, sh_action> action_table[] = {
         {"brightness_up", SH_BRIGHTNESS_UP},
         {"brightness_down", SH_BRIGHTNESS_DOWN},
         {"mode", SH_MODE},
+        {"toggle_shortcuts_inhibit", SH_TOGGLE_SHORTCUTS_INHIBIT},
         {"focus_left", SH_FOCUS_LEFT},
         {"focus_right", SH_FOCUS_RIGHT},
         {"focus_up", SH_FOCUS_UP},

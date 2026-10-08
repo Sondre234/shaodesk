@@ -252,6 +252,7 @@ Edit them in [config/init.lua](config/init.lua).
 | Super + M | Exit shaodesk |
 | Super + Shift + L | [Lock the screen](docs/features.md#power) with `power.lock_command` (swaylock) |
 | Super + Escape | [Power menu](docs/features.md#power): lock, suspend, hibernate, restart, power off, log out |
+| Super + Shift + Escape | Take the keys back from a virtual machine, remote desktop or game [holding them](docs/features.md#applications-that-take-the-shortcuts), or give them back to it (`toggle_shortcuts_inhibit`) |
 | Super + V | Float or tile the focused window |
 | Super + F | Fullscreen |
 | Super + T | Arrange the monitor's windows in a grid (floating mode) |

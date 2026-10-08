@@ -1180,6 +1180,7 @@ bool session_claim(struct sh_server *server, struct sh_toplevel *toplevel,
 
 /* shortcuts_inhibit.c */
 bool shortcuts_inhibited(struct sh_server *server);
+void toggle_shortcuts_inhibit(struct sh_server *server);
 void shortcuts_reload(struct sh_server *server);
 void describe_shortcuts_inhibitors(struct sh_server *server, int fd,
                                    void (*surface)(struct sh_server *, int, const char *,
