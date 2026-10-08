@@ -154,6 +154,15 @@ shadows.
 - The shell can list an installed application's desktop actions ("New window", "New private
   window") and run one, a failure shown across the panel as for the application itself.
 
+### Search
+
+- The command palette (Spotlight in the macOS style) and the start menu's search calculate: an
+  expression such as `2*(3+4)`, `2^10`, `sqrt(2)/3`, `15 % 4` or `1e3 + 0x1f`, with `pi`, `e` and
+  the usual functions, shows its value as the first result (the start menu's best match), and
+  Enter copies it to the clipboard. `5 km in mi`, `100 f in c` and `3 GiB in MB` convert between
+  units, and `255 in hex` writes a whole number in another base. A leading `=` narrows the
+  palette to the calculator.
+
 ### The clock and Quick Settings
 
 - The clock opens one flyout at the bar's right end, as on Windows 11: the notifications above

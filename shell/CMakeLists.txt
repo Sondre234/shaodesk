@@ -58,8 +58,9 @@ if(NOT SHAODESK_SHELL_PREVIEW_ONLY)
 endif()
 
 # The start menu's model (its pins, the launch history and its search), in everything that builds
-# the controller.
-set(SHAODESK_START_SOURCES start_menu.cpp start_menu.hpp launch_history.cpp launch_history.hpp)
+# the controller, and the calculator its search and the palette's share.
+set(SHAODESK_START_SOURCES start_menu.cpp start_menu.hpp launch_history.cpp launch_history.hpp
+    calculator.cpp calculator.hpp)
 # The authentication dialog's model, which the controller holds, in everything that builds it.
 set(SHAODESK_AUTH_SOURCES authentication.cpp authentication.hpp)
 # The models of the services Quick Settings controls over D-Bus, in everything that builds the
@@ -259,6 +260,15 @@ if(BUILD_TESTING)
     target_compile_options(palette_test PRIVATE -Wall -Wextra -Wpedantic)
     target_link_libraries(palette_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME palette COMMAND palette_test)
+    # The calculator of the palette's and the start menu's search.
+    add_executable(calculator_test ${PROJECT_SOURCE_DIR}/tests/calculator_test.cpp calculator.cpp
+        calculator.hpp)
+    set_target_properties(calculator_test PROPERTIES AUTOMOC ON)
+    target_include_directories(calculator_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(calculator_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(calculator_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(calculator_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME calculator COMMAND calculator_test)
     # The start menu's model: its pins, the launch history and its search.
     add_executable(start_menu_test ${PROJECT_SOURCE_DIR}/tests/start_menu_test.cpp
         ${SHAODESK_START_SOURCES} fuzzy.cpp fuzzy.hpp)

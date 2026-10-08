@@ -9,9 +9,10 @@ class ShellController;
 
 // The command palette (Super + P): one search box over open windows, installed applications,
 // workspaces, compositor actions (the power actions among them), appearance profiles and saved
-// sessions. Entries are {kind, title, subtitle, icon,
-// target}; `kind` is window, app, workspace, action or session, and a power action, which runs
-// as the power menu runs it, also has `power` set.
+// sessions, with a calculator. Entries are {kind, title, subtitle, icon,
+// target}; `kind` is window, app, workspace, action, session or calc, and a power action, which
+// runs as the power menu runs it, also has `power` set. A calculation's target is its number,
+// which running it copies to the clipboard.
 class Palette : public QObject {
     Q_OBJECT
     // The output showing the palette, empty while it is closed.

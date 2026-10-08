@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "start_menu.hpp"
+#include "calculator.hpp"
 #include "fuzzy.hpp"
 #include <QAbstractEventDispatcher>
 #include <QDir>
@@ -309,12 +310,15 @@ QVariantList StartMenu::search(const QString &query, const QVariantList &others)
         entry["group"] = QString(group);
         results.push_back(entry);
     };
-    // The best match is the first of whichever group matched best; an application on a tie.
+    // The best match is a calculation's value, else the first of whichever group matched best;
+    // an application on a tie.
     auto scoreOf = [](const QVariantList &group) {
         return group.isEmpty() ? -1.0 : group.first().toMap()["score"].toDouble();
     };
     const double app = apps.empty() ? -1 : apps.front().score;
-    if (app >= 0 && app >= scoreOf(windows) && app >= scoreOf(actions)) {
+    if (const auto calc = calculator::entry(query); !calc.isEmpty()) {
+        add(calc, "best");
+    } else if (app >= 0 && app >= scoreOf(windows) && app >= scoreOf(actions)) {
         add(apps.front().entry, "best");
         apps.erase(apps.begin());
     } else if (scoreOf(windows) >= 0 && scoreOf(windows) >= scoreOf(actions)) {

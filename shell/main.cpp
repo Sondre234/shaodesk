@@ -80,7 +80,8 @@ int main(int argc, char **argv) {
                       "the macOS style system-menu, "
                       "app-menu, window-menu or window-submenu too; or an overlay over the bar: "
                       "osd-volume, osd-text, osd-microphone, cards, power-dialog, auth-dialog, "
-                      "palette, palette-empty, switcher, overview, snap-assist or display-mode",
+                      "palette, palette-empty, palette-calculator, switcher, overview, snap-assist "
+                      "or display-mode",
                       "name"});
     parser.addOption(
         {"quit-after",

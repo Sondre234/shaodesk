@@ -4,6 +4,7 @@
 #include "system_status.hpp"
 #include "view.hpp"
 #include <QAbstractItemModel>
+#include <QClipboard>
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QElapsedTimer>
@@ -3582,6 +3583,30 @@ ListModel {
             std::cerr << "switching workspace from the palette failed: " << switches.join("|").toStdString() << '\n';
             return 1;
         }
+        // A calculation's value comes first, and Enter copies it; = asks for nothing else.
+        requests.clear();
+        QGuiApplication::clipboard()->clear();
+        openPalette();
+        type("2*(3+4)");
+        if (!QTest::qWaitFor([&] { return titlesNow().value(0) == "14"; }) ||
+            palette->results().value(0).toMap()["kind"] != "calc")
+            return fail("the palette did not calculate");
+        QTest::keyClick(&paletteView, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return QGuiApplication::clipboard()->text() == "14"; }) ||
+            !QTest::qWaitFor([&] { return !paletteView.isVisible(); }) || !requests.isEmpty())
+            return fail("the palette did not copy a calculation's value");
+        openPalette();
+        type("=pi");
+        if (!QTest::qWaitFor([&] { return titlesNow() == QStringList{"3.14159265359"}; }))
+            return fail("= did not narrow the palette to the calculator");
+        palette->setQuery("5 km in mi");
+        if (titlesNow().value(0) != "3.10685596119 mi" ||
+            palette->results().value(0).toMap()["target"] != "3.10685596119")
+            return fail("the palette did not convert units");
+        palette->setQuery("e");
+        if (palette->results().value(0).toMap()["kind"] == "calc")
+            return fail("the palette calculated a lone constant");
+        palette->close();
         // Escape closes without running anything, and so does losing the keyboard.
         requests.clear();
         openPalette();
@@ -3868,6 +3893,21 @@ ListModel {
         if (!QTest::qWaitFor([&] { return requests == QStringList{"toggle_tiling"} && !launcherOpen(); }))
             return fail("Enter did not run the action the start menu found");
         requests.clear();
+        // A calculation's value is the best match, which Enter copies.
+        QGuiApplication::clipboard()->clear();
+        if (!openStart())
+            return fail("the start menu did not open for a calculation");
+        type("2^10");
+        if (!QTest::qWaitFor([&] {
+                return shown("startBestMatch") &&
+                       item("startBestMatch")->property("result").toMap()["title"] == "1024";
+            }) ||
+            item("startBestOpen")->property("text") != "Copy")
+            return fail("the start menu's search did not calculate");
+        key(Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return QGuiApplication::clipboard()->text() == "1024" && !launcherOpen(); }) ||
+            !requests.isEmpty())
+            return fail("Enter did not copy the value the start menu calculated");
         // More pins than a page holds go on pages, which the wheel, the dots beside them and the
         // keyboard moving past the last row turn.
         {

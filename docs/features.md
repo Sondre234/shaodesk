@@ -451,7 +451,8 @@ The search finds applications by name, generic name ("Web Browser"), keywords, d
 comment, and open windows, workspaces and actions as the [command palette](#command-palette) does
 (its `>`, `@` and `#` too), grouped under Best match, Apps, Open windows and Actions. The best
 match is on a card of its own, with an application's desktop actions ("New Private Window") as
-buttons beside Open. Among equal matches, what is launched more often comes first; what matches
+buttons beside Open; a calculation's value is the best match, with Copy (see
+[Calculator](#calculator)). Among equal matches, what is launched more often comes first; what matches
 far worse than the best match is left out. A search that finds nothing says so, with the prefixes
 that narrow one.
 
@@ -948,11 +949,43 @@ word must match, in any order, as letters in sequence of the title or its small 
 runs of letters and word starts (`gc` finds Google Chrome, `lay mon` finds Layout: monocle).
 Up and Down, Tab and Shift + Tab, Ctrl + N and Ctrl + P, or the pointer select; Enter or a click
 runs the entry; Escape, or clicking elsewhere, closes it. A leading `>` searches only actions, `@`
-windows, `#` workspaces and `%` sessions; when nothing matches, the palette says so and lists
-these. The palette needs the shell (`shaodesk-shell`), which
+windows, `#` workspaces and `%` sessions, and `=` asks the [calculator](#calculator); when nothing
+matches, the palette says so and lists these. The palette needs the shell (`shaodesk-shell`), which
 draws it, and the compositor's control socket for actions and sessions. On a machine with 600
 entries a keystroke re-ranks them in under a millisecond (an optimized build; see
 `tests/palette_test.cpp`). Super + P used to toggle sticky windows; that moved to Super + Shift + P.
+
+### Calculator
+
+The palette and the [start menu](#start-menu)'s search calculate what is typed: `2*(3+4)` shows
+14 as the first result (the start menu's best match, with a Copy button), and Enter copies the
+value to the clipboard, as its small print says. An expression has numbers (`1.5`, `.5`, `1e3`,
+and `0x1f`, `0b101` or `0o17` in another base), the constants `pi` (or `π`), `tau` and `e`, the
+operators `+`, `-`, `*`, `/`, `%` or `mod` (the remainder), `^` or `**` (power, from the right, so
+`2^3^2` is 512 and `-2^2` is -4), a postfix `!` (factorial) and `√`, parentheses, and the
+functions `sqrt`, `cbrt`, `abs`, `round` (`round(x, digits)` too), `floor`, `ceil`, `trunc`,
+`sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `sinh`, `cosh`, `tanh`, `log` (base 10, or
+`log(x, base)`), `log2`, `ln`, `exp`, `min` and `max`, called with parentheses; `2pi` and
+`3(1 + 2)` multiply without the sign, and `×`, `÷` and `−` stand for `*`, `/` and `-`. Angles are
+in radians. A value is shown with up to 12 significant digits, so binary rounding never shows
+(`0.1 + 0.2` is 0.3, and `sin(pi)` is 0), a whole number in full below 2^53, and very large or
+small ones as `1.07150860719e301`.
+
+A unit and `in`, `to`, `as` or `->` another of the same kind convert: `5 km in mi`, `100 f in c`,
+`3 GiB in MB`, `90 deg to rad`, `100 km/h in mph`. The units are those of length (`mm` to `km`,
+`in`, `ft`, `yd`, `mi`, `nmi`), mass (`mg` to `t`, `oz`, `lb`, `st`), temperature (`C`, `F`, `K`),
+data (`B`, `kB` to `PB`, `KiB` to `PiB`, `bit`, `Kb` to `Tb`), time (`ms` to `yr`), volume (`ml`
+to `l`, `m3`, US `gal`, `qt`, `pt`, `cup`, `floz`, `tbsp`, `tsp`), speed (`m/s`, `km/h`, `mph`,
+`kn`), angle (`rad`, `deg`, `grad`, `turn`), area (`cm2` to `km2`, `ha`, `acre`, `ft2`, `mi2`) and
+energy (`J`, `kJ`, `cal`, `kcal`, `Wh`, `kWh`), by symbol or by name (`miles`, `celsius`); a symbol
+in the wrong case is understood where it is not another unit's, `mb` being megabytes. `in hex`,
+`in bin`, `in oct` and `in dec` write a whole number in another base (`255 in hex` is 0xff). Enter
+copies the number without its unit.
+
+A lone number or constant (`42`, `e`) is searched for rather than calculated, as is anything that
+is not a whole expression, while it is being typed (`2*(`) or when it has no value (`1/0`,
+`sqrt(-1)`); a leading `=` asks for the value of anything (`=pi`) and narrows the palette to the
+calculator. `tests/calculator_test.cpp` tests the parser.
 
 ## Terminal
 

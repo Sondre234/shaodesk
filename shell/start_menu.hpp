@@ -68,7 +68,8 @@ class StartMenu : public QObject {
     // windows, workspaces and actions are searched as the palette searches them. Applications
     // are found by name, generic name, keywords, desktop id and comment, those launched often a
     // little ahead. A result is its entry, an application's being its record with `kind` "app",
-    // a `title` and a `subtitle`, with its `group` and `score` added.
+    // a `title` and a `subtitle`, with its `group` and `score` added. A calculation's value
+    // (calculator::entry) is the best match when there is one.
     Q_INVOKABLE QVariantList search(const QString &query, const QVariantList &others) const;
     // When `then` was, said from `now`: "Just now", "5 min ago", "2 hours ago", "Yesterday", a
     // day of the week, or a date.

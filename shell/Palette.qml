@@ -3,9 +3,10 @@ import QtQuick
 import QtQuick.Effects
 
 // The command palette: a search box over windows, applications, workspaces, actions and saved
-// sessions. Up and Down (or Ctrl+N and Ctrl+P) select, Enter runs, Escape closes; a leading
-// > @ # or % narrows the search to actions, windows, workspaces or sessions. It is a card with
-// room around it for its shadow, coming in each time its window shows.
+// sessions, with a calculator. Up and Down (or Ctrl+N and Ctrl+P) select, Enter runs, Escape
+// closes; a leading > @ # or % narrows the search to actions, windows, workspaces or sessions,
+// and = to the calculator. It is a card with room around it for its shadow, coming in each time
+// its window shows.
 //
 // In the macOS style it is Spotlight: a large field along the card's top, and under a line the
 // results in groups under small headings (the first, the top hit), the one chosen filled with the
@@ -17,11 +18,12 @@ Item {
     // A result's row: a title over a subtitle.
     readonly property int rowHeight: Theme.rowHeight + Theme.spacingL
     readonly property int visibleRows: Math.max(1, Math.min(8, Math.floor((screenSize.height * 0.6 - 3 * padding - input.height) / rowHeight)))
-    readonly property var kindLabels: ({ window: "Window", app: "App", workspace: "Workspace", action: "Action", session: "Session" })
+    readonly property var kindLabels: ({ window: "Window", app: "App", workspace: "Workspace", action: "Action", session: "Session",
+                                         calc: "Calculator" })
     // Spotlight's headings: the top hit's over the first result of a search, and a kind's over the
     // first of a run of it.
     readonly property var groupLabels: ({ window: "Windows", app: "Applications", workspace: "Workspaces",
-                                          action: "Actions", session: "Sessions" })
+                                          action: "Actions", session: "Sessions", calc: "Calculator" })
     // The results, read from the palette once each time they change.
     readonly property var results: shell.palette.results
     function heading(index) {
@@ -303,7 +305,7 @@ Item {
             width: card.width - 2 * root.padding
             icon: "search"
             title: "Nothing matches"
-            hint: "Start with > for actions, @ for windows, # for workspaces or % for sessions"
+            hint: "Start with > for actions, @ for windows, # for workspaces, % for sessions or = to calculate"
         }
     }
 }

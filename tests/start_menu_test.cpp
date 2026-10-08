@@ -319,6 +319,14 @@ class StartMenuTest : public QObject {
         QCOMPARE(found("restore session"), QStringList{});
         // The palette's filters: only windows.
         QCOMPARE(found("@"), (QStringList{"best:Release notes - Mozilla Firefox", "windows:htop"}));
+        // A calculation's value is the best match, its number what choosing it copies; a lone
+        // number is searched for.
+        QCOMPARE(found("2*(3+4)"), QStringList{"best:14"});
+        const auto calc = menu.search("5 km in mi", others).first().toMap();
+        QCOMPARE(calc["kind"].toString(), QString("calc"));
+        QCOMPARE(calc["title"].toString(), QString("3.10685596119 mi"));
+        QCOMPARE(calc["target"].toString(), QString("3.10685596119"));
+        QCOMPARE(found("2").first(), QString("best:Workspace 2: web"));
         // An application's result is its record, with what the menu shows of it.
         const auto best = menu.search("kate", others).first().toMap();
         QCOMPARE(best["kind"].toString(), QString("app"));
