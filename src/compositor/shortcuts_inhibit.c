@@ -3,19 +3,27 @@
  * remote desktop or a game asks for the keys the compositor's bindings take, which then go to its
  * surface while it has the keyboard, the user hearing so the first time. toggle_shortcuts_inhibit
  * turns the focused one off and on again, its binding the one that still runs;
- * keyboard.shortcuts_inhibit and a window rule's shortcuts_inhibit = false refuse them. */
+ * keyboard.shortcuts_inhibit and a window rule's shortcuts_inhibit = false refuse them. An X11
+ * window's active keyboard grab, which Xwayland asks for through
+ * xwayland-keyboard-grab-unstable-v1, counts as one of its surface's. */
 #include "server.h"
+#if WLR_HAS_XWAYLAND
+#include "xwayland-keyboard-grab-unstable-v1-protocol.h"
+#endif
 
 struct sh_shortcuts_inhibitor {
     struct wl_list link; // sh_server.shortcuts.inhibitors
     struct sh_server *server;
+    /* A client's inhibitor, or for an X11 window's grab NULL and Xwayland's
+     * zwp_xwayland_keyboard_grab_v1. */
     struct wlr_keyboard_shortcuts_inhibitor_v1 *wlr_inhibitor;
+    struct wl_resource *grab;
     struct wlr_surface *surface;
-    /* Refused by keyboard.shortcuts_inhibit or a window rule, as last worked out; turned off by
-     * the user (toggle_shortcuts_inhibit) until they turn it on again. */
-    bool refused, off;
+    /* Honoured; refused by keyboard.shortcuts_inhibit or a window rule, as last worked out;
+     * turned off by the user (toggle_shortcuts_inhibit) until they turn it on again. */
+    bool active, refused, off;
     bool told; // the user heard of it taking the keys, for a surface that is no window
-    struct wl_listener destroy;
+    struct wl_listener destroy; // the inhibitor's, or the grabbing surface's
 };
 
 /* The window a surface belongs to, or NULL for a panel, a lock surface and the like. */
@@ -45,14 +53,17 @@ static bool refused(struct sh_shortcuts_inhibitor *inhibitor) {
            rule.no_shortcuts_inhibit;
 }
 
-/* Honours the inhibitor, or stops honouring it, as the settings and the user say; its client
- * hears of each change (active, inactive). */
+/* Honours the inhibitor, or stops honouring it, as the settings and the user say; a client's
+ * inhibitor hears of each change (active, inactive), a grab nothing. */
 static void apply(struct sh_shortcuts_inhibitor *inhibitor) {
     inhibitor->refused = refused(inhibitor);
     bool active = !inhibitor->refused && !inhibitor->off;
-    if (active && !inhibitor->wlr_inhibitor->active)
+    if (active == inhibitor->active)
+        return;
+    inhibitor->active = active;
+    if (inhibitor->wlr_inhibitor && active)
         wlr_keyboard_shortcuts_inhibitor_v1_activate(inhibitor->wlr_inhibitor);
-    else if (!active && inhibitor->wlr_inhibitor->active)
+    else if (inhibitor->wlr_inhibitor)
         wlr_keyboard_shortcuts_inhibitor_v1_deactivate(inhibitor->wlr_inhibitor);
 }
 
@@ -72,7 +83,7 @@ static struct sh_shortcuts_inhibitor *focused_inhibitor(struct sh_server *server
  * ever. */
 bool shortcuts_inhibited(struct sh_server *server) {
     struct sh_shortcuts_inhibitor *inhibitor = focused_inhibitor(server);
-    return !server->locked && inhibitor && inhibitor->wlr_inhibitor->active;
+    return !server->locked && inhibitor && inhibitor->active;
 }
 
 /* The name the user knows the surface's window by, its title, else its app id, as a piece of a
@@ -170,34 +181,132 @@ void toggle_shortcuts_inhibit(struct sh_server *server) {
     send_shell_line(server, line);
 }
 
-static void inhibitor_destroy(struct wl_listener *listener, void *data) {
-    struct sh_shortcuts_inhibitor *inhibitor = wl_container_of(listener, inhibitor, destroy);
+static void forget_inhibitor(struct sh_shortcuts_inhibitor *inhibitor) {
     struct sh_server *server = inhibitor->server;
     wl_list_remove(&inhibitor->destroy.link);
     wl_list_remove(&inhibitor->link);
     if (server->shortcuts.effective == inhibitor)
         server->shortcuts.effective = NULL;
+    if (inhibitor->grab)
+        wl_resource_set_user_data(inhibitor->grab, NULL);
     free(inhibitor);
     shortcuts_changed(server);
+}
+
+static void inhibitor_destroy(struct wl_listener *listener, void *data) {
+    struct sh_shortcuts_inhibitor *inhibitor = wl_container_of(listener, inhibitor, destroy);
+    forget_inhibitor(inhibitor);
+}
+
+/* Starts following an inhibitor or a grab of `surface`, honouring it unless refused. */
+static struct sh_shortcuts_inhibitor *add_inhibitor(struct sh_server *server,
+                                                    struct wlr_surface *surface) {
+    struct sh_shortcuts_inhibitor *inhibitor = calloc(1, sizeof(*inhibitor));
+    if (!inhibitor)
+        return NULL;
+    inhibitor->server = server;
+    inhibitor->surface = surface;
+    wl_list_insert(&server->shortcuts.inhibitors, &inhibitor->link);
+    return inhibitor;
+}
+
+/* Honours a new inhibitor or grab unless refused, and has it take the keys if its surface has the
+ * keyboard. */
+static void start_inhibitor(struct sh_shortcuts_inhibitor *inhibitor) {
+    apply(inhibitor);
+    if (inhibitor->refused)
+        wlr_log(WLR_INFO, "Refused a keyboard %s (keyboard.shortcuts_inhibit or a window rule)",
+                inhibitor->grab ? "grab" : "shortcuts inhibitor");
+    shortcuts_changed(inhibitor->server);
 }
 
 static void new_inhibitor(struct wl_listener *listener, void *data) {
     struct sh_server *server = wl_container_of(listener, server, shortcuts.new_inhibitor);
     struct wlr_keyboard_shortcuts_inhibitor_v1 *wlr_inhibitor = data;
-    struct sh_shortcuts_inhibitor *inhibitor = calloc(1, sizeof(*inhibitor));
+    struct sh_shortcuts_inhibitor *inhibitor = add_inhibitor(server, wlr_inhibitor->surface);
     if (!inhibitor)
         return; // never honoured: its client hears nothing
-    inhibitor->server = server;
     inhibitor->wlr_inhibitor = wlr_inhibitor;
-    inhibitor->surface = wlr_inhibitor->surface;
     add_listener(&wlr_inhibitor->events.destroy, &inhibitor->destroy, inhibitor_destroy);
-    wl_list_insert(&server->shortcuts.inhibitors, &inhibitor->link);
-    apply(inhibitor);
-    if (inhibitor->refused)
-        wlr_log(WLR_INFO, "Refused a keyboard shortcuts inhibitor (keyboard.shortcuts_inhibit or "
-                          "a window rule)");
-    shortcuts_changed(server);
+    start_inhibitor(inhibitor);
 }
+
+#if WLR_HAS_XWAYLAND
+/* xwayland-keyboard-grab-unstable-v1: Xwayland asks for the keyboard to go to an X11 window as an
+ * X11 client takes an active grab of it (XGrabKeyboard), such as a virtual machine's or a remote
+ * desktop's window, and lets go as the grab ends. While its window has the keyboard, the grab
+ * holds the bindings' keys as an inhibitor does; it never takes the keyboard from another window.
+ * The global is offered to Xwayland alone. */
+static void grab_handle_destroy(struct wl_client *client, struct wl_resource *resource) {
+    wl_resource_destroy(resource);
+}
+static const struct zwp_xwayland_keyboard_grab_v1_interface grab_implementation = {
+    .destroy = grab_handle_destroy,
+};
+
+static void grab_resource_destroy(struct wl_resource *resource) {
+    struct sh_shortcuts_inhibitor *inhibitor = wl_resource_get_user_data(resource);
+    if (inhibitor) {
+        inhibitor->grab = NULL;
+        forget_inhibitor(inhibitor);
+    }
+}
+
+static void manager_handle_destroy(struct wl_client *client, struct wl_resource *resource) {
+    wl_resource_destroy(resource);
+}
+
+static void manager_grab_keyboard(struct wl_client *client, struct wl_resource *resource,
+                                  uint32_t id, struct wl_resource *surface_resource,
+                                  struct wl_resource *seat_resource) {
+    struct sh_server *server = wl_resource_get_user_data(resource);
+    struct wl_resource *grab = wl_resource_create(client, &zwp_xwayland_keyboard_grab_v1_interface,
+                                                  wl_resource_get_version(resource), id);
+    if (!grab) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(grab, &grab_implementation, NULL, grab_resource_destroy);
+    struct wlr_seat_client *seat = wlr_seat_client_from_resource(seat_resource);
+    if (!seat || seat->seat != server->seat)
+        return; // another seat's, or one that is gone: the grab does nothing
+    struct sh_shortcuts_inhibitor *inhibitor =
+        add_inhibitor(server, wlr_surface_from_resource(surface_resource));
+    if (!inhibitor)
+        return;
+    inhibitor->grab = grab;
+    wl_resource_set_user_data(grab, inhibitor);
+    // A grab outlives its surface as an object that does nothing.
+    add_listener(&inhibitor->surface->events.destroy, &inhibitor->destroy, inhibitor_destroy);
+    start_inhibitor(inhibitor);
+}
+
+static const struct zwp_xwayland_keyboard_grab_manager_v1_interface manager_implementation = {
+    .destroy = manager_handle_destroy,
+    .grab_keyboard = manager_grab_keyboard,
+};
+
+static void bind_grab_manager(struct wl_client *client, void *data, uint32_t version,
+                              uint32_t id) {
+    struct wl_resource *resource = wl_resource_create(
+        client, &zwp_xwayland_keyboard_grab_manager_v1_interface, (int)version, id);
+    if (!resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+    wl_resource_set_implementation(resource, &manager_implementation, data, NULL);
+}
+
+/* Which client sees which global: the grab manager is Xwayland's alone, as the protocol asks. */
+static bool global_filter(const struct wl_client *client, const struct wl_global *global,
+                          void *data) {
+    struct sh_server *server = data;
+    if (global != server->shortcuts.grab_manager)
+        return true;
+    return server->xwayland && server->xwayland->server &&
+           client == server->xwayland->server->client;
+}
+#endif
 
 static void keyboard_focus_change(struct wl_listener *listener, void *data) {
     struct sh_server *server = wl_container_of(listener, server, shortcuts.keyboard_focus_change);
@@ -216,9 +325,9 @@ void shortcuts_reload(struct sh_server *server) {
 }
 
 /* For `get shortcuts`: "inhibited 1" while the keys go to the focused surface (else 0), then a
- * line per inhibitor: "inhibitor", whether it is honoured ("active"), turned off by the user
- * ("off") or refused ("refused"), whether its surface has the keyboard, and the surface as
- * `surface` describes it. */
+ * line per inhibitor: "inhibitor" (or "grab" for an X11 window's), whether it is honoured
+ * ("active"), turned off by the user ("off") or refused ("refused"), whether its surface has the
+ * keyboard, and the surface as `surface` describes it. */
 void describe_shortcuts_inhibitors(struct sh_server *server, int fd,
                                    void (*surface)(struct sh_server *, int, const char *,
                                                    struct wlr_surface *)) {
@@ -228,10 +337,10 @@ void describe_shortcuts_inhibitors(struct sh_server *server, int fd,
     struct wlr_surface *focus = server->seat->keyboard_state.focused_surface;
     struct sh_shortcuts_inhibitor *inhibitor;
     wl_list_for_each_reverse(inhibitor, &server->shortcuts.inhibitors, link) {
-        snprintf(line, sizeof(line), "inhibitor\t%s\t%d",
-                 inhibitor->wlr_inhibitor->active ? "active"
-                 : inhibitor->refused             ? "refused"
-                                                  : "off",
+        snprintf(line, sizeof(line), "%s\t%s\t%d", inhibitor->grab ? "grab" : "inhibitor",
+                 inhibitor->active    ? "active"
+                 : inhibitor->refused ? "refused"
+                                      : "off",
                  focus && inhibitor->surface == focus);
         surface(server, fd, line, inhibitor->surface);
     }
@@ -244,6 +353,12 @@ void shortcuts_inhibit_init(struct sh_server *server) {
                  &server->shortcuts.new_inhibitor, new_inhibitor);
     add_listener(&server->seat->keyboard_state.events.focus_change,
                  &server->shortcuts.keyboard_focus_change, keyboard_focus_change);
+#if WLR_HAS_XWAYLAND
+    server->shortcuts.grab_manager = wl_global_create(
+        server->wl_display, &zwp_xwayland_keyboard_grab_manager_v1_interface, 1, server,
+        bind_grab_manager);
+    wl_display_set_global_filter(server->wl_display, global_filter, server);
+#endif
 }
 
 void shortcuts_inhibit_finish(struct sh_server *server) {

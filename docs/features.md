@@ -1470,6 +1470,12 @@ so does the lock screen: the `locked` bindings run there whatever a window asked
 mode in use is left as a window takes the keys, as locking leaves it, so that the binding that
 takes them back is the one outside any mode.
 
+An X11 window that grabs the keyboard (XGrabKeyboard), as VirtualBox, Xephyr and X11 remote
+desktop clients do, holds the keys the same way: Xwayland passes the grab on through
+xwayland-keyboard-grab-unstable-v1, which only Xwayland is offered, and while the window has the
+keyboard its grab is a request like any other, ending as the window lets go. A grab never moves
+the keyboard to its window.
+
 `keyboard.shortcuts_inhibit = false` refuses every application, and a window rule's
 `shortcuts_inhibit = false` the windows it matches; a refused window never hears that its request
 is honoured, and the binding does not turn it on. A reload applies a change to either at once.
@@ -1480,10 +1486,10 @@ windows = { rules = { { app_id = "^org.remmina.Remmina$", shortcuts_inhibit = fa
 ```
 
 `shaodesk msg get shortcuts` prints `inhibited 1` while the keys go to the focused window (else
-`0`), then a line per request: `inhibitor`, `active`, `off` (turned off with the binding) or
-`refused`, 1 when its window has the keyboard, and the window as `get seat` names it (`window` and
-its title), tab-separated. `shortcuts_inhibit_smoke` tests it with windows of `input_probe
---inhibit`.
+`0`), then a line per request: `inhibitor` (`grab` for an X11 window's), `active`, `off` (turned
+off with the binding) or `refused`, 1 when its window has the keyboard, and the window as `get
+seat` names it (`window` and its title), tab-separated. `shortcuts_inhibit_smoke` tests it with
+windows of `input_probe --inhibit`, and `xwayland_grab_smoke` with `x11_probe`'s grab.
 
 ### Nested sessions
 

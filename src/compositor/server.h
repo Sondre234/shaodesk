@@ -312,14 +312,15 @@ struct sh_tablets {
 };
 
 /* Keyboard shortcuts inhibitors (shortcuts_inhibit.c): keyboard-shortcuts-inhibit, the
- * inhibitors clients asked for, and the one taking the keys now, which the keyboard's focus
- * decides. */
+ * inhibitors clients asked for and X11 windows' keyboard grabs, and the one taking the keys now,
+ * which the keyboard's focus decides. */
 struct sh_shortcuts_inhibitor;
 struct sh_shortcuts {
     struct wlr_keyboard_shortcuts_inhibit_manager_v1 *manager;
     struct wl_list inhibitors; // struct sh_shortcuts_inhibitor
     struct sh_shortcuts_inhibitor *effective;
     struct wl_listener new_inhibitor, keyboard_focus_change;
+    struct wl_global *grab_manager; // xwayland-keyboard-grab, for X11 windows' grabs
 };
 
 /* The touchpad swipe under way (gestures.c). */
