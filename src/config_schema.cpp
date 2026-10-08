@@ -232,6 +232,10 @@ const Option options[] = {
     {"windows.dim_inactive", "number", "0", "0.25", 0, 0.9,
      "How much darker windows without focus are, 0 for not at all: black laid over them, so it "
      "works for every application and tints nothing. Fades over `dim_duration`."},
+    {"windows.allow_tearing", "boolean", "false", "true", none, none,
+     "Let a fullscreen window that asks for it (tearing-control-v1, as games do) or that a rule's "
+     "`allow_tearing` names show each frame at once, for the least latency, rather than at the "
+     "monitor's next refresh, while nothing else shows on its monitor. The picture may tear."},
     {"windows.dim_duration", "integer", "180", "180", 0, 2000,
      "Milliseconds the dimming takes to fade in and out; 0, or `animations.enabled = false`, "
      "switches it at once."},
@@ -371,6 +375,9 @@ const Option options[] = {
      "Hold the window to the rule's `above`, `floating` and `sticky` while its title and app ID "
      "match, as they change, and give back what it had once they no longer do; its other "
      "actions still act once, as the window opens."},
+    {"windows.rules[].allow_tearing", "boolean", "unset", "", none, none,
+     "With `windows.allow_tearing`, show the window's frames at once while it is fullscreen and "
+     "alone on its monitor, whether or not it asks for that (as an X11 game cannot)."},
 
     {"peek", "table", "", "", none, none,
      "Peek: `peek` (hold a key) and `peek_toggle` make every window nearly transparent to show "

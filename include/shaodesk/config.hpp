@@ -63,7 +63,7 @@ struct Launcher {
 // What rules do to a window as it opens; unset fields leave it to the defaults.
 struct WindowActions {
     enum class Position { Unset, Center, At };
-    std::optional<bool> floating, fullscreen, maximize, focus, sticky, above;
+    std::optional<bool> floating, fullscreen, maximize, focus, sticky, above, allow_tearing;
     std::optional<bool> shortcuts_inhibit; // false: the window's inhibitors are refused
     std::optional<int> workspace;      // from 1
     std::optional<std::string> output; // connector, or "desc:" and the start of its description
@@ -274,6 +274,7 @@ struct Config {
                          .overview_dim = 0.86F,
                          .dim_inactive = 0,
                          .dim_duration = 180,
+                         .allow_tearing = false,
                          .activation = SH_ACTIVATION_URGENT,
                          .urgent_color = {1.0F, 0.62F, 0.39F, 1.0F},
                          .effects = {.peek_opacity = 0.12F,

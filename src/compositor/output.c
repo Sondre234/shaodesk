@@ -43,7 +43,9 @@ static void output_frame(struct wl_listener *listener, void *data) {
             output_release_zoom(output);
             output->zoom_failed = false; // the next zoom tries again
         }
-        wlr_scene_output_commit(scene_output, &night);
+        // A fullscreen game may have its frames shown at once (tearing.c).
+        if (!output_commit_tearing(output, scene_output, &night))
+            wlr_scene_output_commit(scene_output, &night);
     }
     lock_output_presented(output);
     uint64_t spent = now_ns() - started;

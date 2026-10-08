@@ -125,6 +125,9 @@ return {
         -- inactive_opacity = 1.0,
         -- dim_inactive = 0.0, -- 0 to 0.9: black laid over windows without focus, faded in and out
         -- dim_duration = 180, -- milliseconds of that fade
+        -- Games asking for it (or that a rule's allow_tearing = true names) show their frames at
+        -- once, tearing, while fullscreen and alone on their monitor:
+        -- allow_tearing = false,
         -- What an unfocused application asking for attention gets: "urgent" marks its window
         -- (pulsing border, taskbar badge, workspace dot) and leaves focus alone, "focus" raises
         -- it and switches to its workspace, "ignore" drops the request. Super+U (focus_urgent)

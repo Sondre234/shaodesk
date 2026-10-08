@@ -261,6 +261,7 @@ class Translator {
         }
         used_.insert("decoration:rounding_power");
         flag("animations:enabled", {"animations", "enabled"});
+        flag("general:allow_tearing", {"windows", "allow_tearing"});
         // Hyprland focuses an activating window only when asked; shaodesk marks it urgent instead
         // unless windows.activation says "focus".
         if (auto *value = option("misc:focus_on_activate")) {
@@ -574,7 +575,12 @@ class Translator {
         int without = 0;
         for (const auto &item : items) {
             auto opacity = item.fields.find("opacity");
-            if (opacity == item.fields.end()) {
+            // Hyprland's immediate lets the window tear, as shaodesk's allow_tearing does.
+            auto immediate = item.fields.find("immediate");
+            bool tears = immediate != item.fields.end() &&
+                         parse_bool(immediate->second.empty() ? "on" : immediate->second)
+                             .value_or(false);
+            if (opacity == item.fields.end() && !tears) {
                 ++without;
                 continue;
             }
@@ -590,9 +596,10 @@ class Translator {
                 else if (key.starts_with("match:"))
                     other_match = true;
             if (pattern.empty() || other_match) {
-                report_.skip(
-                    files_, item.origin,
-                    "opacity rule matches more than the app ID; shaodesk's rules match app IDs only");
+                report_.skip(files_, item.origin,
+                             std::string(opacity == item.fields.end() ? "immediate" : "opacity") +
+                                 " rule matches more than the app ID; shaodesk's rules match "
+                                 "app IDs only");
                 continue;
             }
             // Hyprland matches the whole class; shaodesk searches, so anchor it.
@@ -606,25 +613,31 @@ class Translator {
                 continue;
             }
             std::vector<double> values;
-            for (const auto &word : split(opacity->second, ' '))
-                if (auto value = parse_number(word))
-                    values.push_back(*value);
-            if (values.empty() || values[0] < 0.05 || values[0] > 1 ||
-                (values.size() > 1 && (values[1] < 0.05 || values[1] > 1))) {
-                report_.skip(files_, item.origin,
-                             "opacity " + opacity->second +
-                                 ": shaodesk keeps windows from 5% to 100% opaque");
-                continue;
+            if (opacity != item.fields.end()) {
+                for (const auto &word : split(opacity->second, ' '))
+                    if (auto value = parse_number(word))
+                        values.push_back(*value);
+                if (values.empty() || values[0] < 0.05 || values[0] > 1 ||
+                    (values.size() > 1 && (values[1] < 0.05 || values[1] > 1))) {
+                    report_.skip(files_, item.origin,
+                                 "opacity " + opacity->second +
+                                     ": shaodesk keeps windows from 5% to 100% opaque");
+                    continue;
+                }
             }
             if (list.empty())
                 first = item.origin;
-            list += "    { app_id = " + quote(pattern) + ", opacity = " + number(values[0]);
+            list += "    { app_id = " + quote(pattern);
+            if (!values.empty())
+                list += ", opacity = " + number(values[0]);
             if (values.size() > 1)
                 list += ", inactive_opacity = " + number(values[1]);
+            if (tears)
+                list += ", allow_tearing = true";
             list += " }, -- " + files_.show(item.origin) + "\n";
         }
         if (without)
-            report_.ignored["window rules without opacity"] += without;
+            report_.ignored["window rules without opacity or immediate"] += without;
         if (!list.empty())
             theme_.set({"windows", "rules"}, "{\n" + list + "}", first);
     }

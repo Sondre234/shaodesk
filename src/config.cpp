@@ -772,6 +772,7 @@ WindowRule window_rule(lua_State *L, int workspaces) {
     actions.sticky = optional_boolean(L, "sticky");
     actions.shortcuts_inhibit = optional_boolean(L, "shortcuts_inhibit");
     actions.above = optional_boolean(L, "above");
+    actions.allow_tearing = optional_boolean(L, "allow_tearing");
     lua_getfield(L, -1, "workspace");
     bool has_workspace = !lua_isnil(L, -1);
     lua_pop(L, 1);
@@ -979,6 +980,7 @@ void read_windows(lua_State *L, Config &config) {
         static_cast<float>(number(L, "inactive_opacity", config.opacity, 0.05, 1));
     config.settings.dim_inactive = static_cast<float>(number(L, "dim_inactive", 0, 0, 0.9));
     config.settings.dim_duration = integer(L, "dim_duration", 180, 0, 2000);
+    boolean(L, "allow_tearing", "windows.allow_tearing", config.settings.allow_tearing);
     lua_getfield(L, -1, "activation");
     if (!lua_isnil(L, -1)) {
         auto name = string(L, -1, "windows.activation");
@@ -2230,8 +2232,8 @@ bool WindowRule::matches(const std::string &app_id, const std::string &title) co
 }
 
 bool WindowActions::empty() const {
-    return !floating && !fullscreen && !maximize && !focus && !sticky && !above && !workspace &&
-           !output && !size && position == Position::Unset && !shortcuts_inhibit;
+    return !floating && !fullscreen && !maximize && !focus && !sticky && !above && !allow_tearing &&
+           !workspace && !output && !size && position == Position::Unset && !shortcuts_inhibit;
 }
 
 void WindowActions::merge(const WindowActions &other) {
@@ -2241,7 +2243,8 @@ void WindowActions::merge(const WindowActions &other) {
                                   {&focus, &other.focus},
                                   {&sticky, &other.sticky},
                                   {&shortcuts_inhibit, &other.shortcuts_inhibit},
-                                  {&above, &other.above}})
+                                  {&above, &other.above},
+                                  {&allow_tearing, &other.allow_tearing}})
         if (*source)
             *target = *source;
     if (other.workspace)
@@ -2276,6 +2279,7 @@ sh_window_rule WindowActions::to_c() const {
     rule.sticky = sticky.value_or(false);
     rule.no_shortcuts_inhibit = !shortcuts_inhibit.value_or(true);
     rule.above = above.value_or(false);
+    rule.allow_tearing = allow_tearing.value_or(false);
     return rule;
 }
 

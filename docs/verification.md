@@ -1072,3 +1072,21 @@ Not checked: 10 bits on a real monitor through DRM, with the GLES renderer (whic
 bandwidth at a high refresh rate may hold it to 8, which wlroots does not tell); direct scan-out and
 the hardware cursor beside a 10-bit primary plane; screen recording and screenshots of a 10-bit
 output through the GPU (grim and the portals reading `XRGB2101010` buffers).
+
+## Tearing
+
+Added 2026-10-08. `tearing_smoke` runs a headless output with `windows.allow_tearing`: a
+fullscreen `wayland_probe` asking for the async hint through tearing-control-v1 has its output's
+frames committed with `tearing_page_flip` (counted by `get tearing`), one asking for vsync, one
+asking nothing and one under a panel do not, the overview stops it while it is open, a rule's
+`allow_tearing` makes a window tear that does not ask, and with the setting off nothing tears;
+where the backend's test refuses the flip (`SHAODESK_TEST_REFUSE_TEARING`) the frames are committed
+as before and the log says so once. `output_config` reads the settings, and `import` Hyprland's
+`allow_tearing` and `immediate`.
+
+Not checked, for want of a real flip headless: an asynchronous page flip on a real monitor through
+DRM (that the picture tears and latency falls, on AMD and on NVIDIA, whose drivers took
+asynchronous atomic flips late), the kernel refusing one at commit rather than at the test, a
+game asking through tearing-control-v1 (Proton, SDL, mpv's `--vo=gpu-next` with
+`wayland-present-mode`), an X11 game through a rule, the interplay with adaptive sync (`vrr`),
+and the hardware cursor over a tearing output.

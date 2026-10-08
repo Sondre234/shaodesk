@@ -272,6 +272,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/switcher.c
         src/compositor/switches.c
         src/compositor/tablet.c
+        src/compositor/tearing.c
         src/compositor/tiling.c
         src/compositor/touch.c
         src/compositor/toplevel.c
@@ -414,6 +415,15 @@ if(SHAODESK_BUILD_COMPOSITOR)
             COMMAND ${WAYLAND_SCANNER} private-code ${TOPLEVEL_ICON_XML}
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-protocol.c
             DEPENDS ${TOPLEVEL_ICON_XML})
+        set(TEARING_XML ${PROTOCOL_DIR}/staging/tearing-control/tearing-control-v1.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/tearing-control-v1-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header ${TEARING_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/tearing-control-v1-client-protocol.h
+            DEPENDS ${TEARING_XML})
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/tearing-control-v1-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code ${TEARING_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/tearing-control-v1-protocol.c
+            DEPENDS ${TEARING_XML})
         set(DECORATION_XML ${PROTOCOL_DIR}/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml)
         add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xdg-decoration-unstable-v1-client-protocol.h
             COMMAND ${WAYLAND_SCANNER} client-header ${DECORATION_XML}
@@ -432,6 +442,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-decoration-unstable-v1-protocol.c
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-protocol.c
+            ${CMAKE_CURRENT_BINARY_DIR}/tearing-control-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/tearing-control-v1-protocol.c
             ${WLR_CLIENT_PROTOCOL_SOURCES})
         target_include_directories(wayland_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
         target_link_libraries(wayland_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
@@ -611,6 +623,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/bit_depth_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:output_management_probe>)
         set_tests_properties(bit_depth_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME tearing_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/tearing_smoke.py $<TARGET_FILE:shaodesk>
+            $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(tearing_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME display_mode_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/display_mode_smoke.py $<TARGET_FILE:shaodesk>)
         set_tests_properties(display_mode_smoke PROPERTIES TIMEOUT 60)

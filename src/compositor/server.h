@@ -100,6 +100,7 @@
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_session_lock_v1.h>
 #include <wlr/types/wlr_switch.h>
+#include <wlr/types/wlr_tearing_control_v1.h>
 #include <wlr/types/wlr_single_pixel_buffer_v1.h>
 #include <wlr/types/wlr_subcompositor.h>
 #include <wlr/types/wlr_tablet_pad.h>
@@ -499,6 +500,7 @@ struct sh_server {
     struct wl_event_source *window_objects_idle;
     struct wl_listener new_capture_request;
     struct wl_listener set_xdg_icon; // a Wayland window giving its icon (window_icon.c)
+    struct wlr_tearing_control_manager_v1 *tearing_control; // windows' tearing hints (tearing.c)
 
     /* Session lock: `locked` outlives a crashed locker so the screen stays covered. */
     bool locked;
@@ -653,6 +655,20 @@ struct sh_server {
     struct wl_listener new_output;
 };
 
+/* Tearing on an output (tearing.c): what its frames do now (`tearing`, `refused`, or why its
+ * window may not tear) and the window's title, the window the rules were last matched for (its
+ * number, under a configuration generation) and their answer, and the frames flipped at once and
+ * refused, for `get tearing`. */
+struct sh_tearing {
+    const char *why;
+    char title[128];
+    const struct sh_toplevel *rule_window;
+    uint32_t rule_id;
+    unsigned rule_generation;
+    bool ruled, refusal_logged;
+    uint64_t flips, refused;
+};
+
 struct sh_output {
     struct wlr_box usable;
     int x, y;                /* arrangement before the shift to the layout origin */
@@ -676,6 +692,7 @@ struct sh_output {
     bool zoom_failed; // it could not be magnified this time; it shows 1x until the zoom is reset
     /* Out of the layout, showing another output's picture (mirror.c); NULL otherwise. */
     struct sh_mirror *mirror;
+    struct sh_tearing tearing;
     struct wl_list link;
     struct sh_server *server;
     struct wlr_output *wlr_output;
@@ -1337,6 +1354,11 @@ void describe_tablets(struct sh_server *server, int fd,
                       void (*surface)(struct sh_server *, int, const char *, struct wlr_surface *));
 void tablet_init(struct sh_server *server);
 void tablet_finish(struct sh_server *server);
+
+/* tearing.c */
+bool output_commit_tearing(struct sh_output *output, struct wlr_scene_output *scene_output,
+                           const struct wlr_scene_output_state_options *options);
+void describe_tearing(struct sh_server *server, int fd);
 
 /* tiling.c */
 struct wlr_output *tiled_output(struct sh_toplevel *toplevel);

@@ -6,6 +6,7 @@
 #include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 #include "xdg-toplevel-icon-v1-client-protocol.h"
+#include "tearing-control-v1-client-protocol.h"
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -73,6 +74,9 @@ struct probe {
     struct wl_data_device *data_device;
     struct wl_data_offer *offer; // the drag's offer while it is over the window
     struct xdg_toplevel_icon_manager_v1 *icons; // for SHAODESK_PROBE_ICON and "icon" commands
+    // For SHAODESK_PROBE_TEARING: the window's tearing-control-v1 hint.
+    struct wp_tearing_control_manager_v1 *tearing_manager;
+    struct wp_tearing_control_v1 *tearing;
 };
 static void die(const char *message) {
     fprintf(stderr, "wayland probe: %s\n", message);
@@ -191,6 +195,9 @@ static void global(void *data, struct wl_registry *registry, uint32_t name, cons
     } else if (!strcmp(interface, "xdg_toplevel_icon_manager_v1")) {
         probe->icons =
             wl_registry_bind(registry, name, &xdg_toplevel_icon_manager_v1_interface, 1);
+    } else if (!strcmp(interface, "wp_tearing_control_manager_v1")) {
+        probe->tearing_manager =
+            wl_registry_bind(registry, name, &wp_tearing_control_manager_v1_interface, 1);
     }
 }
 /* A line on standard output, at once: the test reads it while the probe runs. */
@@ -819,6 +826,18 @@ int main(int argc, char **argv) {
     // SHAODESK_PROBE_ICON=SPEC gives the window an icon before it maps (see set_icon).
     if (getenv("SHAODESK_PROBE_ICON"))
         set_icon(&probe, getenv("SHAODESK_PROBE_ICON"));
+    // SHAODESK_PROBE_TEARING=async (or vsync) gives the window that tearing-control-v1 hint, as a
+    // game asking for its frames at once does.
+    const char *tearing = getenv("SHAODESK_PROBE_TEARING");
+    if (tearing) {
+        if (!probe.tearing_manager)
+            die("wp_tearing_control_manager_v1 is not advertised");
+        probe.tearing =
+            wp_tearing_control_manager_v1_get_tearing_control(probe.tearing_manager, probe.surface);
+        wp_tearing_control_v1_set_presentation_hint(
+            probe.tearing, !strcmp(tearing, "async") ? WP_TEARING_CONTROL_V1_PRESENTATION_HINT_ASYNC
+                                                     : WP_TEARING_CONTROL_V1_PRESENTATION_HINT_VSYNC);
+    }
     wl_surface_commit(probe.surface);
     if (probe.commands)
         run_commands(display, &probe);
@@ -848,6 +867,10 @@ int main(int argc, char **argv) {
         xdg_activation_v1_destroy(probe.activation);
     if (probe.icons)
         xdg_toplevel_icon_manager_v1_destroy(probe.icons);
+    if (probe.tearing)
+        wp_tearing_control_v1_destroy(probe.tearing);
+    if (probe.tearing_manager)
+        wp_tearing_control_manager_v1_destroy(probe.tearing_manager);
     if (probe.panel) {
         zwlr_layer_surface_v1_destroy(probe.panel);
         wl_surface_destroy(probe.panel_surface);
