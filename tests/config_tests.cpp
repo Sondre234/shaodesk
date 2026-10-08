@@ -834,6 +834,17 @@ int main(int argc, char **argv) {
         rejects("return {shell={search={depth=0}}}");
         rejects("return {shell={search={max_files=200001}}}");
         rejects("return {shell={search={folders={'~'}}}}");
+        // The web search's engine: DuckDuckGo by default, another address, or none.
+        require(even.shell.search.web == "https://duckduckgo.com/?q=%s",
+                "the web search does not default to DuckDuckGo");
+        require(shaodesk::parse_config("return {shell={search={web='https://www.google.com/search?q=%s'}}}")
+                        .shell.search.web == "https://www.google.com/search?q=%s" &&
+                    shaodesk::parse_config("return {shell={search={web=false}}}").shell.search.web.empty(),
+                "shell.search.web not parsed");
+        rejects("return {shell={search={web=true}}}");
+        rejects("return {shell={search={web='https://example.org/search'}}}");
+        rejects("return {shell={search={web='file:///etc/%s'}}}");
+        rejects("return {shell={search={web=1}}}");
         using shaodesk::WidgetPlace;
         auto widgets = shaodesk::parse_config(
             "return {shell={widgets={battery=false,calendar=false,workspaces=false}}}");

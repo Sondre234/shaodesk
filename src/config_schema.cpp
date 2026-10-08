@@ -780,6 +780,11 @@ const Option options[] = {
      "How many levels of folders below each of `directories` are read."},
     {"shell.search.max_files", "integer", "20000", "20000", 100, 200000,
      "How many names are read at most, the folders nearest the top first."},
+    {"shell.search.web", "string or false", "\"https://duckduckgo.com/?q=%s\"",
+     "\"https://www.startpage.com/do/search?q=%s\"", none, none,
+     "The search engine of the last result, Search the web for “…”, which opens the default "
+     "browser at this http or https address, `%s` replaced by the words typed (URL-encoded); "
+     "`false` leaves it out."},
     {"shell.workspaces_shown", "integer", "0", "3", 0, 10,
      "How many of the monitor's workspaces the workspace indicator shows, the current one in "
      "the middle: `3` shows it with the one before and the one after, or the first or last "

@@ -5,8 +5,9 @@ import QtQuick.Controls.Basic
 // The best match of the start menu's search, on a card of its own: its icon large, its name,
 // what it is and what its entry says of it, and buttons for what it can do: an application's
 // Open and its desktop actions, a window's Switch to, an action's Run, a calculation's Copy, a
-// file's Open and Open folder. `current` says the keyboard is at it, and `button` at which of its
-// buttons (-1 for the card itself, 0 for Open, then the actions), which press() presses.
+// file's Open and Open folder, the web search's Search. `current` says the keyboard is at it, and
+// `button` at which of its buttons (-1 for the card itself, 0 for Open, then the actions), which
+// press() presses.
 AbstractButton {
     id: card
     required property var result
@@ -102,7 +103,7 @@ AbstractButton {
                 focusPolicy: Qt.NoFocus
                 current: card.current && card.button === 0
                 text: card.app || card.result.kind === "file" ? "Open" : card.result.kind === "window" ? "Switch to"
-                    : card.result.kind === "calc" ? "Copy" : "Run"
+                    : card.result.kind === "calc" ? "Copy" : card.result.kind === "web" ? "Search" : "Run"
                 onClicked: card.press(0)
             }
             Repeater {

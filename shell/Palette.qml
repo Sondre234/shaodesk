@@ -19,12 +19,12 @@ Item {
     readonly property int rowHeight: Theme.rowHeight + Theme.spacingL
     readonly property int visibleRows: Math.max(1, Math.min(8, Math.floor((screenSize.height * 0.6 - 3 * padding - input.height) / rowHeight)))
     readonly property var kindLabels: ({ window: "Window", app: "App", workspace: "Workspace", action: "Action", session: "Session",
-                                         calc: "Calculator", file: "File" })
+                                         calc: "Calculator", file: "File", web: "Web" })
     // Spotlight's headings: the top hit's over the first result of a search, and a kind's over the
     // first of a run of it.
     readonly property var groupLabels: ({ window: "Windows", app: "Applications", workspace: "Workspaces",
                                           action: "Actions", session: "Sessions", calc: "Calculator",
-                                          file: "Files" })
+                                          file: "Files", web: "Web" })
     // The results, read from the palette once each time they change.
     readonly property var results: shell.palette.results
     function heading(index) {

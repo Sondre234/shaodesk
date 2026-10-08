@@ -3,6 +3,7 @@
 #include "calculator.hpp"
 #include "controller.hpp"
 #include "fuzzy.hpp"
+#include "web_search.hpp"
 #include <QClipboard>
 #include <QGuiApplication>
 
@@ -234,8 +235,24 @@ void Palette::refreshResults() {
         if (!typed.isEmpty() && !QString(">@#%").contains(typed[0]))
             results_ = merged(results_, controller_.files()->search(typed, 5));
     }
+    // Spotlight lists what it found by kind, each under its heading, after the top hit.
+    if (controller_.style() == "macos" && !typed.isEmpty() && results_.size() > 2) {
+        QVariantList grouped{results_.first()};
+        QStringList kinds;
+        for (qsizetype i = 1; i < results_.size(); ++i)
+            if (const auto kind = results_[i].toMap()["kind"].toString(); !kinds.contains(kind))
+                kinds.push_back(kind);
+        for (const auto &kind : kinds)
+            for (qsizetype i = 1; i < results_.size(); ++i)
+                if (results_[i].toMap()["kind"] == kind)
+                    grouped.push_back(results_[i]);
+        results_ = grouped;
+    }
     if (!calc.isEmpty())
         results_.prepend(calc);
+    // Searching the web for the words comes after what was found.
+    if (const auto web = web_search::entry(controller_.webSearch(), query_); !web.isEmpty())
+        results_.push_back(web);
     // Saving the arrangement under the name typed is offered last, once the text can be a name.
     if (fuzzy::validSessionName(typed) && !typed.startsWith('>') && !typed.startsWith('@') &&
         !typed.startsWith('#') && !typed.startsWith('%'))
@@ -307,6 +324,8 @@ void Palette::run(const QVariantMap &item, const QString &output) {
         QGuiApplication::clipboard()->setText(target);
     } else if (kind == "file") {
         controller_.openFile(target);
+    } else if (kind == "web") {
+        controller_.openUrl(target);
     } else if (item["power"].toBool()) {
         controller_.power()->request(target, output);
     } else if (kind == "app") {

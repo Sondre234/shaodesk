@@ -174,7 +174,7 @@ PopupCard {
         } else if (name === "launcher-search") {
             search.text = "fi"
         } else if (name === "launcher-empty") {
-            search.text = "zqxw"
+            search.text = "> zqxw" // with a prefix, as a word alone finds the web search
         } else if (name === "launcher-menu") {
             // The fourth tile's, which can move to the front, once the tiles are laid out.
             home.current = Math.min(3, home.pins.length - 1)

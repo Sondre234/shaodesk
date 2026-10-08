@@ -414,6 +414,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.search.directories` | list of strings | unset | - | The folders whose files are found, at most 32, absolute or starting with `~/`; unset reads the XDG user folders (Documents, Downloads, ...) and the home folder. Hidden files and folders, other file systems, and what is inside a version-controlled tree (`.git`), a build tree (`CMakeCache.txt`, `CACHEDIR.TAG`), `node_modules` or `__pycache__` are left out. |
 | `shell.search.depth` | integer | 4 | 1 to 10 | How many levels of folders below each of `directories` are read. |
 | `shell.search.max_files` | integer | 20000 | 100 to 200000 | How many names are read at most, the folders nearest the top first. |
+| `shell.search.web` | string or false | "https://duckduckgo.com/?q=%s" | - | The search engine of the last result, Search the web for “…”, which opens the default browser at this http or https address, `%s` replaced by the words typed (URL-encoded); `false` leaves it out. |
 | `shell.workspaces_shown` | integer | 0 | 0 to 10 | How many of the monitor's workspaces the workspace indicator shows, the current one in the middle: `3` shows it with the one before and the one after, or the first or last three at either end. 0 shows them all. Scrolling still reaches every workspace. |
 | `shell.accent` | color | "#7da8ff" | - | Accent color, `#RRGGBB` or `#RRGGBBAA`. |
 | `shell.panel_color` | color | "#151e2c" | - | Panel color; `#RRGGBBAA` makes it translucent. |

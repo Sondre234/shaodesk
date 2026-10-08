@@ -495,10 +495,10 @@ The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `t
 (the taskbar's slots and groups), `audio.cpp` with `pulse_audio.cpp`, `system_status.cpp`
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
 `volume_keys.cpp` (what the compositor passes on from the volume, microphone and brightness keys),
-`power.cpp`, `palette.cpp` (with `fuzzy.cpp`, and `calculator.cpp` and `file_index.cpp`, which the
-start menu's search shares), `media.cpp` with `mpris.cpp`, `power_mode.cpp` with
-`power_profiles_daemon.cpp`, `wifi.cpp` with `network_manager.cpp`, `bluetooth.cpp` with
-`bluez.cpp`. `preview.cpp` has stand-ins for all of them for `--preview-popup`.
+`power.cpp`, `palette.cpp` (with `fuzzy.cpp`, and `calculator.cpp`, `file_index.cpp` and
+`web_search.cpp`, which the start menu's search shares), `media.cpp` with `mpris.cpp`,
+`power_mode.cpp` with `power_profiles_daemon.cpp`, `wifi.cpp` with `network_manager.cpp`,
+`bluetooth.cpp` with `bluez.cpp`. `preview.cpp` has stand-ins for all of them for `--preview-popup`.
 
 The services Quick Settings controls over D-Bus each have a model the QML reads, built into
 everything that builds the controller (`SHAODESK_SERVICE_SOURCES`), and a backend on the bus built

@@ -3577,6 +3577,15 @@ ListModel {
             std::cerr << "the palette does not offer to save a session by the typed name\n";
             return 1;
         }
+        // Searching the web for the words comes just before, at DuckDuckGo by default. (Nothing
+        // here runs it: GIO might look the address up.)
+        {
+            const auto web = palette->results().value(palette->results().size() - 2).toMap();
+            if (web["kind"] != "web" || web["title"] != "Search the web for “evening”" ||
+                web["target"] != "https://duckduckgo.com/?q=evening" ||
+                web["subtitle"] != "Web · duckduckgo.com")
+                return fail("the palette does not offer to search the web");
+        }
         QTest::keyClick(&paletteView, Qt::Key_Up); // wraps to the last: the save entry
         QTest::keyClick(&paletteView, Qt::Key_Return);
         if (!QTest::qWaitFor([&] { return requests == QStringList{"session save evening"}; })) {
@@ -3677,6 +3686,13 @@ ListModel {
                 return controller.startMenu()->recent().value(0).toMap()["appId"] == "shaodesk-test-other.desktop";
             }))
             return fail("an application launched from the palette was not recorded");
+        // A web search opens its address in the default browser, here an address nothing opens,
+        // which the panel says.
+        controller.clearError();
+        palette->run({{"kind", "web"}, {"target", "shaodesk-test-scheme:evening"}}, output);
+        if (!controller.error().startsWith("Could not open shaodesk-test-scheme:evening: "))
+            return fail("a web search from the palette did not ask GIO for the browser");
+        controller.clearError();
     }
     // The start menu: its pinned applications and those launched lately, every application from
     // A to Z, and a search over applications, windows and actions, each moved through with the
@@ -3850,8 +3866,18 @@ ListModel {
             item("startBestMatch")->property("result").toMap()["title"] != "Quarterly report" ||
             item("startBestOpen")->property("text") != "Switch to")
             return fail("searching for a window's title did not find it as the best match");
+        // One that finds nothing offers to search the web, and with a prefix says it found
+        // nothing.
         search->setProperty("text", "");
         type("zqxw");
+        if (!QTest::qWaitFor([&] {
+                return shown("startBestMatch") &&
+                       item("startBestMatch")->property("result").toMap()["kind"] == "web";
+            }) ||
+            item("startBestOpen")->property("text") != "Search" || shown("startNothing"))
+            return fail("a search that finds nothing does not offer to search the web");
+        search->setProperty("text", "");
+        type("@zqxw");
         if (!QTest::qWaitFor([&] { return shown("startNothing"); }) || shown("startBestMatch"))
             return fail("a search that finds nothing does not say so");
         search->setProperty("text", "");
@@ -5613,6 +5639,24 @@ ListModel {
         controller.reload();
         if (!QTest::qWaitFor([&] { return controller.style() == "macos"; }))
             return fail("the configuration's macOS style was not read");
+        // Spotlight lists what it finds by kind after the top hit, each kind once (but for
+        // searching the web and saving a session at the end), files among them.
+        {
+            auto *palette = controller.palette();
+            palette->open(output);
+            palette->setQuery("a");
+            QStringList runs;
+            for (const auto &item : palette->results().mid(1)) {
+                const auto map = item.toMap();
+                if (map["kind"] == "web" || map["title"].toString().startsWith("Save session as"))
+                    continue;
+                if (runs.isEmpty() || runs.last() != map["kind"].toString())
+                    runs << map["kind"].toString();
+            }
+            palette->close();
+            if (!runs.contains("file") || !runs.contains("app") || runs.removeDuplicates() > 0)
+                return fail(("Spotlight does not list its results by kind: " + runs.join(' ').toStdString()).c_str());
+        }
         if (!token("macos").toBool() || token("menuRowHeight").toInt() != 24 ||
             token("menuHighlight") != token("accent") ||
             token("textOnAccentFill").value<QColor>() != QColor(Qt::white))

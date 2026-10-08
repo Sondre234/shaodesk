@@ -137,6 +137,9 @@ struct ShellSearch {
     std::vector<std::string> directories;
     int depth = 4;         // levels of folders read below each
     int max_files = 20000; // names read at most
+    // The last result, Search the web for “…”, opens this address, %s the words typed; empty
+    // (web = false) leaves it out.
+    std::string web = "https://duckduckgo.com/?q=%s";
 };
 
 struct ShellConfig {

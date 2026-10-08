@@ -56,7 +56,7 @@ the dock.
   application's actions or Keep in Dock; Escape clears the search and then closes it, as does a
   click beside the icons.
 - **Spotlight** is the command palette (Super + P) as a large search field a quarter of the way
-  down the screen, its results grouped under headings; **Control Center** is Quick Settings as
+  down the screen, its results grouped by kind under headings after the top hit; **Control Center** is Quick Settings as
   rounded modules, with Display and Sound under their own headings; notifications show as banners
   at the top-right, and Alt + Tab shows large application icons in a row.
 - **Menus** have dense rows, the highlighted one filled with the accent colour.
@@ -450,12 +450,12 @@ application from A to Z under its letter, and clicking a letter shows them all t
 The search finds applications by name, generic name ("Web Browser"), keywords, desktop id and
 comment, open windows, workspaces and actions as the [command palette](#command-palette) does
 (its `>`, `@`, `#` and `/` too), and [files](#files), grouped under Best match, Apps, Open windows,
-Actions and Files. The best
+Actions and Files, with Search the web last (see [Web search](#web-search)). The best
 match is on a card of its own, with an application's desktop actions ("New Private Window") as
 buttons beside Open; a calculation's value is the best match, with Copy (see
 [Calculator](#calculator)). Among equal matches, what is launched more often comes first; what matches
-far worse than the best match is left out. A search that finds nothing says so, with the prefixes
-that narrow one.
+far worse than the best match is left out. A search that finds nothing offers the web search as
+its best match, or, without one, says it found nothing, with the prefixes that narrow a search.
 
 The arrows, Tab and Page Up and Page Down move through the tiles, the lists and the results, and
 Enter opens what the keyboard is at (the best match, as the search starts); at the best match,
@@ -946,7 +946,7 @@ workspaces (switching to one, or moving the focused window there), compositor ac
 Open a terminal (`terminal`), `layout_monocle` or `group_toggle`, the [power actions](#power) that may run (Restart, Power off
 and Log out asking first, as from the panel), saved sessions (restore, restore and launch what is
 missing, and save the current arrangement under the name typed), and [files](#files), with a
-[calculator](#calculator). Type to narrow the list; each
+[calculator](#calculator) and a [web search](#web-search). Type to narrow the list; each
 word must match, in any order, as letters in sequence of the title or its small print, favouring
 runs of letters and word starts (`gc` finds Google Chrome, `lay mon` finds Layout: monocle).
 Up and Down, Tab and Shift + Tab, Ctrl + N and Ctrl + P, or the pointer select; Enter or a click
@@ -1019,6 +1019,17 @@ cache trees (`CMakeCache.txt`, or the `CACHEDIR.TAG` a cache folder has), `node_
 followed. Only names are read, never what is in the files, and nothing is kept on disk.
 `shell.search.files = false` turns it off. `tests/file_index_test.cpp` tests the reading, the
 search and opening in a home folder of its own.
+
+### Web search
+
+Below what the palette and the start menu's search find comes Search the web for “…”, the words
+typed with their spaces tidied, which opens the default browser (GIO's handler for `https`) at
+`shell.search.web` with `%s` replaced by the words, encoded for an address (`c++ tips` as
+`c%2B%2B%20tips`). Its small print names the engine by its host. In the start menu it is the best
+match when nothing else is found, with a Search button; a search that starts with one of the
+prefixes (`>`, `@`, `#`, `%`, `=`, `/`) leaves it out, and so says it found nothing when it did.
+DuckDuckGo is the default (`"https://duckduckgo.com/?q=%s"`); any `http` or `https` address with
+`%s` in it will do, and `shell.search.web = false` leaves the entry out.
 
 ## Terminal
 

@@ -262,6 +262,7 @@ return {
         --     directories = { "~/Documents", "~/Projects" }, -- unset: home and the user folders
         --     depth = 4,          -- levels of folders read below each (1-10)
         --     max_files = 20000,  -- names read at most (100-200000)
+        --     web = "https://duckduckgo.com/?q=%s", -- Search the web for “…”; false: none
         -- },
         -- widgets = { workspaces = true, battery = true, network = true, volume = true,
         --             clock = true, calendar = true, tiling = true, wallpapers = true,
