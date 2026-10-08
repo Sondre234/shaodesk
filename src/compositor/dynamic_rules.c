@@ -49,16 +49,24 @@ void follow_dynamic_rules(struct sh_toplevel *toplevel) {
     if (!toplevel_mapped(toplevel) || !toplevel->shown || toplevel->group || toplevel->swallowed ||
         toplevel->scratchpad)
         return;
+    struct sh_server *server = toplevel->server;
     struct sh_dynamic_rule want = dynamic_decision(toplevel);
     // A sticky window floats whatever it was; what it was comes back as it is no longer sticky.
     bool floating = toplevel->sticky ? toplevel->sticky_floating : toplevel->floating;
     int give = sh_held_value_step(&toplevel->held_floating, want.floating, floating);
+    // Moved or resized with the pointer, it is let go first, as it is for fullscreen.
+    bool placing = give >= 0 && !toplevel->sticky;
+    if (placing && server->grabbed_toplevel == toplevel)
+        reset_cursor_mode(server);
     if (give >= 0 && toplevel->sticky)
         toplevel->sticky_floating = give;
     else if (give >= 0)
         set_floating(toplevel, give, false);
-    if ((give = sh_held_value_step(&toplevel->held_sticky, want.sticky, toplevel->sticky)) >= 0)
+    if ((give = sh_held_value_step(&toplevel->held_sticky, want.sticky, toplevel->sticky)) >= 0) {
+        if (server->grabbed_toplevel == toplevel)
+            reset_cursor_mode(server);
         set_sticky(toplevel, give, true);
+    }
     if ((give = sh_held_value_step(&toplevel->held_above, want.above, toplevel->above)) >= 0)
         set_above(toplevel, give);
 }
