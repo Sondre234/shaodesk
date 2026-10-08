@@ -36,10 +36,10 @@ endif()
 # share.
 set(SHAODESK_START_SOURCES start_menu.cpp start_menu.hpp launch_history.cpp launch_history.hpp
     calculator.cpp calculator.hpp file_index.cpp file_index.hpp web_search.cpp web_search.hpp)
-# The clipboard history, its pictures, and the overlay its popup shows in, in everything that
-# builds the controller.
-set(SHAODESK_PICKER_SOURCES clipboard.cpp clipboard.hpp clipboard_images.hpp picker_view.cpp
-    picker_view.hpp ${PROJECT_BINARY_DIR}/ext-data-control-v1-protocol.c
+# The clipboard history, its pictures, the emoji picker, and the overlay their popups show in, in
+# everything that builds the controller.
+set(SHAODESK_PICKER_SOURCES clipboard.cpp clipboard.hpp clipboard_images.hpp emoji.cpp emoji.hpp
+    picker_view.cpp picker_view.hpp ${PROJECT_BINARY_DIR}/ext-data-control-v1-protocol.c
     ${PROJECT_BINARY_DIR}/ext-data-control-v1-client-protocol.h)
 set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_images.cpp
     notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp tray.cpp tray.hpp
@@ -95,7 +95,11 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     MenuBarMenu.qml
     QuickSettings.qml
     QuickTile.qml
-    ClipboardPicker.qml)
+    ClipboardPicker.qml
+    EmojiPicker.qml)
+# The emoji picker's table (vendor/emoji), compiled in as :/shaodesk/emoji.tsv.
+qt_add_resources(shaodesk_shell_qml "emoji_table" PREFIX "/shaodesk"
+    BASE ${PROJECT_SOURCE_DIR}/vendor/emoji FILES ${PROJECT_SOURCE_DIR}/vendor/emoji/emoji.tsv)
 # The protocols task_model.cpp and window_pictures.cpp speak, generated in the top-level build
 # directory.
 set(SHAODESK_TASK_PROTOCOL_SOURCES

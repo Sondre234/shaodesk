@@ -267,7 +267,7 @@ what was there.
 | `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |
 | `DrawnWallpaper.qml` | The wallpaper the macOS style draws while none is set, light or dark, from the background colour and the accent. |
 | `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |
-| `ClipboardPicker.qml` | The clipboard history's popup, in an overlay surface of its own (`PickerView`, `picker_view.cpp`). |
+| `ClipboardPicker.qml`, `EmojiPicker.qml` | The clipboard history's popup and the emoji picker, each in an overlay surface of its own (`PickerView`, `picker_view.cpp`). |
 | `SwitcherCards.qml` | The switcher's windows as cards with their pictures, in rows, with `shell.thumbnails` outside the macOS style. |
 
 The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `task_filter.cpp`

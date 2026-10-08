@@ -241,6 +241,11 @@ int main(int argc, char **argv) {
                 }
                 client->write("ok\nwork\t3\t1700000000\n");
                 client->disconnectFromServer();
+            } else if (request.startsWith("type ")) {
+                // Typing what the emoji picker picked; 🙃 has nothing to type into.
+                requests.push_back(QString::fromUtf8(request).trimmed());
+                client->write(request.contains("🙃") ? "error: nothing has the keyboard\n" : "ok\n");
+                client->disconnectFromServer();
             } else if (request.startsWith("output ") || request.startsWith("session ") ||
                        request.startsWith("switcher_confirm ") ||
                        request == "toggle_tiling\n" || request == "layout_monocle\n" ||
@@ -3664,6 +3669,78 @@ ListModel {
         if (!QTest::qWaitFor([&] { return !history->locked(); }) ||
             !history->record({{"text/plain", "unlocked"}}))
             return fail("the clipboard history kept nothing once the session was unlocked");
+    }
+    // The emoji picker: the compositor's emoji_picker action opens it on an output, on the tab
+    // of the first group; typing searches by name and keyword, and Enter picks an emoji, which
+    // the compositor is asked to type once the picker has closed; Ctrl+T changes the skin tone of
+    // those that take one, and what was picked lately has a tab of its own, first. When the
+    // compositor has nothing to type into, the emoji is copied instead, and the panel says so.
+    {
+        PickerView emojiView(controller, app.primaryScreen(), "emoji", "EmojiPicker.qml",
+                             controller.emoji());
+        if (emojiView.status() != QQuickView::Ready) {
+            for (const auto &error : emojiView.errors())
+                std::cerr << error.toString().toStdString() << '\n';
+            return 1;
+        }
+        auto *picker = controller.emoji();
+        if (picker->size() < 1800 || picker->groups().size() != 9)
+            return fail("the emoji picker's table was not compiled in");
+        auto *grid = find(emojiView.rootObject(), "emojiGrid");
+        auto *name = find(emojiView.rootObject(), "emojiName");
+        auto shownCount = [&] { return grid->property("count").toInt(); };
+        auto type = [&](const QString &text) {
+            for (const auto &c : text)
+                QTest::keyClick(&emojiView, c.toLatin1());
+        };
+        auto openPicker = [&] {
+            subscriber->write(("emoji " + output + "\n").toUtf8());
+            return QTest::qWaitFor([&] { return emojiView.isVisible() && picker->output() == output; }) &&
+                   QTest::qWaitFor([&] { return find(emojiView.rootObject(), "emojiSearch")->hasActiveFocus(); });
+        };
+        if (!openPicker())
+            return fail("the emoji_picker action did not open the emoji picker");
+        if (shownCount() < 100 || name->property("text") != "grinning face" ||
+            find(emojiView.rootObject(), "emojiTab:Recently used"))
+            return fail("the emoji picker did not open on its first group");
+        requests.clear();
+        type("thumbs up");
+        if (!QTest::qWaitFor([&] { return name->property("text") == "thumbs up"; }))
+            return fail("the emoji picker's search did not find thumbs up first");
+        QTest::keyClick(&emojiView, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return requests.contains("type 👍"); }) ||
+            !QTest::qWaitFor([&] { return !emojiView.isVisible(); }) || !picker->output().isEmpty())
+            return fail("Enter did not have the compositor type the emoji picked");
+        // A skin tone, for what takes one.
+        requests.clear();
+        if (!openPicker())
+            return fail("the emoji picker did not open again");
+        if (!find(emojiView.rootObject(), "emojiTab:Recently used") || shownCount() != 1)
+            return fail("the emoji picked lately have no tab of their own, first");
+        for (int i = 0; i < 3; ++i)
+            QTest::keyClick(&emojiView, Qt::Key_T, Qt::ControlModifier);
+        type("thumbs up");
+        QTest::keyClick(&emojiView, Qt::Key_Return);
+        if (picker->tone() != 3 || !QTest::qWaitFor([&] { return requests.contains("type 👍🏽"); }))
+            return fail("Ctrl+T did not give the emoji picked a skin tone");
+        picker->setTone(0);
+        // Nothing to type into: copied instead.
+        controller.clearError();
+        QGuiApplication::clipboard()->clear();
+        if (!openPicker())
+            return fail("the emoji picker did not open a third time");
+        type("upside");
+        QTest::keyClick(&emojiView, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return QGuiApplication::clipboard()->text() == "🙃"; }) ||
+            !controller.error().startsWith("Copied 🙃 to paste it, as nothing has the keyboard"))
+            return fail(("the emoji picked was not copied when it could not be typed: " +
+                         controller.error().toStdString()).c_str());
+        controller.clearError();
+        if (!openPicker())
+            return fail("the emoji picker did not open a fourth time");
+        QTest::keyClick(&emojiView, Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !emojiView.isVisible(); }) || !picker->output().isEmpty())
+            return fail("Escape did not close the emoji picker");
     }
     // The start menu: its pinned applications and those launched lately, every application from
     // A to Z, and a search over applications, windows and actions, each moved through with the

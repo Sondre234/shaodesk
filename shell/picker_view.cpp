@@ -42,12 +42,15 @@ PickerView::PickerView(ShellController &controller, QScreen *screen, const char 
         place();
     });
     // Clicking elsewhere takes the keyboard away, which closes it; giving it up as it goes does
-    // not.
+    // not, but a model that waits for it (the emoji picker's, to type what was picked into the
+    // window that has it again) hears of it.
     connect(this, &QWindow::activeChanged, this, [this] {
         if (isActive())
             wasActive_ = true;
         else if (wasActive_ && isVisible() && !leaving())
             QMetaObject::invokeMethod(model_, "close");
+        else if (leaving() && model_->metaObject()->indexOfMethod("keyboardReleased()") >= 0)
+            QMetaObject::invokeMethod(model_, "keyboardReleased");
     });
     connect(model_, SIGNAL(openChanged()), this, SLOT(update()));
 }
