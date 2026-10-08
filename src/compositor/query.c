@@ -572,6 +572,12 @@ static void get_touch(struct sh_server *server, int fd, const char *arguments) {
     }
 }
 
+static void get_tablet(struct sh_server *server, int fd, const char *arguments) {
+    // The drawing tablets, their pads and the tools that came near them (see describe_tablets).
+    control_reply(fd, "ok\n");
+    describe_tablets(server, fd, describe_surface);
+}
+
 static void get_seat(struct sh_server *server, int fd, const char *arguments) {
     // What has the keyboard, what the pointer is on, and, while a drag is under way, what it is
     // over (each as describe_surface has it). During a drag the pointer is on nothing: its events
@@ -620,6 +626,7 @@ static const struct {
     {"seat", get_seat, false},
     {"gesture", get_gesture, false},
     {"touch", get_touch, false},
+    {"tablet", get_tablet, false},
 };
 
 /* Answers `request` if it is a query; false if it is not one. */

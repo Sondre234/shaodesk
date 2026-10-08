@@ -45,6 +45,7 @@ all. In short:
 | `keymap.c` | The keymap from the keyboard settings, given to every keyboard but virtual ones. |
 | `cursor.c` | What is under the pointer, focus on hover, button bindings, scrolling, the cursor image. |
 | `gestures.c` | Touchpad gestures: the swipes `gestures` takes (workspaces and the overview following the fingers, requests), and the rest passed on to the surface under the pointer (pointer-gestures-unstable-v1). |
+| `tablet.c` | Drawing tablets (tablet-v2): tools with pressure and tilt to the surfaces under them, the pointer where tablet input is not taken, pads to the surface with the keyboard, and the output a tablet is mapped to. |
 | `touch.c` | Touchscreens: fingers to the surfaces under them (wl_touch), the pointer for clients without touch and the compositor's own controls, and the output each screen is mapped to. |
 | `grab.c` | Moving and resizing with the pointer, magnetic edges, dropping. |
 | `focus.c` | Keyboard focus and urgent windows. |

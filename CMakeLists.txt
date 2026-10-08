@@ -220,6 +220,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/session.c
         src/compositor/swallow.c
         src/compositor/switcher.c
+        src/compositor/tablet.c
         src/compositor/tiling.c
         src/compositor/touch.c
         src/compositor/toplevel.c
