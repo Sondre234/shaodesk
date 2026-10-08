@@ -203,6 +203,14 @@ int main(int argc, char **argv) {
         if (!picture.save(walls + "/" + name))
             return fail("could not save a wallpaper");
     }
+    // Files for the search to find, in a folder of the test's own (shell.search.directories), so
+    // that nothing of the user's is read.
+    const auto files = directory.filePath("files");
+    QDir(files).mkpath("Archive");
+    QFile report(files + "/Quarterly report.txt");
+    if (!report.open(QIODevice::WriteOnly) || report.write("quarterly\n") < 0)
+        return fail("could not write a file to search for");
+    report.close();
     QFile file(config);
     if (!file.open(QIODevice::WriteOnly))
         return fail("could not write the configuration");
@@ -213,8 +221,9 @@ int main(int argc, char **argv) {
                              "power={countdown=2},"
                              "profile='dark',profiles={dark={},light={shell={accent='#336699'}}},"
                              "shell={wallpaper='walls/a/one.png'," + barWidgets + "wallpapers=[[%3]],"
+                             "search={directories={[[%4]]}},"
                              "launchers={{name='Test app',command={[[%1]],'-E','touch',[[%2]]}}}}}")
-                         .arg(QString::fromLocal8Bit(argv[1]), marker, walls);
+                         .arg(QString::fromLocal8Bit(argv[1]), marker, walls, files);
     file.write(lua.toUtf8());
     file.close();
     // A stand-in for the compositor's control socket, with this screen as its only output.
@@ -3607,6 +3616,36 @@ ListModel {
         if (palette->results().value(0).toMap()["kind"] == "calc")
             return fail("the palette calculated a lone constant");
         palette->close();
+        // Files, read once a search first asks for them, are found among the rest and alone
+        // with /; Enter opens one in its application and Ctrl+Enter its folder. Nothing here
+        // opens either, which the panel says.
+        controller.clearError();
+        openPalette();
+        type("quarterly");
+        if (!QTest::qWaitFor([&] { return titlesNow().contains("Quarterly report.txt"); }, 10000))
+            return fail("the palette did not find a file");
+        palette->setQuery("/archive");
+        if (titlesNow() != QStringList{"Archive"} || palette->results()[0].toMap()["folder"] != true)
+            return fail("/ did not narrow the palette to files");
+        palette->setQuery("/quarterly");
+        const auto found = palette->results().value(0).toMap();
+        if (found["kind"] != "file" || found["target"] != files + "/Quarterly report.txt")
+            return fail("the palette's file has the wrong path");
+        QTest::keyClick(&paletteView, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return controller.error().startsWith("Could not open Quarterly report.txt: "); }) ||
+            !QTest::qWaitFor([&] { return !paletteView.isVisible(); }) || !requests.isEmpty())
+            return fail(("opening a file from the palette did not try GIO's default application: " +
+                         controller.error().toStdString()).c_str());
+        controller.clearError();
+        openPalette();
+        type("/quarterly");
+        if (!QTest::qWaitFor([&] { return titlesNow() == QStringList{"Quarterly report.txt"}; }))
+            return fail("the palette did not find the file again");
+        QTest::keyClick(&paletteView, Qt::Key_Return, Qt::ControlModifier);
+        if (!QTest::qWaitFor([&] { return controller.error().startsWith("Could not open the folder of Quarterly report.txt: "); }) ||
+            !QTest::qWaitFor([&] { return !paletteView.isVisible(); }))
+            return fail("Ctrl+Enter did not open a file's folder from the palette");
+        controller.clearError();
         // Escape closes without running anything, and so does losing the keyboard.
         requests.clear();
         openPalette();
@@ -3908,6 +3947,29 @@ ListModel {
         if (!QTest::qWaitFor([&] { return QGuiApplication::clipboard()->text() == "1024" && !launcherOpen(); }) ||
             !requests.isEmpty())
             return fail("Enter did not copy the value the start menu calculated");
+        // A file found is the best match when nothing matches better, with Open folder beside
+        // Open, which the keyboard reaches.
+        controller.clearError();
+        if (!openStart())
+            return fail("the start menu did not open for a file");
+        type("/quarterly");
+        if (!QTest::qWaitFor([&] {
+                return shown("startBestMatch") && shown("startBestAction:folder") &&
+                       item("startBestMatch")->property("result").toMap()["title"] == "Quarterly report.txt";
+            }) ||
+            item("startBestOpen")->property("text") != "Open")
+            return fail("the start menu's search did not find a file");
+        key(Qt::Key_Right);
+        key(Qt::Key_Right);
+        if (!QTest::qWaitFor([&] { return item("startBestAction:folder")->property("current").toBool(); }))
+            return fail("the keyboard did not reach the file's Open folder");
+        key(Qt::Key_Return);
+        if (!QTest::qWaitFor([&] {
+                return controller.error().startsWith("Could not open the folder of Quarterly report.txt: ") &&
+                       !launcherOpen();
+            }))
+            return fail("Open folder did not open the file's folder from the start menu");
+        controller.clearError();
         // More pins than a page holds go on pages, which the wheel, the dots beside them and the
         // keyboard moving past the last row turn.
         {

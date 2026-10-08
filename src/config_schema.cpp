@@ -762,6 +762,24 @@ const Option options[] = {
      "The pictures follow their windows while the card or the switcher is open, at most 30 "
      "times a second; `false` takes one of each window just before the card opens, or as the "
      "switcher opens."},
+    {"shell.search", "table", "", "", none, none,
+     "What the command palette's and the start menu's search find besides applications, "
+     "windows, workspaces and actions."},
+    {"shell.search.files", "boolean", "true", "true", none, none,
+     "Find files and folders by name: those used lately (`recently-used.xbel`), and those in "
+     "`directories`, read in the background the first time a search asks and again once they "
+     "are five minutes old or something changed. A leading `/` searches only files."},
+    {"shell.search.directories", "list of strings", "unset", "{ \"~/Documents\", \"~/Projects\" }",
+     none, none,
+     "The folders whose files are found, at most 32, absolute or starting with `~/`; unset reads "
+     "the XDG user folders (Documents, Downloads, ...) and the home folder. Hidden files and "
+     "folders, other file systems, and what is inside a version-controlled tree (`.git`), a "
+     "build tree (`CMakeCache.txt`, `CACHEDIR.TAG`), `node_modules` or `__pycache__` are left "
+     "out."},
+    {"shell.search.depth", "integer", "4", "4", 1, 10,
+     "How many levels of folders below each of `directories` are read."},
+    {"shell.search.max_files", "integer", "20000", "20000", 100, 200000,
+     "How many names are read at most, the folders nearest the top first."},
     {"shell.workspaces_shown", "integer", "0", "3", 0, 10,
      "How many of the monitor's workspaces the workspace indicator shows, the current one in "
      "the middle: `3` shows it with the one before and the one after, or the first or last "

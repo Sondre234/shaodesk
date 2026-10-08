@@ -56,9 +56,43 @@ QVariantMap entry(const QString &kind, const QString &title, const QString &subt
             {"target", target}, {"number", number}, {"urgent", urgent}};
 }
 
+// The files found among the entries ranked, each before the first that matched less well, at most
+// `limit` in all.
+QVariantList merged(const QVariantList &ranked, const QVariantList &files, int limit = 60) {
+    QVariantList list;
+    qsizetype i = 0, j = 0;
+    while (list.size() < limit && (i < ranked.size() || j < files.size())) {
+        const bool file = j < files.size() &&
+                          (i == ranked.size() || files[j].toMap()["score"].toDouble() >
+                                                     ranked[i].toMap()["score"].toDouble());
+        list.push_back(file ? files[j++] : ranked[i++]);
+    }
+    return list;
+}
 } // namespace
 
-Palette::Palette(ShellController &controller) : QObject(&controller), controller_(controller) {}
+Palette::Palette(ShellController &controller) : QObject(&controller), controller_(controller) {
+    // Files read while it is open join what it shows.
+    connect(controller.files(), &FileIndex::changed, this, [this] {
+        if (!output_.isEmpty())
+            refreshKeepingSelection();
+    });
+}
+
+void Palette::refreshKeepingSelection() {
+    // Someone who has already moved down the list keeps the entry they are on.
+    const auto before = selected_ > 0 && selected_ < results_.size() ? results_[selected_].toMap()
+                                                                      : QVariantMap{};
+    refreshResults();
+    for (int i = 0; !before.isEmpty() && i < results_.size(); ++i) {
+        const auto item = results_[i].toMap();
+        if (item["kind"] == before["kind"] && item["target"] == before["target"]) {
+            selected_ = i;
+            Q_EMIT selectedChanged();
+            break;
+        }
+    }
+}
 
 void Palette::open(const QString &output) {
     if (output.isEmpty())
@@ -187,13 +221,22 @@ QVariantList Palette::entries(QObject *windows) const {
 }
 
 void Palette::refreshResults() {
-    // A calculation's value comes first; a leading = asks for nothing else.
+    const auto typed = query_.trimmed();
+    // A calculation's value comes first; a leading = asks for nothing else, and a leading / for
+    // files alone. A few files otherwise go among the rest by how well they match.
     const auto calc = calculator::entry(query_);
-    results_ = query_.trimmed().startsWith('=') ? QVariantList() : fuzzy::rank(entries_, query_);
+    if (typed.startsWith('=')) {
+        results_.clear();
+    } else if (typed.startsWith('/')) {
+        results_ = controller_.files()->search(typed.sliced(1), 60);
+    } else {
+        results_ = fuzzy::rank(entries_, query_);
+        if (!typed.isEmpty() && !QString(">@#%").contains(typed[0]))
+            results_ = merged(results_, controller_.files()->search(typed, 5));
+    }
     if (!calc.isEmpty())
         results_.prepend(calc);
     // Saving the arrangement under the name typed is offered last, once the text can be a name.
-    const auto typed = query_.trimmed();
     if (fuzzy::validSessionName(typed) && !typed.startsWith('>') && !typed.startsWith('@') &&
         !typed.startsWith('#') && !typed.startsWith('%'))
         results_.push_back(entry("session", "Save session as " + typed,
@@ -237,6 +280,23 @@ void Palette::activate(int index) {
     run(item, output);
 }
 
+void Palette::reveal(int index) {
+    if (index < 0)
+        index = selected_;
+    if (index < 0 || index >= results_.size())
+        return;
+    const auto item = results_[index].toMap();
+    if (item["kind"] != "file")
+        return activate(index);
+    close();
+    openFolder(item);
+}
+
+void Palette::openFolder(const QVariantMap &item) {
+    if (item["kind"] == "file")
+        controller_.openFile(item["target"].toString(), true);
+}
+
 void Palette::run(const QVariantMap &item, const QString &output) {
     const auto kind = item["kind"].toString();
     const auto target = item["target"].toString();
@@ -245,6 +305,8 @@ void Palette::run(const QVariantMap &item, const QString &output) {
             controller_.tasks()->activate(target.toInt());
     } else if (kind == "calc") {
         QGuiApplication::clipboard()->setText(target);
+    } else if (kind == "file") {
+        controller_.openFile(target);
     } else if (item["power"].toBool()) {
         controller_.power()->request(target, output);
     } else if (kind == "app") {

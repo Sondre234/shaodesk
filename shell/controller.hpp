@@ -6,6 +6,7 @@
 #include "backlight.hpp"
 #include "bluetooth.hpp"
 #include "display_modes.hpp"
+#include "file_index.hpp"
 #include "media.hpp"
 #include "notifications.hpp"
 #include "power_mode.hpp"
@@ -254,6 +255,11 @@ class ShellController : public QObject {
     // reloads follow the setting. Returns whether it is the agent.
     bool startPolkit();
     StartMenu *startMenu() { return &startMenu_; }
+    // The files the palette's and the start menu's search find (shell.search).
+    FileIndex *files() { return &files_; }
+    // Opens a file in its default application, or with `folder` the folder that holds it; a
+    // failure shows across the panel.
+    Q_INVOKABLE bool openFile(const QString &path, bool folder = false);
     // Sends the compositor a request (an action, or "session restore NAME"), as `shaodesk msg`
     // would; `done` gets its whole reply. Without a session, `done` is not called.
     void ask(const QByteArray &line, std::function<void(const QByteArray &)> done);
@@ -394,9 +400,12 @@ class ShellController : public QObject {
     };
     // Loads the configuration, or the default one with configError_ set when it has an error.
     void loadConfig();
+    // Hands the file index shell.search's settings.
+    void configureFiles();
     std::filesystem::path path_;
     shaodesk::Config config_;
     TaskModel tasks_;
+    FileIndex files_;
     Palette palette_{*this};
     Power power_{*this};
     StartMenu startMenu_{{}, this};

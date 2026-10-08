@@ -3,10 +3,10 @@ import QtQuick
 import QtQuick.Effects
 
 // The command palette: a search box over windows, applications, workspaces, actions and saved
-// sessions, with a calculator. Up and Down (or Ctrl+N and Ctrl+P) select, Enter runs, Escape
-// closes; a leading > @ # or % narrows the search to actions, windows, workspaces or sessions,
-// and = to the calculator. It is a card with room around it for its shadow, coming in each time
-// its window shows.
+// sessions, with a calculator and files. Up and Down (or Ctrl+N and Ctrl+P) select, Enter runs,
+// Ctrl+Enter opens a file's folder, Escape closes; a leading > @ # or % narrows the search to
+// actions, windows, workspaces or sessions, = to the calculator and / to files. It is a card
+// with room around it for its shadow, coming in each time its window shows.
 //
 // In the macOS style it is Spotlight: a large field along the card's top, and under a line the
 // results in groups under small headings (the first, the top hit), the one chosen filled with the
@@ -19,11 +19,12 @@ Item {
     readonly property int rowHeight: Theme.rowHeight + Theme.spacingL
     readonly property int visibleRows: Math.max(1, Math.min(8, Math.floor((screenSize.height * 0.6 - 3 * padding - input.height) / rowHeight)))
     readonly property var kindLabels: ({ window: "Window", app: "App", workspace: "Workspace", action: "Action", session: "Session",
-                                         calc: "Calculator" })
+                                         calc: "Calculator", file: "File" })
     // Spotlight's headings: the top hit's over the first result of a search, and a kind's over the
     // first of a run of it.
     readonly property var groupLabels: ({ window: "Windows", app: "Applications", workspace: "Workspaces",
-                                          action: "Actions", session: "Sessions", calc: "Calculator" })
+                                          action: "Actions", session: "Sessions", calc: "Calculator",
+                                          file: "Files" })
     // The results, read from the palette once each time they change.
     readonly property var results: shell.palette.results
     function heading(index) {
@@ -115,7 +116,7 @@ Item {
             x: Theme.macos ? Theme.spacingXS : root.padding; y: Theme.macos ? 0 : root.padding
             width: card.width - 2 * x
             large: true
-            placeholderText: Theme.macos ? "Spotlight Search" : "Search windows, apps, workspaces, actions, sessions"
+            placeholderText: Theme.macos ? "Spotlight Search" : "Search windows, apps, files, workspaces, actions, sessions"
             onTextChanged: shell.palette.query = text
             Keys.onPressed: function(event) {
                 const ctrl = (event.modifiers & Qt.ControlModifier) !== 0
@@ -128,7 +129,9 @@ Item {
                 } else if (event.key === Qt.Key_PageUp) {
                     shell.palette.move(-root.visibleRows); event.accepted = true
                 } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                    shell.palette.activate(); event.accepted = true
+                    if (ctrl) shell.palette.reveal()
+                    else shell.palette.activate()
+                    event.accepted = true
                 } else if (event.key === Qt.Key_Escape) {
                     shell.palette.close(); event.accepted = true
                 }
@@ -188,7 +191,7 @@ Item {
                 }
                 Column {
                     anchors.left: icon.right; anchors.leftMargin: Theme.spacingL
-                    anchors.right: kind.left; anchors.rightMargin: Theme.spacingM
+                    anchors.right: folder.visible ? folder.left : kind.left; anchors.rightMargin: Theme.spacingM
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Theme.spacingXS
                     Text {
@@ -216,7 +219,7 @@ Item {
                     Text {
                         id: kindLabel
                         anchors.centerIn: parent
-                        text: root.kindLabels[row.modelData.kind] || ""
+                        text: row.modelData.folder === true ? "Folder" : root.kindLabels[row.modelData.kind] || ""
                         color: Theme.textMuted
                         font.family: Theme.fontFamily; font.pixelSize: Theme.fontSizeCaption; font.weight: Font.Medium
                     }
@@ -226,6 +229,20 @@ Item {
                     hoverEnabled: true
                     onEntered: shell.palette.selected = row.index
                     onClicked: shell.palette.activate(row.index)
+                }
+                // A file's folder opens from a button beside its kind, as Ctrl+Enter opens it.
+                FlatButton {
+                    id: folder
+                    objectName: "paletteFolder:" + row.modelData.title
+                    visible: row.modelData.kind === "file"
+                    anchors.right: kind.left; anchors.rightMargin: Theme.spacingS
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Theme.rowHeight; height: Theme.rowHeight
+                    focusPolicy: Qt.NoFocus
+                    Accessible.name: "Open the folder"
+                    onHoveredChanged: if (hovered) shell.palette.selected = row.index
+                    onClicked: shell.palette.reveal(row.index)
+                    contentItem: Item { Icon { anchors.centerIn: parent; name: "folder-open"; size: Theme.iconSizeSmall; color: Theme.textMuted } }
                 }
             }
         }
@@ -279,7 +296,8 @@ Item {
                     }
                     Text {
                         id: what
-                        anchors.right: parent.right; anchors.rightMargin: Theme.spacingM
+                        anchors.right: reveal.visible ? reveal.left : parent.right
+                        anchors.rightMargin: reveal.visible ? Theme.spacingS : Theme.spacingM
                         anchors.verticalCenter: parent.verticalCenter
                         width: Math.min(implicitWidth, parent.width / 3)
                         text: result.modelData.subtitle; textFormat: Text.PlainText
@@ -293,6 +311,20 @@ Item {
                         onEntered: shell.palette.selected = result.index
                         onClicked: shell.palette.activate(result.index)
                     }
+                    // The chosen file's folder opens from a button at its end, as Ctrl+Enter
+                    // opens it.
+                    FlatButton {
+                        id: reveal
+                        objectName: "paletteFolder:" + result.modelData.title
+                        visible: result.chosen && result.modelData.kind === "file"
+                        anchors.right: parent.right; anchors.rightMargin: Theme.spacingXS
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.height - 2 * Theme.spacingXS; height: width
+                        focusPolicy: Qt.NoFocus
+                        Accessible.name: "Open the folder"
+                        onClicked: shell.palette.reveal(result.index)
+                        contentItem: Item { Icon { anchors.centerIn: parent; name: "folder-open"; size: Theme.iconSizeSmall; color: Theme.textOnAccentFill } }
+                    }
                 }
             }
         }
@@ -305,7 +337,7 @@ Item {
             width: card.width - 2 * root.padding
             icon: "search"
             title: "Nothing matches"
-            hint: "Start with > for actions, @ for windows, # for workspaces, % for sessions or = to calculate"
+            hint: "Start with > for actions, @ for windows, # for workspaces, % for sessions, / for files or = to calculate"
         }
     }
 }

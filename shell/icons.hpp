@@ -2,8 +2,9 @@
 #pragma once
 #include <QQuickImageProvider>
 
-// image://icons/NAME: a theme icon by name, or an image file by absolute path, with a drawn
-// stand-in when neither exists.
+// image://icons/NAME: a theme icon by name (or the first the theme has of several names
+// separated by commas, as a file's type's icon and more generic ones), or an image file by
+// absolute path, with a drawn stand-in when neither exists.
 class Icons : public QQuickImageProvider {
   public:
     Icons() : QQuickImageProvider(QQuickImageProvider::Image) {}

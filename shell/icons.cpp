@@ -11,7 +11,11 @@
 
 QImage Icons::requestImage(const QString &id, QSize *size, const QSize &requested) {
     QSize dimensions = requested.isEmpty() ? QSize(48, 48) : requested;
-    QIcon icon = id.startsWith('/') ? QIcon(id) : QIcon::fromTheme(id);
+    QIcon icon = id.startsWith('/') ? QIcon(id) : QIcon();
+    // A theme icon's name, or several separated by commas, the first the theme has standing.
+    for (const auto &name : id.startsWith('/') ? QStringList() : id.split(',', Qt::SkipEmptyParts))
+        if (icon = QIcon::fromTheme(name); !icon.isNull())
+            break;
     if (icon.isNull())
         icon = QIcon::fromTheme("application-x-executable");
     QImage image;

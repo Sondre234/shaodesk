@@ -3,10 +3,10 @@ import QtQuick
 import QtQuick.Controls.Basic
 
 // What the start menu's search finds for `query` (StartMenu.search), best first and in groups
-// under their headings: the best match on a card of its own, then applications, open windows and
-// actions. `current` is the result the keyboard is at, the best match to begin with, and `button`
-// the best match's button it is at (-1 for none, the card itself). Its content stays `inset` from
-// its sides.
+// under their headings: the best match on a card of its own, then applications, open windows,
+// actions and files. `current` is the result the keyboard is at, the best match to begin with, and
+// `button` the best match's button it is at (-1 for none, the card itself). Its content stays
+// `inset` from its sides.
 Item {
     id: found
     required property Item launcher
@@ -17,13 +17,25 @@ Item {
     onCurrentChanged: button = -1
     readonly property var results: {
         shell.startMenu.apps // searched again as applications come and go
+        shell.startMenu.searchRevision // and as the files are read again
         return query === "" ? [] : shell.startMenu.search(query, shell.palette.entries(launcher.panel.taskSource))
     }
-    onResultsChanged: { current = 0; button = -1 }
+    // A new search starts at its best match; the same one searched again keeps its place.
+    property string searched
+    onResultsChanged: {
+        if (query !== searched) {
+            searched = query
+            current = 0
+            button = -1
+        } else {
+            current = Math.max(0, Math.min(current, results.length - 1))
+        }
+    }
     readonly property var currentResult: results[current] || null
     // An application's record, when the keyboard is at one.
     readonly property var currentApp: currentResult && currentResult.kind === "app" ? currentResult : null
-    readonly property var headings: ({ best: "Best match", apps: "Apps", windows: "Open windows", actions: "Actions" })
+    readonly property var headings: ({ best: "Best match", apps: "Apps", windows: "Open windows", actions: "Actions",
+                                       files: "Files" })
     // Where the pointer was last seen over the results.
     property point pointer: Qt.point(-1, -1)
 
@@ -84,9 +96,12 @@ Item {
         return false
     }
     // Runs what the keyboard is at: the best match's button, or the result.
-    function activate() {
+    function activate(folder) {
         var card = current === 0 ? bestCard() : null
-        if (card && button >= 0)
+        // Ctrl+Enter opens a file's folder.
+        if (folder && currentResult && currentResult.kind === "file")
+            launcher.openFolder(currentResult)
+        else if (card && button >= 0)
             card.press(button)
         else if (currentResult)
             launcher.run(currentResult)
@@ -171,6 +186,6 @@ Item {
         visible: found.query !== "" && found.results.length === 0
         icon: "search"
         title: "Nothing found for “" + found.query + "”"
-        hint: "Start with > for actions, @ for windows or # for workspaces"
+        hint: "Start with > for actions, @ for windows, # for workspaces or / for files"
     }
 }

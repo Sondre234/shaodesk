@@ -9,10 +9,10 @@ class ShellController;
 
 // The command palette (Super + P): one search box over open windows, installed applications,
 // workspaces, compositor actions (the power actions among them), appearance profiles and saved
-// sessions, with a calculator. Entries are {kind, title, subtitle, icon,
-// target}; `kind` is window, app, workspace, action, session or calc, and a power action, which
-// runs as the power menu runs it, also has `power` set. A calculation's target is its number,
-// which running it copies to the clipboard.
+// sessions, with a calculator and files. Entries are {kind, title, subtitle, icon,
+// target}; `kind` is window, app, workspace, action, session, calc or file, and a power action,
+// which runs as the power menu runs it, also has `power` set. A calculation's target is its
+// number, which running it copies to the clipboard; a file's is its path (FileIndex::search).
 class Palette : public QObject {
     Q_OBJECT
     // The output showing the palette, empty while it is closed.
@@ -40,6 +40,11 @@ class Palette : public QObject {
     Q_INVOKABLE QVariantList entries(QObject *windows) const;
     // Runs one of its entries as choosing it here does, on monitor `output`.
     Q_INVOKABLE void run(const QVariantMap &entry, const QString &output);
+    // Opens the folder of the file at `index` (the selected one when negative) and closes the
+    // palette; runs any other result as activate() does.
+    Q_INVOKABLE void reveal(int index = -1);
+    // Opens the folder of a file among its entries (or the start menu's results).
+    Q_INVOKABLE void openFolder(const QVariantMap &entry);
   Q_SIGNALS:
     void openChanged();
     void queryChanged();
@@ -53,4 +58,5 @@ class Palette : public QObject {
     int selected_ = 0;
     void collect();
     void refreshResults();
+    void refreshKeepingSelection();
 };

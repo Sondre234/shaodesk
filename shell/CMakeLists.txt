@@ -58,9 +58,9 @@ if(NOT SHAODESK_SHELL_PREVIEW_ONLY)
 endif()
 
 # The start menu's model (its pins, the launch history and its search), in everything that builds
-# the controller, and the calculator its search and the palette's share.
+# the controller, and the calculator and the files its search and the palette's share.
 set(SHAODESK_START_SOURCES start_menu.cpp start_menu.hpp launch_history.cpp launch_history.hpp
-    calculator.cpp calculator.hpp)
+    calculator.cpp calculator.hpp file_index.cpp file_index.hpp)
 # The authentication dialog's model, which the controller holds, in everything that builds it.
 set(SHAODESK_AUTH_SOURCES authentication.cpp authentication.hpp)
 # The models of the services Quick Settings controls over D-Bus, in everything that builds the
@@ -269,6 +269,16 @@ if(BUILD_TESTING)
     target_compile_options(calculator_test PRIVATE -Wall -Wextra -Wpedantic)
     target_link_libraries(calculator_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME calculator COMMAND calculator_test)
+    # The files the search finds, in a home folder of the test's own.
+    add_executable(file_index_test ${PROJECT_SOURCE_DIR}/tests/file_index_test.cpp file_index.cpp
+        file_index.hpp fuzzy.cpp fuzzy.hpp)
+    set_target_properties(file_index_test PROPERTIES AUTOMOC ON)
+    target_include_directories(file_index_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(file_index_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(file_index_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(file_index_test PRIVATE Qt6::Core Qt6::Test PkgConfig::GIO)
+    add_test(NAME file_index COMMAND file_index_test)
+    set_tests_properties(file_index PROPERTIES TIMEOUT 60)
     # The start menu's model: its pins, the launch history and its search.
     add_executable(start_menu_test ${PROJECT_SOURCE_DIR}/tests/start_menu_test.cpp
         ${SHAODESK_START_SOURCES} fuzzy.cpp fuzzy.hpp)

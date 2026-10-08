@@ -56,6 +56,8 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
             [this] { startMenu_.setApps(apps(), userPins_); });
     connect(&startMenu_, &StartMenu::failed, this, &ShellController::report);
     connect(&startMenu_, &StartMenu::installedChanged, this, &ShellController::refreshApps);
+    startMenu_.setFiles(&files_);
+    configureFiles();
     refreshApps();
     subscribe();
     notifications_.configure(config_.notifications);
@@ -475,6 +477,30 @@ bool ShellController::openTrash() {
     clearError();
     return true;
 }
+void ShellController::configureFiles() {
+    const auto &search = config_.shell.search;
+    FileIndex::Settings settings;
+    settings.enabled = search.files;
+    for (const auto &folder : search.directories) {
+        auto path = QString::fromStdString(folder);
+        if (path == "~" || path.startsWith("~/"))
+            path = QDir::homePath() + path.sliced(1);
+        settings.roots.push_back(QDir::cleanPath(path));
+    }
+    settings.depth = search.depth;
+    settings.limit = search.max_files;
+    files_.configure(settings);
+}
+bool ShellController::openFile(const QString &path, bool folder) {
+    const auto error = FileIndex::open(path, folder);
+    if (!error.isEmpty()) {
+        const auto name = QFileInfo(path).fileName();
+        report("Could not open " + (folder ? "the folder of " + name : name) + ": " + error);
+        return false;
+    }
+    clearError();
+    return true;
+}
 bool ShellController::start(GAppInfo *info, const QString &name) {
     // The shell's own platform settings are not the application's.
     GAppLaunchContext *context = g_app_launch_context_new();
@@ -587,6 +613,7 @@ void ShellController::reload() {
         notifications_.configure(config_.notifications);
         osd_.configure(config_.osd);
         power_.setCountdown(config_.power.countdown);
+        configureFiles();
         updateNotificationService();
         updateTrayHost();
         updatePolkitAgent();

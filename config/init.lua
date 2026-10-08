@@ -255,6 +255,14 @@ return {
         --     size = 240,     -- width of one picture in pixels (120-480)
         --     live = true,    -- the pictures follow the windows while shown; false takes one
         -- },
+        -- The command palette's and the start menu's search find files too (a leading / finds
+        -- only them): those used lately, and the names in these folders, read in the background:
+        -- search = {
+        --     files = true,
+        --     directories = { "~/Documents", "~/Projects" }, -- unset: home and the user folders
+        --     depth = 4,          -- levels of folders read below each (1-10)
+        --     max_files = 20000,  -- names read at most (100-200000)
+        -- },
         -- widgets = { workspaces = true, battery = true, network = true, volume = true,
         --             clock = true, calendar = true, tiling = true, wallpapers = true,
         --             keyboard_layout = true }, -- false hides one; battery, network, volume,

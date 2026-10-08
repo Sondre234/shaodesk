@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "start_menu.hpp"
 #include "calculator.hpp"
+#include "file_index.hpp"
 #include "fuzzy.hpp"
 #include <QAbstractEventDispatcher>
 #include <QDir>
@@ -209,6 +210,14 @@ void StartMenu::setUser(const QString &name, const QUrl &icon) {
     Q_EMIT userChanged();
 }
 
+void StartMenu::setFiles(FileIndex *files) {
+    files_ = files;
+    connect(files, &FileIndex::changed, this, [this] {
+        ++searchRevision_;
+        Q_EMIT searchChanged();
+    });
+}
+
 bool StartMenu::isPinned(const QString &id) const { return pins_.contains(id); }
 
 void StartMenu::pin(const QString &id) {
@@ -296,10 +305,23 @@ QVariantList StartMenu::search(const QString &query, const QVariantList &others)
         if (group.size() < 5)
             group.push_back(item);
     }
+    // Files, by their names alone, so never by letters strewn through one; a leading / finds
+    // nothing else.
+    const auto typed = query.trimmed();
+    const bool onlyFiles = typed.startsWith('/');
+    QVariantList files;
+    if (files_ && (onlyFiles || !QString(">@#%=").contains(typed[0])))
+        files = files_->search(onlyFiles ? typed.sliced(1) : typed, onlyFiles ? 30 : 5);
+    if (onlyFiles) {
+        apps.clear();
+        windows.clear();
+        actions.clear();
+    }
     // What matched far worse than the best is left out: letters strewn through a long name.
     const double best = std::max({apps.empty() ? 0.0 : apps.front().score,
                                   windows.isEmpty() ? 0.0 : windows.first().toMap()["score"].toDouble(),
-                                  actions.isEmpty() ? 0.0 : actions.first().toMap()["score"].toDouble()});
+                                  actions.isEmpty() ? 0.0 : actions.first().toMap()["score"].toDouble(),
+                                  files.isEmpty() ? 0.0 : files.first().toMap()["score"].toDouble()});
     const double least = best * 0.5;
     std::erase_if(apps, [least](const Found &found) { return found.score < least; });
     auto weak = [least](const QVariant &item) { return item.toMap()["score"].toDouble() < least; };
@@ -311,20 +333,24 @@ QVariantList StartMenu::search(const QString &query, const QVariantList &others)
         results.push_back(entry);
     };
     // The best match is a calculation's value, else the first of whichever group matched best;
-    // an application on a tie.
+    // an application on a tie, a file only when it matched better than the rest.
     auto scoreOf = [](const QVariantList &group) {
         return group.isEmpty() ? -1.0 : group.first().toMap()["score"].toDouble();
     };
     const double app = apps.empty() ? -1 : apps.front().score;
+    const double file = scoreOf(files);
     if (const auto calc = calculator::entry(query); !calc.isEmpty()) {
         add(calc, "best");
-    } else if (app >= 0 && app >= scoreOf(windows) && app >= scoreOf(actions)) {
+    } else if (app >= 0 && app >= scoreOf(windows) && app >= scoreOf(actions) && app >= file) {
         add(apps.front().entry, "best");
         apps.erase(apps.begin());
-    } else if (scoreOf(windows) >= 0 && scoreOf(windows) >= scoreOf(actions)) {
+    } else if (scoreOf(windows) >= 0 && scoreOf(windows) >= scoreOf(actions) &&
+               scoreOf(windows) >= file) {
         add(windows.takeFirst().toMap(), "best");
-    } else if (!actions.isEmpty()) {
+    } else if (!actions.isEmpty() && scoreOf(actions) >= file) {
         add(actions.takeFirst().toMap(), "best");
+    } else if (!files.isEmpty()) {
+        add(files.takeFirst().toMap(), "best");
     }
     for (size_t i = 0; i < apps.size() && i < 8; ++i)
         add(apps[i].entry, "apps");
@@ -332,6 +358,8 @@ QVariantList StartMenu::search(const QString &query, const QVariantList &others)
         add(item.toMap(), "windows");
     for (const auto &item : actions)
         add(item.toMap(), "actions");
+    for (const auto &item : files)
+        add(item.toMap(), "files");
     return results;
 }
 

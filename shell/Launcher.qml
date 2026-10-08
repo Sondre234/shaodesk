@@ -83,6 +83,11 @@ PopupCard {
             shell.palette.run(result, output)
         }
     }
+    // Opens the folder of a file the search found, the menu closing first.
+    function openFolder(result) {
+        panel.closeMenus()
+        shell.palette.openFolder(result)
+    }
     // The keys the search field leaves: what moves through the view shown (the arrows, Tab, the
     // page keys), Enter, which runs what the keyboard is at (in the search, the best match's
     // button it is at), and Escape, which closes the letters of All apps, else clears the
@@ -99,7 +104,7 @@ PopupCard {
             event.accepted = true
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             if (shown === searchView)
-                searchView.activate()
+                searchView.activate((event.modifiers & Qt.ControlModifier) !== 0)
             else if (shown.currentApp)
                 launch(shown.currentApp.appId)
             event.accepted = true

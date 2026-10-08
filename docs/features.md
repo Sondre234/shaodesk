@@ -448,8 +448,9 @@ applications launched lately, with how long ago ("5 min ago", "Yesterday"). All 
 application from A to Z under its letter, and clicking a letter shows them all to jump to one.
 
 The search finds applications by name, generic name ("Web Browser"), keywords, desktop id and
-comment, and open windows, workspaces and actions as the [command palette](#command-palette) does
-(its `>`, `@` and `#` too), grouped under Best match, Apps, Open windows and Actions. The best
+comment, open windows, workspaces and actions as the [command palette](#command-palette) does
+(its `>`, `@`, `#` and `/` too), and [files](#files), grouped under Best match, Apps, Open windows,
+Actions and Files. The best
 match is on a card of its own, with an application's desktop actions ("New Private Window") as
 buttons beside Open; a calculation's value is the best match, with Copy (see
 [Calculator](#calculator)). Among equal matches, what is launched more often comes first; what matches
@@ -943,14 +944,15 @@ it opens and changes.
 under the pointer, that reaches everything from one place: open windows, installed applications,
 workspaces (switching to one, or moving the focused window there), compositor actions such as
 Open a terminal (`terminal`), `layout_monocle` or `group_toggle`, the [power actions](#power) that may run (Restart, Power off
-and Log out asking first, as from the panel), and saved sessions (restore, restore and launch what is
-missing, and save the current arrangement under the name typed). Type to narrow the list; each
+and Log out asking first, as from the panel), saved sessions (restore, restore and launch what is
+missing, and save the current arrangement under the name typed), and [files](#files), with a
+[calculator](#calculator). Type to narrow the list; each
 word must match, in any order, as letters in sequence of the title or its small print, favouring
 runs of letters and word starts (`gc` finds Google Chrome, `lay mon` finds Layout: monocle).
 Up and Down, Tab and Shift + Tab, Ctrl + N and Ctrl + P, or the pointer select; Enter or a click
 runs the entry; Escape, or clicking elsewhere, closes it. A leading `>` searches only actions, `@`
-windows, `#` workspaces and `%` sessions, and `=` asks the [calculator](#calculator); when nothing
-matches, the palette says so and lists these. The palette needs the shell (`shaodesk-shell`), which
+windows, `#` workspaces and `%` sessions, `/` [files](#files) and `=` asks the
+[calculator](#calculator); when nothing matches, the palette says so and lists these. The palette needs the shell (`shaodesk-shell`), which
 draws it, and the compositor's control socket for actions and sessions. On a machine with 600
 entries a keystroke re-ranks them in under a millisecond (an optimized build; see
 `tests/palette_test.cpp`). Super + P used to toggle sticky windows; that moved to Super + Shift + P.
@@ -986,6 +988,37 @@ A lone number or constant (`42`, `e`) is searched for rather than calculated, as
 is not a whole expression, while it is being typed (`2*(`) or when it has no value (`1/0`,
 `sqrt(-1)`); a leading `=` asks for the value of anything (`=pi`) and narrows the palette to the
 calculator. `tests/calculator_test.cpp` tests the parser.
+
+### Files
+
+The palette and the start menu's search find files and folders by name: those used lately, from
+`$XDG_DATA_HOME/recently-used.xbel` (where GTK, KDE and most applications note what they open,
+wherever it is), and the names in the XDG user folders (Documents, Downloads, Pictures, ...) and
+the home folder, or in `shell.search.directories`. Every word typed must be in the name, in any
+case (`report 2024`); a word with a slash in it must be in the path instead (`work/plan`, `~/doc`).
+Among equal matches a file used lately comes first, the more so the more lately. In the palette at
+most five files go among the rest by how well they match, and a leading `/` searches files alone;
+in the start menu they are listed last under Files, and are the best match only when nothing else
+matches as well. A file's small print is its folder, `~` standing for the home folder.
+
+Enter or a click opens a file in the default application for its type, as GIO (and `gio open`)
+choose it, and a folder in the file manager; Ctrl + Enter, the folder button on a file's row in the
+palette (on the chosen row in Spotlight), or the best match's Open folder opens the folder the file
+is in. When nothing opens it the panel says why.
+
+The folders are read on a thread of the shell's own, at low priority, the first time a search
+asks for files and not before, so a session that never searches reads nothing; the search finds
+what was read last meanwhile, and the results fill in as the names arrive. They are read again
+when a search asks once they are five minutes old, or ten seconds after one of the folders searched
+from (but the home folder, whose own files change all the time) or the recent files changed.
+Breadth first, down to `shell.search.depth` levels (4) and `shell.search.max_files` names (20000),
+the reading leaves out hidden files and folders, other file systems, and the contents of
+version-controlled trees (a folder holding `.git`, `.hg`, `.svn`, `.bzr` or `_darcs`), build and
+cache trees (`CMakeCache.txt`, or the `CACHEDIR.TAG` a cache folder has), `node_modules` and
+`__pycache__`, though each such folder is found by its own name; symbolic links are found but not
+followed. Only names are read, never what is in the files, and nothing is kept on disk.
+`shell.search.files = false` turns it off. `tests/file_index_test.cpp` tests the reading, the
+search and opening in a home folder of its own.
 
 ## Terminal
 
