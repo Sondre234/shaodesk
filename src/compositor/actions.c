@@ -313,6 +313,9 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
     case SH_BRIGHTNESS_DOWN:
         volume_action(server, action, argument);
         break;
+    case SH_MODE:
+        set_binding_mode(server, argument);
+        break;
     default:
         arrange_windows(server, action);
         break;

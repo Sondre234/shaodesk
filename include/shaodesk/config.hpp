@@ -40,6 +40,14 @@ struct Binding {
     // `repeats` runs again while the key is held (Hyprland's binde), by default for resize_*.
     bool locked = false;
     bool repeats = false;
+    int mode = 0; // for mode: 0 for the bindings outside any mode, else modes[mode - 1]
+};
+
+// A binding mode, as sway's modes and Hyprland's submaps: key bindings that take the place of
+// `bindings` while the mode is in use.
+struct Mode {
+    std::string name;
+    std::vector<Binding> bindings;
 };
 
 struct Launcher {
@@ -290,6 +298,8 @@ struct Config {
     // hot_corners: what each corner runs, as a control request; "" for nothing.
     std::array<std::string, 4> hot_corners;
     std::vector<Binding> bindings;
+    // modes, sorted by name; a mode's number is its place from 1, the bindings outside any being 0.
+    std::vector<Mode> modes;
     std::vector<Command> startup;
     // The terminal the `terminal` action opens; empty: $TERMINAL or the first one installed.
     Command terminal;
@@ -314,6 +324,12 @@ struct Config {
     std::string workspace_label(int workspace) const;
 
     const Binding *binding(uint32_t modifiers, uint32_t keysym) const;
+    // The key binding of mode `mode` (0, or a number no mode has: the bindings outside any).
+    const Binding *mode_binding(int mode, uint32_t modifiers, uint32_t keysym) const;
+    // 0 for "default", a mode's number for its name, else -1.
+    int mode_number(const std::string &name) const;
+    // "default" and every mode's name.
+    std::vector<std::string> mode_names() const;
     // The first button binding for what lies under the pointer, or nothing (the click belongs
     // to the application, as does one whose first match is action = "none").
     const Binding *button_binding(uint32_t modifiers, uint32_t button, sh_pointer_target target,

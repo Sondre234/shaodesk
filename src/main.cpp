@@ -242,6 +242,7 @@ struct Runtime {
     pid_t screenshot_pid = -1;
     std::string target{}; // the output target of the action last resolved
     unsigned flags = 0;   // the sh_binding_flag bits of the key binding last resolved
+    int mode = 0;         // the binding mode `key` looks in: 0 outside any, else modes[mode - 1]
     shaodesk::Command program{}; // the program of the spawn action last resolved
     bool watch = false; // whether saving a configuration file reloads (off in headless tests)
     int watch_fd = -1;
@@ -304,7 +305,7 @@ struct Runtime {
     }
     static sh_action key(void *data, uint32_t modifiers, uint32_t keysym, int *argument) {
         auto &self = *static_cast<Runtime *>(data);
-        auto *binding = self.config.binding(modifiers, keysym);
+        auto *binding = self.config.mode_binding(self.mode, modifiers, keysym);
         if (!binding)
             return SH_NONE;
         if (binding->action == SH_SPAWN)
@@ -314,12 +315,22 @@ struct Runtime {
             *argument = binding->amount;
         if (binding->action == SH_SWITCH_LAYOUT)
             *argument = binding->layout;
+        if (binding->action == SH_MODE)
+            *argument = binding->mode;
         self.target = binding->output;
         self.flags = (binding->locked ? SH_BINDING_LOCKED : 0) |
                      (binding->repeats ? SH_BINDING_REPEATS : 0);
         return binding->action;
     }
     static unsigned binding_flags(void *data) { return static_cast<Runtime *>(data)->flags; }
+    static const char *set_mode(void *data, int mode) {
+        auto &self = *static_cast<Runtime *>(data);
+        if (mode < 0 || static_cast<std::size_t>(mode) > self.config.modes.size())
+            return nullptr;
+        self.mode = mode;
+        return mode ? self.config.modes[static_cast<std::size_t>(mode) - 1].name.c_str()
+                    : "default";
+    }
     static sh_action button(void *data, uint32_t modifiers, uint32_t button,
                             sh_pointer_target target, const char *app_id, int *argument) {
         auto &self = *static_cast<Runtime *>(data);
@@ -333,12 +344,14 @@ struct Runtime {
             *argument = binding->amount;
         if (binding->action == SH_SWITCH_LAYOUT)
             *argument = binding->layout;
+        if (binding->action == SH_MODE)
+            *argument = binding->mode;
         self.target = binding->output;
         return binding->action;
     }
     /* Control requests: "<action> [workspace]", "screenshot [region|output|window]",
      * "resize_<direction> [pixels]", "volume_up|volume_down|brightness_up|brightness_down
-     * [percent]", "switcher_confirm [N]", "switch_layout [next|prev|N]",
+     * [percent]", "switcher_confirm [N]", "switch_layout [next|prev|N]", "mode NAME|default",
      * "profile NAME|next|prev", or "spawn PROGRAM [ARGS...]". */
     static sh_action command(void *data, const char *request, int *argument, char *error,
                              size_t error_size) {
@@ -404,6 +417,18 @@ struct Runtime {
                                      : " takes a size in pixels, from 1 to ") +
                         std::to_string(most));
                 *argument = amount;
+            } else if (action == SH_MODE) {
+                int number = words.size() == 2 ? self.config.mode_number(words[1]) : -1;
+                if (number < 0) {
+                    std::string names;
+                    for (const auto &name : self.config.mode_names())
+                        names += (names.empty() ? "" : ", ") + name;
+                    throw std::runtime_error(words.size() == 2 ? "no mode " + words[1] +
+                                                                     "; the modes are " + names
+                                                               : "mode takes a mode's name: " +
+                                                                     names);
+                }
+                *argument = number;
             } else if (action == SH_SWITCH_LAYOUT) {
                 try {
                     if (words.size() > 2)
@@ -589,6 +614,7 @@ struct Runtime {
             std::string error;
             auto next = shaodesk::load_config_or_default(self.path, error);
             self.config = std::move(next);
+            self.mode = 0; // the modes may have changed
             self.locker_problem.reset();
             // The shell loads the file too, and shows the error.
             if (self.shell_pid > 0)
@@ -875,7 +901,8 @@ int main(int argc, char **argv) {
             Runtime::command,   Runtime::reload,   Runtime::startup,      Runtime::child_exited,
             Runtime::opacity,   Runtime::screenshot, Runtime::window_rule,
             Runtime::hot_corner, Runtime::action_target, Runtime::config_watch,
-            Runtime::config_changed, Runtime::lock, Runtime::launch, Runtime::binding_flags};
+            Runtime::config_changed, Runtime::lock, Runtime::launch, Runtime::binding_flags,
+            Runtime::set_mode};
         int result = sh_run(&callbacks, mode);
         if (runtime.shell_pid > 0)
             kill(runtime.shell_pid, SIGTERM);

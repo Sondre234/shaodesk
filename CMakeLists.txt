@@ -188,6 +188,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
     set(SHAODESK_COMPOSITOR_SOURCES
         src/compositor/server.c
         src/compositor/actions.c
+        src/compositor/binding_mode.c
         src/compositor/control.c
         src/compositor/cursor.c
         src/compositor/effects.c

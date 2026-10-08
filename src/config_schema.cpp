@@ -30,6 +30,13 @@ const Option options[] = {
      "use, e.g. `light = { shell = { panel_color = \"#f2f4f8\" } }`. Every profile is "
      "checked as the file loads. A file with `extends = \"default\"` gets the default "
      "configuration's profiles only when it has none of its own."},
+    {"modes", "table of lists", "unset", "", none, none,
+     "Binding modes, as sway's modes and Hyprland's submaps: lists of key bindings (as in "
+     "`bindings`, keys only) keyed by a name of up to 32 letters, digits, `-` and `_` (not "
+     "`default`), at most 16. A binding with `action = \"mode\", mode = \"NAME\"` puts one in "
+     "use: its bindings take the place of `bindings`, which `mode = \"default\"` brings back, "
+     "and other keys reach the application. Each mode needs a binding with `action = \"mode\"` "
+     "that leaves it."},
     {"xwayland", "boolean", "true", "true", none, none,
      "Run X11 applications; Xwayland starts on first use. Restart to change."},
     {"auto_reload", "boolean", "true", "false", none, none,
@@ -445,7 +452,8 @@ const Option options[] = {
      "`\"left\"` or `\"right\"` of the focused one, `\"next\"` or `\"prev\"` in order with wrap, or "
      "a connector name or `\"desc:\"` description as in `outputs.monitors`."},
     {"bindings[].mode", "enum", "\"region\"", "", none, none,
-     "With `screenshot` only: `\"region\"`, `\"output\"`, or `\"window\"`."},
+     "With `screenshot`: `\"region\"`, `\"output\"`, or `\"window\"`. With `mode` (required): "
+     "`\"default\"` or the name of one of `modes`."},
     {"bindings[].amount", "integer", "40; 5 for volume and brightness", "", 1, 4000,
      "With `resize_*`: pixels moved per press. With `volume_up`, `volume_down`, `brightness_up` "
      "and `brightness_down`: percent per press, up to 100."},
@@ -780,8 +788,8 @@ std::string config_reference_markdown() {
         first = false;
     }
     out << "\n\n`spawn` needs `command`; `workspace` and `move_to_workspace` need `workspace`; "
-           "`screenshot` takes `mode`; `resize_*`, `volume_up`, `volume_down`, `brightness_up` and "
-           "`brightness_down` take `amount`.\n\n"
+           "`screenshot` takes `mode` and `mode` needs it; `resize_*`, `volume_up`, `volume_down`, "
+           "`brightness_up` and `brightness_down` take `amount`.\n\n"
            "Modifiers: ";
     first = true;
     for (const auto &name : config_modifier_names()) {
