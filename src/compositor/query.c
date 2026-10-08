@@ -655,6 +655,13 @@ static void get_tablet(struct sh_server *server, int fd, const char *arguments) 
     describe_tablets(server, fd, describe_surface);
 }
 
+static void get_shortcuts(struct sh_server *server, int fd, const char *arguments) {
+    // Whether the keys go to the focused surface, and the keyboard shortcuts inhibitors (see
+    // describe_shortcuts_inhibitors).
+    control_reply(fd, "ok\n");
+    describe_shortcuts_inhibitors(server, fd, describe_surface);
+}
+
 static void get_seat(struct sh_server *server, int fd, const char *arguments) {
     // What has the keyboard, what the pointer is on, and, while a drag is under way, what it is
     // over (each as describe_surface has it). During a drag the pointer is on nothing: its events
@@ -709,6 +716,7 @@ static const struct {
     {"touch", get_touch, false},
     {"tablet", get_tablet, false},
     {"mode", get_mode, false},
+    {"shortcuts", get_shortcuts, false},
 };
 
 /* Answers `request` if it is a query; false if it is not one. */

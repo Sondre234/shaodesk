@@ -271,6 +271,11 @@ class ShellController : public QObject {
     // The output that overlays for the focused monitor belong on: the focused one when it
     // exists, else the primary screen.
     QString overlayOutput() const;
+    // Something the compositor tells the user once ("notice SUMMARY<tab>BODY"), such as a window
+    // taking the keyboard's shortcuts: a notification of the desktop's own, kept in the history,
+    // and the summary on the on-screen display while no card shows (notifications off, or do not
+    // disturb).
+    void notice(const QString &summary, const QString &body);
     // Starts answering on the session bus when notifications are enabled and QtDBus is built
     // in; later configuration reloads follow the setting. Returns whether it is serving.
     bool startNotifications();

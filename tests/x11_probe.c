@@ -51,6 +51,15 @@ static void handle(struct probe *probe, xcb_generic_event_t *event) {
         }
         break;
     }
+    case XCB_KEY_PRESS:
+    case XCB_KEY_RELEASE: {
+        // Only while it grabs the keyboard: the window selects no key events.
+        xcb_key_press_event_t *key = (xcb_key_press_event_t *)event;
+        printf("key %u %s\n", key->detail - 8u,
+               (event->response_type & ~0x80) == XCB_KEY_PRESS ? "pressed" : "released");
+        fflush(stdout);
+        break;
+    }
     case XCB_CLIENT_MESSAGE: {
         xcb_client_message_event_t *message = (xcb_client_message_event_t *)event;
         if (message->type == probe->protocols && message->data.data32[0] == probe->delete_window)
@@ -204,7 +213,10 @@ int main(int argc, char **argv) {
         // Lines on standard input ask for attention the two ways X11 clients do: "demand" and
         // "undemand" add and remove _NET_WM_STATE_DEMANDS_ATTENTION, "hint" and "unhint" set
         // and clear the urgency flag of WM_HINTS. "icon SPEC" sets _NET_WM_ICON (see set_icon)
-        // and "unicon" deletes it. Closing the window ends it.
+        // and "unicon" deletes it. "grab" takes an active grab of the keyboard, as a virtual
+        // machine's window does, saying "grab taken" (or "grab refused"), after which the keys
+        // print as "key CODE pressed|released" (evdev's codes); "ungrab" ends it. Closing the
+        // window ends it.
         puts("waiting for commands");
         fflush(stdout);
         char pending[128];
@@ -254,6 +266,18 @@ int main(int argc, char **argv) {
                     set_icon(&probe, pending + 5);
                 } else if (!strcmp(pending, "unicon")) {
                     xcb_delete_property(probe.connection, probe.window, probe.icon);
+                } else if (!strcmp(pending, "grab")) {
+                    xcb_grab_keyboard_reply_t *grab = xcb_grab_keyboard_reply(
+                        probe.connection,
+                        xcb_grab_keyboard(probe.connection, true, probe.window, XCB_CURRENT_TIME,
+                                          XCB_GRAB_MODE_ASYNC, XCB_GRAB_MODE_ASYNC),
+                        NULL);
+                    printf("grab %s\n",
+                           grab && grab->status == XCB_GRAB_STATUS_SUCCESS ? "taken" : "refused");
+                    fflush(stdout);
+                    free(grab);
+                } else if (!strcmp(pending, "ungrab")) {
+                    xcb_ungrab_keyboard(probe.connection, XCB_CURRENT_TIME);
                 } else
                     die("unknown command");
                 xcb_flush(probe.connection);

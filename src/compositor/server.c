@@ -103,6 +103,7 @@ void reload_config(struct sh_server *server) {
     wl_list_for_each(output, &server->outputs, link) reflow_output(server, output->wlr_output);
     power_reload(server);
     idle_reload(server);
+    shortcuts_reload(server);
 }
 
 static int terminate_signal(int signal_number, void *data) {
@@ -401,6 +402,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     add_listener(&server.seat->keyboard_state.events.focus_change, &server.keyboard_focus_change,
                  seat_keyboard_focus_change);
     tablet_init(&server);
+    shortcuts_inhibit_init(&server);
     struct wlr_xdg_activation_v1 *activation = wlr_xdg_activation_v1_create(server.wl_display);
     add_listener(&activation->events.request_activate, &server.request_activate, request_activate);
     server.relative_pointer = wlr_relative_pointer_manager_v1_create(server.wl_display);
@@ -514,6 +516,7 @@ finish:
     gestures_finish(&server);
     touch_finish(&server);
     tablet_finish(&server);
+    shortcuts_inhibit_finish(&server);
 
     wl_list_remove(&server.new_input.link);
     wl_list_remove(&server.new_virtual_keyboard.link);

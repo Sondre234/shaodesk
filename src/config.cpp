@@ -756,6 +756,7 @@ WindowRule window_rule(lua_State *L, int workspaces) {
     actions.maximize = optional_boolean(L, "maximize");
     actions.focus = optional_boolean(L, "focus");
     actions.sticky = optional_boolean(L, "sticky");
+    actions.shortcuts_inhibit = optional_boolean(L, "shortcuts_inhibit");
     lua_getfield(L, -1, "workspace");
     bool has_workspace = !lua_isnil(L, -1);
     lua_pop(L, 1);
@@ -1585,6 +1586,8 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
         lua_pop(L, 1);
         config.settings.repeat_rate = integer(L, "repeat_rate", 25, 0, 100);
         config.settings.repeat_delay = integer(L, "repeat_delay", 600, 0, 5000);
+        boolean(L, "shortcuts_inhibit", "keyboard.shortcuts_inhibit",
+                config.settings.shortcuts_inhibit);
     }
     lua_pop(L, 1);
     current_section.clear();
@@ -1998,6 +2001,7 @@ constexpr std::pair<std::string_view, sh_action> action_table[] = {
         {"brightness_up", SH_BRIGHTNESS_UP},
         {"brightness_down", SH_BRIGHTNESS_DOWN},
         {"mode", SH_MODE},
+        {"toggle_shortcuts_inhibit", SH_TOGGLE_SHORTCUTS_INHIBIT},
         {"focus_left", SH_FOCUS_LEFT},
         {"focus_right", SH_FOCUS_RIGHT},
         {"focus_up", SH_FOCUS_UP},
@@ -2153,7 +2157,7 @@ bool WindowRule::matches(const std::string &app_id, const std::string &title) co
 
 bool WindowActions::empty() const {
     return !floating && !fullscreen && !maximize && !focus && !sticky && !workspace && !output &&
-           !size && position == Position::Unset;
+           !size && position == Position::Unset && !shortcuts_inhibit;
 }
 
 void WindowActions::merge(const WindowActions &other) {
@@ -2161,7 +2165,8 @@ void WindowActions::merge(const WindowActions &other) {
                                   {&fullscreen, &other.fullscreen},
                                   {&maximize, &other.maximize},
                                   {&focus, &other.focus},
-                                  {&sticky, &other.sticky}})
+                                  {&sticky, &other.sticky},
+                                  {&shortcuts_inhibit, &other.shortcuts_inhibit}})
         if (*source)
             *target = *source;
     if (other.workspace)
@@ -2194,6 +2199,7 @@ sh_window_rule WindowActions::to_c() const {
     rule.maximize = maximize.value_or(false);
     rule.no_focus = !focus.value_or(true);
     rule.sticky = sticky.value_or(false);
+    rule.no_shortcuts_inhibit = !shortcuts_inhibit.value_or(true);
     return rule;
 }
 
@@ -2239,6 +2245,25 @@ std::vector<std::string> Config::mode_names() const {
     for (const auto &mode : modes)
         names.push_back(mode.name);
     return names;
+}
+
+std::string Config::binding_keys(sh_action action) const {
+    for (const auto &binding : bindings) {
+        char name[64];
+        if (binding.action != action || binding.button || binding.switch_type >= 0 ||
+            xkb_keysym_get_name(binding.keysym, name, sizeof(name)) <= 0)
+            continue;
+        std::string keys;
+        for (auto [bit, modifier] : {std::pair{SH_LOGO, "Super"}, {SH_CTRL, "Ctrl"},
+                                     {SH_ALT, "Alt"}, {SH_SHIFT, "Shift"}})
+            if (binding.modifiers & bit)
+                keys += std::string(modifier) + " + ";
+        // A letter as printed on the key.
+        if (!name[1])
+            name[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(name[0])));
+        return keys + name;
+    }
+    return {};
 }
 
 const Binding *Config::switch_binding(sh_switch type, bool on) const {

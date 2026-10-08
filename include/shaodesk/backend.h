@@ -203,6 +203,10 @@ enum sh_action {
     SH_MEDIA_NEXT,
     SH_MEDIA_PREVIOUS,
     SH_MEDIA_STOP,
+    /* Turns off the focused surface's keyboard shortcuts inhibitor, which gives the compositor's
+     * bindings their keys back, or on again. Its binding runs while the inhibitor holds every
+     * other one. */
+    SH_TOGGLE_SHORTCUTS_INHIBIT,
 };
 
 enum sh_screenshot_mode {
@@ -457,6 +461,9 @@ struct sh_settings {
     /* idle: the steps on mains, and while the machine runs on battery. */
     struct sh_idle_steps idle, idle_battery;
     int lid; /* enum sh_lid_mode, outputs.lid */
+    /* keyboard.shortcuts_inhibit: applications may ask for the keys the bindings take
+     * (keyboard-shortcuts-inhibit), as virtual machines and remote desktops do. */
+    bool shortcuts_inhibit;
 };
 
 /* What a login session keeps of the last one: nothing; where its windows were, for those that open
@@ -486,6 +493,7 @@ struct sh_window_rule {
     bool fullscreen, maximize;
     bool no_focus;
     bool sticky; /* only with features.sticky */
+    bool no_shortcuts_inhibit; /* shortcuts_inhibit = false: its inhibitors are refused */
 };
 
 /* What a key binding asks for besides its action (sh_callbacks.binding_flags). */
@@ -557,6 +565,9 @@ struct sh_callbacks {
     /* The action bound to a switch turning on (a lid closing, tablet mode starting) or off, as
      * `key` returns one; SH_NONE when none is. */
     enum sh_action (*switch_toggled)(void *, enum sh_switch type, bool on, int *argument);
+    /* The keys of the first key binding of `action` outside any mode, as "Super + Shift +
+     * Escape"; "" when no key is bound to it. Valid until the next call. */
+    const char *(*binding_keys)(void *, enum sh_action action);
 };
 
 enum sh_backend_mode { SH_BACKEND_NESTED, SH_BACKEND_HEADLESS, SH_BACKEND_SESSION };

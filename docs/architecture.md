@@ -73,6 +73,7 @@ all. In short:
 | `window_icon.c` | The icons windows supply themselves (xdg-toplevel-icon-v1; X11 windows' from `xwayland.c`), kept for the window control to send the shell. |
 | `volume.c` | The volume, microphone and brightness actions, which the shell carries out. |
 | `binding_mode.c` | Binding modes: which set of key bindings is in use. |
+| `shortcuts_inhibit.c` | Keyboard shortcuts inhibitors (keyboard-shortcuts-inhibit-unstable-v1): the keys the bindings take going to a virtual machine, a remote desktop or a game while it has the keyboard. |
 
 A function used by one file is `static`; one used by several is declared in `server.h` under
 the file that defines it. The build warns (`-Wmissing-prototypes`) about one that is neither.
@@ -767,7 +768,10 @@ client header and code for the shell and the test probes), its global made with
 
 `send_event` (`control.c`) sends a line to every subscriber; `send_shell_line` and
 `request_shell` are the shell-specific forms, and `report_failure` logs a failure the user no
-longer waits on and shows it across the panel (`power-error`, `spawn-error`). The shell reads
+longer waits on and shows it across the panel (`power-error`, `spawn-error`). `notice
+SUMMARY<tab>BODY` tells the user something once, as a notification of the desktop's own
+(`ShellController::notice`), or on the on-screen display while no card shows; a window taking the
+keyboard's shortcuts is one (`shortcuts_inhibit.c`). The shell reads
 them in `shell/controller.cpp`. It subscribes with `subscribe shell`, and `shell_listening` says
 whether it has, for something the compositor does another way without it, as the volume keys run
 `wpctl` (`volume.c`).

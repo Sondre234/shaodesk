@@ -1261,7 +1261,7 @@ idle daemons through them (swayidle with `wlopm --off \*` and `wlopm --on \*`).
 
 ```lua
 bindings = {
-    { mods = { "Super", "Shift" }, key = "Escape", action = "display_off" },
+    { mods = { "Super", "Alt" }, key = "Escape", action = "display_off" },
     { mods = { "Super", "Ctrl" }, key = "F12", action = "display_toggle", output = "HDMI-A-1" },
 },
 ```
@@ -1540,6 +1540,48 @@ accent colour; a click on it leaves the mode. `shaodesk msg get mode` prints the
 since the modes may have changed, and so does locking the session, so that the keys the lock
 screen leaves to bindings, the volume keys among them, are the ones outside any mode.
 `binding_modes_smoke` tests them, and `shell_ui` the pill.
+
+### Applications that take the shortcuts
+
+A virtual machine (virt-manager, QEMU, GNOME Boxes), a remote desktop client (Remmina, FreeRDP,
+Moonlight) or a game may ask for the keys the bindings take, through
+keyboard-shortcuts-inhibit-unstable-v1, so that Super, Alt + Tab and the rest reach the system
+it shows. While its window has the keyboard no binding runs and every key goes to it; once
+another window has the keyboard, or the window lets go or closes, the bindings are back. The one
+binding that still runs is `toggle_shortcuts_inhibit`, Super + Shift + Escape: it takes the keys
+back from the focused window, which hears that its request is no longer honoured, and gives them
+to it again, the on-screen display saying which. A window turned off this way stays off until the
+binding turns it on again or it asks anew. The first time a window takes the keys, a notification
+says so and names the binding ("Shortcuts go to win11 on QEMU/KVM", "Super + Shift + Escape gives
+them back"); while notifications are off or do not disturb is on, the on-screen display says the
+first part. A window that asks again, as a GTK 3 application may each time it grabs the
+keyboard, is not announced again.
+
+Switching virtual terminals (Ctrl + Alt + F1 to F12) and mouse button bindings work as ever, and
+so does the lock screen: the `locked` bindings run there whatever a window asked for. A binding
+mode in use is left as a window takes the keys, as locking leaves it, so that the binding that
+takes them back is the one outside any mode.
+
+An X11 window that grabs the keyboard (XGrabKeyboard), as VirtualBox, Xephyr and X11 remote
+desktop clients do, holds the keys the same way: Xwayland passes the grab on through
+xwayland-keyboard-grab-unstable-v1, which only Xwayland is offered, and while the window has the
+keyboard its grab is a request like any other, ending as the window lets go. A grab never moves
+the keyboard to its window.
+
+`keyboard.shortcuts_inhibit = false` refuses every application, and a window rule's
+`shortcuts_inhibit = false` the windows it matches; a refused window never hears that its request
+is honoured, and the binding does not turn it on. A reload applies a change to either at once.
+
+```lua
+keyboard = { shortcuts_inhibit = true },
+windows = { rules = { { app_id = "^org.remmina.Remmina$", shortcuts_inhibit = false } } },
+```
+
+`shaodesk msg get shortcuts` prints `inhibited 1` while the keys go to the focused window (else
+`0`), then a line per request: `inhibitor` (`grab` for an X11 window's), `active`, `off` (turned
+off with the binding) or `refused`, 1 when its window has the keyboard, and the window as `get
+seat` names it (`window` and its title), tab-separated. `shortcuts_inhibit_smoke` tests it with
+windows of `input_probe --inhibit`, and `xwayland_grab_smoke` with `x11_probe`'s grab.
 
 ### Nested sessions
 

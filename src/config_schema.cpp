@@ -70,6 +70,11 @@ const Option options[] = {
     {"keyboard.repeat_rate", "integer", "25", "25", 0, 100, "Key repeats per second."},
     {"keyboard.repeat_delay", "integer", "600", "600", 0, 5000,
      "Milliseconds a key is held before it repeats."},
+    {"keyboard.shortcuts_inhibit", "boolean", "true", "true", none, none,
+     "Let applications that ask for it (virtual machines, remote desktops, some games) have the "
+     "keys the bindings take while they have the keyboard; `toggle_shortcuts_inhibit` (Super + "
+     "Shift + Escape) takes them back. `false` refuses every application, a window rule's "
+     "`shortcuts_inhibit = false` one."},
 
     {"mouse", "table", "", "", none, none, "Pointer settings."},
     {"mouse.modifier", "enum", "\"Alt\"", "\"Super\"", none, none,
@@ -342,6 +347,9 @@ const Option options[] = {
      "`false` opens the window without focusing it."},
     {"windows.rules[].sticky", "boolean", "unset", "", none, none,
      "Show on every workspace of its monitor."},
+    {"windows.rules[].shortcuts_inhibit", "boolean", "unset", "", none, none,
+     "`false` refuses the window's requests for the keys the bindings take (see "
+     "`keyboard.shortcuts_inhibit`)."},
 
     {"peek", "table", "", "", none, none,
      "Peek: `peek` (hold a key) and `peek_toggle` make every window nearly transparent to show "

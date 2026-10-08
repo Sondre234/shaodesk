@@ -79,6 +79,7 @@
 #include <wlr/types/wlr_output_management_v1.h>
 #include <wlr/types/wlr_output_power_management_v1.h>
 #include <wlr/types/wlr_keyboard.h>
+#include <wlr/types/wlr_keyboard_shortcuts_inhibit_v1.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_linux_dmabuf_v1.h>
 #include <wlr/types/wlr_linux_drm_syncobj_v1.h>
@@ -310,6 +311,18 @@ struct sh_tablets {
     struct wl_listener tool_proximity, tool_axis, tool_tip, tool_button, keyboard_focus_change;
 };
 
+/* Keyboard shortcuts inhibitors (shortcuts_inhibit.c): keyboard-shortcuts-inhibit, the
+ * inhibitors clients asked for and X11 windows' keyboard grabs, and the one taking the keys now,
+ * which the keyboard's focus decides. */
+struct sh_shortcuts_inhibitor;
+struct sh_shortcuts {
+    struct wlr_keyboard_shortcuts_inhibit_manager_v1 *manager;
+    struct wl_list inhibitors; // struct sh_shortcuts_inhibitor
+    struct sh_shortcuts_inhibitor *effective;
+    struct wl_listener new_inhibitor, keyboard_focus_change;
+    struct wl_global *grab_manager; // xwayland-keyboard-grab, for X11 windows' grabs
+};
+
 /* The touchpad swipe under way (gestures.c). */
 enum sh_swipe_mode {
     SH_SWIPE_IDLE,      /* there is none */
@@ -513,6 +526,7 @@ struct sh_server {
     struct sh_touch touch;
     struct wl_listener touch_down, touch_motion, touch_up, touch_cancel, touch_frame;
     struct sh_tablets tablet;
+    struct sh_shortcuts shortcuts;
 
     struct wlr_seat *seat;
     struct wl_listener new_input;
@@ -755,6 +769,9 @@ struct sh_toplevel {
     /* The opacity the window rules gave for these inputs: matching regexes on every commit
      * would cost more than the commit, so it is redone only when one of them changes. */
     struct sh_opacity_rule opacity_rule;
+    /* The user was told the window took the keyboard's shortcuts (shortcuts_inhibit.c), which
+     * they hear once. */
+    bool shortcuts_told;
     struct wl_listener map;
     struct wl_listener unmap;
     struct wl_listener commit;
@@ -1164,6 +1181,16 @@ void session_save_last(struct sh_server *server);
 void session_restore_last(struct sh_server *server);
 bool session_claim(struct sh_server *server, struct sh_toplevel *toplevel,
                    struct sh_window_rule *rule, bool ruled);
+
+/* shortcuts_inhibit.c */
+bool shortcuts_inhibited(struct sh_server *server);
+void toggle_shortcuts_inhibit(struct sh_server *server);
+void shortcuts_reload(struct sh_server *server);
+void describe_shortcuts_inhibitors(struct sh_server *server, int fd,
+                                   void (*surface)(struct sh_server *, int, const char *,
+                                                   struct wlr_surface *));
+void shortcuts_inhibit_init(struct sh_server *server);
+void shortcuts_inhibit_finish(struct sh_server *server);
 
 /* snap.c */
 const char *snap_zone_name(enum sh_action zone);

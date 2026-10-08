@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The on-screen display: its own timing, and what feeds it (the sound server's volume and a
-// backlight).
+// backlight); and the compositor's notices, which it says while no notification card shows.
 #include "backlight.hpp"
 #include "controller.hpp"
 #include "osd.hpp"
@@ -239,6 +239,26 @@ class OsdTest : public QObject {
         none.setPercent(50);
         QCOMPARE(none.percent(), -1);
         QCOMPARE(noneLevel.count(), 0);
+    }
+    void noticeIsANotification() {
+        ShellController controller(config("").toStdString());
+        controller.notice("Shortcuts go to VM", "Super + Shift + Escape gives them back");
+        const auto *cards = controller.notifications()->cards();
+        QCOMPARE(cards->count(), 1);
+        QCOMPARE(cards->items()[0].app, QString("shaodesk"));
+        QCOMPARE(cards->items()[0].summary, QString("Shortcuts go to VM"));
+        QCOMPARE(cards->items()[0].body, QString("Super + Shift + Escape gives them back"));
+        QVERIFY(!controller.osd()->active());
+        // While no card shows, the on-screen display says it too; the history keeps it either
+        // way, the body as text, not markup.
+        controller.notifications()->setDnd(true);
+        controller.notice("Shortcuts go to <b>", "Ctrl & Q gives them back");
+        QVERIFY(controller.osd()->active());
+        QCOMPARE(controller.osd()->text(), QString("Shortcuts go to <b>"));
+        QCOMPARE(controller.osd()->percent(), -1);
+        const auto *history = controller.notifications()->history();
+        QCOMPARE(history->count(), 2);
+        QCOMPARE(history->items()[0].body, QString("Ctrl &amp; Q gives them back"));
     }
     void uevents() {
         QVERIFY(Backlight::relevantUevent(QByteArray("ACTION=change\0SUBSYSTEM=backlight\0", 34)));

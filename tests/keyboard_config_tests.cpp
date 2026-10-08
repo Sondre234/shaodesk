@@ -202,12 +202,24 @@ static void switch_layout() {
     }
 }
 
+// keyboard.shortcuts_inhibit: whether applications may have the keys the bindings take.
+static void shortcuts_inhibit() {
+    require(shaodesk::parse_config("return {}").settings.shortcuts_inhibit,
+            "applications may not inhibit shortcuts by default");
+    require(!shaodesk::parse_config("return {keyboard={shortcuts_inhibit=false}}")
+                 .settings.shortcuts_inhibit,
+            "keyboard.shortcuts_inhibit = false not parsed");
+    rejects("return {keyboard={shortcuts_inhibit='no'}}",
+            "keyboard.shortcuts_inhibit must be a boolean");
+}
+
 int main() {
     try {
         rules();
         diagnostics();
         keymap_files();
         switch_layout();
+        shortcuts_inhibit();
         std::cout << "Keyboard configuration passed\n";
         return 0;
     } catch (const std::exception &error) {

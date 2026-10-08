@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
     try {
         require(argc == 2, "example config path required");
         auto config = shaodesk::load_config(argv[1]);
-        require(config.bindings.size() == 81, "example shortcuts missing");
+        require(config.bindings.size() == 82, "example shortcuts missing");
         auto *louder = config.binding(0, XKB_KEY_XF86AudioRaiseVolume);
         auto *microphone = config.binding(0, XKB_KEY_XF86AudioMicMute);
         auto *dimmer = config.binding(0, XKB_KEY_XF86MonBrightnessDown);
@@ -40,6 +40,21 @@ int main(int argc, char **argv) {
         require(config.binding(SH_ALT, XKB_KEY_Tab)->action == SH_SWITCHER_NEXT &&
                     config.binding(SH_ALT | SH_SHIFT, XKB_KEY_Tab)->action == SH_SWITCHER_PREV,
                 "example window switcher bindings missing");
+        // The keys of an action's binding, as the compositor tells them: modifiers in a fixed
+        // order, a letter in capitals; nothing for an action without a key.
+        require(config.binding_keys(SH_TERMINAL) == "Super + Q" &&
+                    config.binding_keys(SH_SWITCHER_PREV) == "Alt + Shift + Tab" &&
+                    config.binding_keys(SH_RESIZE_LEFT) == "Super + Ctrl + Shift + Left" &&
+                    config.binding_keys(SH_POWER_MENU) == "Super + Escape" &&
+                    config.binding_keys(SH_TOGGLE_SHORTCUTS_INHIBIT) == "Super + Shift + Escape" &&
+                    config.binding_keys(SH_VOLUME_MUTE) == "XF86AudioMute" &&
+                    config.binding_keys(SH_ZOOM_IN).empty(),
+                "binding_keys mismatch");
+        auto clicked = shaodesk::parse_config(
+            "return {bindings={{button='side',action='close'},{mods={'Ctrl'},key='w',"
+            "action='close'},{switch='lid',state='close',action='lock'}}}");
+        require(clicked.binding_keys(SH_CLOSE) == "Ctrl + W" && clicked.binding_keys(SH_LOCK).empty(),
+                "binding_keys gave a button's or a switch's binding");
         // The example starts in the macOS style; its `default` profile is the taskbar.
         require(config.profile == "macos-light" && config.shell.macos_style &&
                     config.shell.enabled && config.shell.panel_height == 64 &&
@@ -612,6 +627,17 @@ int main(int argc, char **argv) {
                     mpv.width == 100 && mpv.height == 200 && mpv.floating == -1 && mpv.sticky,
                 "later rule did not override an earlier one");
         require(ruled.window_actions("kitty", "My Mail").empty(), "a rule matched the wrong window");
+        require(!mpv.no_shortcuts_inhibit && !pavu_c.no_shortcuts_inhibit,
+                "a rule without shortcuts_inhibit refused inhibitors");
+        // shortcuts_inhibit = false alone is a rule's action, which a later rule may undo.
+        auto inhibit = shaodesk::parse_config(
+            "return {windows={rules={{app_id='^remmina$',shortcuts_inhibit=false},"
+            "{app_id='^remmina$',title='^Trusted',shortcuts_inhibit=true}}}}");
+        require(!inhibit.window_actions("remmina", "Host").empty() &&
+                    inhibit.window_actions("remmina", "Host").to_c().no_shortcuts_inhibit &&
+                    !inhibit.window_actions("remmina", "Trusted host").to_c().no_shortcuts_inhibit &&
+                    inhibit.window_actions("kitty", "").empty(),
+                "shortcuts_inhibit rules mismatch");
         // Opacity: the first rule that sets it wins; action-only rules leave it alone.
         require(ruled.window_opacity("pavucontrol", "Volume", true) == 0.95F &&
                     ruled.window_opacity("mpv", "", true) == 0.5F,
@@ -635,6 +661,7 @@ int main(int argc, char **argv) {
         rejects("return {windows={rules={{app_id='x',floating='yes'}}}}");
         rejects("return {windows={rules={{app_id='x',focus=0}}}}");
         rejects("return {windows={rules={{app_id='x',sticky='yes'}}}}");
+        rejects("return {windows={rules={{app_id='x',shortcuts_inhibit=0}}}}");
         rejects("return {windows={rules={{app_id='x',fullscreen='true'}}}}");
         rejects("return {windows={rules={{app_id='x',workspace=5}}}}");
         rejects("return {windows={rules={{app_id='x',workspace=0}}}}");
@@ -778,7 +805,7 @@ int main(int argc, char **argv) {
         // A configuration extending the defaults holds only its changes.
         setenv("SHAODESK_DEFAULT_CONFIG", argv[1], 1);
         auto bare = shaodesk::parse_config("return {extends='default'}");
-        require(bare.bindings.size() == 81 && bare.shell.launchers.empty() &&
+        require(bare.bindings.size() == 82 && bare.shell.launchers.empty() &&
                     bare.settings.workspaces == 4,
                 "extends did not supply the defaults");
         auto layered = shaodesk::parse_config(
@@ -788,7 +815,7 @@ int main(int argc, char **argv) {
             "{mods={'Super'}, key='e', action='spawn', command={'dolphin'}}}}");
         require(layered.settings.gap_inner == 3 && layered.settings.workspaces == 4,
                 "extending configuration settings not layered over the defaults");
-        require(layered.bindings.size() == 81 && !layered.binding(SH_LOGO, XKB_KEY_v),
+        require(layered.bindings.size() == 82 && !layered.binding(SH_LOGO, XKB_KEY_v),
                 "action none did not remove a default binding");
         require(layered.binding(SH_LOGO, XKB_KEY_q)->command == shaodesk::Command{"foot"} &&
                     layered.binding(SH_LOGO, XKB_KEY_e)->command == shaodesk::Command{"dolphin"},

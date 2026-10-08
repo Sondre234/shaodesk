@@ -257,6 +257,7 @@ struct Runtime {
     pid_t screenshot_pid = -1;
     std::string target{}; // the output target of the action last resolved
     unsigned flags = 0;   // the sh_binding_flag bits of the key binding last resolved
+    std::string keys{};   // what binding_keys returned last
     int mode = 0;         // the binding mode `key` looks in: 0 outside any, else modes[mode - 1]
     shaodesk::Command program{}; // the program of the spawn action last resolved
     bool watch = false; // whether saving a configuration file reloads (off in headless tests)
@@ -393,6 +394,12 @@ struct Runtime {
             *argument = binding->layout;
         self.target = binding->output;
         return binding->action;
+    }
+    /* The keys bound to an action, for the compositor to tell the user. */
+    static const char *binding_keys(void *data, sh_action action) {
+        auto &self = *static_cast<Runtime *>(data);
+        self.keys = self.config.binding_keys(action);
+        return self.keys.c_str();
     }
     /* Control requests: "<action> [workspace]", "screenshot [region|output|window]",
      * "resize_<direction> [pixels]", "volume_up|volume_down|brightness_up|brightness_down
@@ -1022,7 +1029,8 @@ int main(int argc, char **argv) {
             Runtime::opacity,   Runtime::screenshot, Runtime::window_rule,
             Runtime::hot_corner, Runtime::action_target, Runtime::config_watch,
             Runtime::config_changed, Runtime::lock, Runtime::launch, Runtime::autostart,
-            Runtime::started, Runtime::binding_flags, Runtime::set_mode, Runtime::switch_toggled};
+            Runtime::started, Runtime::binding_flags, Runtime::set_mode, Runtime::switch_toggled,
+            Runtime::binding_keys};
         int result = sh_run(&callbacks, mode);
         if (runtime.shell_pid > 0)
             kill(runtime.shell_pid, SIGTERM);

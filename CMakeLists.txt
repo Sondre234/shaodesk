@@ -208,6 +208,17 @@ if(SHAODESK_BUILD_COMPOSITOR)
         ${PROTOCOL_DIR}/stable/xdg-shell/xdg-shell.xml
         ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.h
         DEPENDS ${PROTOCOL_DIR}/stable/xdg-shell/xdg-shell.xml)
+    # X11 windows' keyboard grabs (shortcuts_inhibit.c), a protocol wlroots does not implement.
+    set(XWAYLAND_GRAB_XML
+        ${PROTOCOL_DIR}/unstable/xwayland-keyboard-grab/xwayland-keyboard-grab-unstable-v1.xml)
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xwayland-keyboard-grab-unstable-v1-protocol.h
+        COMMAND ${WAYLAND_SCANNER} server-header ${XWAYLAND_GRAB_XML}
+        ${CMAKE_CURRENT_BINARY_DIR}/xwayland-keyboard-grab-unstable-v1-protocol.h
+        DEPENDS ${XWAYLAND_GRAB_XML})
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xwayland-keyboard-grab-unstable-v1-protocol.c
+        COMMAND ${WAYLAND_SCANNER} private-code ${XWAYLAND_GRAB_XML}
+        ${CMAKE_CURRENT_BINARY_DIR}/xwayland-keyboard-grab-unstable-v1-protocol.c
+        DEPENDS ${XWAYLAND_GRAB_XML})
     set(SHAODESK_COMPOSITOR_SOURCES
         src/compositor/server.c
         src/compositor/actions.c
@@ -237,6 +248,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/scaled_capture.c
         src/compositor/scratchpad.c
         src/compositor/session.c
+        src/compositor/shortcuts_inhibit.c
         src/compositor/snap.c
         src/compositor/swallow.c
         src/compositor/switcher.c
@@ -258,6 +270,9 @@ if(SHAODESK_BUILD_COMPOSITOR)
     target_sources(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c
         ${CMAKE_CURRENT_BINARY_DIR}/wlr-foreign-toplevel-management-unstable-v1-protocol.c
         ${CAPTURE_SOURCE_PROTOCOL_SOURCES})
+    target_sources(shaodesk PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}/xwayland-keyboard-grab-unstable-v1-protocol.h
+        ${CMAKE_CURRENT_BINARY_DIR}/xwayland-keyboard-grab-unstable-v1-protocol.c)
     target_sources(shaodesk PRIVATE src/overview_scene.c)
     target_sources(shaodesk PRIVATE src/power_supply.c)
     target_sources(shaodesk PRIVATE src/lid.c)
@@ -420,7 +435,19 @@ if(SHAODESK_BUILD_COMPOSITOR)
             COMMAND ${WAYLAND_SCANNER} private-code ${TABLET_XML}
             ${CMAKE_CURRENT_BINARY_DIR}/tablet-v2-protocol.c
             DEPENDS ${TABLET_XML})
+        set(SHORTCUTS_INHIBIT_XML
+            ${PROTOCOL_DIR}/unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header ${SHORTCUTS_INHIBIT_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h
+            DEPENDS ${SHORTCUTS_INHIBIT_XML})
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/keyboard-shortcuts-inhibit-unstable-v1-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code ${SHORTCUTS_INHIBIT_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/keyboard-shortcuts-inhibit-unstable-v1-protocol.c
+            DEPENDS ${SHORTCUTS_INHIBIT_XML})
         add_executable(input_probe tests/input_probe.c
+            ${CMAKE_CURRENT_BINARY_DIR}/keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/keyboard-shortcuts-inhibit-unstable-v1-protocol.c
             ${CMAKE_CURRENT_BINARY_DIR}/tablet-v2-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/tablet-v2-protocol.c
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client-protocol.h
@@ -920,6 +947,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/locked_bindings_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:lock_probe>)
         set_tests_properties(locked_bindings_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME shortcuts_inhibit_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/shortcuts_inhibit_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:input_probe>)
+        set_tests_properties(shortcuts_inhibit_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME window_capture_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_capture_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>
@@ -986,6 +1017,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/xwayland_urgent_smoke.py
                 $<TARGET_FILE:shaodesk> $<TARGET_FILE:x11_probe> $<TARGET_FILE:wayland_probe>)
             set_tests_properties(xwayland_urgent_smoke PROPERTIES TIMEOUT 60)
+            add_test(NAME xwayland_grab_smoke COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/xwayland_grab_smoke.py
+                $<TARGET_FILE:shaodesk> $<TARGET_FILE:x11_probe> $<TARGET_FILE:wayland_probe>)
+            set_tests_properties(xwayland_grab_smoke PROPERTIES TIMEOUT 60)
         else()
             message(STATUS "XWayland test skipped: needs an Xwayland binary and wlroots X support")
         endif()

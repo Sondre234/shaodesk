@@ -63,6 +63,7 @@ struct Launcher {
 struct WindowActions {
     enum class Position { Unset, Center, At };
     std::optional<bool> floating, fullscreen, maximize, focus, sticky;
+    std::optional<bool> shortcuts_inhibit; // false: the window's inhibitors are refused
     std::optional<int> workspace;      // from 1
     std::optional<std::string> output; // connector, or "desc:" and the start of its description
     std::optional<std::pair<int, int>> size;
@@ -328,7 +329,8 @@ struct Config {
                          .idle = {.dim = 570000, .display_off = 600000, .lock = 0, .suspend = 0},
                          .idle_battery = {.dim = 570000, .display_off = 600000, .lock = 0,
                                           .suspend = 0},
-                         .lid = SH_LID_CLAMSHELL};
+                         .lid = SH_LID_CLAMSHELL,
+                         .shortcuts_inhibit = true};
     // layout.workspace_names: the label of workspace N is names[N - 1]; "" or past the end: none.
     std::vector<std::string> workspace_names;
     // hot_corners: what each corner runs, as a control request; "" for nothing.
@@ -367,6 +369,9 @@ struct Config {
     int mode_number(const std::string &name) const;
     // "default" and every mode's name.
     std::vector<std::string> mode_names() const;
+    // The keys of the first key binding of `action` outside any mode, as people read them:
+    // "Super + Shift + Escape"; empty when no key is bound to it.
+    std::string binding_keys(sh_action action) const;
     // The binding of a switch turning on or off, "none" included; nullptr when there is none.
     const Binding *switch_binding(sh_switch type, bool on) const;
     // The first button binding for what lies under the pointer, or nothing (the click belongs
