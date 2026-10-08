@@ -512,8 +512,8 @@ wlroots with the rounded-corners patch; elsewhere the preview is the fill alone,
 without the patch.
 
 An edge shared with another monitor does not snap where the other monitor continues, so the
-pointer crosses it; the snap goes to the monitor under the pointer, whichever monitor the window
-mostly covers. Dragging a snapped or maximized window gives it back the size it had before as
+pointer crosses it, and a window snaps on the monitor under the pointer, even one it mostly
+lies beside. Dragging a snapped or maximized window gives it back the size it had before as
 it starts to move, the pointer keeping its place across it, and `restore` puts a window snapped
 by dragging back where it floated before the drag. On a monitor that tiles, a tile lifted out
 with Super + drag goes back into the tiling where it is dropped, splitting the tile under the
@@ -529,10 +529,10 @@ place back. Snapping a window to the half it is in already moves it to the near 
 monitor that way. These float a tile, as dragging one does.
 
 `snap_cycle_left`, `snap_cycle_right`, `snap_cycle_up` and `snap_cycle_down` (Super + Alt +
-arrows) step the focused window as Windows' Win + arrows do. Left and right put a window at its own size or maximized
-into that half; from the other half they give it its own size back, and from that half they move
-it on to the next monitor that way, into the half facing back (where there is none, nothing
-happens). Up maximizes a window at its own size, and down minimizes it; down gives a maximized
+arrows) step the focused window as Windows' Win + arrows do. Left and right put a window at its
+own size or maximized into that half; from the other half they give it its own size back, and
+from that half they move it on to the next monitor that way, into the half facing back (where
+there is none, nothing happens). Up maximizes a window at its own size, and down minimizes it; down gives a maximized
 window its own size back. Up and down take a half to its top or bottom quarter and a quarter
 back to its half; up from a top quarter maximizes, and down from a bottom quarter minimizes.
 Left and right keep a quarter in its row, moving it on to the next monitor from its own side. A
@@ -565,8 +565,9 @@ Return, or a click on a thumbnail, puts that window there (back from minimized) 
 focus. Snapped there, it brings Snap Assist back for the next free part while there are windows
 left to offer, so that three more windows fill the quarters around a first one in turn. The
 arrows, Tab, Home and End move the selection, and Delete or a middle click closes a window.
-Escape, a click anywhere else (which goes on to what is there), any other binding, and any action
-from the control socket dismiss it and leave the part empty; so does the snapped window closing.
+Escape, a click anywhere else (which goes on to what is there), any other binding and any other
+action from the control socket dismiss it and leave the part empty; so does the snapped window
+closing.
 
 It is the [overview](#overview) in that part alone: the compositor draws the thumbnails over the
 part darkened and rounded as a window there would be, and the shell draws the titles and a hint,
