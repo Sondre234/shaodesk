@@ -664,6 +664,17 @@ void read_monitors(lua_State *L, sh_settings &settings) {
         monitor.scale = static_cast<float>(number(L, "scale", 0, 0.25, 10));
         monitor.transform = integer(L, "transform", 0, 0, 7);
         boolean(L, "vrr", "vrr", monitor.vrr);
+        lua_getfield(L, -1, "mirror");
+        if (!lua_isnil(L, -1)) {
+            auto source = string(L, -1, "mirror");
+            if (!valid_output_target(source))
+                fail("mirror must be a monitor's connector name or \"desc:\" and the start of "
+                     "its description");
+            if (source == name)
+                fail(name + " cannot mirror itself");
+            copy_text(source, monitor.mirror, "mirror");
+        }
+        lua_pop(L, 1);
         lua_getfield(L, -1, "position");
         if (!lua_isnil(L, -1)) {
             table(L, -1, "position");

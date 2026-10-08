@@ -223,6 +223,9 @@ struct sh_monitor {
     int transform; /* enum wl_output_transform, which Hyprland's numbering matches */
     bool vrr;      /* adaptive sync, where the monitor supports it */
     int tiling;    /* automatic tiling: -1 follows sh_settings.tiling, else 0 or 1 */
+    /* The monitor it shows the picture of, out of the layout itself: a connector name or
+     * "desc:..." as `name` is; "" to join the layout. */
+    char mirror[64];
 };
 
 /* layout.outputs: defaults for the workspaces of the outputs matching `name` (as sh_monitor's

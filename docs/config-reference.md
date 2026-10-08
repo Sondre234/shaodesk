@@ -120,6 +120,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `outputs.monitors.<name>.transform` | integer | 0 | 0 to 7 | Rotation and flip, as `wl_output.transform`: 0 normal, 1-3 rotated 90/180/270, 4-7 the same flipped. |
 | `outputs.monitors.<name>.vrr` | boolean | false | - | Variable refresh rate. |
 | `outputs.monitors.<name>.tiling` | boolean | unset | - | Automatic tiling on this monitor; unset follows `layout.tiling`. |
+| `outputs.monitors.<name>.mirror` | string | unset | - | Show another monitor's picture, a connector name or `"desc:"` as the keys are: this one leaves the layout (no workspaces, windows or panels of its own) and shows that monitor's whole picture scaled to fit, with black bars where the shapes differ. While that monitor is not in the layout, this one joins it. |
 
 ## `windows`
 
