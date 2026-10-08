@@ -86,9 +86,9 @@ class ShellController : public QObject {
     // The compositor's night light: whether it warms the screen now, and who decides: "auto"
     // (the schedule), "on" or "off" (an override), or "" without a compositor.
     Q_PROPERTY(bool nightLight READ nightLight NOTIFY nightLightChanged)
+    Q_PROPERTY(QString nightLightMode READ nightLightMode NOTIFY nightLightChanged)
     // The binding mode in use, "" outside any.
     Q_PROPERTY(QString bindingMode READ bindingMode NOTIFY bindingModeChanged)
-    Q_PROPERTY(QString nightLightMode READ nightLightMode NOTIFY nightLightChanged)
     Q_PROPERTY(QVariantList pinned READ pinned NOTIFY appsChanged)
     // Configured launchers and installed applications, as {appId, name, icon, pinned (to the
     // taskbar), configured, genericName, keywords, description}.
