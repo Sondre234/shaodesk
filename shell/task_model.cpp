@@ -115,6 +115,12 @@ QVariant TaskModel::data(const QModelIndex &index, int role) const {
         return state.pid;
     case WindowId:
         return state.windowId;
+    case Above:
+        // Undefined while the compositor cannot keep a window above, so the menus leave it out.
+        if (!task.window ||
+            shaodesk_window_v1_get_version(task.window) < SHAODESK_WINDOW_V1_STATE_ABOVE_SINCE_VERSION)
+            return {};
+        return state.above;
     default:
         return {};
     }
@@ -125,7 +131,7 @@ QHash<int, QByteArray> TaskModel::roleNames() const {
             {Urgent, "urgent"},       {Fullscreen, "fullscreen"}, {Output, "output"},
             {Workspace, "workspace"}, {Sticky, "sticky"},         {Floating, "floating"},
             {Tiling, "tiling"},       {Picture, "picture"},       {Pid, "pid"},
-            {WindowId, "windowId"}};
+            {WindowId, "windowId"},   {Above, "above"}};
 }
 TaskModel::Task *TaskModel::find(int id) {
     for (auto &task : tasks_)
@@ -188,6 +194,17 @@ void TaskModel::setSticky(int id, bool sticky) {
             shaodesk_window_v1_set_sticky(task->window);
         else
             shaodesk_window_v1_unset_sticky(task->window);
+    }
+    flush();
+}
+void TaskModel::setAbove(int id, bool above) {
+    auto *task = find(id);
+    if (task && task->window &&
+        shaodesk_window_v1_get_version(task->window) >= SHAODESK_WINDOW_V1_SET_ABOVE_SINCE_VERSION) {
+        if (above)
+            shaodesk_window_v1_set_above(task->window);
+        else
+            shaodesk_window_v1_unset_above(task->window);
     }
     flush();
 }
@@ -316,6 +333,7 @@ void TaskModel::changed(Task *task) {
             compare(&State::tiling, Tiling);
             compare(&State::pid, Pid);
             compare(&State::windowId, WindowId);
+            compare(&State::above, Above);
             if (roles.isEmpty())
                 return;
             task->shown = task->state;
@@ -353,10 +371,10 @@ void TaskModel::global(void *data, wl_registry *registry, uint32_t name, const c
     } else if (!std::strcmp(interface, shaodesk_window_control_v1_interface.name) && !self.control_) {
         // Version 2 gives the windows' capture sources, for their pictures, version 3 ones
         // scaled down to the pictures' size and the windows' processes, for the sound they play,
-        // and version 4 peeks at a window and gives the windows' numbers, for the window
-        // switcher's pictures.
+        // version 4 peeks at a window and gives the windows' numbers, for the window
+        // switcher's pictures, and version 6 keeps a window above the others.
         self.control_ = static_cast<shaodesk_window_control_v1 *>(wl_registry_bind(
-            registry, name, &shaodesk_window_control_v1_interface, std::min(version, 4u)));
+            registry, name, &shaodesk_window_control_v1_interface, std::min(version, 6u)));
         for (auto &task : self.tasks_)
             self.watch(task.get());
     } else if (!std::strcmp(interface, "wl_shm") && !self.shm_) {
@@ -375,7 +393,7 @@ void TaskModel::watch(Task *task) {
     task->window = shaodesk_window_control_v1_get_window(control_, task->handle);
     static const shaodesk_window_v1_listener listener{windowOutput, windowWorkspace, windowState,
                                                       windowDone,   windowPid,       windowId,
-                                                      nullptr,      nullptr};
+                                                      windowIcon,   windowIconImage};
     shaodesk_window_v1_add_listener(task->window, &listener, task);
 }
 void TaskModel::globalRemoved(void *, wl_registry *, uint32_t) {}
@@ -435,6 +453,7 @@ void TaskModel::windowState(void *data, shaodesk_window_v1 *, uint32_t flags) {
     state.sticky = flags & SHAODESK_WINDOW_V1_STATE_STICKY;
     state.floating = flags & SHAODESK_WINDOW_V1_STATE_FLOATING;
     state.tiling = flags & SHAODESK_WINDOW_V1_STATE_TILING;
+    state.above = flags & SHAODESK_WINDOW_V1_STATE_ABOVE;
 }
 void TaskModel::windowDone(void *data, shaodesk_window_v1 *) {
     auto *task = static_cast<Task *>(data);
@@ -445,4 +464,9 @@ void TaskModel::windowPid(void *data, shaodesk_window_v1 *, uint32_t pid) {
 }
 void TaskModel::windowId(void *data, shaodesk_window_v1 *, uint32_t id) {
     static_cast<Task *>(data)->state.windowId = id <= INT_MAX ? static_cast<int>(id) : 0;
+}
+// Version 5's icons, which come with version 6, are not shown: the file goes at once.
+void TaskModel::windowIcon(void *, shaodesk_window_v1 *, const char *) {}
+void TaskModel::windowIconImage(void *, shaodesk_window_v1 *, int32_t fd, uint32_t, uint32_t) {
+    ::close(fd);
 }
