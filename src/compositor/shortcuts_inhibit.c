@@ -303,7 +303,8 @@ static bool global_filter(const struct wl_client *client, const struct wl_global
     struct sh_server *server = data;
     if (global != server->shortcuts.grab_manager)
         return true;
-    return server->xwayland && server->xwayland->server &&
+    // Xwayland is destroyed before the clients as the compositor quits.
+    return server->running && server->xwayland && server->xwayland->server &&
            client == server->xwayland->server->client;
 }
 #endif
