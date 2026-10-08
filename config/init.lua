@@ -366,5 +366,12 @@ return {
         { mods = {}, key = "Print", action = "screenshot", mode = "region" },
         { mods = { "Shift" }, key = "Print", action = "screenshot", mode = "output" },
         { mods = { mod }, key = "Print", action = "screenshot", mode = "window" },
+        -- The media keys go to the player playing most lately (MPRIS), the one Quick Settings
+        -- shows.
+        { mods = {}, key = "XF86AudioPlay", action = "media_play_pause" },
+        { mods = {}, key = "XF86AudioPause", action = "media_play_pause" },
+        { mods = {}, key = "XF86AudioNext", action = "media_next" },
+        { mods = {}, key = "XF86AudioPrev", action = "media_previous" },
+        { mods = {}, key = "XF86AudioStop", action = "media_stop" },
     },
 }

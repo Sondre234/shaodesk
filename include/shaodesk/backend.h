@@ -168,6 +168,11 @@ enum sh_action {
     /* Asks the shell to give the keyboard to the taskbar (or the dock) on the focused output, to
      * walk its buttons and their windows with the arrows, as Windows' Win+T; again, to leave. */
     SH_TASKBAR_FOCUS,
+    /* The media keys: the shell sends them to the media player playing most lately (MPRIS). */
+    SH_MEDIA_PLAY_PAUSE,
+    SH_MEDIA_NEXT,
+    SH_MEDIA_PREVIOUS,
+    SH_MEDIA_STOP,
 };
 
 enum sh_screenshot_mode {

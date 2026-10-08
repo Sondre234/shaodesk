@@ -229,6 +229,18 @@ manage connections); a brightness slider where the screen has a backlight (set t
 `SetBrightness`, so no privileges are needed); the volume with its mute, the outputs to play
 through and each application's volume a click away; and the battery's charge along the foot.
 
+### Media controls
+
+The media keys (Play/Pause, Next, Previous and Stop, bound to the actions `media_play_pause`,
+`media_next`, `media_previous` and `media_stop`, which `shaodesk msg` runs too) control the media
+player playing most lately, as on Windows 11 and KDE. The shell finds players through MPRIS
+(`org.mpris.MediaPlayer2.*` on the session bus), which music and video players offer, and
+browsers for a tab playing sound or video. The players playing come first, the one that started
+last ahead; then those that played, by when they stopped; then those already paused or stopped
+when the shell found them. A player stopped with nothing loaded is left out. The keys do nothing
+while there is no player, and the shell needs Qt's D-Bus module at build time for any
+(`-DSHAODESK_MEDIA=OFF` builds without them).
+
 ### Where the widgets go
 
 Each widget is switched off from Lua: `shell = { widgets = { battery = false, calendar = false } }`,

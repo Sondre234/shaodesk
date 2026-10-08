@@ -286,6 +286,18 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
     case SH_NOTIFICATION_HISTORY:
         request_shell(server, "notifications");
         break;
+    case SH_MEDIA_PLAY_PAUSE:
+        send_shell_line(server, "media play-pause\n");
+        break;
+    case SH_MEDIA_NEXT:
+        send_shell_line(server, "media next\n");
+        break;
+    case SH_MEDIA_PREVIOUS:
+        send_shell_line(server, "media previous\n");
+        break;
+    case SH_MEDIA_STOP:
+        send_shell_line(server, "media stop\n");
+        break;
     case SH_POWER_OFF:
     case SH_REBOOT:
     case SH_SUSPEND:

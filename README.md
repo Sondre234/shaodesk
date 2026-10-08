@@ -268,6 +268,7 @@ Edit them in [config/init.lua](config/init.lua).
 | Super + N / Super + Shift + N | [Notification](docs/features.md#notifications-and-on-screen-display) history / do-not-disturb |
 | Super + Shift + R | Reload the configuration |
 | Print / Shift + Print / Super + Print | [Screenshot](docs/features.md#screenshots-and-screen-sharing) of a region / the monitor / the focused window |
+| Play/Pause, Next, Previous, Stop keys | [Media controls](docs/features.md#media-controls) of the player playing most lately |
 
 ## Scripting
 

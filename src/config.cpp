@@ -1670,6 +1670,10 @@ constexpr std::pair<std::string_view, sh_action> action_table[] = {
         {"toggle_overview", SH_OVERVIEW_TOGGLE},
         {"overview_confirm", SH_OVERVIEW_CONFIRM},
         {"overview_cancel", SH_OVERVIEW_CANCEL},
+        {"media_play_pause", SH_MEDIA_PLAY_PAUSE},
+        {"media_next", SH_MEDIA_NEXT},
+        {"media_previous", SH_MEDIA_PREVIOUS},
+        {"media_stop", SH_MEDIA_STOP},
 };
 } // namespace
 
