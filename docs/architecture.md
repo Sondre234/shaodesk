@@ -317,6 +317,19 @@ whose timer takes the choice shown, and the shell draws it from `display-mode` l
 (`DisplayModes`, `display_modes.cpp`, and `DisplayModeView`). `display_mode_key`, which
 `handle_keybinding` asks before the bindings, takes the arrows, Return and Escape while it is open.
 
+### Tearing
+
+`output_frame` asks `output_commit_tearing` (`tearing.c`) before committing a frame as usual. With
+`windows.allow_tearing` it finds the output's fullscreen window and whether it may tear: it asks
+through tearing-control-v1 (`wlr_tearing_control_manager_v1`'s hint for its surface) or a rule's
+`allow_tearing` names it (matched again only when the window or the configuration generation
+changes), and nothing else is drawn over it: `wlr_scene_output_for_each_buffer` visits the
+output's buffers bottom to top, and one outside the window's tree after the first of its own is
+over it. The session locked, the output magnified, the overview, the switcher or a peek rule it
+out at once. Then it builds the frame with `wlr_scene_output_build_state`, sets
+`tearing_page_flip`, tests it and commits without it where the test, or the commit, refuses.
+`sh_output.tearing` keeps why and the counts for `get tearing`.
+
 ### Power saving when idle
 
 `idle.c` takes the `idle` steps (`enum sh_idle_step`: dim, display_off, lock, suspend) with one
@@ -802,7 +815,9 @@ whether it has, for something the compositor does another way without it, as the
   (see `drag_focus_smoke.py`). `headless_output capture NAME PATH` writes a mirroring output's
 picture to a PPM file (see `mirror_smoke.py`), and `SHAODESK_TEST_REFUSE_10BIT=NAME,...` makes
 those headless outputs refuse a 10-bit render format, as a monitor without one does (see
-`bit_depth_smoke.py`). `SHAODESK_PROBE_ICON` gives a `wayland_probe` window an icon
+`bit_depth_smoke.py`), and `SHAODESK_TEST_REFUSE_TEARING` refuses their asynchronous page flips
+(see `tearing_smoke.py`, whose windows ask for them with `SHAODESK_PROBE_TEARING=async`).
+`SHAODESK_PROBE_ICON` gives a `wayland_probe` window an icon
   through xdg-toplevel-icon-v1 and an `x11_probe` window `_NET_WM_ICON`, and their commands
   change it (see `window_icon_smoke.py`). `SHAODESK_LOGIN_SESSION=1` makes a headless
   compositor start as a standalone session does, running XDG autostart from the directories
