@@ -482,6 +482,10 @@ static bool action_targets_window(enum sh_action action) {
     case SH_MOVE_TO_WORKSPACE:
     case SH_SNAP_LEFT:
     case SH_SNAP_RIGHT:
+    case SH_SNAP_TOP_LEFT:
+    case SH_SNAP_TOP_RIGHT:
+    case SH_SNAP_BOTTOM_LEFT:
+    case SH_SNAP_BOTTOM_RIGHT:
     case SH_MAXIMIZE:
     case SH_RESTORE:
     case SH_MOVE_LEFT:

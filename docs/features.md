@@ -522,6 +522,12 @@ floating on purpose there snaps as on any other monitor. The magnetic edges belo
 alongside: the window sticks to an edge while it is dragged, and the pointer decides the snap
 when it is dropped.
 
+From the keyboard, `snap_left` and `snap_right` put the focused window into that half of its
+monitor, `snap_top_left`, `snap_top_right`, `snap_bottom_left` and `snap_bottom_right` into that
+quarter, and `maximize` fills it; `restore` gives a snapped or maximized window its size and
+place back. Snapping a window to the half it is in already moves it to the near half of the next
+monitor that way. These float a tile, as dragging one does.
+
 `windows.snap = { enabled = false }` turns snapping by dragging off, the top edge too;
 `corners = false` leaves the corners to the side edges; `preview = false` snaps without the
 preview. `shaodesk msg get snap` says which zone the pointer is in while a window is moved, the
