@@ -239,6 +239,8 @@ struct sh_monitor {
     /* The monitor it shows the picture of, out of the layout itself: a connector name or
      * "desc:..." as `name` is; "" to join the layout. */
     char mirror[64];
+    int bit_depth; /* bits per colour channel it is drawn in: 8, or 10 where the output and the
+                    * renderer allow it; 0: 8 */
 };
 
 /* layout.outputs: defaults for the workspaces of the outputs matching `name` (as sh_monitor's
