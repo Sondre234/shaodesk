@@ -105,6 +105,30 @@ int main(int argc, char **argv) {
         rejects("return {bindings={{key='l',action='close',amount=10}}}");
         rejects("return {bindings={{key='l',action='resize_up',amount=0}}}");
         rejects("return {bindings={{key='l',action='resize_up',amount=1.5}}}");
+        {
+            // The volume and brightness steps take `amount` in percent, 5 unless given.
+            auto steps = shaodesk::parse_config(
+                "return {bindings={{key='XF86AudioRaiseVolume',action='volume_up'},"
+                "{key='XF86AudioLowerVolume',action='volume_down',amount=2},"
+                "{key='XF86MonBrightnessUp',action='brightness_up',amount=100},"
+                "{key='XF86AudioMute',action='volume_mute'},"
+                "{key='XF86AudioMicMute',action='mic_mute'}}}");
+            require(steps.bindings.size() == 5 && steps.bindings[0].action == SH_VOLUME_UP &&
+                        steps.bindings[0].amount == shaodesk::default_step_percent &&
+                        steps.bindings[1].action == SH_VOLUME_DOWN && steps.bindings[1].amount == 2 &&
+                        steps.bindings[2].action == SH_BRIGHTNESS_UP &&
+                        steps.bindings[2].amount == 100 && steps.bindings[3].action == SH_VOLUME_MUTE &&
+                        steps.bindings[4].action == SH_MIC_MUTE,
+                    "volume and brightness bindings not parsed");
+            require(shaodesk::parse_action("brightness_down") == SH_BRIGHTNESS_DOWN &&
+                        shaodesk::default_amount(SH_RESIZE_UP) == shaodesk::default_resize_amount &&
+                        shaodesk::max_amount(SH_VOLUME_UP) == 100,
+                    "volume and brightness actions missing");
+            rejects("return {bindings={{key='l',action='volume_up',amount=101}}}");
+            rejects("return {bindings={{key='l',action='brightness_down',amount=0}}}");
+            rejects("return {bindings={{key='l',action='volume_mute',amount=5}}}");
+            rejects("return {bindings={{key='l',action='mic_mute',amount=5}}}");
+        }
         auto *launcher = config.binding(SH_LOGO, XKB_KEY_r);
         require(launcher && launcher->action == SH_LAUNCHER, "launcher binding missing");
         require(shaodesk::parse_action("toggle_floating") == SH_TOGGLE_FLOATING,
