@@ -324,6 +324,14 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
         wlr_xdg_decoration_manager_v1_create(server.wl_display);
     add_listener(&decorations->events.new_toplevel_decoration, &server.new_decoration,
                  server_new_decoration);
+    // Windows' own icons, for the taskbar (window_icon.c). Clients are told the sizes taskbars
+    // and switchers commonly draw, up to the 256 pixels the shell is sent at most.
+    struct wlr_xdg_toplevel_icon_manager_v1 *icons =
+        wlr_xdg_toplevel_icon_manager_v1_create(server.wl_display, 1);
+    int icon_sizes[] = {16, 24, 32, 48, 64, 128, 256};
+    wlr_xdg_toplevel_icon_manager_v1_set_sizes(icons, icon_sizes,
+                                               sizeof(icon_sizes) / sizeof(*icon_sizes));
+    add_listener(&icons->events.set_icon, &server.set_xdg_icon, server_set_xdg_icon);
 
     server.cursor = wlr_cursor_create();
     wlr_cursor_attach_output_layout(server.cursor, server.output_layout);
@@ -473,6 +481,7 @@ finish:
     wl_list_remove(&server.new_xdg_toplevel.link);
     wl_list_remove(&server.new_xdg_popup.link);
     wl_list_remove(&server.new_decoration.link);
+    wl_list_remove(&server.set_xdg_icon.link);
     wl_list_remove(&server.new_layer_surface.link);
 
     wl_list_remove(&server.cursor_motion.link);

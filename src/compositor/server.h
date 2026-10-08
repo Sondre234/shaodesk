@@ -106,6 +106,7 @@
 #include <wlr/types/wlr_xdg_foreign_v2.h>
 #include <wlr/types/wlr_xdg_output_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/types/wlr_xdg_toplevel_icon_v1.h>
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>
 #include <wlr/xcursor.h>
@@ -357,6 +358,7 @@ struct sh_server {
     struct wl_list window_objects;
     struct wl_event_source *window_objects_idle;
     struct wl_listener new_capture_request;
+    struct wl_listener set_xdg_icon; // a Wayland window giving its icon (window_icon.c)
 
     /* Session lock: `locked` outlives a crashed locker so the screen stays covered. */
     bool locked;
@@ -1051,6 +1053,7 @@ void window_control_init(struct sh_server *server);
 int icon_size_rank(uint32_t width, uint32_t height);
 void set_toplevel_icon(struct sh_toplevel *toplevel, struct sh_icon icon);
 void free_icon(struct sh_icon *icon);
+void server_set_xdg_icon(struct wl_listener *listener, void *data);
 
 /* workspace.c */
 int output_slot(struct sh_server *server, const char *name);

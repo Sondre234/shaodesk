@@ -43,7 +43,8 @@ with harness.Compositor(compositor, Path(example).read_text()) as desktop:
                     "ext_output_image_capture_source_manager_v1",
                     "ext_foreign_toplevel_list_v1", "zxdg_decoration_manager_v1",
                     "ext_foreign_toplevel_image_capture_source_manager_v1",
-                    "zwp_virtual_keyboard_manager_v1", "zwlr_virtual_pointer_manager_v1"}
+                    "zwp_virtual_keyboard_manager_v1", "zwlr_virtual_pointer_manager_v1",
+                    "xdg_toplevel_icon_manager_v1"}
         assert expected <= advertised, f"missing globals: {sorted(expected - advertised)}"
         for _ in range(3):
             subprocess.run([probe], env=env, check=True, timeout=30)
