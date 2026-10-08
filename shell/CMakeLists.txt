@@ -654,6 +654,10 @@ if(BUILD_TESTING)
             ${PROJECT_SOURCE_DIR}/tests/display_mode_shell_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:pointer_probe>)
         set_tests_properties(display_mode_shell_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME display_settings_shell_smoke COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/display_settings_shell_smoke.py $<TARGET_FILE:shaodesk>
+            $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:pointer_probe>)
+        set_tests_properties(display_settings_shell_smoke PROPERTIES TIMEOUT 90)
         if(SHAODESK_DBUS)
             add_test(NAME notifications_smoke COMMAND ${Python3_EXECUTABLE}
                 ${PROJECT_SOURCE_DIR}/tests/notifications_smoke.py $<TARGET_FILE:shaodesk>
