@@ -7,6 +7,7 @@ leak:tests/lock_probe.c
 leak:tests/pointer_probe.c
 leak:tests/idle_probe.c
 leak:tests/x11_probe.c
+leak:tests/clipboard_probe.c
 leak:tests/shell_ui_test.cpp
 leak:tests/task_model_test.cpp
 # fontconfig's pattern cache, filled through Qt's font fallback and never freed; neither the
