@@ -67,6 +67,10 @@ void hyprlang(const fs::path &root) {
             "a mode without a rate not imported");
     auto *dp2 = monitor(config, "DP-2");
     require(dp2 && !dp2->enabled, "a disabled monitor not imported");
+    auto *mirror = monitor(config, "HDMI-A-2");
+    require(mirror && std::string(mirror->mirror) == "DP-1", "mirror not imported");
+    require(monitor(config, "HDMI-A-3") && !monitor(config, "HDMI-A-3")->mirror[0],
+            "a monitor mirroring itself should drop only the mirror");
     auto *dp9 = monitor(config, "DP-9");
     require(dp9 && dp9->scale == 0 && dp9->x == -1920, "a bad scale should drop only the scale");
     require(s.output_count == 3 && std::string(s.output_order[0]) == "DP-9" &&
@@ -97,6 +101,7 @@ void hyprlang(const fs::path &root) {
     const auto &report = result.report;
     for (const char *expected :
          {"rounded corners", "blur needs", "some-mouse", "source /etc/hostname", "scale 1ab",
+          "HDMI-A-3: mirror HDMI-A-3 is not another monitor's name",
           "matches more than the app ID", "key bindings (1)", "window rules without opacity (1)"})
         require(contains(report, expected), std::string("report lacks: ") + expected);
 }

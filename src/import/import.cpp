@@ -512,8 +512,16 @@ class Translator {
                 report_.skip(files_, item.origin,
                              name + ": vrr " + vrr + " (fullscreen only) is not supported");
         }
+        // Hyprland's mirror shows another monitor's picture, as shaodesk's does.
+        if (auto mirror = field("mirror"); !mirror.empty()) {
+            if (valid_output_target(mirror) && mirror != name)
+                theme_.set(at("mirror"), quote(mirror), item.origin);
+            else
+                report_.skip(files_, item.origin, name + ": mirror " + mirror +
+                                                      " is not another monitor's name");
+        }
         for (const auto &[key, value] : item.fields)
-            if (key == "bitdepth" || key == "mirror" || key == "cm" || key == "sdrbrightness" ||
+            if (key == "bitdepth" || key == "cm" || key == "sdrbrightness" ||
                 key == "sdrsaturation" || key == "reserved")
                 report_.skip(files_, item.origin, name + ": " + key + " is not supported yet");
     }

@@ -85,7 +85,8 @@ shaodesk before it can be imported, **won't** = deliberately not carried over.
 | Transform / rotation | `transform, N` | `outputs.monitors[NAME].transform` | done | yes |
 | Match by description | `desc:…` | `outputs.monitors["desc:…"]` | done (untested on hardware) | yes |
 | Variable refresh rate | `vrr` | `outputs.monitors[NAME].vrr` | done (untested on hardware) | yes |
-| 10-bit color, mirroring | `bitdepth`, `mirror` | — | missing | no |
+| Mirroring | `mirror, NAME` | `outputs.monitors[NAME].mirror` | done (untested on hardware) | yes |
+| 10-bit color | `bitdepth` | — | missing | no |
 
 ### Colors and wallpaper
 
