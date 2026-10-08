@@ -78,6 +78,16 @@ Audio::Output *Audio::current() {
     return nullptr;
 }
 const Audio::Output *Audio::current() const { return const_cast<Audio *>(this)->current(); }
+Audio::Output *Audio::currentInput() {
+    for (auto &input : state_.inputs)
+        if (input.name == state_.input)
+            return &input;
+    return nullptr;
+}
+const Audio::Output *Audio::currentInput() const {
+    return const_cast<Audio *>(this)->currentInput();
+}
+bool Audio::inputMuted() const { return currentInput() && currentInput()->muted; }
 int Audio::volume() const { return current() ? current()->volume : 0; }
 bool Audio::muted() const { return current() && current()->muted; }
 QVariantList Audio::outputs() const {
@@ -112,6 +122,13 @@ void Audio::toggleMute() {
     if (auto *output = current()) {
         output->muted = !output->muted;
         sendMute(output->name, output->muted);
+        Q_EMIT changed();
+    }
+}
+void Audio::toggleInputMute() {
+    if (auto *input = currentInput()) {
+        input->muted = !input->muted;
+        sendInputMute(input->name, input->muted);
         Q_EMIT changed();
     }
 }
