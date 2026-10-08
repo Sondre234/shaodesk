@@ -838,7 +838,8 @@ DisplaySettingsView::DisplaySettingsView(ShellController &controller, QScreen *s
         if (rootObject())
             rootObject()->setProperty("screenSize", outputScreen_->geometry().size());
     });
-    connect(controller.displaySettings(), &DisplaySettings::openChanged, this, &DisplaySettingsView::update);
+    connect(controller.displaySettings(), &DisplaySettings::openChanged, this,
+            &DisplaySettingsView::update);
     // Its output gone, as a trial may turn it off, the primary screen's view takes over, and
     // gives it back as the output returns.
     connect(qGuiApp, &QGuiApplication::screenRemoved, this, &DisplaySettingsView::update,

@@ -409,8 +409,10 @@ class ShellController : public QObject {
     NotificationCenter notifications_;
     Osd osd_;
     DisplayModes displayModes_;
-    DisplaySettings displaySettings_{
-        [this](const QByteArray &line, std::function<void(const QByteArray &)> done) { ask(line, std::move(done)); }};
+    DisplaySettings displaySettings_{[this](const QByteArray &line,
+                                            std::function<void(const QByteArray &)> done) {
+        ask(line, std::move(done));
+    }};
     // $SHAODESK_SYSFS names another sysfs tree, polled, for tests.
     Backlight backlight_{qEnvironmentVariable("SHAODESK_SYSFS", "/sys"), !qEnvironmentVariableIsSet("SHAODESK_SYSFS"),
                          qEnvironmentVariableIsSet("SHAODESK_SYSFS") ? 100 : 0};
