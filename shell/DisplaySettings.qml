@@ -270,8 +270,9 @@ Item {
             anchors.fill: parent
             anchors.margins: Theme.spacingXL
             spacing: Theme.spacingL
-            // The title, and the cross that closes the window.
+            // The title, and the cross that closes the window, which takes a trial back too.
             RowLayout {
+                id: header
                 Layout.fillWidth: true
                 spacing: Theme.spacingM
                 Icon { name: "monitor"; size: Theme.iconSize; color: Theme.text }
@@ -678,12 +679,14 @@ Item {
                 }
             }
         }
-        // The question while the settings are on trial, over the window.
+        // The question while the settings are on trial, over the window but for its title.
         Rectangle {
             id: question
             objectName: "displayTrial"
             anchors.fill: parent
+            anchors.topMargin: column.y + header.y + header.height + Theme.spacingS
             radius: Theme.radiusLarge
+            topLeftRadius: 0; topRightRadius: 0
             color: Theme.alpha(Theme.popupSurface, 0.82)
             opacity: root.settings.trial ? 1 : 0
             visible: opacity > 0
