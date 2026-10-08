@@ -14,6 +14,7 @@
 #include <iostream>
 #include <iterator>
 #include <optional>
+#include <set>
 #include <signal.h>
 #include <spawn.h>
 #include <sstream>
@@ -264,6 +265,12 @@ struct Runtime {
     // SHAODESK_LOGIN_SESSION=1.
     bool login = false;
     std::string autostart_report{}; // what `get autostart` prints
+    // The names of what startup, autostart and --exec started, to know their windows by.
+    std::set<std::string> started_names{};
+    void note_started(const shaodesk::Command &command) {
+        for (auto &name : shaodesk::program_names(command))
+            started_names.insert(std::move(name));
+    }
 
     ~Runtime() {
         if (watch_fd >= 0)
@@ -705,6 +712,11 @@ struct Runtime {
                 ++skipped;
             } else if (start_program(entry.command, failure, {}, entry.directory) > 0) {
                 state = "started";
+                note_started(entry.command);
+                // Its windows may be called after its file, or what it says they are called.
+                note_started({entry.name.substr(0, entry.name.size() - 8)});
+                if (!entry.wm_class.empty())
+                    note_started({entry.wm_class});
                 detail.clear();
                 for (const auto &argument : entry.command)
                     detail += (detail.empty() ? "" : " ") + argument;
@@ -723,6 +735,10 @@ struct Runtime {
     static const char *autostart(void *data) {
         return static_cast<Runtime *>(data)->autostart_report.c_str();
     }
+    static bool started(void *data, const char *app_id, const char *program) {
+        return shaodesk::started_by(static_cast<Runtime *>(data)->started_names,
+                                    app_id ? app_id : "", program ? program : "");
+    }
     static void startup(void *data) {
         auto &self = *static_cast<Runtime *>(data);
         if (self.standalone)
@@ -730,10 +746,11 @@ struct Runtime {
         set_window_buttons(self.config.window_buttons);
         self.start_shell();
         for (const auto &command : self.config.startup)
-            spawn(command);
+            if (spawn(command) > 0)
+                self.note_started(command);
         self.run_autostart();
-        if (!self.extra_command.empty())
-            spawn(self.extra_command);
+        if (!self.extra_command.empty() && spawn(self.extra_command) > 0)
+            self.note_started(self.extra_command);
     }
 };
 std::filesystem::path personal_config() {
@@ -942,7 +959,8 @@ int main(int argc, char **argv) {
             Runtime::command,   Runtime::reload,   Runtime::startup,      Runtime::child_exited,
             Runtime::opacity,   Runtime::screenshot, Runtime::window_rule,
             Runtime::hot_corner, Runtime::action_target, Runtime::config_watch,
-            Runtime::config_changed, Runtime::lock, Runtime::launch, Runtime::autostart};
+            Runtime::config_changed, Runtime::lock, Runtime::launch, Runtime::autostart,
+            Runtime::started};
         int result = sh_run(&callbacks, mode);
         if (runtime.shell_pid > 0)
             kill(runtime.shell_pid, SIGTERM);

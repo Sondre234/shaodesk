@@ -445,6 +445,10 @@ struct sh_callbacks {
      * entry with its file name, "started", "skipped" or "failed", the command it ran or why
      * not, and its file, separated by tabs. "" when autostart did not run. */
     const char *(*autostart)(void *);
+    /* Whether the window of a saved session with this app ID, whose process ran `program` (the
+     * first word of its command line; either may be ""), is one that a program startup,
+     * autostart or --exec started at startup will open again. */
+    bool (*started)(void *, const char *app_id, const char *program);
 };
 
 enum sh_backend_mode { SH_BACKEND_NESTED, SH_BACKEND_HEADLESS, SH_BACKEND_SESSION };
