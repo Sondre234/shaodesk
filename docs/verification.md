@@ -602,3 +602,20 @@ The `config` test checks that keyboard resizing's bindings repeat unless `repeat
 
 Not checked: a real keyboard's held keys on a real lock screen (swaylock), and how a locker that
 reads the keys itself takes the ones a `locked` binding keeps from it.
+
+## Binding modes
+
+Added 2026-10-08. `binding_modes_smoke` types on a headless keyboard with a stand-in for `wpctl`
+writing down what the mode's bindings run: outside the mode its bare keys do nothing, a binding
+enters it, its keys then run and those outside it do not, one mode leads to another and Escape or
+Return back out; `shaodesk msg mode NAME` and `get mode`, the refusal of a mode that does not
+exist, what a subscriber hears at each change, and the mode left by a reload and as the session
+locks (a probe holding an `ext-session-lock-v1` lock). `config` and `config_diagnostics` check the
+shape of `modes`, the mode action and the refusals with their lines, and `example_snippets` the
+shipped configuration's resize mode uncommented. `shell_ui` checks the pill on the taskbar and the
+macOS menu bar, and a click on it leaving the mode; both were looked at on a headless compositor
+through grim.
+
+Not checked: a mode in daily use with a real keyboard, over real applications that take the keys
+a mode leaves them.
+
