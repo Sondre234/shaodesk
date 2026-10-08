@@ -4822,6 +4822,15 @@ ListModel {
         if (!QTest::qWaitFor([&] { return !settings->changed() && !settings->busy(); }))
             return fail("the display settings did not read the monitors again");
         settings->select("EXT-1");
+        // A switch follows the settings: adaptive sync on, then Undo changes turns it off again.
+        click(item("displayVrr"));
+        if (!QTest::qWaitFor([&] { return monitor(settings, "EXT-1")["vrr"].toBool(); }) ||
+            !item("displayVrr")->property("checked").toBool())
+            return fail("the adaptive sync switch did not turn it on");
+        click(item("displayUndo"));
+        if (!QTest::qWaitFor([&] { return !settings->changed() && !settings->busy(); }) ||
+            item("displayVrr")->property("checked").toBool())
+            return fail("Undo changes did not turn the adaptive sync switch back off");
         item("displayScale")->forceActiveFocus();
         QTest::keyClick(&window, Qt::Key_Down);
         if (!QTest::qWaitFor([&] { return monitor(settings, "EXT-1")["scale"].toDouble() == 1.25; }) ||
