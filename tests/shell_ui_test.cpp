@@ -3513,6 +3513,36 @@ ListModel {
         if (palette->results().value(0).toMap()["kind"] == "calc")
             return fail("the palette calculated a lone constant");
         palette->close();
+        // Files, read once a search first asks for them, are found among the rest and alone
+        // with /; Enter opens one in its application and Ctrl+Enter its folder. Nothing here
+        // opens either, which the panel says.
+        controller.clearError();
+        openPalette();
+        type("quarterly");
+        if (!QTest::qWaitFor([&] { return titlesNow().contains("Quarterly report.txt"); }, 10000))
+            return fail("the palette did not find a file");
+        palette->setQuery("/archive");
+        if (titlesNow() != QStringList{"Archive"} || palette->results()[0].toMap()["folder"] != true)
+            return fail("/ did not narrow the palette to files");
+        palette->setQuery("/quarterly");
+        const auto found = palette->results().value(0).toMap();
+        if (found["kind"] != "file" || found["target"] != files + "/Quarterly report.txt")
+            return fail("the palette's file has the wrong path");
+        QTest::keyClick(&paletteView, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return controller.error().startsWith("Could not open Quarterly report.txt: "); }) ||
+            !QTest::qWaitFor([&] { return !paletteView.isVisible(); }) || !requests.isEmpty())
+            return fail(("opening a file from the palette did not try GIO's default application: " +
+                         controller.error().toStdString()).c_str());
+        controller.clearError();
+        openPalette();
+        type("/quarterly");
+        if (!QTest::qWaitFor([&] { return titlesNow() == QStringList{"Quarterly report.txt"}; }))
+            return fail("the palette did not find the file again");
+        QTest::keyClick(&paletteView, Qt::Key_Return, Qt::ControlModifier);
+        if (!QTest::qWaitFor([&] { return controller.error().startsWith("Could not open the folder of Quarterly report.txt: "); }) ||
+            !QTest::qWaitFor([&] { return !paletteView.isVisible(); }))
+            return fail("Ctrl+Enter did not open a file's folder from the palette");
+        controller.clearError();
         // Escape closes without running anything, and so does losing the keyboard.
         requests.clear();
         openPalette();
