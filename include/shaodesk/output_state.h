@@ -39,7 +39,8 @@ bool sh_output_state_write(const struct sh_output_state *state, FILE *file);
 /* Reads what sh_output_state_write wrote. A line it cannot read is passed over whole, and a key
  * it does not know, so that a file edited by hand or written by a newer shaodesk gives what it
  * can. False, with the reason in `error`, for a file that is not one. */
-bool sh_output_state_read(struct sh_output_state *state, FILE *file, char *error, size_t error_size);
+bool sh_output_state_read(struct sh_output_state *state, FILE *file, char *error,
+                          size_t error_size);
 /* What sh_output_state_set made of a KEY=VALUE field. */
 enum sh_output_field {
     SH_OUTPUT_FIELD_SET,

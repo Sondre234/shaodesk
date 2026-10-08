@@ -48,8 +48,8 @@ void display_settings_load(struct sh_server *server) {
     if (!sh_output_state_read(saved, file, error, sizeof(error)))
         wlr_log(WLR_ERROR, "Passing over %s: %s", path, error);
     else if (saved->count > 0)
-        wlr_log(WLR_INFO, "Monitors kept from the display settings window: %d, in %s",
-                saved->count, path);
+        wlr_log(WLR_INFO, "Monitors kept from the display settings window: %d, in %s", saved->count,
+                path);
     fclose(file);
 }
 
@@ -169,7 +169,8 @@ static void shown_settings(struct sh_server *server, struct sh_output *output,
     if (source)
         snprintf(m->mirror, sizeof(m->mirror), "%s", source->wlr_output->name);
     struct sh_output *placed = source ? source : output;
-    const struct sh_monitor *placed_monitor = placed == output ? monitor : output_monitor(settings, placed);
+    const struct sh_monitor *placed_monitor =
+        placed == output ? monitor : output_monitor(settings, placed);
     m->positioned = true;
     if (!placed->disabled)
         m->x = placed->x, m->y = placed->y;
@@ -205,7 +206,7 @@ static void describe_monitor(struct sh_server *server, int fd, struct sh_output 
     struct sh_output_saved shown;
     shown_settings(server, output, &shown);
     const struct sh_monitor *m = &shown.monitor;
-    const char *source = output->has_override ? "override"
+    const char *source = output->has_override   ? "override"
                          : saved_output(output) ? "window"
                          : monitor              ? "config"
                                                 : "default";
@@ -223,8 +224,10 @@ static void describe_monitor(struct sh_server *server, int fd, struct sh_output 
              "%s\t%s\t%d\t%s\t%d\t%s\t%s\t%d\t%d\t%s\t%.9g\t%d\t%s\t%d\t%d\t%s\t%s\t%s\t%d\t",
              o->name, shown.description, sh_output_built_in(o->name), source, m->enabled, state,
              m->mirror[0] ? m->mirror : "-", m->x, m->y, mode, m->scale, m->transform,
-             !o->adaptive_sync_supported ? "-" : m->vrr ? "on" : "off", m->bit_depth,
-             live && deep_format(o->render_format) ? 10 : 8, m->hdr ? "on" : "off",
+             !o->adaptive_sync_supported ? "-"
+             : m->vrr                    ? "on"
+                                         : "off",
+             m->bit_depth, live && deep_format(o->render_format) ? 10 : 8, m->hdr ? "on" : "off",
              output_is_hdr(output) ? "hdr" : "sdr", why ? why : "-", shown.primary);
     control_reply(fd, line);
     // The modes it offers, each once, its preferred one marked; one without any (a nested or
@@ -242,7 +245,8 @@ static void describe_monitor(struct sh_server *server, int fd, struct sh_output 
         if (again)
             continue;
         format_mode(mode, sizeof(mode), each->width, each->height, each->refresh);
-        snprintf(line, sizeof(line), "%s%s%s", listed++ ? "," : "", mode, each->preferred ? "*" : "");
+        snprintf(line, sizeof(line), "%s%s%s", listed++ ? "," : "", mode,
+                 each->preferred ? "*" : "");
         control_reply(fd, line);
     }
     if (!listed) {
@@ -284,8 +288,8 @@ static bool took_settings(struct sh_server *server, struct sh_output *output) {
     if (m && m->width > 0) {
         bool offered = wl_list_empty(&o->modes);
         struct wlr_output_mode *mode;
-        wl_list_for_each(mode, &o->modes, link) offered |= mode->width == m->width &&
-                                                         mode->height == m->height;
+        wl_list_for_each(mode, &o->modes, link) offered |=
+            mode->width == m->width && mode->height == m->height;
         if (offered && (o->width != m->width || o->height != m->height))
             return false;
     }
@@ -390,7 +394,8 @@ static bool start_trial(struct sh_server *server, const struct sh_output_state *
             continue;
         char reason[96];
         snprintf(reason, sizeof(reason), "refused %s", outputs[i]->wlr_output->name);
-        snprintf(error, error_size, "%s did not take its settings; the monitors are back as they were",
+        snprintf(error, error_size,
+                 "%s did not take its settings; the monitors are back as they were",
                  outputs[i]->wlr_output->name);
         revert_trial(server, reason);
         return false;
@@ -438,8 +443,9 @@ static bool parse_apply(struct sh_server *server, char *words, struct sh_output_
                                        ? sh_output_state_set(current, word, equals + 1)
                                        : SH_OUTPUT_FIELD_UNKNOWN;
         if (set != SH_OUTPUT_FIELD_SET) {
-            snprintf(error, error_size, set == SH_OUTPUT_FIELD_BAD ? "%s cannot take %s=%s"
-                                                                   : "%s has no setting %s%.0s",
+            snprintf(error, error_size,
+                     set == SH_OUTPUT_FIELD_BAD ? "%s cannot take %s=%s"
+                                                : "%s has no setting %s%.0s",
                      current->monitor.name, word, equals + 1);
             return false;
         }
@@ -482,8 +488,8 @@ static bool check_apply(struct sh_server *server, const struct sh_output_state *
         struct wlr_output *o = outputs[i]->wlr_output;
         bool offered = wl_list_empty(&o->modes);
         struct wlr_output_mode *mode;
-        wl_list_for_each(mode, &o->modes, link) offered |= mode->width == m->width &&
-                                                         mode->height == m->height;
+        wl_list_for_each(mode, &o->modes, link) offered |=
+            mode->width == m->width && mode->height == m->height;
         if (m->width > 0 && !offered) {
             snprintf(error, error_size, "%s has no %dx%d mode", m->name, m->width, m->height);
             return false;
@@ -548,9 +554,9 @@ void control_monitors(struct sh_server *server, int fd, const char *arguments) {
     bool done = false;
     if (!strcmp(verb, "apply") || (!strcmp(verb, "reset") && !*rest)) {
         struct sh_output_state *next = calloc(1, sizeof(*next));
-        done = next && (!strcmp(verb, "reset") ||
-                        (parse_apply(server, rest, next, error, sizeof(error)) &&
-                         check_apply(server, next, error, sizeof(error)))) &&
+        done = next &&
+               (!strcmp(verb, "reset") || (parse_apply(server, rest, next, error, sizeof(error)) &&
+                                           check_apply(server, next, error, sizeof(error)))) &&
                start_trial(server, next, error, sizeof(error));
         if (!next)
             snprintf(error, sizeof(error), "out of memory");

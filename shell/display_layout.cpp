@@ -16,8 +16,10 @@ bool overlap(const QRect &a, const QRect &b) {
 }
 
 bool touch(const QRect &a, const QRect &b) {
-    const bool side = (right(a) == b.x() || right(b) == a.x()) && a.y() < bottom(b) && b.y() < bottom(a);
-    const bool stacked = (bottom(a) == b.y() || bottom(b) == a.y()) && a.x() < right(b) && b.x() < right(a);
+    const bool side =
+        (right(a) == b.x() || right(b) == a.x()) && a.y() < bottom(b) && b.y() < bottom(a);
+    const bool stacked =
+        (bottom(a) == b.y() || bottom(b) == a.y()) && a.x() < right(b) && b.x() < right(a);
     return side || stacked;
 }
 
@@ -58,7 +60,8 @@ enum Side { Right = 1, Left = 2, Below = 4, Above = 8, Anywhere = 15 };
 int sideOf(const QRect &rect, const QRect &other) {
     const double dx = (2.0 * rect.x() + rect.width()) - (2.0 * other.x() + other.width());
     const double dy = (2.0 * rect.y() + rect.height()) - (2.0 * other.y() + other.height());
-    if (std::abs(dx) / (rect.width() + other.width()) >= std::abs(dy) / (rect.height() + other.height()))
+    if (std::abs(dx) / (rect.width() + other.width()) >=
+        std::abs(dy) / (rect.height() + other.height()))
         return dx >= 0 ? Right : Left;
     return dy >= 0 ? Below : Above;
 }
@@ -70,7 +73,8 @@ bool place(const QList<QRect> &others, QSize size, QPoint wanted, int threshold,
     long long nearest = -1;
     auto consider = [&](QPoint at) {
         const QRect placed(at, size);
-        if (std::any_of(others.begin(), others.end(), [&](const QRect &other) { return overlap(placed, other); }))
+        if (std::any_of(others.begin(), others.end(),
+                        [&](const QRect &other) { return overlap(placed, other); }))
             return;
         const long long dx = at.x() - wanted.x(), dy = at.y() - wanted.y();
         if (nearest < 0 || dx * dx + dy * dy < nearest) {
@@ -85,16 +89,18 @@ bool place(const QList<QRect> &others, QSize size, QPoint wanted, int threshold,
             if (!(allowed & side))
                 continue;
             const int low = other.y() - h + 1, high = bottom(other) - 1;
-            consider({side == Right ? right(other) : other.x() - w,
-                      align(std::clamp(wanted.y(), low, high), h, others, false, low, high, threshold)});
+            consider(
+                {side == Right ? right(other) : other.x() - w,
+                 align(std::clamp(wanted.y(), low, high), h, others, false, low, high, threshold)});
         }
         // Over or under it, the same along its top or bottom edge.
         for (int side : {Below, Above}) {
             if (!(allowed & side))
                 continue;
             const int low = other.x() - w + 1, high = right(other) - 1;
-            consider({align(std::clamp(wanted.x(), low, high), w, others, true, low, high, threshold),
-                      side == Below ? bottom(other) : other.y() - h});
+            consider(
+                {align(std::clamp(wanted.x(), low, high), w, others, true, low, high, threshold),
+                 side == Below ? bottom(other) : other.y() - h});
         }
     }
     return nearest >= 0;
@@ -109,8 +115,9 @@ QPoint snap(const QList<QRect> &others, QSize size, QPoint wanted, int threshold
     if (place(others, size, wanted, threshold, [](const QRect &) { return Anywhere; }, best))
         return best;
     // Hemmed in everywhere it could go: right of the one reaching furthest right, level with it.
-    const auto furthest = std::max_element(others.begin(), others.end(),
-                                           [](const QRect &a, const QRect &b) { return right(a) < right(b); });
+    const auto furthest =
+        std::max_element(others.begin(), others.end(),
+                         [](const QRect &a, const QRect &b) { return right(a) < right(b); });
     return {right(*furthest), furthest->y()};
 }
 
@@ -139,8 +146,9 @@ QList<QRect> settle(const QList<QRect> &rects) {
         QPoint at;
         if (done.isEmpty())
             at = rect.topLeft();
-        else if (!place(done, rect.size(), rect.topLeft(), 0,
-                        [&rect](const QRect &other) { return sideOf(rect, other); }, at))
+        else if (!place(
+                     done, rect.size(), rect.topLeft(), 0,
+                     [&rect](const QRect &other) { return sideOf(rect, other); }, at))
             at = snap(done, rect.size(), rect.topLeft());
         result[next].moveTopLeft(at);
         placed[next] = true;

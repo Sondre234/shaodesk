@@ -25,7 +25,11 @@ bool parseMode(QString text, int &width, int &height, int &refresh, bool &prefer
 QString modeText(int width, int height, int refresh) {
     if (refresh <= 0)
         return QString("%1x%2").arg(width).arg(height);
-    return QString("%1x%2@%3.%4").arg(width).arg(height).arg(refresh / 1000).arg(refresh % 1000, 3, 10, QChar('0'));
+    return QString("%1x%2@%3.%4")
+        .arg(width)
+        .arg(height)
+        .arg(refresh / 1000)
+        .arg(refresh % 1000, 3, 10, QChar('0'));
 }
 
 QString rateLabel(int refresh) {
@@ -84,18 +88,20 @@ QVariantMap DisplaySettings::record(const Monitor &m) const {
         else
             same->preferred |= mode.preferred;
         if (mode.width == m.width && mode.height == m.height)
-            rates.push_back(QVariantMap{{"refresh", mode.refresh}, {"label", rateLabel(mode.refresh)}});
+            rates.push_back(
+                QVariantMap{{"refresh", mode.refresh}, {"label", rateLabel(mode.refresh)}});
     }
     std::stable_sort(sizes.begin(), sizes.end(), [](const Mode &a, const Mode &b) {
         return qint64(a.width) * a.height > qint64(b.width) * b.height ||
                (qint64(a.width) * a.height == qint64(b.width) * b.height && a.width > b.width);
     });
     for (const auto &size : sizes)
-        resolutions.push_back(QVariantMap{{"width", size.width},
-                                          {"height", size.height},
-                                          {"preferred", size.preferred},
-                                          {"label", QString("%1 × %2").arg(size.width).arg(size.height) +
-                                                        (size.preferred ? " (recommended)" : "")}});
+        resolutions.push_back(
+            QVariantMap{{"width", size.width},
+                        {"height", size.height},
+                        {"preferred", size.preferred},
+                        {"label", QString("%1 × %2").arg(size.width).arg(size.height) +
+                                      (size.preferred ? " (recommended)" : "")}});
     std::stable_sort(rates.begin(), rates.end(), [](const QVariant &a, const QVariant &b) {
         return a.toMap()["refresh"].toInt() > b.toMap()["refresh"].toInt();
     });
@@ -105,37 +111,40 @@ QVariantMap DisplaySettings::record(const Monitor &m) const {
             mirroredBy << other.name;
     const QString description = m.description.simplified();
     const auto logical = m.rect().size();
-    return {{"name", m.name},
-            {"title", m.builtIn ? QString("Built-in display") : description.isEmpty() ? m.name : description},
-            {"description", description},
-            {"builtIn", m.builtIn},
-            {"source", m.source},
-            {"enabled", m.enabled},
-            {"state", m.state},
-            {"mirror", m.mirror},
-            {"mirroredBy", mirroredBy},
-            {"x", m.x},
-            {"y", m.y},
-            {"width", m.width},
-            {"height", m.height},
-            {"refresh", m.refresh},
-            {"scale", m.scale},
-            {"transform", m.transform},
-            {"logicalWidth", logical.width()},
-            {"logicalHeight", logical.height()},
-            {"inLayout", m.inLayout()},
-            {"vrrSupported", m.vrrSupported},
-            {"vrr", m.vrr},
-            {"bitDepth", m.bitDepth},
-            {"drawnDepth", m.drawnDepth},
-            {"hdr", m.hdr},
-            {"hdrActive", m.hdrActive},
-            {"hdrPossible", m.hdrWhy.isEmpty()},
-            {"hdrWhy", m.hdrWhy},
-            {"primary", m.primary},
-            {"resolutions", resolutions},
-            {"rates", rates},
-            {"modeLabel", QString("%1 × %2, %3").arg(m.width).arg(m.height).arg(rateLabel(m.refresh))}};
+    return {
+        {"name", m.name},
+        {"title", m.builtIn               ? QString("Built-in display")
+                  : description.isEmpty() ? m.name
+                                          : description},
+        {"description", description},
+        {"builtIn", m.builtIn},
+        {"source", m.source},
+        {"enabled", m.enabled},
+        {"state", m.state},
+        {"mirror", m.mirror},
+        {"mirroredBy", mirroredBy},
+        {"x", m.x},
+        {"y", m.y},
+        {"width", m.width},
+        {"height", m.height},
+        {"refresh", m.refresh},
+        {"scale", m.scale},
+        {"transform", m.transform},
+        {"logicalWidth", logical.width()},
+        {"logicalHeight", logical.height()},
+        {"inLayout", m.inLayout()},
+        {"vrrSupported", m.vrrSupported},
+        {"vrr", m.vrr},
+        {"bitDepth", m.bitDepth},
+        {"drawnDepth", m.drawnDepth},
+        {"hdr", m.hdr},
+        {"hdrActive", m.hdrActive},
+        {"hdrPossible", m.hdrWhy.isEmpty()},
+        {"hdrWhy", m.hdrWhy},
+        {"primary", m.primary},
+        {"resolutions", resolutions},
+        {"rates", rates},
+        {"modeLabel", QString("%1 × %2, %3").arg(m.width).arg(m.height).arg(rateLabel(m.refresh))}};
 }
 
 QVariantList DisplaySettings::monitors() const {
@@ -159,8 +168,9 @@ QSize DisplaySettings::extent() const {
 }
 
 int DisplaySettings::layoutCount() const {
-    return static_cast<int>(std::count_if(monitors_.begin(), monitors_.end(),
-                                          [](const Monitor &monitor) { return monitor.inLayout(); }));
+    return static_cast<int>(
+        std::count_if(monitors_.begin(), monitors_.end(),
+                      [](const Monitor &monitor) { return monitor.inLayout(); }));
 }
 
 bool DisplaySettings::changed() const {
@@ -168,9 +178,10 @@ bool DisplaySettings::changed() const {
         return true;
     for (qsizetype i = 0; i < monitors_.size(); ++i) {
         const auto &a = monitors_[i], &b = loaded_[i];
-        if (a.enabled != b.enabled || a.mirror != b.mirror || a.width != b.width || a.height != b.height ||
-            a.refresh != b.refresh || std::abs(a.scale - b.scale) > 1e-6 || a.transform != b.transform ||
-            a.vrr != b.vrr || a.bitDepth != b.bitDepth || a.hdr != b.hdr || a.primary != b.primary ||
+        if (a.enabled != b.enabled || a.mirror != b.mirror || a.width != b.width ||
+            a.height != b.height || a.refresh != b.refresh || std::abs(a.scale - b.scale) > 1e-6 ||
+            a.transform != b.transform || a.vrr != b.vrr || a.bitDepth != b.bitDepth ||
+            a.hdr != b.hdr || a.primary != b.primary ||
             (a.inLayout() && (a.x != b.x || a.y != b.y)))
             return true;
     }
@@ -178,10 +189,12 @@ bool DisplaySettings::changed() const {
 }
 
 bool DisplaySettings::kept() const {
-    return std::any_of(monitors_.begin(), monitors_.end(), [](const Monitor &m) { return m.source == "window"; });
+    return std::any_of(monitors_.begin(), monitors_.end(),
+                       [](const Monitor &m) { return m.source == "window"; });
 }
 
-void DisplaySettings::request(const QByteArray &line, std::function<void(const QByteArray &)> done) {
+void DisplaySettings::request(const QByteArray &line,
+                              std::function<void(const QByteArray &)> done) {
     ++pending_;
     if (pending_ == 1)
         Q_EMIT busyChanged();
@@ -297,7 +310,8 @@ bool DisplaySettings::handle(const QString &line) {
     if (line.startsWith("monitors-reverted ")) {
         const auto reason = line.mid(18);
         ended(reason == "timeout" ? "The settings were not kept; the previous ones are back."
-              : reason == "reload" ? "The configuration was reloaded; the previous settings are back."
+              : reason == "reload"
+                  ? "The configuration was reloaded; the previous settings are back."
               : reason.startsWith("refused ")
                   ? reason.mid(8) + " did not take its settings; the previous ones are back."
                   : QString());
@@ -392,7 +406,8 @@ void DisplaySettings::placeRight(Monitor &monitor) {
 
 void DisplaySettings::setEnabled(const QString &name, bool enabled) {
     auto *monitor = find(name);
-    if (!monitor || monitor->enabled == enabled || (!enabled && monitor->inLayout() && layoutCount() == 1))
+    if (!monitor || monitor->enabled == enabled ||
+        (!enabled && monitor->inLayout() && layoutCount() == 1))
         return;
     monitor->enabled = enabled;
     if (enabled && monitor->inLayout())
@@ -418,7 +433,8 @@ void DisplaySettings::setEnabled(const QString &name, bool enabled) {
 void DisplaySettings::setMirror(const QString &name, const QString &source) {
     auto *monitor = find(name);
     const auto *shown = source.isEmpty() ? nullptr : find(source);
-    if (!monitor || monitor->mirror == source || (!source.isEmpty() && (!shown || shown == monitor || !shown->inLayout())))
+    if (!monitor || monitor->mirror == source ||
+        (!source.isEmpty() && (!shown || shown == monitor || !shown->inLayout())))
         return;
     if (source.isEmpty()) {
         monitor->mirror.clear();
@@ -466,7 +482,8 @@ void DisplaySettings::setRefresh(const QString &name, int refresh) {
     auto *monitor = find(name);
     if (!monitor || monitor->refresh == refresh ||
         std::none_of(monitor->modes.begin(), monitor->modes.end(), [&](const Mode &mode) {
-            return mode.width == monitor->width && mode.height == monitor->height && mode.refresh == refresh;
+            return mode.width == monitor->width && mode.height == monitor->height &&
+                   mode.refresh == refresh;
         }))
         return;
     monitor->refresh = refresh;
@@ -554,12 +571,14 @@ QByteArray DisplaySettings::applyRequest() const {
     for (const auto &m : monitors_) {
         words << m.name << QString("enabled=%1").arg(m.enabled ? "on" : "off")
               << "mode=" + modeText(m.width, m.height, m.refresh)
-              << "scale=" + QString::number(m.scale, 'g', 9) << QString("transform=%1").arg(m.transform)
+              << "scale=" + QString::number(m.scale, 'g', 9)
+              << QString("transform=%1").arg(m.transform)
               << QString("position=%1,%2").arg(m.x).arg(m.y);
         if (m.vrrSupported)
             words << QString("vrr=%1").arg(m.vrr ? "on" : "off");
         words << "mirror=" + (m.mirror.isEmpty() ? QString("-") : m.mirror)
-              << QString("bit_depth=%1").arg(m.bitDepth) << QString("hdr=%1").arg(m.hdr ? "on" : "off")
+              << QString("bit_depth=%1").arg(m.bitDepth)
+              << QString("hdr=%1").arg(m.hdr ? "on" : "off")
               << QString("primary=%1").arg(m.primary ? "on" : "off");
     }
     return words.join(' ').toUtf8() + "\n";
@@ -614,12 +633,11 @@ void DisplaySettings::reset() {
     });
 }
 
-QVariantList DisplaySettings::scales() {
-    return {1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 3.0};
-}
+QVariantList DisplaySettings::scales() { return {1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 3.0}; }
 
 QString DisplaySettings::transformName(int transform) {
-    static const char *const names[] = {"Normal", "90°", "180°", "270°", "Flipped", "Flipped, 90°",
+    static const char *const names[] = {"Normal",        "90°",          "180°",
+                                        "270°",          "Flipped",      "Flipped, 90°",
                                         "Flipped, 180°", "Flipped, 270°"};
     return transform >= 0 && transform < 8 ? names[transform] : QString();
 }

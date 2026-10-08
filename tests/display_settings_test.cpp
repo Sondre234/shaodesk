@@ -11,9 +11,11 @@ namespace {
 // laptop's panel at a scale of 1.5 to its right, and a third off.
 const QByteArray monitors =
     "ok\n"
-    "DP-3\tDell Inc. DELL U2720Q 4KX\t0\tconfig\t1\ton\t-\t-1920\t0\t2560x1440@143.912\t1\t0\toff\t8\t8\t"
+    "DP-3\tDell Inc. DELL U2720Q "
+    "4KX\t0\tconfig\t1\ton\t-\t-1920\t0\t2560x1440@143.912\t1\t0\toff\t8\t8\t"
     "off\tsdr\t-\t1\t2560x1440@59.951*,2560x1440@143.912,1920x1080@60.000,1920x1080@143.912\n"
-    "eDP-1\tBOE 0x0BCA \t1\tdefault\t1\ton\t-\t640\t0\t2880x1800@120.000\t1.5\t0\t-\t8\t8\toff\tsdr\t"
+    "eDP-1\tBOE 0x0BCA "
+    "\t1\tdefault\t1\ton\t-\t640\t0\t2880x1800@120.000\t1.5\t0\t-\t8\t8\toff\tsdr\t"
     "the monitor does not offer BT.2020 with PQ\t0\t2880x1800@120.000*,2880x1800@60.000\n"
     "HDMI-A-1\t  \t0\twindow\t0\toff\t-\t0\t0\t1920x1080@60.000\t1\t0\t-\t8\t8\toff\tsdr\t"
     "the monitor does not offer BT.2020 with PQ\t0\t1920x1080@60.000*\n";
@@ -44,8 +46,8 @@ class DisplaySettingsTest : public QObject {
         settings = std::make_unique<DisplaySettings>(
             [this](const QByteArray &line, std::function<void(const QByteArray &)> done) {
                 requests << QString::fromUtf8(line).trimmed();
-                QByteArray reply = !answer.isEmpty()            ? answer
-                                   : line == "get monitors\n"   ? monitors
+                QByteArray reply = !answer.isEmpty()          ? answer
+                                   : line == "get monitors\n" ? monitors
                                    : line.startsWith("monitors apply") || line == "monitors reset\n"
                                        ? QByteArray("ok\n15000\n")
                                        : QByteArray("ok\n");
@@ -147,14 +149,16 @@ class DisplaySettingsTest : public QObject {
         settings->setHdr("DP-3", true);
         settings->setHdr("eDP-1", true); // cannot be had
         QCOMPARE(monitor(*settings, "eDP-1")["hdr"], QVariant(false));
-        QCOMPARE(QString::fromUtf8(settings->applyRequest()),
-                 QString("monitors apply "
-                         "DP-3 enabled=on mode=1920x1080@60.000 scale=1 transform=1 position=0,0 vrr=on "
-                         "mirror=- bit_depth=10 hdr=on primary=off "
-                         "eDP-1 enabled=on mode=2880x1800@120.000 scale=2 transform=0 position=1080,0 "
-                         "mirror=- bit_depth=8 hdr=off primary=on "
-                         "HDMI-A-1 enabled=off mode=1920x1080@60.000 scale=1 transform=0 position=2520,0 "
-                         "mirror=DP-3 bit_depth=8 hdr=off primary=off\n"));
+        QCOMPARE(
+            QString::fromUtf8(settings->applyRequest()),
+            QString(
+                "monitors apply "
+                "DP-3 enabled=on mode=1920x1080@60.000 scale=1 transform=1 position=0,0 vrr=on "
+                "mirror=- bit_depth=10 hdr=on primary=off "
+                "eDP-1 enabled=on mode=2880x1800@120.000 scale=2 transform=0 position=1080,0 "
+                "mirror=- bit_depth=8 hdr=off primary=on "
+                "HDMI-A-1 enabled=off mode=1920x1080@60.000 scale=1 transform=0 position=2520,0 "
+                "mirror=DP-3 bit_depth=8 hdr=off primary=off\n"));
         // Disabling the primary monitor makes another one primary.
         settings->setEnabled("HDMI-A-1", true); // mirrors DP-3 again
         settings->setEnabled("eDP-1", false);
@@ -186,7 +190,8 @@ class DisplaySettingsTest : public QObject {
         requests.clear();
         settings->apply();
         QCOMPARE(requests.size(), 2);
-        QVERIFY(requests[0].startsWith("monitors apply DP-3 enabled=on mode=2560x1440@143.912 scale=1.25 "));
+        QVERIFY(requests[0].startsWith(
+            "monitors apply DP-3 enabled=on mode=2560x1440@143.912 scale=1.25 "));
         QCOMPARE(requests[1], QString("get monitors"));
         QVERIFY(settings->trial());
         QCOMPARE(settings->secondsLeft(), 15);
@@ -216,13 +221,15 @@ class DisplaySettingsTest : public QObject {
         QVERIFY(settings->handle("monitors-reverted timeout"));
         QVERIFY(!settings->trial());
         QCOMPARE(requests, QStringList{"get monitors"});
-        QCOMPARE(settings->message(), QString("The settings were not kept; the previous ones are back."));
+        QCOMPARE(settings->message(),
+                 QString("The settings were not kept; the previous ones are back."));
         // A trial a script started shows too, and its end.
         QVERIFY(settings->handle("monitors-trial 3000"));
         QVERIFY(settings->trial());
         QCOMPARE(settings->secondsLeft(), 3);
         QVERIFY(settings->handle("monitors-reverted refused eDP-1"));
-        QCOMPARE(settings->message(), QString("eDP-1 did not take its settings; the previous ones are back."));
+        QCOMPARE(settings->message(),
+                 QString("eDP-1 did not take its settings; the previous ones are back."));
         QVERIFY(!settings->handle("monitors-unknown"));
         // A refusal says why, and nothing is on trial.
         answer = "error: DP-3 refused these settings; nothing changed\n";
@@ -234,8 +241,10 @@ class DisplaySettingsTest : public QObject {
         answer = "error: cannot write /state/shaodesk/outputs: Read-only file system\n";
         settings->keep();
         QVERIFY(!settings->trial());
-        QCOMPARE(settings->message(),
-                 QString("Kept for now, but cannot write /state/shaodesk/outputs: Read-only file system."));
+        QCOMPARE(
+            settings->message(),
+            QString(
+                "Kept for now, but cannot write /state/shaodesk/outputs: Read-only file system."));
         // Reset to configuration puts the configuration's settings on trial.
         requests.clear();
         settings->reset();

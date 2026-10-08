@@ -30,27 +30,29 @@ class DisplayLayoutTest : public QObject {
         const QSize size(1920, 1080);
         // Tops, bottoms and centres within the threshold come in line; further, they do not.
         QCOMPARE(snap(others, size, {2600, 30}, 50), QPoint(2560, 0));
-        QCOMPARE(snap(others, size, {2600, 340}, 50), QPoint(2560, 360));    // bottoms
-        QCOMPARE(snap(others, size, {2600, 200}, 50), QPoint(2560, 180));    // centres
-        QCOMPARE(snap(others, size, {2600, 100}, 50), QPoint(2560, 100));    // none near
-        QCOMPARE(snap(others, size, {2600, 30}, 0), QPoint(2560, 30));       // no threshold
+        QCOMPARE(snap(others, size, {2600, 340}, 50), QPoint(2560, 360)); // bottoms
+        QCOMPARE(snap(others, size, {2600, 200}, 50), QPoint(2560, 180)); // centres
+        QCOMPARE(snap(others, size, {2600, 100}, 50), QPoint(2560, 100)); // none near
+        QCOMPARE(snap(others, size, {2600, 30}, 0), QPoint(2560, 30));    // no threshold
         // Under it, lefts and rights the same.
         QCOMPARE(snap(others, size, {40, 1500}, 50), QPoint(0, 1440));
-        QCOMPARE(snap(others, size, {610, 1500}, 50), QPoint(640, 1440));     // rights
+        QCOMPARE(snap(others, size, {610, 1500}, 50), QPoint(640, 1440)); // rights
         // A third monitor lines up with either.
         const QList<QRect> two{{0, 0, 2560, 1440}, {2560, 200, 1920, 1080}};
         QCOMPARE(snap(two, QSize(1280, 1024), {4500, 195}, 50), QPoint(4480, 200));
-        QCOMPARE(snap(two, QSize(1280, 1024), {4500, 230}, 50), QPoint(4480, 228));  // centres
+        QCOMPARE(snap(two, QSize(1280, 1024), {4500, 230}, 50), QPoint(4480, 228)); // centres
     }
     void neverOverlaps() {
         // Two side by side; a third dropped onto the seam goes beside one of them, overlapping
         // neither.
         const QList<QRect> two{{0, 0, 1920, 1080}, {1920, 0, 1920, 1080}};
         const QSize size(1280, 720);
-        for (const QPoint &dropped : {QPoint(1500, 200), QPoint(1900, 0), QPoint(1000, 500), QPoint(-10, 1000)}) {
+        for (const QPoint &dropped :
+             {QPoint(1500, 200), QPoint(1900, 0), QPoint(1000, 500), QPoint(-10, 1000)}) {
             const QRect placed(snap(two, size, dropped), size);
             for (const auto &other : two)
-                QVERIFY2(!placed.intersects(other), qPrintable(QString("dropped at %1,%2").arg(dropped.x()).arg(dropped.y())));
+                QVERIFY2(!placed.intersects(other),
+                         qPrintable(QString("dropped at %1,%2").arg(dropped.x()).arg(dropped.y())));
             QVERIFY(arranged(two + QList<QRect>{placed}));
         }
         // On the seam's top it goes over the two, where it was dropped across.
@@ -71,7 +73,8 @@ class DisplayLayoutTest : public QObject {
         QCOMPARE(settle({{0, 0, 1920, 1080}, {1920, 0, 1280, 720}, {3840, 0, 1920, 1080}}),
                  (QList<QRect>{{0, 0, 1920, 1080}, {1920, 0, 1280, 720}, {3200, 0, 1920, 1080}}));
         // An arrangement that is already one stays as it is.
-        const QList<QRect> stacked{{0, 0, 1920, 1080}, {300, 1080, 1280, 1024}, {1920, 500, 1080, 1920}};
+        const QList<QRect> stacked{
+            {0, 0, 1920, 1080}, {300, 1080, 1280, 1024}, {1920, 500, 1080, 1920}};
         QVERIFY(arranged(stacked));
         QCOMPARE(settle(stacked), stacked);
         // One far off comes back beside the others.
