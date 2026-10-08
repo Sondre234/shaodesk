@@ -3,7 +3,7 @@
 window over the floating windows and tiles of its output through focus changes, workspace
 switches, snapping, groups and sticky, under a fullscreen window of its output, also while
 another output has the focus, until a window there is raised; toggled again it goes back among
-the others."""
+the others. A window rule's `above = true` keeps a window above as it opens."""
 from pathlib import Path
 import subprocess
 import sys
@@ -17,7 +17,9 @@ CONFIG = """return {
     layout = { tiling = %s, workspaces = 4 },
     outputs = { monitors = { ["HEADLESS-1"] = { mode = "1280x720" } } },
     animations = { enabled = false },
-    windows = { rules = { { title = "^F$", output = "HEADLESS-2" } } },
+    windows = { rules = { { title = "^F$", output = "HEADLESS-2" },
+                          { title = "^Pinned$", above = true },
+                          { title = "^Quiet$", above = true, focus = false } } },
 }"""
 
 with harness.Compositor(compositor, CONFIG % "false") as desktop:
@@ -150,6 +152,18 @@ with harness.Compositor(compositor, CONFIG % "false") as desktop:
     msg("toggle_above")
     assert not above("A") and not above("E"), windows()
     msg("ungroup")
+
+    # A rule keeps a window above as it opens, focused or not.
+    launch("Pinned")
+    assert above("Pinned") and stacking()[0] == ("Pinned", "above"), stacking()
+    clients["Quiet"] = desktop.spawn([probe, "--window-only"],
+                                     env={"SHAODESK_PROBE_TITLE": "Quiet",
+                                          "SHAODESK_PROBE_APP_ID": "app-Quiet"})
+    desktop.wait_for(lambda: "Quiet" in windows(), "Quiet open")
+    assert focused() == ["Pinned"] and above("Quiet"), windows()
+    assert stacking()[:2] == [("Quiet", "above"), ("Pinned", "above")], stacking()
+    focus("Pinned")
+    assert order()[:2] == ["Pinned", "Quiet"], stacking()
 
     for title, client in clients.items():
         subprocess.run([probe, "--close", f"app-{title}"], env=desktop.env, check=True,

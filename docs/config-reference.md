@@ -178,6 +178,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `windows.rules[].maximize` | boolean | unset | - | Open maximized. |
 | `windows.rules[].focus` | boolean | unset | - | `false` opens the window without focusing it. |
 | `windows.rules[].sticky` | boolean | unset | - | Show on every workspace of its monitor. |
+| `windows.rules[].above` | boolean | unset | - | Keep above the other windows, as `toggle_above` does. |
 
 ## `peek`
 

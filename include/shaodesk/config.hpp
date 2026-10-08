@@ -62,7 +62,7 @@ struct Launcher {
 // What rules do to a window as it opens; unset fields leave it to the defaults.
 struct WindowActions {
     enum class Position { Unset, Center, At };
-    std::optional<bool> floating, fullscreen, maximize, focus, sticky;
+    std::optional<bool> floating, fullscreen, maximize, focus, sticky, above;
     std::optional<int> workspace;      // from 1
     std::optional<std::string> output; // connector, or "desc:" and the start of its description
     std::optional<std::pair<int, int>> size;

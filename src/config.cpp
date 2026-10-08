@@ -753,6 +753,7 @@ WindowRule window_rule(lua_State *L, int workspaces) {
     actions.maximize = optional_boolean(L, "maximize");
     actions.focus = optional_boolean(L, "focus");
     actions.sticky = optional_boolean(L, "sticky");
+    actions.above = optional_boolean(L, "above");
     lua_getfield(L, -1, "workspace");
     bool has_workspace = !lua_isnil(L, -1);
     lua_pop(L, 1);
@@ -2146,8 +2147,8 @@ bool WindowRule::matches(const std::string &app_id, const std::string &title) co
 }
 
 bool WindowActions::empty() const {
-    return !floating && !fullscreen && !maximize && !focus && !sticky && !workspace && !output &&
-           !size && position == Position::Unset;
+    return !floating && !fullscreen && !maximize && !focus && !sticky && !above && !workspace &&
+           !output && !size && position == Position::Unset;
 }
 
 void WindowActions::merge(const WindowActions &other) {
@@ -2155,7 +2156,8 @@ void WindowActions::merge(const WindowActions &other) {
                                   {&fullscreen, &other.fullscreen},
                                   {&maximize, &other.maximize},
                                   {&focus, &other.focus},
-                                  {&sticky, &other.sticky}})
+                                  {&sticky, &other.sticky},
+                                  {&above, &other.above}})
         if (*source)
             *target = *source;
     if (other.workspace)
@@ -2188,6 +2190,7 @@ sh_window_rule WindowActions::to_c() const {
     rule.maximize = maximize.value_or(false);
     rule.no_focus = !focus.value_or(true);
     rule.sticky = sticky.value_or(false);
+    rule.above = above.value_or(false);
     return rule;
 }
 

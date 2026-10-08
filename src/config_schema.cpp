@@ -342,6 +342,8 @@ const Option options[] = {
      "`false` opens the window without focusing it."},
     {"windows.rules[].sticky", "boolean", "unset", "", none, none,
      "Show on every workspace of its monitor."},
+    {"windows.rules[].above", "boolean", "unset", "", none, none,
+     "Keep above the other windows, as `toggle_above` does."},
 
     {"peek", "table", "", "", none, none,
      "Peek: `peek` (hold a key) and `peek_toggle` make every window nearly transparent to show "

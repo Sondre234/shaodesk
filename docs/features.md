@@ -482,6 +482,7 @@ windows = {
 | `maximize = true` | Opens it maximized, floating over the tiles. |
 | `focus = false` | Leaves the focus where it was. A fullscreen window on the current workspace still takes it. |
 | `sticky = true` | Opens it sticky (see below) on its monitor's current workspace, whatever `workspace` says. Ignored with `features = { sticky = false }`. |
+| `above = true` | Opens it [kept above](#keeping-windows-above) the other windows, as `toggle_above` does. |
 
 Every matching rule applies, in order; where two set the same action, the later one wins. A
 tiled window keeps `size` and `position` as the place it floats to when toggled. Rules see the

@@ -581,7 +581,7 @@ int main(int argc, char **argv) {
             "{title='^Mail',workspace=2,output='desc:Dell U2720Q',floating=false},"
             "{app_id='^mpv$',fullscreen=true,maximize=true,opacity=0.5},"
             "{app_id='^mpv$',output='DP-1',size={width=100,height=200},fullscreen=false},"
-            "{app_id='^mpv$',sticky=true}}}}");
+            "{app_id='^mpv$',sticky=true},{app_id='^mpv$',above=true}}}}");
         require(ruled.settings.window_rules, "window rules should be on by default");
         auto pavu = ruled.window_actions("pavucontrol", "Volume Control");
         require(pavu.floating == true && pavu.size == std::pair{640, 480} &&
@@ -600,8 +600,10 @@ int main(int argc, char **argv) {
                 "title-only rule mismatch");
         auto mpv = ruled.window_actions("mpv", "").to_c();
         require(!mpv.fullscreen && mpv.maximize && std::string(mpv.output) == "DP-1" &&
-                    mpv.width == 100 && mpv.height == 200 && mpv.floating == -1 && mpv.sticky,
+                    mpv.width == 100 && mpv.height == 200 && mpv.floating == -1 && mpv.sticky &&
+                    mpv.above,
                 "later rule did not override an earlier one");
+        require(!pavu_c.above, "a rule kept the wrong window above");
         require(ruled.window_actions("kitty", "My Mail").empty(), "a rule matched the wrong window");
         // Opacity: the first rule that sets it wins; action-only rules leave it alone.
         require(ruled.window_opacity("pavucontrol", "Volume", true) == 0.95F &&
@@ -626,6 +628,13 @@ int main(int argc, char **argv) {
         rejects("return {windows={rules={{app_id='x',floating='yes'}}}}");
         rejects("return {windows={rules={{app_id='x',focus=0}}}}");
         rejects("return {windows={rules={{app_id='x',sticky='yes'}}}}");
+        rejects("return {windows={rules={{app_id='x',above=1}}}}");
+        // A rule that only keeps a window above takes no part in the opacity.
+        auto kept = shaodesk::parse_config(
+            "return {windows={rules={{app_id='^mpv$',above=true},{app_id='mpv',opacity=0.5}}}}");
+        require(kept.window_actions("mpv", "").to_c().above &&
+                    kept.window_opacity("mpv", "", true) == 0.5F,
+                "an above rule took part in the opacity");
         rejects("return {windows={rules={{app_id='x',fullscreen='true'}}}}");
         rejects("return {windows={rules={{app_id='x',workspace=5}}}}");
         rejects("return {windows={rules={{app_id='x',workspace=0}}}}");
