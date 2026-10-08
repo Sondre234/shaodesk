@@ -330,6 +330,20 @@ if(BUILD_TESTING)
     target_compile_options(media_test PRIVATE -Wall -Wextra -Wpedantic)
     target_link_libraries(media_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME shell_media COMMAND media_test)
+    if(SHAODESK_MEDIA_DBUS)
+        # The MPRIS backend against stand-in players on a bus of its own, the environment's made
+        # unusable.
+        add_executable(media_dbus_test ${PROJECT_SOURCE_DIR}/tests/media_dbus_test.cpp
+            ${PROJECT_SOURCE_DIR}/tests/fake_dbus.hpp media.cpp media.hpp mpris.cpp mpris.hpp)
+        set_target_properties(media_dbus_test PROPERTIES AUTOMOC ON)
+        target_include_directories(media_dbus_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+        target_compile_definitions(media_dbus_test PRIVATE QT_NO_KEYWORDS SHAODESK_MEDIA=1)
+        target_compile_options(media_dbus_test PRIVATE -Wall -Wextra -Wpedantic)
+        target_link_libraries(media_dbus_test PRIVATE Qt6::Core Qt6::DBus Qt6::Test)
+        add_test(NAME shell_media_dbus COMMAND media_dbus_test)
+        set_tests_properties(shell_media_dbus PROPERTIES TIMEOUT 60
+            ENVIRONMENT "DBUS_SESSION_BUS_ADDRESS=disabled:;DBUS_SYSTEM_BUS_ADDRESS=disabled:")
+    endif()
     add_test(NAME shell_preview COMMAND ${Python3_EXECUTABLE}
         ${PROJECT_SOURCE_DIR}/tests/shell_preview.py $<TARGET_FILE:shaodesk-shell>
         ${EXAMPLE_CONFIG})
