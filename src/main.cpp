@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "shaodesk/autostart.hpp"
 #include "shaodesk/config.hpp"
 #include "shaodesk/import.hpp"
 #include "version.h"
@@ -33,10 +34,11 @@ bool has_env(const char *name) {
     const char *value = std::getenv(name);
     return value && *value;
 }
-/* Starts `command`, with `extra_env` laid over the environment: its pid, or -1 with `failure`
- * saying why. */
+/* Starts `command`, with `extra_env` laid over the environment and in `directory` when one is
+ * given: its pid, or -1 with `failure` saying why. */
 pid_t start_program(const shaodesk::Command &command, std::string &failure,
-                    const std::vector<std::string> &extra_env = {}) {
+                    const std::vector<std::string> &extra_env = {},
+                    const std::string &directory = {}) {
     std::vector<char *> argv;
     for (const auto &arg : command)
         argv.push_back(const_cast<char *>(arg.c_str()));
@@ -68,11 +70,23 @@ pid_t start_program(const shaodesk::Command &command, std::string &failure,
     error = posix_spawnattr_setsigmask(&attributes, &mask);
     if (!error)
         error = posix_spawnattr_setflags(&attributes, POSIX_SPAWN_SETSIGMASK);
+    posix_spawn_file_actions_t actions;
+    bool in_directory = false;
+    if (!error && !directory.empty()) {
+        error = posix_spawn_file_actions_init(&actions);
+        in_directory = !error;
+        if (in_directory)
+            error = posix_spawn_file_actions_addchdir_np(&actions, directory.c_str());
+    }
     if (!error)
-        error = posix_spawnp(&pid, argv[0], nullptr, &attributes, argv.data(), env.data());
+        error = posix_spawnp(&pid, argv[0], in_directory ? &actions : nullptr, &attributes,
+                             argv.data(), env.data());
+    if (in_directory)
+        posix_spawn_file_actions_destroy(&actions);
     posix_spawnattr_destroy(&attributes);
     if (error)
-        failure = "cannot launch " + command.front() + ": " + std::strerror(error);
+        failure = "cannot launch " + command.front() +
+                  (directory.empty() ? "" : " in " + directory) + ": " + std::strerror(error);
     return error ? -1 : pid;
 }
 /* start_program, saying on standard error when it fails. */
@@ -246,6 +260,10 @@ struct Runtime {
     int watch_fd = -1;
     // Why power.lock_command cannot lock ("" when it can), worked out once per load.
     std::optional<std::string> locker_problem{};
+    // A login session runs XDG autostart: a standalone one, or a test's with
+    // SHAODESK_LOGIN_SESSION=1.
+    bool login = false;
+    std::string autostart_report{}; // what `get autostart` prints
 
     ~Runtime() {
         if (watch_fd >= 0)
@@ -649,6 +667,55 @@ struct Runtime {
     static void report_error(const std::string &error) {
         std::cerr << "Configuration error; using the default configuration: " << error << '\n';
     }
+    /* XDG autostart: starts the entries of the autostart directories, noting for `get autostart`
+     * what was started or skipped, and why. */
+    void run_autostart() {
+        autostart_report.clear();
+        if (!login || !config.autostart.xdg)
+            return;
+        shaodesk::AutostartOptions options{config.autostart.exclude, shaodesk::current_desktops()};
+        // What the shell provides itself, as it will once it runs.
+        [[maybe_unused]] bool shell = false;
+#if SHAODESK_HAS_SHELL
+        shell = allow_shell && config.shell.enabled;
+#endif
+#if SHAODESK_SHELL_NOTIFICATIONS
+        options.notifications = shell && config.notifications.enabled;
+#endif
+#if SHAODESK_SHELL_TRAY
+        options.tray = shell && config.shell.widgets.tray;
+#endif
+        auto field = [](std::string text) {
+            for (auto &c : text)
+                c = c == '\t' || c == '\n' || c == '\r' ? ' ' : c;
+            return text;
+        };
+        int started = 0, skipped = 0;
+        for (const auto &entry :
+             shaodesk::autostart_entries(shaodesk::autostart_directories(), options)) {
+            std::string state = "skipped", detail = entry.skip, failure;
+            if (!entry.skip.empty()) {
+                ++skipped;
+            } else if (start_program(entry.command, failure, {}, entry.directory) > 0) {
+                state = "started";
+                detail.clear();
+                for (const auto &argument : entry.command)
+                    detail += (detail.empty() ? "" : " ") + argument;
+                ++started;
+            } else {
+                state = "failed";
+                detail = failure;
+                std::cerr << "Autostart " << entry.name << ": " << failure << '\n';
+            }
+            autostart_report += field(entry.name) + '\t' + state + '\t' + field(detail) + '\t' +
+                                field(entry.path.string()) + '\n';
+        }
+        std::cerr << "XDG autostart: started " << started << ", skipped " << skipped
+                  << " (shaodesk msg get autostart lists them)\n";
+    }
+    static const char *autostart(void *data) {
+        return static_cast<Runtime *>(data)->autostart_report.c_str();
+    }
     static void startup(void *data) {
         auto &self = *static_cast<Runtime *>(data);
         if (self.standalone)
@@ -657,6 +724,7 @@ struct Runtime {
         self.start_shell();
         for (const auto &command : self.config.startup)
             spawn(command);
+        self.run_autostart();
         if (!self.extra_command.empty())
             spawn(self.extra_command);
     }
@@ -849,6 +917,7 @@ int main(int argc, char **argv) {
             Runtime::report_error(error);
         runtime.allow_shell = !no_shell && mode != SH_BACKEND_HEADLESS;
         runtime.standalone = mode == SH_BACKEND_SESSION;
+        runtime.login = runtime.standalone || has_env("SHAODESK_LOGIN_SESSION");
         // Tests rewrite their configuration and reload it themselves.
         runtime.watch = mode != SH_BACKEND_HEADLESS || has_env("SHAODESK_AUTO_RELOAD");
         if (check) {
@@ -866,7 +935,7 @@ int main(int argc, char **argv) {
             Runtime::command,   Runtime::reload,   Runtime::startup,      Runtime::child_exited,
             Runtime::opacity,   Runtime::screenshot, Runtime::window_rule,
             Runtime::hot_corner, Runtime::action_target, Runtime::config_watch,
-            Runtime::config_changed, Runtime::lock, Runtime::launch};
+            Runtime::config_changed, Runtime::lock, Runtime::launch, Runtime::autostart};
         int result = sh_run(&callbacks, mode);
         if (runtime.shell_pid > 0)
             kill(runtime.shell_pid, SIGTERM);

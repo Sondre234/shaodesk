@@ -506,6 +506,9 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/launch_smoke.py
             $<TARGET_FILE:shaodesk> ${EXAMPLE_CONFIG})
         set_tests_properties(launch_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME autostart_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/autostart_smoke.py $<TARGET_FILE:shaodesk>)
+        set_tests_properties(autostart_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME startup_failure_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/startup_failure_smoke.py
             $<TARGET_FILE:shaodesk> ${EXAMPLE_CONFIG})
