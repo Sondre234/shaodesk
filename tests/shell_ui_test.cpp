@@ -6057,6 +6057,14 @@ ListModel {
             return fail("the system menu did not lock the screen");
         if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
             return fail("the popover stayed after the menu bar's menus closed");
+        // Displays… opens the display settings window on this monitor.
+        if (!openMenu("system") || !chosen("systemMenuDisplays") ||
+            !QTest::qWaitFor([&] { return controller.displaySettings()->open(); }) ||
+            controller.displaySettings()->output() != output)
+            return fail("the system menu's Displays… did not open the display settings window");
+        controller.displaySettings()->close();
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the popover stayed after the system menu opened the display settings");
 
         // The clock and Quick Settings open their popups at the output's right edge below the
         // menu bar; search opens the command palette there, and closes it again.
