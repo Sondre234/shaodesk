@@ -517,6 +517,10 @@ draws with it in both styles and the taskbar's keeps its look; branch on `Theme.
 the macOS layout differs (Control Center's modules, Spotlight's groups), and give a popup a file of
 its own only where all of it does (Launchpad).
 
+A `WheelHandler` takes `acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad`: since the
+compositor offers pointer gestures, Qt puts every event of the seat's pointer down to a touchpad,
+a mouse wheel's too, and a handler left at its default of the mouse alone hears none of them.
+
 ### Seeing a change
 
 `shaodesk-shell --config FILE --preview-popup NAME --screenshot OUT.png --quit-after 400`

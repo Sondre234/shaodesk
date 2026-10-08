@@ -581,5 +581,9 @@ window under the pointer with its fingers, deltas, scale, rotation and cancellat
 window which never bound the gestures gets none, and that they go to the window under the
 pointer rather than the focused one.
 
+Once the compositor offered the gestures, `tray_smoke` found the tray deaf to the wheel: Qt (6.11)
+then takes the seat's pointer for a touchpad, and a `WheelHandler` hears only mice by default.
+Every one in the shell now takes both.
+
 Not checked: a real touchpad through libinput, and real applications' use of the gestures
 (pinch-zoom in Firefox and Chromium, a hold stopping kinetic scrolling, GTK's gestures).
