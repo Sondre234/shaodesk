@@ -272,8 +272,20 @@ what was there.
 The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `task_filter.cpp`
 (the taskbar's slots and groups), `audio.cpp` with `pulse_audio.cpp`, `system_status.cpp`
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
-`power.cpp`, `palette.cpp`. `preview.cpp` has stand-ins for all of them for
-`--preview-popup`.
+`power.cpp`, `palette.cpp`, `media.cpp` with `mpris.cpp`. `preview.cpp` has stand-ins for all of
+them for `--preview-popup`.
+
+The services Quick Settings controls over D-Bus each have a model the QML reads, built into
+everything that builds the controller (`SHAODESK_SERVICE_SOURCES`), and a backend on the bus built
+into the shell alone, as `audio.cpp` has `pulse_audio.cpp`: `media.cpp` (the media players in
+order, the current one, its controls and its position between reads) with `mpris.cpp`. The
+backend fills the model and carries out its requests, virtual `send*` functions; without Qt's
+D-Bus module, or without a bus, one that never finds anything takes its place (`makeMedia`). Each
+reaches `Panel.qml` through a property (`mediaSource`) that the preview and `shell_ui_test` point
+at stand-ins, and each backend is tested against stand-in services (`tests/fake_dbus.hpp`) on a
+private bus. The media actions reach the shell as `media VERB` lines, which the controller hands
+to `Media::command`; `tests/mpris_probe.cpp` is a player for `media_smoke`, which follows a key
+from the compositor to a player.
 
 A window is known by its app id alone. `app_match.cpp` finds the desktop entry it belongs to: an
 `app_match::Index` of the entries, which `refreshApps` builds, tries each way of matching from the
