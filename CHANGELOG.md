@@ -233,6 +233,13 @@ shadows.
   with the `display_off`, `display_on` and `display_toggle` actions, for every monitor or the one
   named. Once every monitor is off, a key press or the pointer turns them on again. `shaodesk msg
   get outputs` ends each line with the monitor's power, `on` or `off`.
+- Power saving when idle, without an idle daemon: the `idle` table sets the seconds without
+  input after which the screens dim (fading to half their brightness, until the next input), the
+  monitors turn off (the next key or the pointer turns them on), the screen locks and the machine
+  suspends, with `idle.battery` for shorter ones on battery. By default the screens dim at nine
+  and a half minutes and the monitors go off at ten; nothing locks or suspends unless set. Idle
+  inhibitors (videos playing) hold every step off, swayidle and the like work as before through
+  `ext-idle-notify-v1`, and `shaodesk msg get idle` tells where the steps are.
 
 ### Working on the shell
 

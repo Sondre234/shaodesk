@@ -587,3 +587,24 @@ Not checked: any of it on real monitors, that is, what a DRM output does when it
 enabled again (the monitor's standby and how long it takes to come back, on NVIDIA and AMD, at
 mixed refresh rates and scales), the real `wlopm` and swayidle with it (neither is installed
 here), and night light and the magnifier on a monitor turned on again.
+
+## Power saving when idle
+
+Added 2026-10-08. `idle_smoke` runs the `idle` steps on a headless compositor with two monitors
+and timeouts of a few seconds, against a fake `/sys/class/power_supply` (`SHAODESK_SYSFS`): the
+screens dim (half dark in a screenshot, with grim) and input brightens them; the monitors go off,
+dimmed, and the screen locks with them off at once; the pointer turns them on, showing the lock;
+an idle inhibitor from a probe holds every step off and the time counts from when it goes; the
+key that turns the monitors on runs no binding, and a monitor turned off by hand stays off; the
+battery's steps apply on battery and the others back on mains; and an `ext-idle-notify-v1` client,
+as swayidle is, hears idled and resumed beside the steps. `idle_suspend_smoke` takes the suspend
+step against the fake logind (`tests/fake_login1.c`): the monitors off, the lock, the suspend, and
+the monitors on again as the machine wakes up. `power_supply` reads fake supplies: a mouse's
+battery, a laptop on mains and on battery, a USB-C charger, two batteries.
+`display_power_config` checks the settings, defaults and derived dimming.
+
+Not checked: any of it on a real machine over the real ten minutes; real batteries and chargers
+(this desktop has none, only a mouse's battery, which is rightly passed over); real video players'
+and browsers' inhibitors; swayidle itself beside the steps; a real suspend through logind from
+the step, and what the monitors and the locker do as the machine wakes; the dimming's look and
+fade at a high refresh rate and with the GPU renderer.

@@ -1407,6 +1407,56 @@ session is on screen it holds a logind sleep inhibitor, so an idle daemon left r
 another desktop on a different VT cannot suspend the machine; switching VTs away releases it.
 This needs sd-bus from libsystemd, libelogind, or basu at build time.
 
+### Power saving when idle
+
+shaodesk saves power by itself after a while without input, as KDE and Windows do, so no idle
+daemon is needed. The `idle` table gives the seconds after the last key press, click, scroll or
+pointer motion at which each step is taken, once until the next input; 0 never takes it:
+
+- `dim`: the screens darken by half, fading in over a second, over everything, the lock screen
+  too. Any input brightens them at once. Unset, it is 30 seconds before `display_off` (halfway
+  when that is under a minute), so the screens warn before they go dark.
+- `display_off`: every monitor turns off as the `display_off` action does
+  ([Turning monitors off](#turning-monitors-off)), keeping its windows and panels. A key press
+  or the pointer turns them on again, and the key does nothing else; a monitor that was off
+  already, turned off by hand, stays off. 600 (ten minutes) unless set.
+- `lock`: the screen locks with `power.lock_command`. Off unless set.
+- `suspend`: the machine suspends as the `suspend` action does, through logind and locking
+  first. When it wakes up, the monitors come on and the steps count again from then. Off unless
+  set.
+
+```lua
+idle = {
+    display_off = 600, -- the screens dim at 570 seconds and go off at 600
+    lock = 900,
+    suspend = 1800,
+    battery = { display_off = 300, suspend = 900 }, -- dimming at 270
+},
+```
+
+`battery` holds the steps while the machine runs on battery: a battery of its own discharging
+(not a mouse's or a headset's) and no mains or USB charger online, as
+`/sys/class/power_supply` says. Each step it leaves out is the one above, but for `dim`, which
+follows its own `display_off`. The power source is read again at each step and after input, so
+unplugging the charger shows from the next step on.
+
+An idle inhibitor (`idle-inhibit-unstable-v1`, which video players, browsers playing video and
+games hold) holds every step off, and the screens brighten if they had dimmed; once the last one
+goes, the time without input counts from then. So does switching to another VT and back:
+nothing happens while another VT is in front. `shaodesk msg get idle` prints a line `state`
+with the milliseconds since the last input, whether something holds the steps off, whether the
+machine runs on battery and how dark the screens are (thousandths), then a line per step with
+its timeout in milliseconds on that power source and whether it has been taken since the last
+input.
+
+The defaults turn the monitors off after ten minutes and lock and suspend nothing, as the
+screens going dark is what everyone wants and locking and suspending are choices KDE and Windows
+also leave open on a desktop. Idle daemons keep working as before: swayidle and hypridle hear of
+idleness through `ext-idle-notify-v1`, which these steps do not change, so a setup that runs
+swayidle sees only the dimming and the monitors going off after ten minutes, if it does not turn
+them off sooner itself. `idle = { display_off = 0 }` turns both off and leaves everything to the
+idle daemon; set `power.lock_before_sleep = false` if it also locks before sleep.
+
 ## Power
 
 The power button in the bottom-right corner of the start menu, as on Windows, opens a menu above
