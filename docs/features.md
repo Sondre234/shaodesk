@@ -1229,6 +1229,8 @@ Night light leaves an HDR monitor alone. A mirror of an HDR monitor shows its pi
 to SDR, and a mirror is itself never HDR. Screenshots of an HDR monitor hold its PQ-encoded
 pixels, which look dark and washed out to programs that take them for sRGB.
 
+### Mirroring
+
 A monitor can show another's picture, as Windows' Duplicate and KDE's display mirroring do:
 
 ```lua
@@ -1249,7 +1251,7 @@ the monitor it mirrors is not in the layout (unplugged, `enabled = false`, or be
 lid), it joins the layout as any other monitor does, and leaves it again when that one comes
 back, its windows moving as when a monitor is unplugged. It turns off and on with the monitor it
 mirrors (see [Turning monitors off](#turning-monitors-off)), and `shaodesk msg get outputs` names
-that monitor in its last column. One mirroring a monitor that mirrors another shows that other
+that monitor in a column of its own. One mirroring a monitor that mirrors another shows that other
 one. wlr-output-management clients list it as enabled, at the place of the monitor it mirrors:
 left there, it goes on mirroring; moved elsewhere, it joins the layout there.
 
