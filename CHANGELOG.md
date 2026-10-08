@@ -331,6 +331,15 @@ shadows.
   off from the start, as logind's `LidClosed` tells. `outputs.lid = "ignore"` leaves the panel on. Bindings act on the lid and on
   tablet mode: `{ switch = "lid", state = "close", action = "lock" }`. `shaodesk msg get
   switches` tells what the switches say.
+- Mirroring: `outputs.monitors[NAME].mirror = "eDP-1"` makes a monitor show another's picture, as
+  Windows' Duplicate does, scaled to fit with black bars where the shapes differ, the pointer
+  included. It leaves the layout while the monitor it mirrors is there, and joins it otherwise.
+  `shaodesk import` carries Hyprland's `mirror` over, and `shaodesk msg get outputs` names the
+  monitor a mirror shows in a last column.
+- The `display_mode` action sets the monitors up as Windows' Win + P does: `extend`, `duplicate`,
+  `internal` (the built-in panel, or the primary monitor, alone) or `external`, until the
+  configuration is reloaded. A laptop's display key (XF86Display) runs it without a choice, which
+  opens a popup that steps through the four and takes the one shown once the key rests.
 
 ### Working on the shell
 

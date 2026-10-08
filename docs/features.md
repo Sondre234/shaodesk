@@ -1199,9 +1199,9 @@ the configuration is reloaded, as wlr-output-management changes do. With one mon
 only `extend` can be had.
 
 XF86Display, the key a laptop sends for Fn and its display key, runs `display_mode` without a
-choice: a popup on the focused monitor shows the four with the one in force selected, each
-further press moves the selection on, and a second and a half after the last press the selected
-one is taken. While the popup is open the arrow keys move the selection, Return takes it at once
+choice: a popup on the focused monitor shows the four in Windows' order (PC screen only,
+duplicate, extend, second screen only) with the one in force selected, each further press moves
+the selection on, and a second and a half after the last press the selected one is taken. While the popup is open the arrow keys move the selection, Return takes it at once
 and Escape closes the popup without changing anything; a click takes a choice too. Win + P
 itself opens the command palette.
 
@@ -1810,8 +1810,9 @@ one: `shaodesk msg output HDMI-A-1 workspace_next`. The query
 prints one tab-separated line per monitor (name, current workspace, focused, the
 workspaces holding windows, such as `1,3`, or `-`, and tiling, `on` or `off`),
 `shaodesk msg get tiling` prints `on` or `off` for the focused monitor, `shaodesk msg get outputs` prints one tab-separated line per monitor (name,
-enabled, x, y, logical width and height, scale, transform, mode, "make model serial", and
-whether it shows a picture, `on`, or is [turned off](#turning-monitors-off) or disabled, `off`), and
+enabled, x, y, logical width and height, scale, transform, mode, "make model serial",
+whether it shows a picture, `on`, or is [turned off](#turning-monitors-off) or disabled, `off`,
+and the monitor it [mirrors](#mirroring), or `-`), and
 `shaodesk msg get windows` prints one tab-separated line per window:
 workspace, focused, minimized, tiled, x, y, width, height, app ID, title, monitor,
 visible, scratchpad (a window hidden there is also minimized), sticky, and its window group
