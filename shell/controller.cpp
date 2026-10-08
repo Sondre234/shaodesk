@@ -172,6 +172,7 @@ void ShellController::refreshApps() {
     for (const auto &launcher : config_.shell.launchers)
         apps_.push_back({QString("pinned:%1").arg(index++), QString::fromStdString(launcher.name),
                          QString::fromStdString(launcher.icon), launcher.command, nullptr, true, {}});
+    QList<app_match::Entry> entries;
     GList *list = g_app_info_get_all();
     for (GList *item = list; item; item = item->next) {
         auto *info = G_APP_INFO(item->data);
@@ -205,8 +206,12 @@ void ShellController::refreshApps() {
                 app.keywords.push_back(QString::fromUtf8(*keyword));
         }
         app.description = QString::fromUtf8(g_app_info_get_description(info));
+        entries.push_back({id, app.wmClass, QString::fromUtf8(g_app_info_get_commandline(info)),
+                           app.name});
     }
     g_list_free_full(list, g_object_unref);
+    appIndex_ = app_match::Index(entries);
+    appFor_.clear();
     sortApps();
     Q_EMIT appsChanged();
 }
@@ -289,25 +294,10 @@ bool ShellController::isPinned(const QString &id) const {
 QString ShellController::appFor(const QString &windowAppId) const {
     if (windowAppId.isEmpty())
         return {};
-    // Most windows use their desktop file's name; others, like many X11 clients, only its
-    // StartupWMClass or the last part of a reverse-DNS name.
-    auto base = [](const QString &id) { return id.endsWith(".desktop") ? id.chopped(8) : id; };
-    const std::function<bool(const App &)> matches[] = {
-        [&](const App &app) { return base(app.id) == windowAppId; },
-        [&](const App &app) { return base(app.id).compare(windowAppId, Qt::CaseInsensitive) == 0; },
-        [&](const App &app) {
-            return !app.wmClass.isEmpty() &&
-                   app.wmClass.compare(windowAppId, Qt::CaseInsensitive) == 0;
-        },
-        [&](const App &app) {
-            return base(app.id).section('.', -1).compare(windowAppId, Qt::CaseInsensitive) == 0;
-        },
-    };
-    for (const auto &match : matches)
-        for (const auto &app : apps_)
-            if (app.info && match(app))
-                return app.id;
-    return {};
+    auto known = appFor_.constFind(windowAppId);
+    if (known == appFor_.cend())
+        known = appFor_.insert(windowAppId, appIndex_.find(windowAppId));
+    return *known;
 }
 QString ShellController::pinnedAppFor(const QString &windowAppId) const {
     if (windowAppId.isEmpty())

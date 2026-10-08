@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include "app_match.hpp"
 #include "audio.hpp"
 #include "backlight.hpp"
 #include "notifications.hpp"
@@ -12,6 +13,7 @@
 #include "task_model.hpp"
 #include "tray.hpp"
 #include <QColor>
+#include <QHash>
 #include <QLocalSocket>
 #include <QMap>
 #include <QObject>
@@ -382,6 +384,10 @@ class ShellController : public QObject {
     void showVolume();
     void handleDnd(const QString &verb);
     std::vector<App> apps_;
+    // The desktop entries of apps_, for finding a window's (appFor), and what it found for each
+    // app id since they last changed.
+    app_match::Index appIndex_;
+    mutable QHash<QString, QString> appFor_;
     // Desktop ids pinned from the shell, in the order they were pinned.
     QStringList userPins_;
     QString error_;

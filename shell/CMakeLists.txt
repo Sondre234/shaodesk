@@ -98,7 +98,7 @@ set(SHAODESK_TASK_PROTOCOL_SOURCES
     ${PROJECT_BINARY_DIR}/ext-image-copy-capture-v1-client-protocol.h
     ${CAPTURE_SOURCE_PROTOCOL_SOURCES})
 add_executable(shaodesk-shell main.cpp ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp task_model.cpp task_model.hpp window_pictures.cpp window_pictures.hpp
-    task_filter.cpp task_filter.hpp icons.cpp icons.hpp wallpapers.cpp wallpapers.hpp window_images.cpp window_images.hpp view.cpp view.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
+    task_filter.cpp task_filter.hpp icons.cpp icons.hpp app_match.cpp app_match.hpp wallpapers.cpp wallpapers.hpp window_images.cpp window_images.hpp view.cpp view.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
     preview.cpp preview.hpp
     ${SHAODESK_TASK_PROTOCOL_SOURCES})
 add_dependencies(shaodesk-shell shaodesk_wlr_client_protocols shaodesk_version)
@@ -137,7 +137,7 @@ if(BUILD_TESTING)
     find_package(Qt6 6.9 REQUIRED COMPONENTS Test)
     add_executable(shell_ui_test ${PROJECT_SOURCE_DIR}/tests/shell_ui_test.cpp
         ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp view.cpp view.hpp task_model.cpp task_model.hpp window_pictures.cpp window_pictures.hpp
-        task_filter.cpp task_filter.hpp icons.cpp icons.hpp wallpapers.cpp wallpapers.hpp window_images.cpp window_images.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
+        task_filter.cpp task_filter.hpp icons.cpp icons.hpp app_match.cpp app_match.hpp wallpapers.cpp wallpapers.hpp window_images.cpp window_images.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
         ${SHAODESK_TASK_PROTOCOL_SOURCES})
     set_target_properties(shell_ui_test PROPERTIES AUTOMOC ON)
     target_sources(shell_ui_test PRIVATE ${SHAODESK_START_SOURCES})
@@ -152,7 +152,7 @@ if(BUILD_TESTING)
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
     add_executable(task_filter_test ${PROJECT_SOURCE_DIR}/tests/task_filter_test.cpp
         ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp view.cpp view.hpp task_model.cpp task_model.hpp window_pictures.cpp window_pictures.hpp
-        task_filter.cpp task_filter.hpp icons.cpp icons.hpp wallpapers.cpp wallpapers.hpp window_images.cpp window_images.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
+        task_filter.cpp task_filter.hpp icons.cpp icons.hpp app_match.cpp app_match.hpp wallpapers.cpp wallpapers.hpp window_images.cpp window_images.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
         ${SHAODESK_TASK_PROTOCOL_SOURCES})
     set_target_properties(task_filter_test PROPERTIES AUTOMOC ON)
     target_sources(task_filter_test PRIVATE ${SHAODESK_START_SOURCES})
@@ -274,7 +274,7 @@ if(BUILD_TESTING)
     endif()
     add_executable(osd_test ${PROJECT_SOURCE_DIR}/tests/osd_test.cpp
         ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp view.cpp view.hpp task_model.cpp task_model.hpp window_pictures.cpp window_pictures.hpp
-        task_filter.cpp task_filter.hpp icons.cpp icons.hpp wallpapers.cpp wallpapers.hpp window_images.cpp window_images.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
+        task_filter.cpp task_filter.hpp icons.cpp icons.hpp app_match.cpp app_match.hpp wallpapers.cpp wallpapers.hpp window_images.cpp window_images.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
         ${SHAODESK_TASK_PROTOCOL_SOURCES})
     set_target_properties(osd_test PROPERTIES AUTOMOC ON)
     target_sources(osd_test PRIVATE ${SHAODESK_START_SOURCES})
