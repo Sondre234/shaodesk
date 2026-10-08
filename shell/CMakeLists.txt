@@ -32,9 +32,10 @@ if(NOT SHAODESK_SHELL_PREVIEW_ONLY)
 endif()
 
 # The start menu's model (its pins, the launch history and its search), in everything that builds
-# the controller, and the calculator and the files its search and the palette's share.
+# the controller, and the calculator, the files and the web search its search and the palette's
+# share.
 set(SHAODESK_START_SOURCES start_menu.cpp start_menu.hpp launch_history.cpp launch_history.hpp
-    calculator.cpp calculator.hpp file_index.cpp file_index.hpp)
+    calculator.cpp calculator.hpp file_index.cpp file_index.hpp web_search.cpp web_search.hpp)
 set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_images.cpp
     notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp tray.cpp tray.hpp
     tray_images.cpp tray_images.hpp)
@@ -192,6 +193,15 @@ if(BUILD_TESTING)
     target_link_libraries(file_index_test PRIVATE Qt6::Core Qt6::Test PkgConfig::GIO)
     add_test(NAME file_index COMMAND file_index_test)
     set_tests_properties(file_index PROPERTIES TIMEOUT 60)
+    # The search's last result, Search the web for “…”.
+    add_executable(web_search_test ${PROJECT_SOURCE_DIR}/tests/web_search_test.cpp web_search.cpp
+        web_search.hpp)
+    set_target_properties(web_search_test PROPERTIES AUTOMOC ON)
+    target_include_directories(web_search_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(web_search_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(web_search_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(web_search_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME web_search COMMAND web_search_test)
     # The start menu's model: its pins, the launch history and its search.
     add_executable(start_menu_test ${PROJECT_SOURCE_DIR}/tests/start_menu_test.cpp
         ${SHAODESK_START_SOURCES} fuzzy.cpp fuzzy.hpp)
