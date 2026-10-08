@@ -38,6 +38,8 @@ Item {
     property var backlightSource: shell.backlight
     // The media players, swapped the same way.
     property var mediaSource: shell.media
+    // The power mode, swapped the same way.
+    property var powerModeSource: shell.powerMode
     property string audioPopup: ""
     // The middle of the item it opens by, and the item's width.
     property real audioPopupX: 0
@@ -628,10 +630,13 @@ Item {
             return wallpapersButton.visible
         case "quick-settings":
         case "quick-settings-mixer":
-            // Quick Settings; with the applications' volumes open.
+        case "quick-settings-power":
+            // Quick Settings; with the applications' volumes open, or the power modes.
             toggleAudioPopup("quick", quickButton)
             if (name === "quick-settings-mixer")
                 Qt.callLater(function() { quickSettingsLoader.item.expanded = "mixer" })
+            if (name === "quick-settings-power")
+                Qt.callLater(function() { quickSettingsLoader.item.expanded = "powerMode" })
             return quickButton.visible
         case "notifications":
             // The flyout with the mail application's notifications expanded.

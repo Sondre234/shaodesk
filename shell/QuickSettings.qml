@@ -23,8 +23,18 @@ PopupCard {
     readonly property var audio: panel.audioSource
     readonly property var backlight: panel.backlightSource
     readonly property var media: panel.mediaSource
+    readonly property var powerMode: panel.powerModeSource
     readonly property var center: shell.notifications
-    // Which list is open under its tile or row: "profiles", "outputs", "mixer", or "" for none.
+    // A power-profiles-daemon profile's name and icon.
+    function powerModeName(profile) {
+        return profile === "power-saver" ? "Power saver" : profile === "balanced" ? "Balanced"
+             : profile === "performance" ? "Performance" : profile
+    }
+    function powerModeGlyph(profile) {
+        return profile === "power-saver" ? "leaf" : profile === "performance" ? "zap" : "gauge"
+    }
+    // Which list is open under its tile or row: "profiles", "outputs", "mixer", "powerMode", or ""
+    // for none.
     property string expanded: ""
     function toggle(list) { expanded = expanded === list ? "" : list }
     onOpened: expanded = ""
@@ -97,6 +107,7 @@ PopupCard {
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
         Module { section: mediaCard }
         Module { section: profileList }
+        Module { section: powerModeList }
         Module { section: brightness; heading: "Display" }
         Module { section: sound; heading: "Sound" }
         ColumnLayout {
@@ -187,6 +198,42 @@ PopupCard {
                          : quick.status.networkState === "wifi" ? "Wi-Fi" : "Disconnected"
                     detail: quick.status.networkInterface
                     checked: quick.status.networkState === "ethernet" || quick.status.networkState === "wifi"
+                }
+                QuickTile {
+                    objectName: "quickTile:powerMode"
+                    visible: quick.widgets.power_mode && !!quick.powerMode && quick.powerMode.available
+                    Layout.fillWidth: true; Layout.preferredWidth: 1
+                    glyph: quick.powerModeGlyph(quick.powerMode.profile)
+                    label: "Power mode"
+                    detail: quick.powerModeName(quick.powerMode.profile)
+                    // Lit while away from the daemon's default.
+                    checked: quick.powerMode.profile !== "balanced"
+                    expandable: true
+                    expanded: quick.expanded === "powerMode"
+                    onClicked: quick.toggle("powerMode")
+                }
+            }
+            // The power modes, under their tile; performance says when the daemon holds it back.
+            Column {
+                id: powerModeList
+                objectName: "quickPowerModes"
+                visible: quick.expanded === "powerMode" && quick.powerMode.available
+                Layout.fillWidth: true
+                Repeater {
+                    model: quick.powerMode.profiles.map(function(profile) {
+                        var degraded = quick.powerMode.degraded
+                        return { text: quick.powerModeName(profile), profile: profile, toggle: "radio",
+                                 checked: profile === quick.powerMode.profile,
+                                 secondary: profile !== "performance" || degraded === "" ? ""
+                                          : degraded === "lap-detected" ? "Limited on a lap"
+                                          : degraded === "high-operating-temperature" ? "Limited while hot" : "Limited" }
+                    })
+                    MenuRow {
+                        objectName: "quickPowerModeItem"
+                        width: parent.width
+                        iconColumn: true
+                        onClicked: quick.powerMode.setProfile(modelData.profile)
+                    }
                 }
             }
             // The appearance profiles, under their tile.

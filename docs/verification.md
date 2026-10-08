@@ -876,3 +876,17 @@ lines the shell would, and `media_smoke` follows them through the shell to `mpri
 Not checked: real players (Spotify, mpv, VLC, Elisa, Firefox and Chromium tabs), their covers
 from `https:` and `file:` URLs, players that give no track id or length, a real keyboard's media
 keys, and players under playerctld or KDE Connect.
+
+## Power mode
+
+Added 2026-10-08. The tile and its list were looked at in the gallery in both themes of both
+styles and both renderers (`quick-settings`, `quick-settings-power`). `power_mode_dbus_test` drives
+the backend against a stand-in power-profiles-daemon on a private bus: nothing while it is absent,
+the daemon coming and going, its newer name and the older one (and the newer winning while both
+are owned), its announced changes, a switch reaching it as a property set, and a switch it refuses
+said and undone. `shell_ui` clicks the tile and a profile against a stand-in model, and checks the
+held-back performance, `shell.widgets.power_mode` and the Quick Settings button staying for it.
+
+Not checked: a real power-profiles-daemon (this desktop runs none) with its polkit rule, its
+drivers' sets of profiles (the placeholder driver's two), and a laptop's lap detection or heat
+holding performance back.

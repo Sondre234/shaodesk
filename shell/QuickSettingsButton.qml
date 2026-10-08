@@ -26,10 +26,12 @@ FlatButton {
         if (showBattery) lines.push(status.batteryText)
         return lines.length > 0 ? lines.join("\n") : "Quick settings"
     }
-    // The media card counts while it has a player to show.
+    // The media card counts while it has a player to show, the power mode while its daemon runs.
     readonly property bool showMedia: !!widgets.media && !!panel.mediaSource && panel.mediaSource.available
-    visible: showMedia || ["network", "battery", "volume", "tiling", "profiles", "wallpapers", "notifications"]
-        .some(function(name) { return button.widgets[name] === "quick" })
+    readonly property bool showPowerMode: !!widgets.power_mode && !!panel.powerModeSource && panel.powerModeSource.available
+    visible: showMedia || showPowerMode ||
+             ["network", "battery", "volume", "tiling", "profiles", "wallpapers", "notifications"]
+                 .some(function(name) { return button.widgets[name] === "quick" })
     Layout.preferredWidth: icons.implicitWidth + 2 * Theme.spacingM
     Layout.preferredHeight: Theme.barButtonHeight
     hoverEnabled: true

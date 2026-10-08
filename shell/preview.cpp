@@ -34,6 +34,11 @@ class PreviewMedia : public Media {
     void sendPosition(const QString &, const QString &, qint64) override {}
     void queryPosition(const QString &) override {}
 };
+// A power-profiles-daemon that switches as asked.
+class PreviewPowerMode : public PowerMode {
+  protected:
+    void sendProfile(const QString &) override {}
+};
 
 // A tray icon: a rounded square in `color` with a letter on it.
 QImage trayIcon(const QColor &color, const QString &letter) {
@@ -228,7 +233,7 @@ Notification notification(const QString &app, const QString &icon, const QString
 
 PreviewData::PreviewData(ShellController &controller)
     : QObject(&controller), controller_(controller), audio_(std::make_unique<PreviewAudio>()),
-      media_(std::make_unique<PreviewMedia>()) {
+      media_(std::make_unique<PreviewMedia>()), powerMode_(std::make_unique<PreviewPowerMode>()) {
     // Firefox plays from a child process of its window's, and the music player from the shell of
     // the first terminal, which has no window of its own (the processes are the stand-in tasks').
     audio_->update({"speakers",
@@ -344,6 +349,7 @@ PreviewData::PreviewData(ShellController &controller)
     browser.art = "";
     media_->setPlayer(browser);
     media_->setPlayer(music);
+    powerMode_->update({true, "balanced", {"power-saver", "balanced", "performance"}, ""});
 
     // The start menu as on a desktop in use: two pages of pins, applications launched lately and
     // someone logged in; those of tools/shell_gallery.py that are installed show.
@@ -415,6 +421,8 @@ void PreviewData::fill(QQuickItem *panel) {
     panel->setProperty("backlightSource", QVariant::fromValue<QObject *>(backlight_.get()));
     QQmlEngine::setObjectOwnership(media_.get(), QQmlEngine::CppOwnership);
     panel->setProperty("mediaSource", QVariant::fromValue<QObject *>(media_.get()));
+    QQmlEngine::setObjectOwnership(powerMode_.get(), QQmlEngine::CppOwnership);
+    panel->setProperty("powerModeSource", QVariant::fromValue<QObject *>(powerMode_.get()));
     if (tasks_)
         panel->setProperty("taskSource", QVariant::fromValue(tasks_));
 }

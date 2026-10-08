@@ -223,8 +223,9 @@ small icons, and the network only while its link is down, dimmed and struck thro
 mutes. Clicking it opens Quick Settings at the bar's right end: what is playing
 ([media controls](#media-controls)), tiles for do-not-disturb, night light (on or off against its
 schedule, through the compositor), tiling on this monitor (greyed out where tiling is not
-available), the appearance profile (listing the profiles under it) and the
-wallpaper (opening the same picker as the bar's button), and the network's state on a disc rather
+available), the [power mode](#power-mode) while power-profiles-daemon runs, the appearance profile
+(listing the profiles under it) and the wallpaper (opening the same picker as the bar's button),
+and the network's state on a disc rather
 than a tile, as it is only shown (Wi-Fi, wired or down, and the interface; shaodesk does not
 manage connections); a brightness slider where the screen has a backlight (set through logind's
 `SetBrightness`, so no privileges are needed); the volume with its mute, the outputs to play
@@ -252,14 +253,27 @@ when the shell found them. A player stopped with nothing loaded is left out. The
 while there is no player, and the shell needs Qt's D-Bus module at build time for any
 (`-DSHAODESK_MEDIA=OFF` builds without them).
 
+### Power mode
+
+While power-profiles-daemon runs, Quick Settings has a Power mode tile, as GNOME and KDE have: it
+shows the profile in use (a leaf for Power saver, a gauge for Balanced, a bolt for Performance), lit
+while that is not Balanced, and a click lists the profiles the daemon offers to pick from. Where
+the daemon holds performance back (a laptop on a lap, or too hot), Performance says so. The shell
+asks the daemon on the system bus (`org.freedesktop.UPower.PowerProfiles`, or
+`net.hadess.PowerProfiles` before version 0.20), which lets the active session's user switch
+without a password; a switch the daemon refuses is said across the panel and the tile shows the
+profile in use again. Without the daemon the tile is not there, and `shell.widgets.power_mode =
+false` leaves it out; `-DSHAODESK_POWER_PROFILES=OFF` builds without it.
+
 ### Where the widgets go
 
 Each widget is switched off from Lua: `shell = { widgets = { battery = false, calendar = false } }`,
 with `workspaces`, `battery`, `network`, `volume`, `clock`, `calendar` (the clock stays, the
 calendar goes), `tiling`, `profiles` (the appearance profile picker), `wallpapers`,
 `notifications` (do-not-disturb), `keyboard_layout`, `power` (the [power button](#power) in the
-start menu), `tray` (the [system tray](#system-tray)) and `media` (the card of what is playing,
-in Quick Settings) all on by default. Those that can move sit
+start menu), `tray` (the [system tray](#system-tray)), `media` (the card of what is playing,
+in Quick Settings) and `power_mode` (its [power mode](#power-mode) tile) all on by default.
+Those that can move sit
 on the bar with `"bar"` or in Quick Settings with `"quick"`, and `true` leaves them in their default
 place: `network`, `battery`, `volume`, `profiles` and `notifications` are in Quick Settings and
 `tiling` and `wallpapers` on the bar. Placed on the bar, each has its button there

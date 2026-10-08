@@ -72,6 +72,7 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
     });
     connect(&backlight_, &Backlight::failed, this, &ShellController::report);
     authentication_.setOutputSource([this] { return overlayOutput(); });
+    connect(powerMode_.get(), &PowerMode::failed, this, &ShellController::report);
 }
 ShellController::~ShellController() {
     delete engine_; // Before the objects its context refers to go away.
@@ -364,7 +365,8 @@ QVariantMap ShellController::widgets() const {
             {"wallpapers", place(w.wallpapers)}, {"keyboard_layout", w.keyboard_layout},
             {"power", w.power},                 {"tray", w.tray},
             {"notifications", place(w.notifications)},
-            {"media", w.media}};
+            {"media", w.media},
+            {"power_mode", w.power_mode}};
 }
 QStringList ShellController::profiles() const {
     QStringList names;

@@ -41,6 +41,7 @@ POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switch
 # The start menu's other views and its menus.
 POPUPS += ["launcher-all", "launcher-search", "launcher-empty", "launcher-menu"]
 POPUPS += ["quick-settings", "quick-settings-mixer", "bar-all"]
+POPUPS += ["quick-settings-power"]
 # The menus of the macOS style's menu bar, which only its themes picture.
 MACOS_POPUPS = ["system-menu", "app-menu", "window-menu", "window-submenu"]
 POPUPS += MACOS_POPUPS
