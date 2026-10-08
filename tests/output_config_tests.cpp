@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Configuration of what a monitor shows: mirroring another one, and the display_mode action.
+// Configuration of what a monitor shows: mirroring another one, the display_mode action, and the
+// bits per channel it is drawn in.
 #include "shaodesk/config.hpp"
 #include <iostream>
 #include <stdexcept>
@@ -59,6 +60,18 @@ int main() {
         rejects("return {bindings={{key='p',action='display_mode',mode='mirror'}}}");
         rejects("return {bindings={{key='p',action='display_mode',mode=2}}}");
         rejects("return {bindings={{key='p',action='display_mode',output='eDP-1'}}}");
+
+        // bit_depth is 8 unless 10 is asked for.
+        auto deep = shaodesk::parse_config(
+            "return {outputs={monitors={['DP-1']={bit_depth=10},['DP-2']={bit_depth=8},"
+            "['DP-3']={}}}}");
+        require(monitor(deep, "DP-1").bit_depth == 10 && monitor(deep, "DP-2").bit_depth == 8 &&
+                    monitor(deep, "DP-3").bit_depth == 8,
+                "bit_depth not parsed");
+        rejects("return {outputs={monitors={X={bit_depth=9}}}}");
+        rejects("return {outputs={monitors={X={bit_depth=12}}}}");
+        rejects("return {outputs={monitors={X={bit_depth='10'}}}}");
+        rejects("return {outputs={monitors={X={bit_depth=10.5}}}}");
     } catch (const std::exception &error) {
         std::cerr << "output_config: " << error.what() << '\n';
         return 1;

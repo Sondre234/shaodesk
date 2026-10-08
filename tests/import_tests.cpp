@@ -75,6 +75,9 @@ void hyprlang(const fs::path &root) {
     require(dp2 && !dp2->enabled, "a disabled monitor not imported");
     auto *mirror = monitor(config, "HDMI-A-2");
     require(mirror && std::string(mirror->mirror) == "DP-1", "mirror not imported");
+    require(mirror->bit_depth == 10 && monitor(config, "HDMI-A-4") &&
+                monitor(config, "HDMI-A-4")->bit_depth == 8 && dp1->bit_depth == 8,
+            "bitdepth not imported, or 12 bits were");
     require(monitor(config, "HDMI-A-3") && !monitor(config, "HDMI-A-3")->mirror[0],
             "a monitor mirroring itself should drop only the mirror");
     auto *dp9 = monitor(config, "DP-9");
@@ -108,6 +111,7 @@ void hyprlang(const fs::path &root) {
     for (const char *expected :
          {"rounded corners", "blur needs", "some-mouse", "source /etc/hostname", "scale 1ab",
           "HDMI-A-3: mirror HDMI-A-3 is not another monitor's name",
+          "HDMI-A-4: bitdepth 12 is not 8 or 10",
           "matches more than the app ID", "key bindings (1)", "window rules without opacity (1)"})
         require(contains(report, expected), std::string("report lacks: ") + expected);
 }

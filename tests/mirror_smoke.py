@@ -53,8 +53,10 @@ with harness.Compositor(compositor, config(), env={"WLR_HEADLESS_OUTPUTS": "2"})
                 for r in desktop.rows("outputs")}
 
     def capture(name="HEADLESS-3"):
+        """The mirror's last frame, once it has drawn one since it started mirroring."""
         path = desktop.root / "mirror.ppm"
-        msg("headless_output", "capture", name, str(path))
+        wait_for(lambda: desktop.run("headless_output", "capture", name, str(path)).returncode == 0,
+                 "the mirror drew a frame")
         return harness.Shot(path.read_bytes())
 
     def windows():

@@ -2,6 +2,7 @@
 /* Outputs: adding, configuring and laying out monitors from outputs.monitors and the
  * wlr-output-management protocol, and committing each frame with zoom and night light. */
 #include "server.h"
+#include <drm_fourcc.h>
 
 static void output_frame(struct wl_listener *listener, void *data) {
     struct sh_output *output = wl_container_of(listener, output, frame);
@@ -298,6 +299,42 @@ static struct wlr_output_mode *pick_mode(struct wlr_output *wlr_output,
     return best;
 }
 
+bool deep_format(uint32_t format) {
+    return format == DRM_FORMAT_XRGB2101010 || format == DRM_FORMAT_XBGR2101010;
+}
+
+/* wlr_output_test_state, but for tests under --headless, whose outputs take any format: the
+ * outputs SHAODESK_TEST_REFUSE_10BIT names (separated by commas) refuse 10 bits, as a monitor or
+ * a renderer without them does. */
+static bool test_render_format(struct sh_output *output, const struct wlr_output_state *state) {
+    const char *refused = getenv("SHAODESK_TEST_REFUSE_10BIT");
+    if (refused && headless_backend(output->server) && deep_format(state->render_format)) {
+        size_t length = strlen(output->wlr_output->name);
+        for (const char *at = strstr(refused, output->wlr_output->name); at;
+             at = strstr(at + 1, output->wlr_output->name)) {
+            if ((at == refused || at[-1] == ',') && (at[length] == ',' || at[length] == '\0'))
+                return false;
+        }
+    }
+    return wlr_output_test_state(output->wlr_output, state);
+}
+
+/* Adds a 10-bit render format to `state`: the first of XRGB2101010 and XBGR2101010 (which the
+ * GLES renderer may have alone) that passes the test with the rest of it. Without one the output
+ * stays at the format it has, and says why. */
+static void try_deep_format(struct sh_output *output, struct wlr_output_state *state) {
+    static const uint32_t formats[] = {DRM_FORMAT_XRGB2101010, DRM_FORMAT_XBGR2101010};
+    for (size_t i = 0; i < sizeof(formats) / sizeof(*formats); ++i) {
+        wlr_output_state_set_render_format(state, formats[i]);
+        if (test_render_format(output, state))
+            return;
+    }
+    state->committed &= ~WLR_OUTPUT_STATE_RENDER_FORMAT;
+    if (state->committed == 0 || wlr_output_test_state(output->wlr_output, state))
+        wlr_log(WLR_ERROR, "%s cannot be drawn in 10 bits; it stays at 8",
+                output->wlr_output->name);
+}
+
 static void destroy_output_layers(struct sh_server *server, struct wlr_output *wlr_output) {
     struct sh_layer *layer, *temporary;
     wl_list_for_each_safe(layer, temporary, &server->layers, link) {
@@ -361,6 +398,12 @@ void configure_output(struct sh_server *server, struct sh_output *output) {
         if (wlr_output->adaptive_sync_supported &&
             vrr != (wlr_output->adaptive_sync_status == WLR_OUTPUT_ADAPTIVE_SYNC_ENABLED))
             wlr_output_state_set_adaptive_sync_enabled(&state, vrr);
+        // 10 bits per channel where asked for and taken; else the default 8.
+        bool deep = monitor && monitor->bit_depth == 10;
+        if (deep && !deep_format(wlr_output->render_format))
+            try_deep_format(output, &state);
+        else if (!deep && wlr_output->render_format != DRM_FORMAT_XRGB8888)
+            wlr_output_state_set_render_format(&state, DRM_FORMAT_XRGB8888);
     }
     if (state.committed != 0 && !wlr_output_test_state(wlr_output, &state)) {
         // Fall back to the defaults; a new monitor must still light up.
@@ -431,6 +474,7 @@ static void head_monitor(struct sh_server *server, const struct sh_output *outpu
     const struct sh_monitor *configured = monitor_settings(server_settings(server), output->wlr_output);
     memset(monitor, 0, sizeof(*monitor));
     monitor->tiling = configured ? configured->tiling : -1;
+    monitor->bit_depth = configured ? configured->bit_depth : 8; // no head state says it
     snprintf(monitor->name, sizeof(monitor->name), "%s", output->wlr_output->name);
     monitor->enabled = head->enabled;
     if (!head->enabled)

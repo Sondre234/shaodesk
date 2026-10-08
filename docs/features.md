@@ -1322,7 +1322,21 @@ settings replace the `outputs.monitors` entry of the outputs they touch until th
 configuration is reloaded, which brings the configured setup back. The last enabled output
 cannot be turned off.
 
-### Mirroring
+### Colour depth
+
+`bit_depth = 10` in a monitor's entry draws it with 10 bits per colour channel instead of 8, as
+Hyprland's `bitdepth` does, for smoother gradients on a monitor that shows them:
+
+```lua
+outputs = { monitors = { ["DP-3"] = { bit_depth = 10 } } },
+```
+
+The desktop is then drawn in a 10-bit format (`XRGB2101010`, else `XBGR2101010`, which the GLES
+renderer may have alone), where the monitor, the cable and the GPU take it: shaodesk tests the
+monitor's settings with it first, and where that fails it stays at 8 bits and logs `DP-3 cannot be
+drawn in 10 bits; it stays at 8`. `shaodesk msg get outputs` ends each line with the depth a
+monitor is drawn in, 8 or 10. A 10-bit format does not by itself mean the monitor receives 10 bits:
+that is up to the driver and the link. A wlr-output-management change keeps the configured depth.
 
 A monitor can show another's picture, as Windows' Duplicate and KDE's display mirroring do:
 
@@ -1367,9 +1381,10 @@ only `extend` can be had.
 XF86Display, the key a laptop sends for Fn and its display key, runs `display_mode` without a
 choice: a popup on the focused monitor shows the four in Windows' order (PC screen only,
 duplicate, extend, second screen only) with the one in force selected, each further press moves
-the selection on, and a second and a half after the last press the selected one is taken. While the popup is open the arrow keys move the selection, Return takes it at once
-and Escape closes the popup without changing anything; a click takes a choice too. Win + P
-itself opens the command palette.
+the selection on, and a second and a half after the last press the selected one is taken. While
+the popup is open the arrow keys move the selection, Return takes it at once and Escape closes
+the popup without changing anything; a click takes a choice too, and while the pointer rests on
+the popup it stays open. Win + P itself opens the command palette.
 
 ```lua
 bindings = {
@@ -2059,7 +2074,8 @@ workspaces holding windows, such as `1,3`, or `-`, and tiling, `on` or `off`),
 `shaodesk msg get tiling` prints `on` or `off` for the focused monitor, `shaodesk msg get outputs` prints one tab-separated line per monitor (name,
 enabled, x, y, logical width and height, scale, transform, mode, "make model serial",
 whether it shows a picture, `on`, or is [turned off](#turning-monitors-off) or disabled, `off`,
-and the monitor it [mirrors](#mirroring), or `-`), and
+the monitor it [mirrors](#mirroring), or `-`, and the bits per channel it is [drawn
+in](#colour-depth), 8 or 10), and
 `shaodesk msg get windows` prints one tab-separated line per window:
 workspace, focused, minimized, tiled, x, y, width, height, app ID, title, monitor,
 visible, scratchpad (a window hidden there is also minimized), sticky, its window group

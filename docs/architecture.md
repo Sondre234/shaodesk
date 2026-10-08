@@ -857,7 +857,9 @@ whether it has, for something the compositor does another way without it, as the
   `SHAODESK_PROBE_DRAG=source` drags a line of text on a button press of `pointer_probe`'s, and
   one with `=target` takes it, each printing what it hears; `get seat` says where the drag is
   (see `drag_focus_smoke.py`). `headless_output capture NAME PATH` writes a mirroring output's
-picture to a PPM file (see `mirror_smoke.py`). `SHAODESK_PROBE_ICON` gives a `wayland_probe` window an icon
+picture to a PPM file (see `mirror_smoke.py`), and `SHAODESK_TEST_REFUSE_10BIT=NAME,...` makes
+those headless outputs refuse a 10-bit render format, as a monitor without one does (see
+`bit_depth_smoke.py`). `SHAODESK_PROBE_ICON` gives a `wayland_probe` window an icon
   through xdg-toplevel-icon-v1 and an `x11_probe` window `_NET_WM_ICON`, and their commands
   change it (see `window_icon_smoke.py`). `SHAODESK_LOGIN_SESSION=1` makes a headless
   compositor start as a standalone session does, running XDG autostart from the directories

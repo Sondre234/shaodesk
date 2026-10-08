@@ -1057,3 +1057,18 @@ a source with a gamma table set by `wlsunset` (applied by the source's CRTC, so 
 picture without it); a real laptop's lid with a projector mirroring its panel; the XF86Display key a
 real laptop's Fn key sends (some send Super+P instead, which the palette takes); and kanshi or
 wdisplays beside a mirror.
+
+## Colour depth
+
+Added 2026-10-08. `bit_depth_smoke` asks for 10 bits on three headless outputs with the pixman
+renderer: two are drawn in `XRGB2101010` (one of them a mirror, in its own), and the third, whose
+10 bits a test variable refuses as a monitor without them would, stays at 8 and says so; grim's
+picture of a 10-bit output and the mirror's show the background's colour exactly, a
+wlr-output-management change keeps the depth and a reload without `bit_depth` brings 8 back.
+`output_config` reads the setting and `import` Hyprland's `bitdepth`.
+
+Not checked: 10 bits on a real monitor through DRM, with the GLES renderer (which may take only
+`XBGR2101010`) and Vulkan, on NVIDIA and AMD; that a monitor really receives 10 bits (the link's
+bandwidth at a high refresh rate may hold it to 8, which wlroots does not tell); direct scan-out and
+the hardware cursor beside a 10-bit primary plane; screen recording and screenshots of a 10-bit
+output through the GPU (grim and the portals reading `XRGB2101010` buffers).

@@ -87,7 +87,7 @@ shaodesk before it can be imported, **won't** = deliberately not carried over.
 | Match by description | `desc:…` | `outputs.monitors["desc:…"]` | done (untested on hardware) | yes |
 | Variable refresh rate | `vrr` | `outputs.monitors[NAME].vrr` | done (untested on hardware) | yes |
 | Mirroring | `mirror, NAME` | `outputs.monitors[NAME].mirror` | done (untested on hardware) | yes |
-| 10-bit color | `bitdepth` | — | missing | no |
+| 10-bit color | `bitdepth, 10` | `outputs.monitors[NAME].bit_depth` | done (untested on hardware) | yes |
 
 ### Colors and wallpaper
 

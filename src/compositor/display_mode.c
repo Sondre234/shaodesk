@@ -159,8 +159,23 @@ static void close_popup(struct sh_server *server, bool take) {
         wlr_log(WLR_ERROR, "%s", error);
 }
 
+/* Whether the pointer is on the shell's popup: someone about to click a choice. */
+static bool pointer_on_popup(struct sh_server *server) {
+    struct wlr_surface *surface = server->seat->pointer_state.focused_surface;
+    struct wlr_layer_surface_v1 *layer =
+        surface ? wlr_layer_surface_v1_try_from_wlr_surface(surface) : NULL;
+    return layer && layer->namespace && !strcmp(layer->namespace, "shaodesk-display-mode");
+}
+
+/* The key has rested: the choice shown is taken, unless the pointer is on the popup, which then
+ * stays open as long as it is. */
 static int popup_settled(void *data) {
-    close_popup(data, true);
+    struct sh_server *server = data;
+    if (pointer_on_popup(server)) {
+        wl_event_source_timer_update(server->display_mode.timer, DISPLAY_MODE_SETTLE_MS);
+        return 0;
+    }
+    close_popup(server, true);
     return 0;
 }
 

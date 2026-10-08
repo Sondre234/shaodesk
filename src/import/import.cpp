@@ -540,8 +540,14 @@ class Translator {
                 report_.skip(files_, item.origin, name + ": mirror " + mirror +
                                                       " is not another monitor's name");
         }
+        if (auto depth = field("bitdepth"); !depth.empty()) {
+            if (depth == "8" || depth == "10")
+                theme_.set(at("bit_depth"), depth, item.origin);
+            else
+                report_.skip(files_, item.origin, name + ": bitdepth " + depth + " is not 8 or 10");
+        }
         for (const auto &[key, value] : item.fields)
-            if (key == "bitdepth" || key == "cm" || key == "sdrbrightness" ||
+            if (key == "cm" || key == "sdrbrightness" ||
                 key == "sdrsaturation" || key == "reserved")
                 report_.skip(files_, item.origin, name + ": " + key + " is not supported yet");
     }

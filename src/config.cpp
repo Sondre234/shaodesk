@@ -667,6 +667,9 @@ void read_monitors(lua_State *L, sh_settings &settings) {
         monitor.scale = static_cast<float>(number(L, "scale", 0, 0.25, 10));
         monitor.transform = integer(L, "transform", 0, 0, 7);
         boolean(L, "vrr", "vrr", monitor.vrr);
+        monitor.bit_depth = integer(L, "bit_depth", 8, 8, 10);
+        if (monitor.bit_depth != 8 && monitor.bit_depth != 10)
+            fail("bit_depth must be 8 or 10");
         lua_getfield(L, -1, "mirror");
         if (!lua_isnil(L, -1)) {
             auto source = string(L, -1, "mirror");
