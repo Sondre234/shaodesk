@@ -174,9 +174,27 @@ void place_by_hand(struct sh_toplevel *toplevel, enum sh_action action) {
             action = action == SH_SNAP_LEFT ? SH_SNAP_RIGHT : SH_SNAP_LEFT;
         }
     }
+    place_by_hand_on(toplevel, action, output);
+}
+
+/* The slot snapping or maximizing puts a window in on `output`, its border included. */
+bool placed_slot(struct sh_server *server, enum sh_action action, struct wlr_output *output,
+                 struct sh_rect *slot) {
     const struct sh_settings *settings = server_settings(server);
-    struct sh_rect area = gap_area(settings, usable_area(server, output), action), target;
-    if (sh_placement(action, area, settings->gap_inner, 0, 1, &target))
+    struct sh_rect area = gap_area(settings, usable_area(server, output), action);
+    return sh_placement(action, area, settings->gap_inner, 0, 1, slot);
+}
+
+/* Snaps or maximizes one window within the usable area of `output`, as place_by_hand does
+ * on the output it is on: a window dropped at an edge goes to the output under the pointer. */
+void place_by_hand_on(struct sh_toplevel *toplevel, enum sh_action action,
+                      struct wlr_output *output) {
+    if (toplevel->tiled || wants_tiling(toplevel, output))
+        toplevel->floating = toplevel->placed = true;
+    if (toplevel->tiled)
+        untile_toplevel(toplevel, false);
+    struct sh_rect target;
+    if (placed_slot(toplevel->server, action, output, &target))
         place_toplevel(toplevel, action, target);
 }
 

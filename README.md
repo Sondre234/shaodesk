@@ -324,7 +324,7 @@ Work happens on short-lived branches off `main` that are merged back with `--no-
 [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md) for notable changes, and
 [docs/performance.md](docs/performance.md) for measurements.
 
-Not yet done: drag-to-edge snap previews, blur and shadows, and Lua extension APIs for custom
+Not yet done: blur and shadows, and Lua extension APIs for custom
 layouts and shell widgets.
 
 ## Reporting bugs

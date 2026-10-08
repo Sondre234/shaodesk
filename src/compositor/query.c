@@ -200,6 +200,25 @@ static void get_guides(struct sh_server *server, int fd, const char *arguments) 
     }
 }
 
+static void get_snap(struct sh_server *server, int fd, const char *arguments) {
+    // Snapping by dragging: "zone", the zone the pointer is in while a window is moved (none,
+    // left, right, maximize, top_left, ...), the slot a drop there gives (x, y, width, height),
+    // and whether a window is being moved with the pointer; "preview", whether the preview is
+    // shown, where it is drawn now (x, y, width, height), how far it has faded in (thousandths)
+    // and the radius of its corners.
+    char line[256];
+    struct sh_rect slot = server->snap.slot;
+    const float *drawn = server->snap.drawn;
+    snprintf(line, sizeof(line),
+             "ok\nzone\t%s\t%d\t%d\t%d\t%d\t%d\npreview\t%d\t%ld\t%ld\t%ld\t%ld\t%ld\t%d\n",
+             snap_zone_name(server->snap.zone), slot.x, slot.y, slot.width, slot.height,
+             server->cursor_mode == SH_CURSOR_MOVE && server->grabbed_toplevel,
+             server->snap.preview && server->snap.preview->node.enabled, lround(drawn[0]),
+             lround(drawn[1]), lround(drawn[2]), lround(drawn[3]), lround(1000 * drawn[4]),
+             server->snap.radius);
+    control_reply(fd, line);
+}
+
 static void get_animations(struct sh_server *server, int fd, const char *arguments) {
     // Running animations, and the scene trees stacked for windows (with closing copies).
     char reply[64];
@@ -615,6 +634,7 @@ static const struct {
     {"pid_at", get_pid_at, true},
     {"swallow", get_swallow, false},
     {"guides", get_guides, false},
+    {"snap", get_snap, false},
     {"animations", get_animations, false},
     {"stats", get_stats, false},
     {"frame_times", get_frame_times, false},

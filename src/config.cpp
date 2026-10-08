@@ -781,6 +781,32 @@ void read_magnet(lua_State *L, Config &config) {
     }
     lua_pop(L, 1);
 }
+// `windows.snap = { enabled, distance, corners, preview, color }`. The preview's colour follows
+// the focused window's border, a quarter opaque, unless it is given.
+void read_snap(lua_State *L, Config &config) {
+    auto &settings = config.settings;
+    bool colored = false;
+    lua_getfield(L, -1, "snap");
+    if (!lua_isnil(L, -1)) {
+        table(L, -1, "windows.snap");
+        keys(L, -1, "windows.snap");
+        boolean(L, "enabled", "windows.snap.enabled", settings.snap);
+        settings.snap_distance = integer(L, "distance", settings.snap_distance, 1, 100);
+        boolean(L, "corners", "windows.snap.corners", settings.snap_corners);
+        boolean(L, "preview", "windows.snap.preview", settings.snap_preview);
+        lua_getfield(L, -1, "color");
+        if (!lua_isnil(L, -1)) {
+            premultiplied(string(L, -1, "color"), "color", settings.snap_color);
+            colored = true;
+        }
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+    if (!colored) {
+        for (int i = 0; i < 4; ++i)
+            settings.snap_color[i] = settings.border_active[i] * 0.25F;
+    }
+}
 // `windows.shadow = { enabled, color, inactive_color, blur, offset }`; the offset is pixels down
 // or { x, y }.
 void read_shadow(lua_State *L, Config &config) {
@@ -864,6 +890,7 @@ void read_windows(lua_State *L, Config &config) {
     lua_pop(L, 1);
     read_swallow(L, config);
     read_magnet(L, config);
+    read_snap(L, config);
     read_shadow(L, config);
     lua_getfield(L, -1, "placement");
     if (!lua_isnil(L, -1)) {

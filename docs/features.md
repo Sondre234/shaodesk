@@ -395,7 +395,8 @@ window over it goes to the window. Other windows, and windows that ask to draw t
 themselves.
 
 Dropping a dragged window with the pointer at the top edge of the screen, or on a panel along
-it, maximizes it below the panels; dragging it away again restores its earlier size. Hovering a
+it, maximizes it below the panels, and at a side or in a corner snaps it into that half or
+quarter (see [Snapping](#snapping)); dragging it away again restores its earlier size. Hovering a
 window focuses it without raising it (`mouse.focus_follows = false` turns this off), except
 while dragging, while a menu or popup is open, or while a panel or launcher has the keyboard.
 
@@ -405,8 +406,7 @@ browser's fullscreen video, covers the whole monitor, panels included, and keeps
 while you work on another monitor; bringing another window forward on its monitor puts it
 behind that window and shows the panels again.
 
-Limitations: snapping is keyboard-driven, without edge-drag previews. Window
-placement during interactive resize is immediate, without waiting for the
+Limitations: window placement during interactive resize is immediate, without waiting for the
 client's next buffer.
 
 Actions without a section of their own: `quit` ends the session (Super + M), and `snap_left` and
@@ -490,6 +490,46 @@ made from the size the window asked for when it opens; the algorithm has unit te
 (`tests/window_placement_tests.cpp`) and the modes are checked headless with a panel
 (`tests/placement_smoke.py`).
 
+### Snapping
+
+A floating window dragged with the pointer (Super + drag, a client-decorated window's own title
+bar, or the drag strip of one shaodesk decorates) snaps when it is dropped at an edge of its
+monitor, as Windows' Aero Snap and KWin's quick tiling do: at the left or right edge it fills
+that half, in a corner that quarter, and at the top edge it is maximized below the panels. The
+pointer decides, not the window: it has to be within `windows.snap.distance` (8 pixels) of the
+edge, or on a panel along it, and in a corner within that distance of both edges. The halves
+and quarters keep `layout.gap_outer` from the screen's edges and `gap_inner` between them, as
+`snap_left` and `snap_right` do, and they follow the panels as those come and go.
+
+While a drop would snap, a translucent preview of the slot shows under the dragged window, in
+`windows.snap.color` (the focused border's colour, a quarter opaque) with an outline of the same
+colour, more opaque, and rounded as a window there would be. It grows out of the window into
+the slot as the pointer reaches the edge, glides to the next slot as the pointer moves into a
+corner, fades out where it is as the pointer leaves the edge, and goes as the window is dropped.
+It moves with the duration and curve of `animations.move` and fades with those of
+`animations.close`, at once with animations off. The outline needs the GLES2 renderer and
+wlroots with the rounded-corners patch; elsewhere the preview is the fill alone, and square
+without the patch.
+
+An edge shared with another monitor does not snap where the other monitor continues, so the
+pointer crosses it; the snap goes to the monitor under the pointer, whichever monitor the window
+mostly covers. Dragging a snapped or maximized window gives it back the size it had before as
+it starts to move, the pointer keeping its place across it, and `restore` puts a window snapped
+by dragging back where it floated before the drag. On a monitor that tiles, a tile lifted out
+with Super + drag goes back into the tiling where it is dropped, splitting the tile under the
+pointer, at a side edge too; dropping it at the top edge still maximizes it, floating. A window
+floating on purpose there snaps as on any other monitor. The magnetic edges below work
+alongside: the window sticks to an edge while it is dragged, and the pointer decides the snap
+when it is dropped.
+
+`windows.snap = { enabled = false }` turns snapping by dragging off, the top edge too;
+`corners = false` leaves the corners to the side edges; `preview = false` snaps without the
+preview. `shaodesk msg get snap` says which zone the pointer is in while a window is moved, the
+slot a drop gives, and where the preview is drawn and how far it has faded in.
+`tests/snap_smoke.py` checks the zones, slots and drops with a virtual pointer on one and on two
+monitors, a panel, a tiling monitor, the settings, and the preview's easing, corners and pixels;
+the zones have unit tests in `tests/layout_tests.cpp`.
+
 ### Magnetic edges
 
 A floating window that is dragged (Alt + left drag, or a client-decorated window's own title
@@ -504,7 +544,7 @@ position, so it stays held until the pointer has moved the distance away, then f
 hold the `bypass` modifier (Shift by default; `"none"` for no modifier) to drag freely.
 `windows.magnet = { enabled = false }` turns it off, and `guides = false` leaves the lines out.
 Tiles and windows lifted out of the tiling to be dropped somewhere are not affected, and
-dropping a window at the top of the screen still maximizes it (that goes by the pointer). When
+dropping a window at an edge of the screen still snaps it (that goes by the pointer). When
 resizing, only the edges being pulled stick. It does not act on keyboard moves or resizes, or on
 snap actions. Tested headless with a virtual
 pointer and keyboard, including the guide's pixels (`tests/magnet_smoke.py`); the feel of the

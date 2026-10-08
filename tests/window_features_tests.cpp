@@ -80,6 +80,34 @@ int main() {
         rejects("return {windows={magnet={guide_color='blue'}}}");
         rejects("return {windows={magnet={dist=3}}}");
         rejects("return {windows={magnet=false}}");
+        // Snapping by dragging is on, 8 pixels from the edge, with corners and a preview in the
+        // focused border's colour, a quarter opaque, unless given one.
+        require(defaults.settings.snap && defaults.settings.snap_distance == 8 &&
+                    defaults.settings.snap_corners && defaults.settings.snap_preview &&
+                    defaults.settings.snap_color[3] > 0.24F &&
+                    defaults.settings.snap_color[3] < 0.26F,
+                "snap defaults changed");
+        auto snap = shaodesk::parse_config(
+            "return {windows={snap={enabled=false,distance=20,corners=false,preview=false,"
+            "color='#ff000080'}}}");
+        require(!snap.settings.snap && snap.settings.snap_distance == 20 &&
+                    !snap.settings.snap_corners && !snap.settings.snap_preview &&
+                    snap.settings.snap_color[0] > 0.49F && snap.settings.snap_color[0] < 0.51F &&
+                    snap.settings.snap_color[1] == 0,
+                "snap settings not read (premultiplied color)");
+        auto bordered = shaodesk::parse_config("return {windows={border_color='#00ff00'}}");
+        require(bordered.settings.snap_color[1] > 0.24F && bordered.settings.snap_color[1] < 0.26F &&
+                    bordered.settings.snap_color[0] == 0,
+                "the snap preview follows the border colour");
+        require(shaodesk::parse_config("return {windows={snap={distance=1}}}")
+                        .settings.snap_distance == 1,
+                "snap distance 1");
+        rejects("return {windows={snap={distance=0}}}");
+        rejects("return {windows={snap={distance=101}}}");
+        rejects("return {windows={snap={corners='yes'}}}");
+        rejects("return {windows={snap={color='blue'}}}");
+        rejects("return {windows={snap={assits=true}}}");
+        rejects("return {windows={snap=true}}");
         // windows.placement: cascade unless told otherwise.
         require(defaults.settings.placement == SH_PLACE_CASCADE, "placement default");
         for (auto [name, mode] : {std::pair{"cascade", SH_PLACE_CASCADE},

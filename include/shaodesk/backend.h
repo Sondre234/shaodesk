@@ -168,6 +168,11 @@ enum sh_action {
     /* Asks the shell to give the keyboard to the taskbar (or the dock) on the focused output, to
      * walk its buttons and their windows with the arrows, as Windows' Win+T; again, to leave. */
     SH_TASKBAR_FOCUS,
+    /* Snapping into a quarter of the output, as SH_SNAP_LEFT and SH_SNAP_RIGHT into a half. */
+    SH_SNAP_TOP_LEFT,
+    SH_SNAP_TOP_RIGHT,
+    SH_SNAP_BOTTOM_LEFT,
+    SH_SNAP_BOTTOM_RIGHT,
 };
 
 enum sh_screenshot_mode {
@@ -355,6 +360,15 @@ struct sh_settings {
     bool magnet_guides;
     uint32_t magnet_bypass;
     float magnet_guide_color[4]; /* premultiplied RGBA */
+    /* windows.snap: a floating window dropped with the pointer within `snap_distance` pixels of
+     * a side of its output fills that half, of two sides that quarter (with `snap_corners`), of
+     * the top it is maximized (see sh_snap_zone); while it would, a preview in `snap_color` shows
+     * where (with `snap_preview`). */
+    bool snap;
+    int snap_distance;
+    bool snap_corners;
+    bool snap_preview;
+    float snap_color[4]; /* premultiplied RGBA */
     /* windows.placement: enum sh_place_mode, where new floating windows open. */
     int placement;
     /* windows.drag_strip: how many pixels along the top of a window without a title bar move
@@ -485,6 +499,15 @@ struct sh_rect {
 };
 bool sh_placement(enum sh_action action, struct sh_rect area, int gap, int index, int count,
                   struct sh_rect *result);
+/* Where a window dragged with the pointer at (x, y) snaps when dropped there, `area` being the
+ * output less its panels (a panel along an edge counts as that edge): SH_SNAP_LEFT or
+ * SH_SNAP_RIGHT within `distance` pixels of that side, SH_MAXIMIZE of the top, and with
+ * `corners` a quarter (SH_SNAP_TOP_LEFT, ...) within `distance` of two sides at once, where
+ * without them the side wins. The bottom alone snaps nothing, and neither does an edge in
+ * `shared` (enum sh_edge bits), which leads on to another output. SH_NONE where nothing
+ * snaps. */
+enum sh_action sh_snap_zone(struct sh_rect area, double x, double y, int distance, bool corners,
+                            uint32_t shared);
 
 /* Where a new floating window of `width` x `height` opens in `area` (the output less its
  * panels), given the rectangles `others` of the windows already showing there. Cascade steps

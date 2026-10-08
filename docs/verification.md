@@ -690,3 +690,25 @@ or lens, which act as absolute tools here, a pad that libinput attaches to its t
 and strips, which go through groups the headless pad has none of), pressure in Krita, GIMP and
 Inkscape, the cursors applications set for a tool, and a tablet mapped to a rotated or scaled
 monitor.
+
+## Snapping by dragging
+
+Added 2026-10-08. `snap_smoke` drags a probe window through a virtual pointer (the client asks
+for the move as a client-decorated window does) in headless compositors: the zones and slots of
+both side edges, the top and the four corners with a panel along the bottom counting as the
+edge, the bottom edge alone snapping nothing, the drop placing the window in the slot and
+`restore` putting it back where it floated before the drag, a snapped window getting its size
+back as it is dragged away, `distance`, `corners = false` and `enabled = false`; on two monitors
+of different heights, the shared edge snapping only below the shorter one and the snap going to
+the monitor under the pointer; on a tiling monitor, a tile dropped at a side edge splitting the
+tile there and one dropped at the top maximizing. With animations slowed to a tenth it checks
+the preview growing out of the window, gliding into a corner, fading as the pointer leaves the
+edge and going on the drop, its radius against the window's own once snapped, its pixels
+(grim) and `preview = false`. `layout_tests` covers the zones, shared edges and the quarters'
+geometry. The preview was looked at in screenshots of a headless compositor drawing through
+GLES2 (rounded, with its outline) and pixman (square, the fill alone).
+
+Not checked: the feel of the distance and the corners with a real mouse or touchpad at real
+refresh rates, the preview's easing on a real display at 144 or 200 Hz, snapping across real
+monitors with different scales or offsets, X11 windows dragged by their own title bars, and the
+preview on NVIDIA and with the Vulkan renderer.

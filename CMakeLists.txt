@@ -222,6 +222,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/scaled_capture.c
         src/compositor/scratchpad.c
         src/compositor/session.c
+        src/compositor/snap.c
         src/compositor/swallow.c
         src/compositor/switcher.c
         src/compositor/tablet.c
@@ -790,6 +791,11 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>
             "${GRIM_ARGUMENT}")
         set_tests_properties(magnet_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME snap_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/snap_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>
+            "${GRIM_ARGUMENT}")
+        set_tests_properties(snap_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME night_light_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/night_light_smoke.py
             $<TARGET_FILE:shaodesk>)
