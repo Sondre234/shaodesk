@@ -124,6 +124,7 @@ shaodesk before it can be imported, **won't** = deliberately not carried over.
 | Shadows | `decoration:shadow` | `windows.shadow` | missing (set by hand) | no |
 | Animations on/off | `animations:enabled` | `animations.enabled` | done | yes |
 | Focus a window that asks for it | `misc:focus_on_activate` | `windows.activation` (`"focus"`; unset keeps the default `"urgent"`, which marks the window instead) | done | yes |
+| Tearing for games | `general:allow_tearing`, `windowrule = immediate, class:…` | `windows.allow_tearing`, `windows.rules` (`allow_tearing = true`) | done (untested on hardware) | yes |
 | Animation styles, speeds, curves | `animation`, `bezier` | — (fixed fade, scale, and glide; `animations.duration`) | won't (for now) | — |
 
 ### Input

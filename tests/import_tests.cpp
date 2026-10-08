@@ -80,7 +80,10 @@ void hyprlang(const fs::path &root) {
                 std::string(s.output_order[2]) == "DP-1",
             "output order does not follow positions");
 
-    require(config.window_rules.size() == 4, "expected four opacity rules");
+    require(config.window_rules.size() == 5, "expected four opacity rules and one immediate");
+    require(s.allow_tearing && config.window_actions("cs2", "").to_c().allow_tearing &&
+                !config.window_actions("kitty", "").allow_tearing,
+            "allow_tearing or the immediate rule not imported");
     require(near(config.window_opacity("kitty", true), 0.8F) &&
                 near(config.window_opacity("kitty", false), 0.7F),
             "v1 opacity rule not imported");
@@ -106,7 +109,8 @@ void hyprlang(const fs::path &root) {
          {"rounded corners", "blur needs", "some-mouse", "source /etc/hostname", "scale 1ab",
           "HDMI-A-3: mirror HDMI-A-3 is not another monitor's name",
           "HDMI-A-4: bitdepth 12 is not 8 or 10",
-          "matches more than the app ID", "key bindings (1)", "window rules without opacity (1)"})
+          "matches more than the app ID", "key bindings (1)",
+          "window rules without opacity or immediate (1)"})
         require(contains(report, expected), std::string("report lacks: ") + expected);
 }
 
