@@ -221,6 +221,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/swallow.c
         src/compositor/switcher.c
         src/compositor/tiling.c
+        src/compositor/touch.c
         src/compositor/toplevel.c
         src/compositor/window_control.c
         src/compositor/window_icon.c

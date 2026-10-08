@@ -358,6 +358,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     add_listener(&server.cursor->events.axis, &server.cursor_axis, server_cursor_axis);
     add_listener(&server.cursor->events.frame, &server.cursor_frame, server_cursor_frame);
     gestures_init(&server);
+    touch_init(&server);
 
     wl_list_init(&server.keyboards);
     wl_list_init(&server.headless_keyboards);
@@ -493,6 +494,7 @@ finish:
     wl_list_remove(&server.cursor_axis.link);
     wl_list_remove(&server.cursor_frame.link);
     gestures_finish(&server);
+    touch_finish(&server);
 
     wl_list_remove(&server.new_input.link);
     wl_list_remove(&server.new_virtual_keyboard.link);

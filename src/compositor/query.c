@@ -559,6 +559,19 @@ static void get_gesture(struct sh_server *server, int fd, const char *arguments)
     describe_gesture(server, fd);
 }
 
+static void get_touch(struct sh_server *server, int fd, const char *arguments) {
+    // The touchscreens and the finger standing in for the pointer (see describe_touch), then
+    // each other finger down, `point ID` with the surface it went to as describe_surface has it.
+    control_reply(fd, "ok\n");
+    describe_touch(server, fd);
+    struct wlr_touch_point *point;
+    wl_list_for_each(point, &server->seat->touch_state.touch_points, link) {
+        char what[32];
+        snprintf(what, sizeof(what), "point %d", point->touch_id);
+        describe_surface(server, fd, what, point->surface);
+    }
+}
+
 static void get_seat(struct sh_server *server, int fd, const char *arguments) {
     // What has the keyboard, what the pointer is on, and, while a drag is under way, what it is
     // over (each as describe_surface has it). During a drag the pointer is on nothing: its events
@@ -606,6 +619,7 @@ static const struct {
     {"pictures", get_pictures, false},
     {"seat", get_seat, false},
     {"gesture", get_gesture, false},
+    {"touch", get_touch, false},
 };
 
 /* Answers `request` if it is a query; false if it is not one. */
