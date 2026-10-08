@@ -229,6 +229,10 @@ int main() {
         rejects("return {autostart={exclude={'/etc/xdg/autostart/a.desktop'}}}");
         rejects("return {autostart={exclude={1}}}");
         rejects("return {autostart={xdgs=true}}");
+        require(defaults.shell.polkit_agent &&
+                    !shaodesk::parse_config("return {shell={polkit_agent=false}}").shell.polkit_agent,
+                "shell.polkit_agent not parsed");
+        rejects("return {shell={polkit_agent='no'}}");
         std::cout << "autostart passed\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';

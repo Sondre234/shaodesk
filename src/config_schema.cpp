@@ -558,6 +558,11 @@ const Option options[] = {
      "Taskbar buttons show only the window icon, the title as a tooltip."},
     {"shell.group_windows", "boolean", "true", "true", none, none,
      "One taskbar button per application; `false` gives every window its own."},
+    {"shell.polkit_agent", "boolean", "true", "true", none, none,
+     "Be the session's polkit authentication agent: a dialog asks for the password a program "
+     "needs for what only an administrator may do (`pkexec`, GParted, an updater). It stays "
+     "out of the way while another agent serves the session, and XDG autostart then leaves "
+     "other agents out. `false` leaves it to another agent."},
     {"shell.thumbnails", "table", "", "", none, none,
      "Pictures of the windows on the taskbar and in the window switcher: resting the pointer on "
      "a button with windows shows a card beside it with a small picture of each, and Alt + Tab "

@@ -340,6 +340,7 @@ void read_shell(lua_State *L, ShellConfig &shell) {
     lua_pop(L, 1);
     boolean(L, "icons_only", "shell.icons_only", shell.icons_only);
     boolean(L, "group_windows", "shell.group_windows", shell.group_windows);
+    boolean(L, "polkit_agent", "shell.polkit_agent", shell.polkit_agent);
     shell.workspaces_shown = integer(L, "workspaces_shown", 0, 0, 10);
     if (section(L, "thumbnails", "shell.thumbnails")) {
         auto &thumbnails = shell.thumbnails;
