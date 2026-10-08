@@ -226,8 +226,11 @@ sleep calls `idle_activity` as input would.
 ### The lid
 
 `switches.c` follows libinput's switches (`WLR_INPUT_DEVICE_SWITCH`), one `sh_switch_device`
-each, keeping what each last said of the lid and of tablet mode from its toggle events;
-`sh_server.lid_closed` is any of them saying the lid is closed. `configure_output` asks
+each, keeping what each last said of the lid and of tablet mode from its toggle events, and
+logind's `LidClosed` (`sh_login1_ask_lid`, which power.c asks as it connects, and its
+PropertiesChanged): libinput tells of a lid already closed as its device appears only when a quirk
+says the switch is reliable, and then never of its opening either. `sh_server.lid_closed` is any of
+them saying the lid is closed. `configure_output` asks
 `lid_holds_off` of every output, which applies `src/lid.c`'s decision (a built-in connector, the
 lid closed, clamshell mode, a monitor that is not built in in the layout), and when the lid holds
 an output off it goes out of the layout as with `enabled = false`, but its windows keep their

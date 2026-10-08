@@ -618,11 +618,14 @@ lid's binding; with no other monitor the panel stays on, a monitor plugged in tu
 unplugging that one brings it back without the session ending; a lid switch that appears closed
 holds the panel off, and so does a panel appearing behind it; `outputs.lid = "ignore"` leaves it
 on; opening the lid turns on the monitors the idle steps turned off; tablet mode runs its binding.
-`lid` checks which connectors count as built in and when the panel goes off, and
+`lid_logind_smoke` gives the fake logind a `LidClosed` property: closed as the compositor starts,
+it holds a panel plugged in afterwards off, and its changes turn the panel on and off. `lid`
+checks which connectors count as built in and when the panel goes off, and
 `display_power_config` the setting and the switch bindings.
 
-Not checked, for want of a laptop here: a real lid switch through libinput, in particular the
-state libinput reports as the switch appears with the lid already closed, on which a laptop
+Not checked, for want of a laptop here: a real lid switch through libinput; a real logind's
+`LidClosed` and its PropertiesChanged as the lid moves (this desktop's elogind offers the property,
+always false; systemd-logind and elogind are both meant to emit its changes), on which a laptop
 started closed on a dock relies; a real eDP panel going off and on through DRM, and the windows
 and the cursor moving with it; logind's own handling beside it (`HandleLidSwitchDocked`, by
 default ignoring the lid while another monitor is connected, and whether logind still counts a

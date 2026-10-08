@@ -1104,7 +1104,9 @@ windows move to another monitor, keeping their workspaces, as when a monitor is 
 Opening the lid brings the panel back and, with `outputs.return_windows`, its windows with it.
 The panel follows the other monitors too: one plugged in while the lid is closed turns the panel
 off, and unplugging the last one brings the panel back on. A lid that is closed as shaodesk
-starts, which libinput reports as the lid switch appears, holds the panel off from the start.
+starts holds the panel off from the start: logind says so (its `LidClosed`, which shaodesk reads
+and follows over the system bus), and libinput does as the lid switch appears when it knows that
+switch to be reliable.
 With no other monitor nothing changes: the panel stays on, and logind decides what closing the
 lid does (by default it suspends, and shaodesk locks the screen first, see [Power](#power)).
 `outputs.lid = "ignore"` leaves the panel on whatever the lid does. Opening the lid counts as

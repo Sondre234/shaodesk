@@ -243,7 +243,7 @@ shadows.
 - The clamshell mode KDE and Windows have: closing a laptop's lid while another monitor is on
   turns the built-in panel off, its windows moving to the other monitor as when it is unplugged,
   and opening it brings the panel and its windows back; a lid closed at startup holds the panel
-  off from the start. `outputs.lid = "ignore"` leaves the panel on. Bindings act on the lid and on
+  off from the start, as logind's `LidClosed` tells. `outputs.lid = "ignore"` leaves the panel on. Bindings act on the lid and on
   tablet mode: `{ switch = "lid", state = "close", action = "lock" }`. `shaodesk msg get
   switches` tells what the switches say.
 
