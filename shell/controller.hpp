@@ -5,6 +5,7 @@
 #include "backlight.hpp"
 #include "notifications.hpp"
 #include "osd.hpp"
+#include "volume_keys.hpp"
 #include "palette.hpp"
 #include "power.hpp"
 #include "shaodesk/config.hpp"
@@ -363,6 +364,8 @@ class ShellController : public QObject {
     // $SHAODESK_SYSFS names another sysfs tree, polled, for tests.
     Backlight backlight_{qEnvironmentVariable("SHAODESK_SYSFS", "/sys"), !qEnvironmentVariableIsSet("SHAODESK_SYSFS"),
                          qEnvironmentVariableIsSet("SHAODESK_SYSFS") ? 100 : 0};
+    // The compositor's volume, microphone and brightness lines.
+    VolumeKeys volumeKeys_{*audio_, backlight_, osd_, [this] { return overlayOutput(); }};
     QString focusedOutput_, cardsOutput_;
     QVariantMap keyboardLayout_;
     bool nightLight_ = false;

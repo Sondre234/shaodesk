@@ -193,7 +193,7 @@ int main(int argc, char **argv) {
             if (!client->canReadLine())
                 return;
             auto request = client->readLine();
-            if (request == "subscribe\n") {
+            if (request == "subscribe shell\n") {
                 subscriber = client;
                 client->write("ok\n" + state(false, 2));
             } else if (request == "output " + output.toUtf8() + " toggle_tiling\n") {
