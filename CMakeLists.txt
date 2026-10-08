@@ -638,6 +638,9 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/keyboard_resize_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(keyboard_resize_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME volume_keys_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/volume_keys_smoke.py $<TARGET_FILE:shaodesk>)
+        set_tests_properties(volume_keys_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME keymap_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/keymap_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>
