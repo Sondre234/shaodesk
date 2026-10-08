@@ -168,6 +168,9 @@ enum sh_action {
     /* Asks the shell to give the keyboard to the taskbar (or the dock) on the focused output, to
      * walk its buttons and their windows with the arrows, as Windows' Win+T; again, to leave. */
     SH_TASKBAR_FOCUS,
+    /* Asks the shell for its clipboard history on the output under the pointer, as Windows'
+     * Win+V. */
+    SH_CLIPBOARD_HISTORY,
 };
 
 enum sh_screenshot_mode {

@@ -757,6 +757,11 @@ prefixes (`>`, `@`, `#`, `%`, `=`, `/`) leaves it out, and so says it found noth
 DuckDuckGo is the default (`"https://duckduckgo.com/?q=%s"`); any `http` or `https` address with
 `%s` in it will do, and `shell.search.web = false` leaves the entry out.
 
+## Clipboard history
+
+`clipboard_history` (Super + Shift + V, or `shaodesk msg clipboard_history`) opens the shell's
+history of what was copied, as Windows' Win + V does, on the monitor under the pointer.
+
 ## Terminal
 
 The `terminal` action (`shaodesk msg terminal`) opens a terminal: the program and arguments of

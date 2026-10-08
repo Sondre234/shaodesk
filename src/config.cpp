@@ -1652,6 +1652,7 @@ constexpr std::pair<std::string_view, sh_action> action_table[] = {
         {"dnd_on", SH_DND_ON},
         {"dnd_off", SH_DND_OFF},
         {"notification_history", SH_NOTIFICATION_HISTORY},
+        {"clipboard_history", SH_CLIPBOARD_HISTORY},
         {"poweroff", SH_POWER_OFF},
         {"reboot", SH_REBOOT},
         {"suspend", SH_SUSPEND},
