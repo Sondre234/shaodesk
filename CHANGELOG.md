@@ -225,6 +225,15 @@ shadows.
 - `shaodesk msg get seat` says what has the keyboard, what the pointer is on, and what a drag is
   over.
 
+### Monitors off, idle and the lid
+
+- A monitor can be turned off and on again while it stays in the layout with its windows,
+  workspaces and panels, where `enabled = false` takes it out: through
+  wlr-output-power-management, so `wlopm` works and swayidle can blank the monitors with it, and
+  with the `display_off`, `display_on` and `display_toggle` actions, for every monitor or the one
+  named. Once every monitor is off, a key press or the pointer turns them on again. `shaodesk msg
+  get outputs` ends each line with the monitor's power, `on` or `off`.
+
 ### Working on the shell
 
 - `shaodesk-shell --preview-popup NAME` shows one of the taskbar's popups or overlays on stand-in

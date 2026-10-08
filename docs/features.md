@@ -1401,7 +1401,8 @@ installed. The desktop is covered
 before the locker draws, only the locker receives input, and if it crashes the
 session stays locked until a new locker takes over. Idle notification and idle
 inhibition (`ext-idle-notify-v1`, `idle-inhibit-unstable-v1`) let swayidle lock
-or blank after inactivity while video players keep the session awake. While a standalone
+or blank after inactivity while video players keep the session awake; it blanks the monitors
+with `wlopm` (see [Turning monitors off](#turning-monitors-off)). While a standalone
 session is on screen it holds a logind sleep inhibitor, so an idle daemon left running by
 another desktop on a different VT cannot suspend the machine; switching VTs away releases it.
 This needs sd-bus from libsystemd, libelogind, or basu at build time.

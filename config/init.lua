@@ -329,6 +329,9 @@ return {
         -- { mods = { mod, "Ctrl" }, key = "Escape", action = "suspend" },
         { mods = { mod, "Shift" }, key = "l", action = "lock" },
         { mods = { mod }, key = "Escape", action = "power_menu" },
+        -- Turn every monitor off until a key or the mouse wakes it (display_on and
+        -- display_toggle too; output = "HDMI-A-1" picks one monitor), e.g.:
+        -- { mods = { mod, "Shift" }, key = "Escape", action = "display_off" },
         { mods = { mod }, key = "1", action = "workspace", workspace = 1 },
         { mods = { mod }, key = "2", action = "workspace", workspace = 2 },
         { mods = { mod }, key = "3", action = "workspace", workspace = 3 },

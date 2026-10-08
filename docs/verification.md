@@ -570,3 +570,20 @@ back when opened as it fades, and that the switcher fades before its surface goe
 Not checked: any of the motion on a real display at 144 or 200 Hz (how it looks and what it costs
 on the GPU), the safe triangle with a real pointer's speed and jitter, and the overlays' exits
 over real applications.
+
+## Monitors turned off in the layout
+
+Added 2026-10-08. `output_power_smoke` turns monitors off and on on a headless compositor through
+wlr-output-power-management, with a probe that speaks it as wlopm does, and through the
+`display_off`, `display_on` and `display_toggle` actions from the control socket and a binding:
+a monitor that is off keeps its place, windows, workspace and panel, draws no frames however the
+scene changes, is reported `off` by `get outputs` and to a client watching it, stays off over a
+reload, and a lock taken while every monitor is off holds at once; once every one is off, a key
+press (which does nothing else) or the pointer turns them on, a key coming up does not, and for a
+second after the action input leaves them off; a monitor unplugged while off sends its windows to
+another, and they return with it, on. `display_power_config` checks the bindings.
+
+Not checked: any of it on real monitors, that is, what a DRM output does when it is disabled and
+enabled again (the monitor's standby and how long it takes to come back, on NVIDIA and AMD, at
+mixed refresh rates and scales), the real `wlopm` and swayidle with it (neither is installed
+here), and night light and the magnifier on a monitor turned on again.
