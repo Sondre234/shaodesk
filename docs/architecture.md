@@ -191,6 +191,20 @@ libwayland sends a copy of it, so the compositor closes its own at once. `shaode
 window_icons` lists each window's number, app id and icon's name and size, and
 `tests/window_icon_smoke.py` tests them.
 
+### Monitors turned off
+
+An output in `outputs` (the layout) may be `powered_off` (`output_power.c`): its `wlr_output` is
+committed disabled, which stops its frame events and scan-out, while it stays in the output
+layout, so its `wl_output` global, its place, workspaces, windows and layer surfaces stay as they
+are. `set_output_power` is the one way in and out; turning on clears the flag and calls
+`configure_output`, which until then leaves a powered-off output alone (a reload or a
+wlr-output-management change waits for it), and taking an output out of the layout clears it.
+`publish_output_configuration` reports such an output as enabled, as sway does, and
+`send_locked_if_presented` waits for no frame from it. wlroots' `wlr_output_power_manager_v1`
+reports the mode from `wlr_output->enabled` on every commit that changes it, so clients hear of
+the actions' changes too. `input_activity` (`input.c`), which every key, button, scroll and motion
+event calls, wakes them through `wake_displays` once every output in the layout is off.
+
 ## The shell (`shell/`)
 
 `ShellController` (`controller.cpp`) loads the configuration, keeps the compositor's state from
