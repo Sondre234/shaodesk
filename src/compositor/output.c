@@ -303,7 +303,9 @@ static void destroy_output_layers(struct sh_server *server, struct wlr_output *w
 void configure_output(struct sh_server *server, struct sh_output *output) {
     struct wlr_output *wlr_output = output->wlr_output;
     const struct sh_monitor *monitor = output_monitor(server_settings(server), output);
-    bool enable = monitor == NULL || monitor->enabled;
+    // A laptop's panel with its lid closed stays dark while another monitor shows the desktop.
+    bool by_lid = lid_holds_off(server, output);
+    bool enable = (monitor == NULL || monitor->enabled) && !by_lid;
     if (!enable) {
         bool others = false;
         struct sh_output *candidate;
@@ -389,7 +391,7 @@ void configure_output(struct sh_server *server, struct sh_output *output) {
         wlr_scene_node_set_enabled(&output->background->node, false);
         wlr_scene_node_set_enabled(&output->lock_blank->node, false);
         if (turned_off && server->running)
-            evacuate_output(server, wlr_output->name, gone, false);
+            evacuate_output(server, wlr_output->name, gone, by_lid); // the lid: as if unplugged
     }
 }
 
@@ -540,6 +542,9 @@ static void output_destroy(struct wl_listener *listener, void *data) {
         overview_dismiss(server);
     if (server->running)
         schedule_evacuation(server, output);
+    // A laptop's panel the lid held off comes back when the last other monitor goes.
+    if (server->running)
+        apply_lid(server);
     // Closing the host window ends a nested session. A standalone session loses every output
     // on VT switch (wlroots recreates them on return) or when the last monitor is unplugged.
     bool standalone = false;
@@ -586,6 +591,7 @@ void server_new_output(struct wl_listener *listener, void *data) {
         wlr_wl_output_set_title(wlr_output, "shaodesk — nested desktop");
     arrange_outputs(server);
     return_home_windows(server);
+    apply_lid(server); // a monitor joining a laptop with its lid closed turns the panel off
 }
 
 struct wlr_output *find_output(struct sh_server *server, const char *name) {

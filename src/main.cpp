@@ -378,6 +378,22 @@ struct Runtime {
         self.target = binding->output;
         return binding->action;
     }
+    /* The same for a switch turning on or off: { switch = "lid", state = "close", ... }. */
+    static sh_action switch_toggled(void *data, sh_switch type, bool on, int *argument) {
+        auto &self = *static_cast<Runtime *>(data);
+        auto *binding = self.config.switch_binding(type, on);
+        if (!binding)
+            return SH_NONE;
+        if (binding->action == SH_SPAWN)
+            self.program = binding->command;
+        *argument = binding->action == SH_SCREENSHOT ? binding->screenshot : binding->workspace;
+        if (shaodesk::action_takes_amount(binding->action))
+            *argument = binding->amount;
+        if (binding->action == SH_SWITCH_LAYOUT)
+            *argument = binding->layout;
+        self.target = binding->output;
+        return binding->action;
+    }
     /* Control requests: "<action> [workspace]", "screenshot [region|output|window]",
      * "resize_<direction> [pixels]", "volume_up|volume_down|brightness_up|brightness_down
      * [percent]", "switcher_confirm [N]", "switch_layout [next|prev|N]", "mode NAME|default",
@@ -1006,7 +1022,7 @@ int main(int argc, char **argv) {
             Runtime::opacity,   Runtime::screenshot, Runtime::window_rule,
             Runtime::hot_corner, Runtime::action_target, Runtime::config_watch,
             Runtime::config_changed, Runtime::lock, Runtime::launch, Runtime::autostart,
-            Runtime::started, Runtime::binding_flags, Runtime::set_mode};
+            Runtime::started, Runtime::binding_flags, Runtime::set_mode, Runtime::switch_toggled};
         int result = sh_run(&callbacks, mode);
         if (runtime.shell_pid > 0)
             kill(runtime.shell_pid, SIGTERM);

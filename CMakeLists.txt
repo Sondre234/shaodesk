@@ -135,6 +135,10 @@ if(BUILD_TESTING)
     target_include_directories(power_supply_tests PRIVATE include)
     target_compile_options(power_supply_tests PRIVATE -Wall -Wextra)
     add_test(NAME power_supply COMMAND power_supply_tests)
+    add_executable(lid_tests tests/lid_tests.c src/lid.c)
+    target_include_directories(lid_tests PRIVATE include)
+    target_compile_options(lid_tests PRIVATE -Wall -Wextra)
+    add_test(NAME lid COMMAND lid_tests)
 endif()
 option(SHAODESK_BUILD_COMPOSITOR "Build the wlroots compositor" ON)
 if(SHAODESK_BUILD_COMPOSITOR)
@@ -236,6 +240,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/snap.c
         src/compositor/swallow.c
         src/compositor/switcher.c
+        src/compositor/switches.c
         src/compositor/tablet.c
         src/compositor/tiling.c
         src/compositor/touch.c
@@ -255,6 +260,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         ${CAPTURE_SOURCE_PROTOCOL_SOURCES})
     target_sources(shaodesk PRIVATE src/overview_scene.c)
     target_sources(shaodesk PRIVATE src/power_supply.c)
+    target_sources(shaodesk PRIVATE src/lid.c)
     target_include_directories(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_compile_definitions(shaodesk PRIVATE WLR_USE_UNSTABLE)
     # version.h, for --version: the project version, and `git describe` in a git checkout.
@@ -511,6 +517,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:output_power_probe>
             $<TARGET_FILE:lock_probe> $<TARGET_FILE:pointer_probe>)
         set_tests_properties(output_power_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME lid_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/lid_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(lid_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME compositor_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/compositor_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>
@@ -931,6 +941,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/idle_suspend_smoke.py
                 $<TARGET_FILE:shaodesk> $<TARGET_FILE:fake_login1> $<TARGET_FILE:lock_probe>)
             set_tests_properties(idle_suspend_smoke PROPERTIES TIMEOUT 60)
+            add_test(NAME lid_logind_smoke COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/lid_logind_smoke.py
+                $<TARGET_FILE:shaodesk> $<TARGET_FILE:fake_login1>)
+            set_tests_properties(lid_logind_smoke PROPERTIES TIMEOUT 60)
         endif()
         # The compositor benchmark (tools/bench/bench.py); see docs/performance.md.
         add_executable(shaodesk-bench-client tools/bench/bench_client.c

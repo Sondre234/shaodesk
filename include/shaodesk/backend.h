@@ -284,6 +284,13 @@ struct sh_idle_steps {
     int suspend;     /* the machine suspends, locking first */
 };
 
+/* Lua outputs.lid: what closing a laptop's lid does. CLAMSHELL turns its built-in panel off
+ * while another monitor shows the desktop, as unplugging the panel would, and back on as the lid
+ * opens; IGNORE leaves the panel on. */
+enum sh_lid_mode { SH_LID_CLAMSHELL, SH_LID_IGNORE };
+/* The switches bindings act on: a laptop's lid (on: closed) and tablet mode (on: folded). */
+enum sh_switch { SH_SWITCH_LID, SH_SWITCH_TABLET };
+
 struct sh_settings {
     float background[4];
     uint32_t mouse_modifier;
@@ -444,6 +451,7 @@ struct sh_settings {
     char tablet_output[128];
     /* idle: the steps on mains, and while the machine runs on battery. */
     struct sh_idle_steps idle, idle_battery;
+    int lid; /* enum sh_lid_mode, outputs.lid */
 };
 
 /* What a login session keeps of the last one: nothing; where its windows were, for those that open
@@ -541,6 +549,9 @@ struct sh_callbacks {
      * mode) the ones `key` looks in, until another mode or a reload. Returns the mode's name
      * ("default" for 0), or NULL, changing nothing, when there is no such mode. */
     const char *(*set_mode)(void *, int mode);
+    /* The action bound to a switch turning on (a lid closing, tablet mode starting) or off, as
+     * `key` returns one; SH_NONE when none is. */
+    enum sh_action (*switch_toggled)(void *, enum sh_switch type, bool on, int *argument);
 };
 
 enum sh_backend_mode { SH_BACKEND_NESTED, SH_BACKEND_HEADLESS, SH_BACKEND_SESSION };

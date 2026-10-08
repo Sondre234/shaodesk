@@ -95,6 +95,7 @@
 #include <wlr/types/wlr_screencopy_v1.h>
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_session_lock_v1.h>
+#include <wlr/types/wlr_switch.h>
 #include <wlr/types/wlr_single_pixel_buffer_v1.h>
 #include <wlr/types/wlr_subcompositor.h>
 #include <wlr/types/wlr_tablet_pad.h>
@@ -543,6 +544,12 @@ struct sh_server {
     struct wl_list headless_pointers;  // and "headless_pointer add" (headless_input.c)
     struct wl_list headless_touches;   // and "headless_touch add"
     struct wl_list headless_tablets;   // and "headless_tablet add"
+    /* Switch devices (switches.c), whether any says the lid is closed, and the switches tests
+     * add with "headless_switch add". */
+    struct wl_list switches;
+    bool lid_closed;
+    bool logind_lid_closed; // logind's LidClosed, which counts as one more switch
+    struct wl_list headless_switches;
     struct wl_list pointers; /* struct sh_pointer */
     enum sh_cursor_mode cursor_mode;
     struct sh_toplevel *grabbed_toplevel;
@@ -798,6 +805,15 @@ struct sh_pointer {
     struct sh_server *server;
     struct wlr_input_device *device;
     struct wl_listener destroy;
+};
+
+/* A switch device (switches.c): whether it says the lid is closed, and tablet mode is on. */
+struct sh_switch_device {
+    struct wl_list link; // sh_server.switches
+    struct sh_server *server;
+    struct wlr_switch *wlr_switch;
+    bool lid_closed, tablet_mode;
+    struct wl_listener toggle, destroy;
 };
 
 struct sh_keyboard {
@@ -1164,6 +1180,14 @@ void swallow_attach(struct sh_toplevel *host, struct sh_toplevel *child);
 void swallow_release(struct sh_toplevel *child);
 void swallow_end(struct sh_toplevel *toplevel);
 void swallow_toggle(struct sh_server *server, struct sh_toplevel *current);
+
+/* switches.c */
+bool lid_holds_off(struct sh_server *server, struct sh_output *output);
+void apply_lid(struct sh_server *server);
+void server_new_switch(struct sh_server *server, struct wlr_input_device *input);
+void lid_from_logind(struct sh_server *server, bool closed);
+void control_headless_switch(struct sh_server *server, int fd, const char *arguments);
+void destroy_headless_switches(struct sh_server *server);
 
 /* switcher.c */
 void switcher_close(struct sh_server *server, int index);

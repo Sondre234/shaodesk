@@ -109,6 +109,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `outputs.order` | list of strings | unset | - | Connector names from left to right; unlisted monitors follow on the right. At most 8, without duplicates. |
 | `outputs.primary` | string | leftmost | - | Connector where the cursor starts. |
 | `outputs.return_windows` | boolean | true | - | When a monitor is unplugged its windows move to the nearest one, keeping their workspace numbers; with this on they go back, to the same workspace and place, when it returns. |
+| `outputs.lid` | enum | "clamshell" | - | What closing a laptop's lid does: `"clamshell"` turns its built-in panel (eDP, LVDS, DSI) off while another monitor is on, its windows moving there as when it is unplugged, and back on as the lid opens; `"ignore"` leaves the panel on. With no other monitor, the panel stays on either way and logind decides whether the machine sleeps. |
 | `outputs.monitors` | table of tables | unset | - | Per-monitor settings, keyed by connector name or by `"desc:"` and the start of "make model serial", e.g. `["DP-3"] = { mode = "2560x1440@144" }`. |
 | `outputs.monitors.<name>.enabled` | boolean | true | - | `false` turns the monitor off. |
 | `outputs.monitors.<name>.mode` | string | preferred | - | `"WIDTHxHEIGHT"` or `"WIDTHxHEIGHT@HZ"`, e.g. `"2560x1440@144"`. |
@@ -284,8 +285,10 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | --- | --- | --- | --- | --- |
 | `bindings` | list of tables | unset | - | Shortcuts, at most 512, checked in order. A binding has a `key` or a `button`, an `action`, and optionally `mods`. Keyboard bindings must not repeat a key and modifier combination. |
 | `bindings[].mods` | list of strings | {} | - | Up to four of `Alt`, `Super`, `Ctrl`, `Shift`, without repeats. |
-| `bindings[].key` | string | - | - | An XKB keysym name, e.g. `"q"`, `"Left"`, `"Print"`, `"minus"`. Not with `button`. |
+| `bindings[].key` | string | - | - | An XKB keysym name, e.g. `"q"`, `"Left"`, `"Print"`, `"minus"`. Not with `button` or `switch`. |
 | `bindings[].button` | enum | - | - | A mouse button: `left`, `right`, `middle`, `side`, `extra`, `forward`, `back`. Not with `key`. |
+| `bindings[].switch` | enum | - | - | A switch: `"lid"`, a laptop's lid, or `"tablet"`, a convertible's tablet mode, which acts as `state` says it changes, as Hyprland's `bindl = , switch:...` does. Not with `key`, `button` or `mods`. It runs even while the session is locked. |
+| `bindings[].state` | enum | - | - | With `switch` only, and needed there: `"close"` or `"open"` for the lid, `"on"` or `"off"` for tablet mode. |
 | `bindings[].app_id` | regex | any | - | Only with `button`: act only over windows whose app ID matches. |
 | `bindings[].desktop` | boolean | false | - | Only with `button`: also act over the bare desktop. |
 | `bindings[].action` | enum | - | - | What the binding does; see the action list below. `"none"` unbinds (with `extends`) or hands a button click to the application. |
@@ -447,6 +450,6 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 
 `spawn`, `terminal`, `quit`, `close`, `cycle`, `snap_left`, `snap_right`, `snap_top_left`, `snap_top_right`, `snap_bottom_left`, `snap_bottom_right`, `snap_cycle_left`, `snap_cycle_right`, `snap_cycle_up`, `snap_cycle_down`, `maximize`, `restore`, `tile`, `reload`, `fullscreen`, `workspace`, `move_to_workspace`, `workspace_next`, `workspace_prev`, `workspace_back`, `toggle_tiling`, `layout_next`, `layout_prev`, `layout_dwindle`, `layout_master`, `layout_spiral`, `layout_monocle`, `layout_scroll`, `promote`, `focus_next`, `focus_prev`, `swap_next`, `swap_prev`, `master_grow`, `master_shrink`, `master_more`, `master_less`, `peek`, `peek_toggle`, `night_light_toggle`, `night_light_on`, `night_light_off`, `night_light_auto`, `zoom_in`, `zoom_out`, `zoom_reset`, `move_workspace_to_output`, `swap_workspaces`, `swallow_toggle`, `switch_layout`, `dnd_toggle`, `dnd_on`, `dnd_off`, `notification_history`, `poweroff`, `reboot`, `suspend`, `hibernate`, `logout`, `lock`, `power_menu`, `display_off`, `display_on`, `display_toggle`, `scroll_left`, `scroll_right`, `column_widen`, `column_narrow`, `column_cycle_width`, `consume_left`, `consume_right`, `expel`, `center_column`, `toggle_floating`, `launcher`, `taskbar_focus`, `volume_up`, `volume_down`, `volume_mute`, `mic_mute`, `brightness_up`, `brightness_down`, `mode`, `focus_left`, `focus_right`, `focus_up`, `focus_down`, `screenshot`, `move_left`, `move_right`, `move_up`, `move_down`, `move_to_scratchpad`, `scratchpad_show`, `toggle_sticky`, `resize_left`, `resize_right`, `resize_up`, `resize_down`, `switcher`, `switcher_prev`, `switcher_confirm`, `switcher_cancel`, `focus_last`, `focus_urgent`, `group_toggle`, `group_next`, `group_prev`, `ungroup`, `group_merge_left`, `group_merge_right`, `group_merge_up`, `group_merge_down`, `palette`, `toggle_overview`, `overview_confirm`, `overview_cancel`
 
-`spawn` needs `command`; `workspace` and `move_to_workspace` need `workspace`; `screenshot` takes `mode` and `mode` needs it; `resize_*`, `volume_up`, `volume_down`, `brightness_up` and `brightness_down` take `amount`.
+`spawn` needs `command`; `workspace` and `move_to_workspace` need `workspace`; `screenshot` takes `mode` and `mode` needs it; `resize_*`, `volume_up`, `volume_down`, `brightness_up` and `brightness_down` take `amount`; a `switch` needs `state`.
 
 Modifiers: `Alt`, `Super`, `Ctrl`, `Shift`.

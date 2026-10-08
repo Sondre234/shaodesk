@@ -181,6 +181,12 @@ static void prepare_for_sleep(void *data, bool before) {
     }
 }
 
+/* logind's LidClosed, which also tells of a lid closed before shaodesk started (libinput says so
+ * only of a lid it knows to be reliable). */
+static void lid_answered(void *data, bool closed) {
+    lid_from_logind(data, closed);
+}
+
 static void power_disconnect(struct sh_server *server) {
     struct sh_power *power = &server->power;
     if (!power->login1)
@@ -192,6 +198,7 @@ static void power_disconnect(struct sh_server *server) {
     power->login1 = NULL;
     memset(power->answers, 0, sizeof(power->answers));
     release_sleep(server);
+    lid_from_logind(server, false); // only the switches tell of the lid now
     power->inhibiting = power->before_sleep = false;
     if (power->step == SH_POWER_CALLING) {
         power->step = SH_POWER_IDLE;
@@ -267,7 +274,8 @@ static bool power_connect(struct sh_server *server, char *error, size_t error_si
                                               .answer = answered,
                                               .done = done,
                                               .inhibited = inhibited,
-                                              .sleep = prepare_for_sleep};
+                                              .sleep = prepare_for_sleep,
+                                              .lid = lid_answered};
     power->login1 = sh_login1_connect(address, &handler, error, error_size);
     if (!power->login1)
         return false;
@@ -287,6 +295,8 @@ static bool power_connect(struct sh_server *server, char *error, size_t error_si
     }
     power_ask(server);
     hold_sleep(server);
+    sh_login1_ask_lid(power->login1);
+    power_watch(server);
     return true;
 }
 

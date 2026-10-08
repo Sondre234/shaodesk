@@ -129,11 +129,13 @@ static void idle_update(struct sh_server *server) {
     for (size_t i = 0; i < 2; ++i)
         for (int step = 0; step < SH_IDLE_STEPS; ++step)
             any |= idle_step_timeout(tables[i], step, NULL) > 0;
+    bool was_armed = idle->armed;
     idle->armed = false;
     if (!idle->timer)
         return; // not started yet
     if (!any || idle_held(server)) {
-        wl_event_source_timer_update(idle->timer, 0);
+        if (was_armed) // input calls this while nothing is armed, as often as it comes
+            wl_event_source_timer_update(idle->timer, 0);
         return;
     }
     const struct sh_idle_steps *steps = idle_steps(server, &idle->on_battery);

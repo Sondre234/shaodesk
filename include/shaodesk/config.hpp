@@ -42,6 +42,8 @@ struct Binding {
     bool locked = false;
     bool repeats = false;
     int mode = 0; // for mode: 0 for the bindings outside any mode, else modes[mode - 1]
+    int switch_type = -1; // the enum sh_switch of a switch binding; -1 for a key or button
+    bool switch_on = false; // with switch_type: it acts as the switch turns on (a lid closing)
 };
 
 // A binding mode, as sway's modes and Hyprland's submaps: key bindings that take the place of
@@ -322,7 +324,8 @@ struct Config {
                          .tablet_output = "",
                          .idle = {.dim = 570000, .display_off = 600000, .lock = 0, .suspend = 0},
                          .idle_battery = {.dim = 570000, .display_off = 600000, .lock = 0,
-                                          .suspend = 0}};
+                                          .suspend = 0},
+                         .lid = SH_LID_CLAMSHELL};
     // layout.workspace_names: the label of workspace N is names[N - 1]; "" or past the end: none.
     std::vector<std::string> workspace_names;
     // hot_corners: what each corner runs, as a control request; "" for nothing.
@@ -361,6 +364,8 @@ struct Config {
     int mode_number(const std::string &name) const;
     // "default" and every mode's name.
     std::vector<std::string> mode_names() const;
+    // The binding of a switch turning on or off, "none" included; nullptr when there is none.
+    const Binding *switch_binding(sh_switch type, bool on) const;
     // The first button binding for what lies under the pointer, or nothing (the click belongs
     // to the application, as does one whose first match is action = "none").
     const Binding *button_binding(uint32_t modifiers, uint32_t button, sh_pointer_target target,

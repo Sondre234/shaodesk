@@ -490,6 +490,23 @@ static void get_idle(struct sh_server *server, int fd, const char *arguments) {
     }
 }
 
+static void get_switches(struct sh_server *server, int fd, const char *arguments) {
+    // "lid closed" or "lid open" (whether any switch says it is closed), then a line per switch
+    // device (switches.c): its name, whether it says the lid is closed, and whether it says
+    // tablet mode is on.
+    control_reply(fd, server->lid_closed ? "ok\nlid\tclosed\n" : "ok\nlid\topen\n");
+    struct sh_switch_device *device;
+    wl_list_for_each_reverse(device, &server->switches, link) {
+        char name[128], line[192];
+        snprintf(name, sizeof(name), "%s",
+                 device->wlr_switch->base.name ? device->wlr_switch->base.name : "");
+        one_field(name);
+        snprintf(line, sizeof(line), "%s\t%d\t%d\n", name, device->lid_closed,
+                 device->tablet_mode);
+        control_reply(fd, line);
+    }
+}
+
 static void get_pictures(struct sh_server *server, int fd, const char *arguments) {
     // Per capture source a client asked for a window's picture (get_scaled_capture_source),
     // oldest window first: the box asked for, the frame's size (0x0 before the first), how many
@@ -684,6 +701,7 @@ static const struct {
     {"keyboard", get_keyboard, false},
     {"power", get_power, false},
     {"idle", get_idle, false},
+    {"switches", get_switches, false},
     {"pictures", get_pictures, false},
     {"seat", get_seat, false},
     {"autostart", get_autostart, false},

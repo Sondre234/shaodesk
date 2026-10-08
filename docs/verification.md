@@ -834,3 +834,27 @@ Not checked: any of it on a real machine over the real ten minutes; real batteri
 and browsers' inhibitors; swayidle itself beside the steps; a real suspend through logind from
 the step, and what the monitors and the locker do as the machine wakes; the dimming's look and
 fade at a high refresh rate and with the GPU renderer.
+
+## The laptop lid
+
+Added 2026-10-08. `lid_smoke` drives a headless lid switch (`headless_switch`) beside a headless
+panel named `eDP-1` and another monitor: closing the lid takes the panel out of the layout and
+its window to the other monitor on the same workspace, opening it brings both back and runs the
+lid's binding; with no other monitor the panel stays on, a monitor plugged in turns it off and
+unplugging that one brings it back without the session ending; a lid switch that appears closed
+holds the panel off, and so does a panel appearing behind it; `outputs.lid = "ignore"` leaves it
+on; opening the lid turns on the monitors the idle steps turned off; tablet mode runs its binding.
+`lid_logind_smoke` gives the fake logind a `LidClosed` property: closed as the compositor starts,
+it holds a panel plugged in afterwards off, and its changes turn the panel on and off. `lid`
+checks which connectors count as built in and when the panel goes off, and
+`display_power_config` the setting and the switch bindings.
+
+Not checked, for want of a laptop here: a real lid switch through libinput; a real logind's
+`LidClosed` and its PropertiesChanged as the lid moves (this desktop's elogind offers the property,
+always false; systemd-logind and elogind are both meant to emit its changes), on which a laptop
+started closed on a dock relies; a real eDP panel going off and on through DRM, and the windows
+and the cursor moving with it; logind's own handling beside it (`HandleLidSwitchDocked`, by
+default ignoring the lid while another monitor is connected, and whether logind still counts a
+monitor as docked while the idle steps or `display_off` have turned it off, or suspends the
+closed laptop then); a convertible's tablet-mode switch; and a switch's binding while the session
+is locked.

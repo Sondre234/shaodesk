@@ -62,6 +62,7 @@ all. In short:
 | `output_power.c` | Monitors turned off and on in the layout: wlr-output-power-management. |
 | `layer_shell.c` | Panels and other layer surfaces. |
 | `group.c`, `scratchpad.c`, `swallow.c`, `switcher.c`, `overview.c`, `session.c` | One feature each. `session.c` also saves a login session as `last` as it ends (`session_save_last`, from the power actions and quit) and restores it after `startup` (`session_restore_last`, from `sh_run`), asking `sh_callbacks.started` which missing windows startup and autostart will open. |
+| `switches.c` | Switch devices: the lid turning a laptop's panel off and on (clamshell), switches' bindings. |
 | `effects.c` | Dimming, peeking at the desktop or at one window, night light, magnifier, hot corners. |
 | `lock.c` | Session lock and idle/sleep inhibitors. |
 | `idle.c` | Power saving after a while without input: dimming, monitors off, locking, suspending. |
@@ -291,6 +292,23 @@ the session not active) disarms the timer, and `idle_hold_changed` (called from 
 inhibitors come and go and the VT changes) restarts the count once released. `idle_steps` reads
 `src/power_supply.c`'s answer, from `$SHAODESK_SYSFS` in the tests; power.c's waking up after
 sleep calls `idle_activity` as input would.
+
+### The lid
+
+`switches.c` follows libinput's switches (`WLR_INPUT_DEVICE_SWITCH`), one `sh_switch_device`
+each, keeping what each last said of the lid and of tablet mode from its toggle events, and
+logind's `LidClosed` (`sh_login1_ask_lid`, which power.c asks as it connects, and its
+PropertiesChanged): libinput tells of a lid already closed as its device appears only when a quirk
+says the switch is reliable, and then never of its opening either. `sh_server.lid_closed` is any of
+them saying the lid is closed. `configure_output` asks
+`lid_holds_off` of every output, which applies `src/lid.c`'s decision (a built-in connector, the
+lid closed, clamshell mode, a monitor that is not built in in the layout), and when the lid holds
+an output off it goes out of the layout as with `enabled = false`, but its windows keep their
+workspaces as when it is unplugged. `apply_lid` configures the built-in panels again, and arranges
+the outputs and windows when one changed, as the lid changes and after an output is added or
+destroyed (before an empty layout would end a nested or headless session). Each toggle counts
+as input and runs the binding `sh_callbacks.switch_toggled` returns. Under `--headless`,
+`headless_switch` adds switches for the tests (`lid_smoke`).
 
 ## The shell (`shell/`)
 
@@ -733,7 +751,9 @@ whether it has, for something the compositor does another way without it, as the
   (`headless_keyboard key NAME CODE press` types on one, see `keymap_smoke.py`;
   `headless_pointer swipe NAME update DX DY [TIME]` moves a touchpad gesture's fingers, at a given
   time in milliseconds, see `pointer_gestures_smoke.py`; `headless_touch down NAME ID X Y` puts a
-  finger on a screen, see `touchscreen_smoke.py`). The `input_probe` window (or panel, with
+  finger on a screen, see `touchscreen_smoke.py`), and `headless_switch` a lid or tablet-mode
+  switch (`headless_switch toggle NAME on` closes a lid; see `lid_smoke.py`). The `input_probe`
+  window (or panel, with
   `--layer`) prints the input it gets, a line per event, and `wayland_probe --keymap` prints the
   keymap an application gets. A `wayland_probe` window with
   `SHAODESK_PROBE_DRAG=source` drags a line of text on a button press of `pointer_probe`'s, and

@@ -166,6 +166,11 @@ const Option options[] = {
     {"outputs.return_windows", "boolean", "true", "false", none, none,
      "When a monitor is unplugged its windows move to the nearest one, keeping their workspace "
      "numbers; with this on they go back, to the same workspace and place, when it returns."},
+    {"outputs.lid", "enum", "\"clamshell\"", "\"clamshell\"", none, none,
+     "What closing a laptop's lid does: `\"clamshell\"` turns its built-in panel (eDP, LVDS, "
+     "DSI) off while another monitor is on, its windows moving there as when it is unplugged, and "
+     "back on as the lid opens; `\"ignore\"` leaves the panel on. With no other monitor, the "
+     "panel stays on either way and logind decides whether the machine sleeps."},
     {"outputs.monitors", "table of tables", "unset", "", none, none,
      "Per-monitor settings, keyed by connector name or by `\"desc:\"` and the start of "
      "\"make model serial\", e.g. `[\"DP-3\"] = { mode = \"2560x1440@144\" }`."},
@@ -496,10 +501,18 @@ const Option options[] = {
     {"bindings[].mods", "list of strings", "{}", "", none, none,
      "Up to four of `Alt`, `Super`, `Ctrl`, `Shift`, without repeats."},
     {"bindings[].key", "string", "", "", none, none,
-     "An XKB keysym name, e.g. `\"q\"`, `\"Left\"`, `\"Print\"`, `\"minus\"`. Not with `button`."},
+     "An XKB keysym name, e.g. `\"q\"`, `\"Left\"`, `\"Print\"`, `\"minus\"`. Not with `button` "
+     "or `switch`."},
     {"bindings[].button", "enum", "", "", none, none,
      "A mouse button: `left`, `right`, `middle`, `side`, `extra`, `forward`, `back`. Not "
      "with `key`."},
+    {"bindings[].switch", "enum", "", "", none, none,
+     "A switch: `\"lid\"`, a laptop's lid, or `\"tablet\"`, a convertible's tablet mode, which "
+     "acts as `state` says it changes, as Hyprland's `bindl = , switch:...` does. Not with `key`, "
+     "`button` or `mods`. It runs even while the session is locked."},
+    {"bindings[].state", "enum", "", "", none, none,
+     "With `switch` only, and needed there: `\"close\"` or `\"open\"` for the lid, `\"on\"` or "
+     "`\"off\"` for tablet mode."},
     {"bindings[].app_id", "regex", "any", "", none, none,
      "Only with `button`: act only over windows whose app ID matches."},
     {"bindings[].desktop", "boolean", "false", "", none, none,
@@ -912,7 +925,7 @@ std::string config_reference_markdown() {
     }
     out << "\n\n`spawn` needs `command`; `workspace` and `move_to_workspace` need `workspace`; "
            "`screenshot` takes `mode` and `mode` needs it; `resize_*`, `volume_up`, `volume_down`, "
-           "`brightness_up` and `brightness_down` take `amount`.\n\n"
+           "`brightness_up` and `brightness_down` take `amount`; a `switch` needs `state`.\n\n"
            "Modifiers: ";
     first = true;
     for (const auto &name : config_modifier_names()) {
