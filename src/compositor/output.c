@@ -620,6 +620,7 @@ static void output_destroy(struct wl_listener *listener, void *data) {
     wl_list_remove(&output->destroy.link);
     wl_list_remove(&output->link);
     mirror_stop(output);
+    mirrors_forget_source(output);
     output_release_zoom(output);
     destroy_output_layers(output->server, output->wlr_output);
     wlr_scene_node_destroy(&output->background->node);
