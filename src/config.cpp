@@ -1637,6 +1637,8 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
         config.settings.gap_inner = integer(L, "gap_inner", gap, 0, 100);
         config.settings.gap_outer = integer(L, "gap_outer", gap, 0, 100);
         boolean(L, "smart_gaps", "layout.smart_gaps", config.settings.smart_gaps);
+        boolean(L, "floating_above_tiles", "layout.floating_above_tiles",
+                config.settings.floating_above_tiles);
         boolean(L, "tiling", "layout.tiling", config.settings.tiling);
         boolean(L, "tiling_per_workspace", "layout.tiling_per_workspace",
                 config.settings.tiling_per_workspace);

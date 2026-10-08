@@ -918,7 +918,15 @@ scroll layout loses its gaps and keeps its width.
   change. Holding the keys keeps resizing, at the keyboard's `repeat_delay` and
   `repeat_rate`. `features = { keyboard_resize = false }` turns the actions off.
 
-Not yet: keeping floating windows above tiles. Windows tiled on a
+A window brought forward comes in front of the others on its monitor, tile or not, so that a tile
+clicked covers the floating windows over it. With `layout.floating_above_tiles = true` the
+windows out of the tiling (dialogs, windows floated with Super + V, snapped, maximized and sticky
+ones) always stay over the tiles, as in sway and Hyprland, and a tile brought forward comes in
+front of the other tiles only; a tile that floats goes up among them, and a floating window
+that tiles goes down among the tiles, in front. It is off by default. [Windows kept
+above](#keeping-windows-above) stay over both.
+
+Windows tiled on a
 monitor that is disabled in the config hands its tiles to the nearest one, where they float if
 that one does not tile. Unplugging a monitor does the same with all its windows (floating ones
 keep their relative place, tiles join the tiling of the nearest monitor, workspace numbers are

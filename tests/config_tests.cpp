@@ -428,6 +428,11 @@ int main(int argc, char **argv) {
         require(gaps.settings.smart_gaps &&
                     !shaodesk::parse_config("return {layout={smart_gaps=false}}").settings.smart_gaps,
                 "smart_gaps not parsed");
+        require(!gaps.settings.floating_above_tiles &&
+                    shaodesk::parse_config("return {layout={floating_above_tiles=true}}")
+                        .settings.floating_above_tiles,
+                "floating_above_tiles not parsed, or not off by default");
+        rejects("return {layout={floating_above_tiles='yes'}}");
         auto windows = shaodesk::parse_config(
             "return {windows={border_width=2,border_color='#ff000080',"
             "border_inactive_color='#00ff00',opacity=0.95,inactive_opacity=0.8,"

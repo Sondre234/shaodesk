@@ -182,15 +182,51 @@ with harness.Compositor(compositor, CONFIG % "true") as desktop:
         return [(row[1], row[3]) for row in desktop.rows("stacking")]
 
     desktop.detail = lambda: f"stacking: {stacking()}\nwindows: {windows()}"
-    for title in "AB":
+
+    def focus(title):
+        subprocess.run([probe, "--activate", f"app-{title}"], env=desktop.env, check=True,
+                       timeout=30, stdout=subprocess.DEVNULL)
+        desktop.wait_for(lambda: windows()[title][1] == "1", f"{title} focused")
+
+    for title in "ABC":
         desktop.spawn([probe, "--window-only"], env={"SHAODESK_PROBE_TITLE": title,
                                                      "SHAODESK_PROBE_APP_ID": f"app-{title}"})
         desktop.wait_for(lambda: title in windows() and windows()[title][3] == "1",
                          f"{title} tiled")
+    focus("B")
     msg("toggle_above")
     assert windows()["B"][3] == "1" and stacking()[0] == ("B", "above"), stacking()
-    subprocess.run([probe, "--activate", "app-A"], env=desktop.env, check=True, timeout=30,
-                   stdout=subprocess.DEVNULL)
-    desktop.wait_for(lambda: windows()["A"][1] == "1", "A focused")
-    assert stacking() == [("B", "above"), ("A", "normal")], stacking()
-print("Windows kept above stay over the others, under fullscreen, and go back when let go")
+    focus("A")
+    assert stacking() == [("B", "above"), ("A", "normal"), ("C", "normal")], stacking()
+    focus("B")
+    msg("toggle_above")
+
+    # layout.floating_above_tiles off, as by default: a tile brought forward goes over a
+    # floating window.
+    focus("C")
+    msg("toggle_floating")
+    focus("A")
+    assert stacking() == [("A", "normal"), ("C", "normal"), ("B", "normal")], stacking()
+    # On, floating windows come up over every tile, keeping their order, and stay there.
+    desktop.reload(CONFIG % "true, floating_above_tiles = true")
+    assert stacking() == [("C", "floating"), ("A", "normal"), ("B", "normal")], stacking()
+    focus("B")
+    assert stacking() == [("C", "floating"), ("B", "normal"), ("A", "normal")], stacking()
+    # Kept above, a tile is over them still.
+    msg("toggle_above")
+    assert stacking()[:2] == [("B", "above"), ("C", "floating")], stacking()
+    msg("toggle_above")
+    # A tile floating goes up among them, a floating window tiling down among the tiles.
+    msg("toggle_floating")
+    assert stacking() == [("B", "floating"), ("C", "floating"), ("A", "normal")], stacking()
+    focus("C")
+    msg("toggle_floating")
+    assert windows()["C"][3] == "1", windows()
+    assert stacking() == [("B", "floating"), ("C", "normal"), ("A", "normal")], stacking()
+    # Off again, the floating windows go back among the tiles, in front.
+    desktop.reload(CONFIG % "true")
+    assert stacking() == [("B", "normal"), ("C", "normal"), ("A", "normal")], stacking()
+    focus("A")
+    assert stacking()[0] == ("A", "normal"), stacking()
+print("Windows kept above stay over the others, under fullscreen, and go back when let go; "
+      "floating windows stay over tiles with layout.floating_above_tiles")

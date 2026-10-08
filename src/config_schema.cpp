@@ -113,6 +113,9 @@ const Option options[] = {
     {"layout.gap_outer", "integer", "`gap`", "8", 0, 100, "Pixels between tiles and the edges."},
     {"layout.smart_gaps", "boolean", "true", "false", none, none,
      "No gaps around a tiled window that is alone on its workspace."},
+    {"layout.floating_above_tiles", "boolean", "false", "true", none, none,
+     "Floating windows always stack over tiles, as in sway and Hyprland; `false` puts the "
+     "window brought forward last in front, tile or not."},
     {"layout.workspaces", "integer", "4", "4", 1, 10, "Workspaces per monitor."},
     {"layout.workspace_names", "list of strings", "unset", "{ \"web\", \"code\" }", none, none,
      "Names for workspaces 1, 2, ...; at most `workspaces` of them, each up to 32 characters, "
