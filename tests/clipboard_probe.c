@@ -4,7 +4,8 @@
  *
  *   clipboard_probe set TYPE=VALUE...  copies VALUE as TYPE (VALUE @PATH: the file's bytes),
  *                                      prints "set" once it is copied, and hands it to whoever
- *                                      pastes until something else is copied
+ *                                      pastes until something else is copied, printing
+ *                                      "sent TYPE" each time
  *   clipboard_probe get TYPE           prints what is copied as TYPE, exit 1 when nothing is
  *   clipboard_probe types              prints the types of what is copied, one a line */
 #define _GNU_SOURCE
@@ -111,6 +112,8 @@ static void send(void *data, struct ext_data_control_source_v1 *source, const ch
         break;
     }
     close(fd);
+    printf("sent %s\n", type);
+    fflush(stdout);
 }
 static void cancelled(void *data, struct ext_data_control_source_v1 *source) {
     ((struct probe *)data)->cancelled = true;

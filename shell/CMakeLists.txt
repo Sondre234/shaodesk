@@ -381,6 +381,10 @@ if(BUILD_TESTING)
             ${PROJECT_SOURCE_DIR}/tests/overlay_exit_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(overlay_exit_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME clipboard_shell_smoke COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/clipboard_shell_smoke.py $<TARGET_FILE:shaodesk>
+            $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:clipboard_probe>)
+        set_tests_properties(clipboard_shell_smoke PROPERTIES TIMEOUT 60)
         # A few of the gallery's popups and overlays through the GPU (Mesa's software OpenGL, in a
         # private compositor), where effects are drawn. Not under the sanitizers: now and then
         # Qt's Wayland platform leaks a surface of a preview that quits soon after showing.
