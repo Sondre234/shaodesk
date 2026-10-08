@@ -21,10 +21,11 @@ fi
 # GPL-3+ for shaodesk; MIT for the TinyWL-derived adapter and the wlr protocol files.
 LICENSE="GPL-3+ MIT"
 SLOT="0"
-IUSE="X +notifications +pulseaudio +shell test"
+IUSE="X +notifications +polkit +pulseaudio +shell test"
 REQUIRED_USE="
 	${LUA_REQUIRED_USE}
 	notifications? ( shell )
+	polkit? ( shell )
 	pulseaudio? ( shell )
 "
 RESTRICT="!test? ( test )"
@@ -53,6 +54,7 @@ COMMON_DEPEND="
 		>=dev-qt/qtdeclarative-6.9:6
 		>=kde-plasma/layer-shell-qt-6.6:6
 		notifications? ( dev-qt/qtbase:6[dbus] )
+		polkit? ( sys-auth/polkit )
 		pulseaudio? ( media-libs/libpulse )
 	)
 "
@@ -87,6 +89,7 @@ src_configure() {
 	)
 	use shell && mycmakeargs+=(
 		-DSHAODESK_NOTIFICATIONS=$(usex notifications)
+		-DSHAODESK_POLKIT=$(usex polkit)
 		-DSHAODESK_PULSEAUDIO=$(usex pulseaudio)
 	)
 	cmake_src_configure

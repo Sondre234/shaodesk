@@ -36,6 +36,8 @@ USE flags:
 
 - `shell` (on by default): `shaodesk-shell`, with Qt 6 and LayerShellQt
 - `notifications` (on): the shell's notification daemon, through Qt's D-Bus module
+- `polkit` (on, in the live ebuild): the shell's polkit authentication agent, which asks for the
+  password `pkexec`, GParted or an updater needs, through `sys-auth/polkit`'s agent library
 - `pulseaudio` (on): the panel's volume control, through libpulse (PipeWire serves it too)
 - `X`: X11 applications through XWayland. shaodesk's X11 support follows wlroots', so this
   flag sets wlroots' `X` flag to match.
@@ -69,6 +71,8 @@ between release series. Relevant Gentoo packages are:
 - Optional: `media-libs/libpulse` for the panel's volume control (PipeWire's
   `sound-server` USE flag serves it); without it, or with `-DSHAODESK_PULSEAUDIO=OFF`, the
   control is left out
+- Optional: `sys-auth/polkit` for the shell's polkit authentication agent
+  (`libpolkit-agent-1`); without it, or with `-DSHAODESK_POLKIT=OFF`, the agent is left out
 - `sys-auth/elogind` (or systemd), whose sd-bus keeps other desktops' idle daemons from
   suspending the machine while shaodesk is on screen
 - `dev-build/cmake`, `dev-build/ninja`, and `virtual/pkgconfig`

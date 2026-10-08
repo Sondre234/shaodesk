@@ -8,6 +8,7 @@
 	</longdescription>
 	<use>
 		<flag name="notifications">Serve desktop notifications (org.freedesktop.Notifications) from the shell</flag>
+		<flag name="polkit">Make the shell the session's polkit authentication agent, asking for administrator passwords, with <pkg>sys-auth/polkit</pkg></flag>
 		<flag name="shell">Build shaodesk-shell, the Qt Quick panels, launcher and notifications, with <pkg>kde-plasma/layer-shell-qt</pkg></flag>
 	</use>
 	<upstream>
