@@ -61,6 +61,7 @@ all. In short:
 | `output.c`, `output_moves.c` | Monitors and their configuration; windows and workspaces moving between outputs. |
 | `output_power.c` | Monitors turned off and on in the layout: wlr-output-power-management. |
 | `mirror.c` | Mirroring: a monitor out of the layout showing another's frames, scaled to fit, with its hardware cursor. |
+| `tearing.c` | Tearing (tearing-control-v1, `windows.allow_tearing`): which fullscreen window may have its frames shown at once, and the asynchronous page flips. |
 | `display_mode.c` | The display_mode action (Windows' Win+P): extend, duplicate, internal, external, and the popup that steps through them. |
 | `layer_shell.c` | Panels and other layer surfaces. |
 | `group.c`, `scratchpad.c`, `swallow.c`, `switcher.c`, `overview.c`, `session.c` | One feature each. `session.c` also saves a login session as `last` as it ends (`session_save_last`, from the power actions and quit) and restores it after `startup` (`session_restore_last`, from `sh_run`), asking `sh_callbacks.started` which missing windows startup and autostart will open. |

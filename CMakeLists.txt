@@ -247,6 +247,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/switcher.c
         src/compositor/switches.c
         src/compositor/tablet.c
+        src/compositor/tearing.c
         src/compositor/tiling.c
         src/compositor/touch.c
         src/compositor/toplevel.c
