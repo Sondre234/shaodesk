@@ -207,6 +207,9 @@ enum sh_action {
      * bindings their keys back, or on again. Its binding runs while the inhibitor holds every
      * other one. */
     SH_TOGGLE_SHORTCUTS_INHIBIT,
+    /* Keeps the focused window above the others (floating ones and tiles), or lets it go back
+     * among them: KDE's Keep Above Others, Hyprland's pin, PowerToys' Always on Top. */
+    SH_TOGGLE_ABOVE,
 };
 
 enum sh_screenshot_mode {
@@ -308,6 +311,9 @@ struct sh_settings {
     int gap_inner; /* between neighbouring windows */
     int gap_outer; /* between windows and the edges of the usable area */
     bool smart_gaps; /* a workspace's only tile has no gaps */
+    /* layout.floating_above_tiles: floating windows always stack over the tiles of their output,
+     * as in sway and Hyprland; off, the window raised last is on top, tile or not. */
+    bool floating_above_tiles;
     char keyboard_layout[128];
     char keyboard_variant[128];
     char keyboard_model[128];
@@ -494,6 +500,7 @@ struct sh_window_rule {
     bool no_focus;
     bool sticky; /* only with features.sticky */
     bool no_shortcuts_inhibit; /* shortcuts_inhibit = false: its inhibitors are refused */
+    bool above;  /* kept above the other windows */
 };
 
 /* What a key binding asks for besides its action (sh_callbacks.binding_flags). */

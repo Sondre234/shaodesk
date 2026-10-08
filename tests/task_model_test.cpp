@@ -84,6 +84,14 @@ int main(int argc, char **argv) {
         wait([&] { return !value(TaskModel::Floating).toBool(); }, "letting the window tile failed");
         model.setFloating(id, true);
         wait([&] { return value(TaskModel::Floating).toBool(); }, "floating the window failed");
+        // Kept above the others and let go, through version 6.
+        if (!value(TaskModel::Above).isValid() || value(TaskModel::Above).toBool() ||
+            model.roleNames().value(TaskModel::Above) != "above")
+            throw std::runtime_error("the window's above state is not as the compositor has it");
+        model.setAbove(id, true);
+        wait([&] { return value(TaskModel::Above).toBool(); }, "keeping the window above failed");
+        model.setAbove(id, false);
+        wait([&] { return !value(TaskModel::Above).toBool(); }, "letting the window go failed");
         model.moveToOutput(id, "HEADLESS-1"); // the one it is on: nothing changes
         // Moved away, it lost the focus, and none of these gave it back.
         if (value(TaskModel::Active).toBool())

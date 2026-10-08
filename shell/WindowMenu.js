@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The entries of a menu about windows that move them to another workspace or monitor, as
-// PopupMenu entries, for every menu that has them. `windows` are windows as a TaskFilter lists
-// them, `tasks` the panel's source of windows, which carries the moves out.
+// The entries of a menu about windows that move them to another workspace or monitor, or keep
+// one above the others, as PopupMenu entries, for every menu that has them. `windows` are windows
+// as a TaskFilter lists them, `tasks` the panel's source of windows, which carries the moves out.
 
 // Where the windows can go, once the compositor has said where they are (workspace from 1):
 // the workspaces of their monitors, the one they are all on marked.
@@ -50,4 +50,13 @@ function workspaceEntries(windows, tasks) {
         })(n))
     }
     return entries
+}
+// Keeping `window` above the others, checked while it is, as `text` in the menu's own style and
+// named `objectName`; none until the compositor says where it is, or while it cannot keep a
+// window above (its `above` is undefined then).
+function aboveEntries(window, tasks, text, objectName) {
+    if (!(window.workspace > 0) || window.above === undefined || window.above === null)
+        return []
+    return [{ text: text, toggle: "check", checked: window.above === true, objectName: objectName,
+              run: function() { tasks.setAbove(window.taskId, window.above !== true) } }]
 }

@@ -118,6 +118,9 @@ const Option options[] = {
     {"layout.gap_outer", "integer", "`gap`", "8", 0, 100, "Pixels between tiles and the edges."},
     {"layout.smart_gaps", "boolean", "true", "false", none, none,
      "No gaps around a tiled window that is alone on its workspace."},
+    {"layout.floating_above_tiles", "boolean", "false", "true", none, none,
+     "Floating windows always stack over tiles, as in sway and Hyprland; `false` puts the "
+     "window brought forward last in front, tile or not."},
     {"layout.workspaces", "integer", "4", "4", 1, 10, "Workspaces per monitor."},
     {"layout.workspace_names", "list of strings", "unset", "{ \"web\", \"code\" }", none, none,
      "Names for workspaces 1, 2, ...; at most `workspaces` of them, each up to 32 characters, "
@@ -350,6 +353,8 @@ const Option options[] = {
     {"windows.rules[].shortcuts_inhibit", "boolean", "unset", "", none, none,
      "`false` refuses the window's requests for the keys the bindings take (see "
      "`keyboard.shortcuts_inhibit`)."},
+    {"windows.rules[].above", "boolean", "unset", "", none, none,
+     "Keep above the other windows, as `toggle_above` does."},
 
     {"peek", "table", "", "", none, none,
      "Peek: `peek` (hold a key) and `peek_toggle` make every window nearly transparent to show "

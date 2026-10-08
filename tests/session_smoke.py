@@ -23,10 +23,11 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
                SHAODESK_PROBE_APP_ID="app-b")
 
     def windows():
-        """By title: workspace, focused, minimized, tiled, x, y, width, height."""
+        """By title: workspace, focused, minimized, tiled, x, y, width, height, kept above."""
         rows = desktop.rows("windows")
         return {r[9]: dict(workspace=int(r[0]), focused=r[1] == "1", tiled=r[3] == "1",
-                           x=int(r[4]), y=int(r[5]), width=int(r[6]), height=int(r[7]))
+                           x=int(r[4]), y=int(r[5]), width=int(r[6]), height=int(r[7]),
+                           above=r[15] == "1")
                 for r in rows}
 
     def summary():
@@ -55,15 +56,19 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
                          f"{title} focused")
     desktop.wait_for(lambda: all(w["tiled"] for w in windows().values()), "all tiled")
 
-    # B goes to workspace 2, C floats, A stays; workspace 1 uses the master layout.
+    # B goes to workspace 2, C floats, A stays; workspace 1 uses the master layout. B and C are
+    # kept above.
     msg("toggle_floating")  # C, focused
     desktop.wait_for(lambda: not windows()["C"]["tiled"], "C floats")
+    msg("toggle_above")
     msg("layout_master")
     focus("B")
     desktop.wait_for(lambda: windows()["B"]["focused"], "B focused")
+    msg("toggle_above")
     msg("move_to_workspace", "2")
     desktop.wait_for(lambda: windows()["B"]["workspace"] == 2, "B on workspace 2")
     msg("workspace", "3")
+    assert {t for t, w in windows().items() if w["above"]} == {"B", "C"}, windows()
     saved_state = summary()
     assert saved_state == {"A": (1, True), "B": (2, True), "C": (1, False)}, saved_state
     saved_c = windows()["C"]
@@ -89,12 +94,14 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
     desktop.wait_for(lambda: windows()["C"]["focused"], "C focused")
     msg("toggle_floating")
     desktop.wait_for(lambda: windows()["C"]["tiled"], "C tiles")
+    msg("toggle_above")
     msg("workspace", "4")
-    assert summary() != saved_state
+    assert summary() != saved_state and not windows()["C"]["above"]
 
     out = msg("session", "restore", "work")
     assert "restored 3, launched 0, not found 0" in out, out
     desktop.wait_for(lambda: summary() == saved_state, "windows restored")
+    assert windows()["C"]["above"] and windows()["B"]["above"] and not windows()["A"]["above"]
     assert msg("get", "workspace").strip() == "3"
     msg("workspace", "1")
     assert msg("get", "layout").split()[0] == "master"
@@ -116,6 +123,7 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
     desktop.wait_for(lambda: "Relaunched" in windows(), "B launched again")
     desktop.wait_for(lambda: windows()["Relaunched"]["workspace"] == 2 and
                      windows()["Relaunched"]["tiled"], "launched window placed")
+    assert windows()["Relaunched"]["above"], windows()
 
     assert msg("session", "delete", "work") == ""
     assert msg("session", "list") == ""

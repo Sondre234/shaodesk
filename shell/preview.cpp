@@ -429,22 +429,22 @@ PreviewData::PreviewData(ShellController &controller)
     component.setData(R"(import QtQml.Models
 ListModel {
     ListElement { taskId: 1; title: "Release notes - Mozilla Firefox"; appId: "firefox"; active: true; minimized: false; urgent: false
-                  maximized: false; fullscreen: false; output: ""; workspace: 1; sticky: false; floating: false; tiling: true
+                  maximized: false; fullscreen: false; output: ""; workspace: 1; sticky: false; floating: false; tiling: true; above: false
                   windowId: 41; pid: 1001; picture: "image://preview-windows/1" }
     ListElement { taskId: 2; title: "~/dev/shaodesk"; appId: "foot"; active: false; minimized: false; urgent: false
-                  maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: false; tiling: true
+                  maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: false; tiling: true; above: false
                   windowId: 42; pid: 2002; picture: "image://preview-windows/2" }
     ListElement { taskId: 3; title: "htop"; appId: "foot"; active: false; minimized: false; urgent: false
-                  maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: true; tiling: true
+                  maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: true; tiling: true; above: true
                   windowId: 43; pid: 2003; picture: "image://preview-windows/3" }
     ListElement { taskId: 6; title: "man shaodesk"; appId: "foot"; active: false; minimized: false; urgent: false
-                  maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: false; tiling: true
+                  maximized: false; fullscreen: false; output: ""; workspace: 2; sticky: false; floating: false; tiling: true; above: false
                   windowId: 46; pid: 2006; picture: "" }
     ListElement { taskId: 4; title: "Downloads - Dolphin"; appId: "org.kde.dolphin"; active: false; minimized: true; urgent: false
-                  maximized: true; fullscreen: false; output: ""; workspace: 3; sticky: false; floating: false; tiling: false
+                  maximized: true; fullscreen: false; output: ""; workspace: 3; sticky: false; floating: false; tiling: false; above: false
                   windowId: 44; pid: 4004; picture: "" }
     ListElement { taskId: 5; title: "Build finished"; appId: "kitty"; active: false; minimized: false; urgent: true
-                  maximized: false; fullscreen: false; output: ""; workspace: 1; sticky: true; floating: true; tiling: true
+                  maximized: false; fullscreen: false; output: ""; workspace: 1; sticky: true; floating: true; tiling: true; above: false
                   windowId: 45; pid: 5005; picture: "" }
 })",
                       QUrl());

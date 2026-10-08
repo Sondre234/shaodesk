@@ -376,6 +376,9 @@ struct sh_server {
     int64_t spawn_until;
     struct wlr_scene_tree *backgrounds;
     struct wlr_scene_tree *windows;
+    // Over `windows`: floating windows with layout.floating_above_tiles, and windows kept above
+    // the others (stacking.c).
+    struct wlr_scene_tree *floating_windows, *above_windows;
     struct wlr_scene_tree *fullscreen;
     struct wlr_scene_tree *peek_layer;       // the window peeked at, over the others
     struct wlr_scene_tree *fullscreen_cover; // above the panels
@@ -732,6 +735,9 @@ struct sh_toplevel {
     /* Shown on every workspace of its output, always floating; its workspace follows the
      * output's current one. `sticky_floating` is what `floating` was before, for unsticking. */
     bool sticky, sticky_floating;
+    /* Kept above the other windows (stacking.c): drawn in above_windows while not fullscreen in
+     * front. */
+    bool above;
     /* Asked for attention while it had no focus; cleared when it is focused or unmapped.
      * urgent_order says which asked first, urgent_since (milliseconds) when it began pulsing. */
     bool urgent;
@@ -1230,6 +1236,14 @@ bool snap_drop(struct sh_server *server);
 void snap_preview_hide(struct sh_server *server);
 void snap_cycle(struct sh_server *server, enum sh_action direction);
 void snap_assist_offer(struct sh_toplevel *toplevel);
+
+/* stacking.c */
+struct wlr_scene_tree *window_layer(struct sh_toplevel *toplevel);
+bool is_window_layer(struct sh_server *server, const struct wlr_scene_tree *tree);
+void restack_toplevel(struct sh_toplevel *toplevel);
+void restack_windows(struct sh_server *server);
+void set_above(struct sh_toplevel *toplevel, bool above);
+void describe_stacking(struct sh_server *server, int fd);
 
 /* swallow.c */
 struct sh_toplevel *swallow_host(struct sh_toplevel *child, bool terminals_only);

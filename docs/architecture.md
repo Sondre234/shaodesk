@@ -52,6 +52,7 @@ all. In short:
 | `touch.c` | Touchscreens: fingers to the surfaces under them (wl_touch), the pointer for clients without touch and the compositor's own controls, and the output each screen is mapped to. |
 | `grab.c` | Moving and resizing with the pointer, magnetic edges, dropping. |
 | `snap.c` | Snapping a window dragged to an edge of its output: the zones, the preview, the drop. |
+| `stacking.c` | The layers windows are drawn in among themselves (tiles, floating windows over them with `layout.floating_above_tiles`, windows kept above the others) and keeping a window above. |
 | `focus.c` | Keyboard focus and urgent windows. |
 | `toplevel.c` | Windows: xdg-shell toplevels and popups, opening by window rules, maximize, fullscreen, minimize. |
 | `xwayland.c` | X11 windows and the XWM waker. |
@@ -203,6 +204,14 @@ is read again. `send_window` sends `icon` (the name, or null) and `icon_image` t
 libwayland sends a copy of it, so the compositor closes its own at once. `shaodesk msg get
 window_icons` lists each window's number, app id and icon's name and size, and
 `tests/window_icon_smoke.py` tests them.
+
+Since version 6 the `state` also has `above` while the window is kept above the others, sent only
+to objects of version 6 as an older client knows no such bit, and `set_above` / `unset_above` call
+`set_above` (`stacking.c`), as `toggle_above` does for the focused window, for the window menu's
+Keep Above Others. A window kept above is drawn in `above_windows`, a tree between the other
+windows (`windows`, and `floating_windows` with `layout.floating_above_tiles`) and the
+fullscreen ones; `window_layer` names the tree a window belongs in, and everything that puts a
+window back among the others (focus, leaving fullscreen, the overview, the peek) puts it there.
 
 ### Touchpad swipes
 

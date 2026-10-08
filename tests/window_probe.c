@@ -26,6 +26,7 @@
  *   window_probe TITLE output NAME       move_to_output
  *   window_probe TITLE sticky 0|1        set_sticky or unset_sticky
  *   window_probe TITLE floating 0|1      set_floating or unset_floating
+ *   window_probe TITLE above 0|1         set_above or unset_above (version 6)
  *   window_probe TITLE minimize          minimizes it through its wlr-foreign-toplevel handle
  *   window_probe TITLE pid               prints the process id the pid event gives (version 3)
  *   window_probe TITLE id                prints the number the id event gives (version 4)
@@ -169,7 +170,7 @@ static const struct zwlr_foreign_toplevel_manager_v1_listener manager_listener =
     .toplevel = manager_toplevel, .finished = manager_finished};
 
 static void print_state(struct probe *probe) {
-    static const char *names[] = {"sticky", "floating", "tiled", "tiling"};
+    static const char *names[] = {"sticky", "floating", "tiled", "tiling", "above"};
     char state[64] = "";
     for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); ++i)
         if (probe->state & 1u << i)
@@ -443,8 +444,8 @@ static void registry_global(void *data, struct wl_registry *registry, uint32_t n
         zwlr_foreign_toplevel_manager_v1_add_listener(probe->manager, &manager_listener, probe);
     } else if (!strcmp(interface, shaodesk_window_control_v1_interface.name)) {
         const char *cap = getenv("SHAODESK_WINDOW_PROBE_VERSION");
-        uint32_t most = cap ? (uint32_t)strtoul(cap, NULL, 10) : 5;
-        most = most < 5 ? most : 5;
+        uint32_t most = cap ? (uint32_t)strtoul(cap, NULL, 10) : 6;
+        most = most < 6 ? most : 6;
         probe->control = wl_registry_bind(registry, name, &shaodesk_window_control_v1_interface,
                                           version < most ? version : most);
     } else if (!strcmp(interface, ext_foreign_toplevel_list_v1_interface.name)) {
@@ -574,7 +575,7 @@ static void peek(struct probe *probe, struct wl_display *display, const char *ti
 int main(int argc, char **argv) {
     if (argc < 2 || argc > 6)
         die("usage: window_probe TITLE [watch | workspace N | output NAME | sticky 0|1 | "
-            "floating 0|1 | minimize | pid | id | capture [watch] | capture-listed [watch] | "
+            "floating 0|1 | above 0|1 | minimize | pid | id | capture [watch] | capture-listed [watch] | "
             "capture-scaled WIDTH HEIGHT [watch | twice | closed] | peek | icon [watch]]");
     const char *title = argv[1], *command = argc > 2 ? argv[2] : "", *argument = argc > 3 ? argv[3] : "";
     struct probe probe = {.watch = !strcmp(command, "watch")};
@@ -621,6 +622,13 @@ int main(int argc, char **argv) {
             shaodesk_window_v1_set_floating(window);
         else
             shaodesk_window_v1_unset_floating(window);
+    } else if (!strcmp(command, "above") && argument[0]) {
+        if (shaodesk_window_control_v1_get_version(probe.control) < 6)
+            die("the compositor's window control keeps no window above");
+        if (!strcmp(argument, "1"))
+            shaodesk_window_v1_set_above(window);
+        else
+            shaodesk_window_v1_unset_above(window);
     } else if (!strcmp(command, "minimize")) {
         zwlr_foreign_toplevel_handle_v1_set_minimized(found->object);
     } else if (!strcmp(command, "pid")) {

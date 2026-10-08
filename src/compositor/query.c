@@ -4,8 +4,8 @@
 #include "server.h"
 
 /* workspace, focused, minimized, tiled, x, y, width, height, app_id, title, output,
- * visible, scratchpad, sticky, group (0 for none) — one line. A window hidden in the
- * scratchpad is minimized. */
+ * visible, scratchpad, sticky, group (0 for none), kept above — one line. A window hidden in
+ * the scratchpad is minimized. */
 static void control_describe_window(struct sh_server *server, int fd,
                                     struct sh_toplevel *toplevel) {
     char line[1024], app_id[256], title[512];
@@ -18,12 +18,12 @@ static void control_describe_window(struct sh_server *server, int fd,
     for (char *c = title; *c; ++c)
         *c = *c == '\t' || *c == '\n' || *c == '\r' ? ' ' : *c;
     struct wlr_box geometry = toplevel_geometry(toplevel);
-    snprintf(line, sizeof(line), "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%s\t%s\t%s\t%d\t%d\t%d\t%u\n",
+    snprintf(line, sizeof(line), "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%s\t%s\t%s\t%d\t%d\t%d\t%u\t%d\n",
              toplevel->workspace + 1, server->focused_toplevel == toplevel, toplevel->minimized,
              toplevel->tiled, toplevel->scene_tree->node.x, toplevel->scene_tree->node.y,
              geometry.width, geometry.height, app_id, title, toplevel->output,
              toplevel_visible(toplevel), toplevel->scratchpad, toplevel->sticky,
-             toplevel->group);
+             toplevel->group, toplevel->above);
     control_reply(fd, line);
 }
 
@@ -158,6 +158,10 @@ static void get_windows(struct sh_server *server, int fd, const char *arguments)
     control_describe_windows(server, fd);
 }
 
+static void get_stacking(struct sh_server *server, int fd, const char *arguments) {
+    describe_stacking(server, fd);
+}
+
 static void get_pid_at(struct sh_server *server, int fd, const char *arguments) {
     // The process of the window drawn at layout point X Y, or no line when there is none.
     double x, y;
@@ -226,6 +230,8 @@ static void get_animations(struct sh_server *server, int fd, const char *argumen
     char reply[64];
     snprintf(reply, sizeof(reply), "ok\n%zu\t%d\t%zu\n", sh_animator_running(server->animator),
              wl_list_length(&server->windows->children) +
+                 wl_list_length(&server->floating_windows->children) +
+                 wl_list_length(&server->above_windows->children) +
                  wl_list_length(&server->fullscreen->children) +
                  wl_list_length(&server->fullscreen_cover->children),
              sh_animator_tweens(server->animator));
@@ -532,8 +538,9 @@ static void get_pictures(struct sh_server *server, int fd, const char *arguments
 /* Where a window is stacked among the windows, from 0 at the bottom: counting the windows in the
  * trees they are drawn in from the lowest, the one peeked at over the others; -1 for none. */
 static int stacked_at(struct sh_server *server, struct sh_toplevel *toplevel) {
-    struct wlr_scene_tree *trees[] = {server->windows, server->fullscreen, server->peek_layer,
-                                      server->fullscreen_cover};
+    struct wlr_scene_tree *trees[] = {server->windows,       server->floating_windows,
+                                      server->above_windows, server->fullscreen,
+                                      server->peek_layer,    server->fullscreen_cover};
     int index = 0;
     for (size_t i = 0; i < sizeof(trees) / sizeof(*trees); ++i) {
         struct wlr_scene_node *node;
@@ -695,6 +702,7 @@ static const struct {
     {"tiling", get_tiling, false},
     {"urgent", get_urgent, false},
     {"windows", get_windows, false},
+    {"stacking", get_stacking, false},
     {"pid_at", get_pid_at, true},
     {"swallow", get_swallow, false},
     {"guides", get_guides, false},

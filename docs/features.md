@@ -29,8 +29,9 @@ the dock.
   the `power_menu` action opens it too. The focused application's name, in bold ("Desktop" when
   no window has focus), opens its menu: its desktop actions, New Window, Hide, Hide Others and
   Quit. The **Window** menu acts on the focused window: Minimize, Zoom, Tile Window to Left or
-  Right of Screen, Enter Full Screen, Float, Keep on All Workspaces, Move to a workspace or
-  monitor, the application's other windows, and Close Window. While one menu is open, pointing at
+  Right of Screen, Enter Full Screen, Float, Keep on All Workspaces, Keep Above Others (checked
+  while the window is [kept above](#keeping-windows-above)), Move to a workspace or monitor, the
+  application's other windows, and Close Window. While one menu is open, pointing at
   another title or pressing Left and Right switches to it. At the right are the widgets
   `shell.widgets` puts on the bar, a search button (the command palette, drawn as Spotlight), a
   Control Center button (Quick Settings) and the date and time, which open Notification Center:
@@ -417,8 +418,9 @@ its desktop entry; the window's app id without one) over the window's title. The
 - **Move to workspace**, beside it the workspaces of its monitor (named as
   `layout.workspace_names` names them), the one it is on marked; **Move to monitor**, with two or
   more monitors, from left to right; **Keep on all workspaces**, making it
-  [sticky](#sticky-windows) (not with `features = { sticky = false }`); and where its workspace
-  tiles, **Float**, checked while it is kept out of the tiling;
+  [sticky](#sticky-windows) (not with `features = { sticky = false }`); **Keep above others**,
+  checked while it is [kept above](#keeping-windows-above) the other windows; and where its
+  workspace tiles, **Float**, checked while it is kept out of the tiling;
 - **Pin to taskbar** or **Unpin from taskbar** for an installed application, **Close window**
   in the danger colour, and last **Kill process**, which ends the process that made the window
   with `SIGKILL`, for one that does not close (only once its process is known; never the shell's
@@ -496,7 +498,9 @@ A window you fullscreen with a binding or its title bar fills its monitor except
 other bars, which stay shown. Fullscreen a program asks for itself, like a video player or a
 browser's fullscreen video, covers the whole monitor, panels included, and keeps covering it
 while you work on another monitor; bringing another window forward on its monitor puts it
-behind that window and shows the panels again.
+behind that window and shows the panels again. Either kind stays in front of the other windows
+of its monitor, those [kept above](#keeping-windows-above) too, while you work on another
+monitor, until a window of its own monitor is brought forward.
 
 Limitations: window placement during interactive resize is immediate, without waiting for the
 client's next buffer.
@@ -505,6 +509,20 @@ Actions without a section of their own: `quit` ends the session (Super + M), and
 `snap_right` fill half of the monitor with the focused window (no default binding; see
 [Snapping](#snapping) for the quarters and Super + Alt + arrows). `focus_last` (Super + `) focuses the window focused before this one, on any workspace; repeated,
 it flips between two windows.
+
+### Keeping windows above
+
+`toggle_above` (Super + Ctrl + T, the keys of PowerToys' Always on Top) keeps the focused window
+above the others, as KDE's Keep Above Others, Hyprland's pinned windows and PowerToys do: it stays
+over the floating windows and tiles of its monitor while they are focused and brought forward,
+and toggled again it goes back among them, in front. Windows kept above stack among themselves as focus raises them. A window
+keeps it through workspace switches, snapping, tiling (a tile kept above stays a tile), being
+sticky, and window groups, whose windows share it as they share their slot: a window joining a
+group takes the group's, and toggling one toggles them all. A fullscreen window covers the
+windows kept above on its monitor; the panels, their popups and menus, and the overlays (the
+switcher, the start menu, notifications) stay over all of them. A window's menu on the taskbar
+has **Keep above others** and the macOS style's Window menu **Keep Above Others**, checked while
+the window is kept above, and the window rule `above = true` keeps a window above as it opens.
 
 ### Borders, opacity and rounded corners
 
@@ -560,6 +578,7 @@ windows = {
 | `maximize = true` | Opens it maximized, floating over the tiles. |
 | `focus = false` | Leaves the focus where it was. A fullscreen window on the current workspace still takes it. |
 | `sticky = true` | Opens it sticky (see below) on its monitor's current workspace, whatever `workspace` says. Ignored with `features = { sticky = false }`. |
+| `above = true` | Opens it [kept above](#keeping-windows-above) the other windows, as `toggle_above` does. |
 
 Every matching rule applies, in order; where two set the same action, the later one wins. A
 tiled window keeps `size` and `position` as the place it floats to when toggled. Rules see the
@@ -995,7 +1014,15 @@ scroll layout loses its gaps and keeps its width.
   change. Holding the keys keeps resizing, at the keyboard's `repeat_delay` and
   `repeat_rate`. `features = { keyboard_resize = false }` turns the actions off.
 
-Not yet: keeping floating windows above tiles. Windows tiled on a
+A window brought forward comes in front of the others on its monitor, tile or not, so that a tile
+clicked covers the floating windows over it. With `layout.floating_above_tiles = true` the
+windows out of the tiling (dialogs, windows floated with Super + V, snapped, maximized and sticky
+ones) always stay over the tiles, as in sway and Hyprland, and a tile brought forward comes in
+front of the other tiles only; a tile that floats goes up among them, and a floating window
+that tiles goes down among the tiles, in front. It is off by default. [Windows kept
+above](#keeping-windows-above) stay over both.
+
+Windows tiled on a
 monitor that is disabled in the config hands its tiles to the nearest one, where they float if
 that one does not tile. Unplugging a monitor does the same with all its windows (floating ones
 keep their relative place, tiles join the tiling of the nearest monitor, workspace numbers are
@@ -1862,7 +1889,7 @@ started and skipped, and says why an entry failed to start.
 `$XDG_STATE_HOME/shaodesk/sessions/NAME` (`~/.local/state/shaodesk/sessions`): each monitor's
 current workspace, tiling on or off and the tiling layouts of its workspaces, and for every
 window its monitor, workspace, floating place, tiled, floating, minimized, sticky, maximized,
-fullscreen, scratchpad and focus state, the app ID and title to find it by, and the command line
+fullscreen, scratchpad, kept-above and focus state, the app ID and title to find it by, and the command line
 it was started with. `session restore NAME` puts every window that matches back where it was (app
 ID and title first, then app ID alone; a window is matched once), switches the monitors to their
 saved workspaces and refocuses the window that had focus. Windows of applications that are no
@@ -1927,8 +1954,12 @@ enabled, x, y, logical width and height, scale, transform, mode, "make model ser
 whether it shows a picture, `on`, or is [turned off](#turning-monitors-off) or disabled, `off`), and
 `shaodesk msg get windows` prints one tab-separated line per window:
 workspace, focused, minimized, tiled, x, y, width, height, app ID, title, monitor,
-visible, scratchpad (a window hidden there is also minimized), sticky, and its window group
-(a number; 0 for none). `shaodesk msg get pid_at X Y` prints the process ID of the window
+visible, scratchpad (a window hidden there is also minimized), sticky, its window group
+(a number; 0 for none), and whether it is [kept above](#keeping-windows-above). `shaodesk msg
+get stacking` lists the windows front to back as they are drawn, hidden ones where they would
+be: app ID, title, monitor, and the layer it is in (`fullscreen_cover` for fullscreen over the
+panels, `peek` for the window the taskbar peeks at, `fullscreen`, `above`, `floating` for floating
+windows kept over tiles, `normal`). `shaodesk msg get pid_at X Y` prints the process ID of the window
 drawn at that layout point, or nothing over bare desktop. `shaodesk msg get layers` prints one line per panel or other layer-shell surface:
 namespace, output, layer (0 background to 3 overlay), whether it is shown, and whether it holds
 the keyboard.

@@ -1012,9 +1012,10 @@ ListModel {
     function moveToOutput(id, output) { note("output " + id + " " + output) }
     function setSticky(id, on) { note("sticky " + id + " " + on) }
     function setFloating(id, on) { note("floating " + id + " " + on) }
+    function setAbove(id, on) { note("above " + id + " " + on) }
     ListElement { taskId: 7; title: 'Fake'; appId: 'fake'; active: false; minimized: false; urgent: false
                   maximized: false; fullscreen: false; output: 'TEST-1'; workspace: 2; sticky: false
-                  floating: false; tiling: false; picture: ''; pid: 0 }
+                  floating: false; tiling: false; above: false; picture: ''; pid: 0 }
 })",
                       QUrl());
     QObject *fakeModel = fakeTasks.create();
@@ -1261,6 +1262,32 @@ ListModel {
         editTasks("model.setProperty(0, 'tiling', false)");
         if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
             return fail("the popover did not close after making the window sticky");
+    }
+    // Keeping it above the others, checked while it is.
+    {
+        auto above = [&] { return menuItem("Keep above others"); };
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && above(); }) || above()->property("marked").toBool())
+            return fail("a window's menu does not offer to keep it above the others");
+        click(above());
+        if (const auto asked = taskRequests(); asked != "above 7 true") {
+            std::cerr << "keeping a window above from its menu asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the popover did not close after keeping the window above");
+        editTasks("model.setProperty(0, 'above', true)");
+        click(task, Qt::RightButton);
+        if (!QTest::qWaitFor([&] { return menuShown() && above() && above()->property("marked").toBool(); }))
+            return fail("a window kept above is not checked in its menu");
+        click(above());
+        if (const auto asked = taskRequests(); asked != "above 7 false") {
+            std::cerr << "letting a window go from its menu asked " << asked.toStdString() << '\n';
+            return 1;
+        }
+        editTasks("model.setProperty(0, 'above', false)");
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("the popover did not close after letting the window go");
     }
     // Closing the window comes last, in the danger colour.
     {
@@ -5720,7 +5747,8 @@ ListModel {
             controller.unpin(app.toMap()["appId"].toString());
         controller.power()->setAvailable("lock,suspend,reboot,poweroff,logout");
         const QString roles = ", minimized: false, urgent: false, maximized: false, fullscreen: false, "
-                              "output: '" + output + "', workspace: 2, sticky: false, floating: false, tiling: true})";
+                              "output: '" + output + "', workspace: 2, sticky: false, floating: false, tiling: true, "
+                              "above: false})";
         editTasks("model.clear(); "
                   "model.append({taskId: 31, title: 'Fake window', appId: 'fake', active: true" + roles + "; "
                   "model.append({taskId: 32, title: 'Action window', appId: 'shaodesk-test-actions', active: false" + roles + "; "
@@ -5827,6 +5855,10 @@ ListModel {
             return fail("the Window menu did not tile the focused window to the left");
         if (!openMenu("window") || !chosen("windowMenu:fullscreen") || taskRequests() != "fullscreen 31 true")
             return fail("the Window menu did not make the window fullscreen");
+        if (!openMenu("window") || !QTest::qWaitFor([&] {
+                return entryOf("windowMenu:above") && entryOf("windowMenu:above")->property("text") == "Keep Above Others";
+            }) || !chosen("windowMenu:above") || taskRequests() != "above 31 true")
+            return fail("the Window menu did not keep the window above the others");
         // The system menu: the appearance profiles beside it, and the power actions.
         if (!openMenu("system") ||
             !QTest::qWaitFor([&] { return entryOf("systemMenuAppearance") && entryOf("Restart…") && entryOf("Shut Down…"); }) ||

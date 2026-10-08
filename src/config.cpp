@@ -757,6 +757,7 @@ WindowRule window_rule(lua_State *L, int workspaces) {
     actions.focus = optional_boolean(L, "focus");
     actions.sticky = optional_boolean(L, "sticky");
     actions.shortcuts_inhibit = optional_boolean(L, "shortcuts_inhibit");
+    actions.above = optional_boolean(L, "above");
     lua_getfield(L, -1, "workspace");
     bool has_workspace = !lua_isnil(L, -1);
     lua_pop(L, 1);
@@ -1642,6 +1643,8 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
         config.settings.gap_inner = integer(L, "gap_inner", gap, 0, 100);
         config.settings.gap_outer = integer(L, "gap_outer", gap, 0, 100);
         boolean(L, "smart_gaps", "layout.smart_gaps", config.settings.smart_gaps);
+        boolean(L, "floating_above_tiles", "layout.floating_above_tiles",
+                config.settings.floating_above_tiles);
         boolean(L, "tiling", "layout.tiling", config.settings.tiling);
         boolean(L, "tiling_per_workspace", "layout.tiling_per_workspace",
                 config.settings.tiling_per_workspace);
@@ -2014,6 +2017,7 @@ constexpr std::pair<std::string_view, sh_action> action_table[] = {
         {"move_to_scratchpad", SH_MOVE_TO_SCRATCHPAD},
         {"scratchpad_show", SH_SCRATCHPAD_SHOW},
         {"toggle_sticky", SH_TOGGLE_STICKY},
+        {"toggle_above", SH_TOGGLE_ABOVE},
         {"resize_left", SH_RESIZE_LEFT},
         {"resize_right", SH_RESIZE_RIGHT},
         {"resize_up", SH_RESIZE_UP},
@@ -2156,8 +2160,8 @@ bool WindowRule::matches(const std::string &app_id, const std::string &title) co
 }
 
 bool WindowActions::empty() const {
-    return !floating && !fullscreen && !maximize && !focus && !sticky && !workspace && !output &&
-           !size && position == Position::Unset && !shortcuts_inhibit;
+    return !floating && !fullscreen && !maximize && !focus && !sticky && !above && !workspace &&
+           !output && !size && position == Position::Unset && !shortcuts_inhibit;
 }
 
 void WindowActions::merge(const WindowActions &other) {
@@ -2166,7 +2170,8 @@ void WindowActions::merge(const WindowActions &other) {
                                   {&maximize, &other.maximize},
                                   {&focus, &other.focus},
                                   {&sticky, &other.sticky},
-                                  {&shortcuts_inhibit, &other.shortcuts_inhibit}})
+                                  {&shortcuts_inhibit, &other.shortcuts_inhibit},
+                                  {&above, &other.above}})
         if (*source)
             *target = *source;
     if (other.workspace)
@@ -2200,6 +2205,7 @@ sh_window_rule WindowActions::to_c() const {
     rule.no_focus = !focus.value_or(true);
     rule.sticky = sticky.value_or(false);
     rule.no_shortcuts_inhibit = !shortcuts_inhibit.value_or(true);
+    rule.above = above.value_or(false);
     return rule;
 }
 

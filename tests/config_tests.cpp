@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
     try {
         require(argc == 2, "example config path required");
         auto config = shaodesk::load_config(argv[1]);
-        require(config.bindings.size() == 82, "example shortcuts missing");
+        require(config.bindings.size() == 83, "example shortcuts missing");
         auto *louder = config.binding(0, XKB_KEY_XF86AudioRaiseVolume);
         auto *microphone = config.binding(0, XKB_KEY_XF86AudioMicMute);
         auto *dimmer = config.binding(0, XKB_KEY_XF86MonBrightnessDown);
@@ -338,6 +338,8 @@ int main(int argc, char **argv) {
                 "features.sticky not parsed");
         auto *sticky = config.binding(SH_LOGO | SH_SHIFT, XKB_KEY_p);
         require(sticky && sticky->action == SH_TOGGLE_STICKY, "sticky binding missing");
+        auto *above = config.binding(SH_LOGO | SH_CTRL, XKB_KEY_t);
+        require(above && above->action == SH_TOGGLE_ABOVE, "keep-above binding missing");
         auto *palette = config.binding(SH_LOGO, XKB_KEY_p);
         require(palette && palette->action == SH_PALETTE, "palette binding missing");
         rejects("return {bindings={{mods={'Super'},key='Tab',action='workspace_back',workspace=2}}}");
@@ -452,6 +454,11 @@ int main(int argc, char **argv) {
         require(gaps.settings.smart_gaps &&
                     !shaodesk::parse_config("return {layout={smart_gaps=false}}").settings.smart_gaps,
                 "smart_gaps not parsed");
+        require(!gaps.settings.floating_above_tiles &&
+                    shaodesk::parse_config("return {layout={floating_above_tiles=true}}")
+                        .settings.floating_above_tiles,
+                "floating_above_tiles not parsed, or not off by default");
+        rejects("return {layout={floating_above_tiles='yes'}}");
         auto windows = shaodesk::parse_config(
             "return {windows={border_width=2,border_color='#ff000080',"
             "border_inactive_color='#00ff00',opacity=0.95,inactive_opacity=0.8,"
@@ -605,7 +612,7 @@ int main(int argc, char **argv) {
             "{title='^Mail',workspace=2,output='desc:Dell U2720Q',floating=false},"
             "{app_id='^mpv$',fullscreen=true,maximize=true,opacity=0.5},"
             "{app_id='^mpv$',output='DP-1',size={width=100,height=200},fullscreen=false},"
-            "{app_id='^mpv$',sticky=true}}}}");
+            "{app_id='^mpv$',sticky=true},{app_id='^mpv$',above=true}}}}");
         require(ruled.settings.window_rules, "window rules should be on by default");
         auto pavu = ruled.window_actions("pavucontrol", "Volume Control");
         require(pavu.floating == true && pavu.size == std::pair{640, 480} &&
@@ -624,8 +631,10 @@ int main(int argc, char **argv) {
                 "title-only rule mismatch");
         auto mpv = ruled.window_actions("mpv", "").to_c();
         require(!mpv.fullscreen && mpv.maximize && std::string(mpv.output) == "DP-1" &&
-                    mpv.width == 100 && mpv.height == 200 && mpv.floating == -1 && mpv.sticky,
+                    mpv.width == 100 && mpv.height == 200 && mpv.floating == -1 && mpv.sticky &&
+                    mpv.above,
                 "later rule did not override an earlier one");
+        require(!pavu_c.above, "a rule kept the wrong window above");
         require(ruled.window_actions("kitty", "My Mail").empty(), "a rule matched the wrong window");
         require(!mpv.no_shortcuts_inhibit && !pavu_c.no_shortcuts_inhibit,
                 "a rule without shortcuts_inhibit refused inhibitors");
@@ -662,6 +671,13 @@ int main(int argc, char **argv) {
         rejects("return {windows={rules={{app_id='x',focus=0}}}}");
         rejects("return {windows={rules={{app_id='x',sticky='yes'}}}}");
         rejects("return {windows={rules={{app_id='x',shortcuts_inhibit=0}}}}");
+        rejects("return {windows={rules={{app_id='x',above=1}}}}");
+        // A rule that only keeps a window above takes no part in the opacity.
+        auto kept = shaodesk::parse_config(
+            "return {windows={rules={{app_id='^mpv$',above=true},{app_id='mpv',opacity=0.5}}}}");
+        require(kept.window_actions("mpv", "").to_c().above &&
+                    kept.window_opacity("mpv", "", true) == 0.5F,
+                "an above rule took part in the opacity");
         rejects("return {windows={rules={{app_id='x',fullscreen='true'}}}}");
         rejects("return {windows={rules={{app_id='x',workspace=5}}}}");
         rejects("return {windows={rules={{app_id='x',workspace=0}}}}");
@@ -805,7 +821,7 @@ int main(int argc, char **argv) {
         // A configuration extending the defaults holds only its changes.
         setenv("SHAODESK_DEFAULT_CONFIG", argv[1], 1);
         auto bare = shaodesk::parse_config("return {extends='default'}");
-        require(bare.bindings.size() == 82 && bare.shell.launchers.empty() &&
+        require(bare.bindings.size() == 83 && bare.shell.launchers.empty() &&
                     bare.settings.workspaces == 4,
                 "extends did not supply the defaults");
         auto layered = shaodesk::parse_config(
@@ -815,7 +831,7 @@ int main(int argc, char **argv) {
             "{mods={'Super'}, key='e', action='spawn', command={'dolphin'}}}}");
         require(layered.settings.gap_inner == 3 && layered.settings.workspaces == 4,
                 "extending configuration settings not layered over the defaults");
-        require(layered.bindings.size() == 82 && !layered.binding(SH_LOGO, XKB_KEY_v),
+        require(layered.bindings.size() == 83 && !layered.binding(SH_LOGO, XKB_KEY_v),
                 "action none did not remove a default binding");
         require(layered.binding(SH_LOGO, XKB_KEY_q)->command == shaodesk::Command{"foot"} &&
                     layered.binding(SH_LOGO, XKB_KEY_e)->command == shaodesk::Command{"dolphin"},

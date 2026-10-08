@@ -17,7 +17,8 @@
 // `picture` (WindowPictures), "" until one has arrived; from version 3 each has the `pid` of the
 // process that made it, 0 until it is known; and from version 4 each has its `windowId`, the
 // number the compositor's control socket names it by (as the window switcher does), 0 until it
-// is known, and the model can peek at one.
+// is known, and the model can peek at one; from version 6 whether it is kept `above` the others,
+// undefined below it.
 class TaskModel : public QAbstractListModel {
     Q_OBJECT
     // The window the model peeks at, -1 for none.
@@ -39,7 +40,8 @@ class TaskModel : public QAbstractListModel {
         Tiling,
         Picture,
         Pid,
-        WindowId
+        WindowId,
+        Above
     };
     explicit TaskModel(QObject *parent = nullptr);
     ~TaskModel() override;
@@ -58,6 +60,8 @@ class TaskModel : public QAbstractListModel {
     Q_INVOKABLE void moveToOutput(int id, const QString &output);
     Q_INVOKABLE void setSticky(int id, bool sticky);
     Q_INVOKABLE void setFloating(int id, bool floating);
+    // Keeps the window above the others or lets it go, through the window control's version 6.
+    Q_INVOKABLE void setAbove(int id, bool above);
     Q_INVOKABLE void close(int id);
     // Ends the process that made window `id` with SIGKILL, when its pid is known and is neither
     // the shell's nor the compositor's, which started it.
@@ -92,7 +96,7 @@ class TaskModel : public QAbstractListModel {
         QString title, appId, output;
         bool active = false, minimized = false, maximized = false, fullscreen = false, urgent = false;
         int workspace = 0;
-        bool sticky = false, floating = false, tiling = false;
+        bool sticky = false, floating = false, tiling = false, above = false;
         int pid = 0;
         int windowId = 0;
     };
@@ -144,4 +148,6 @@ class TaskModel : public QAbstractListModel {
     static void windowDone(void *, shaodesk_window_v1 *);
     static void windowPid(void *, shaodesk_window_v1 *, uint32_t);
     static void windowId(void *, shaodesk_window_v1 *, uint32_t);
+    static void windowIcon(void *, shaodesk_window_v1 *, const char *);
+    static void windowIconImage(void *, shaodesk_window_v1 *, int32_t, uint32_t, uint32_t);
 };

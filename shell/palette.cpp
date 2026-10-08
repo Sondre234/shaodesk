@@ -32,6 +32,7 @@ constexpr Action actions[] = {
     {"focus_last", "Focus the previous window"},
     {"focus_urgent", "Focus the window asking for attention"},
     {"toggle_sticky", "Toggle sticky window"},
+    {"toggle_above", "Keep window above others, or not"},
     {"move_to_scratchpad", "Hide window in the scratchpad"},
     {"scratchpad_show", "Show the scratchpad"},
     {"group_toggle", "Group: make a tab group, or dissolve it"},

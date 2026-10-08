@@ -326,6 +326,10 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
         if (current && server_settings(server)->sticky)
             set_sticky(current, !current->sticky, true);
         break;
+    case SH_TOGGLE_ABOVE:
+        if (current)
+            set_above(current, !current->above);
+        break;
     case SH_TOGGLE_FLOATING:
         if (current)
             set_floating(current, current->tiled, true);

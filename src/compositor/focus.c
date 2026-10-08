@@ -7,10 +7,8 @@ void deactivate_toplevel(struct sh_server *server) {
     if (!server->focused_toplevel)
         return;
     struct sh_toplevel *old = server->focused_toplevel;
-    // Fullscreen the client asked for stays over the panels, so a video keeps covering its
-    // output while another output has focus; raising a window over it lowers it.
-    if (old->fullscreen && !old->fullscreen_cover)
-        wlr_scene_node_reparent(&old->scene_tree->node, server->windows);
+    // A fullscreen window stays in front of its output, over the windows kept above there too,
+    // while another output has focus; raising a window over it lowers it.
     toplevel_set_activated(old, false);
     if (old->foreign)
         wlr_foreign_toplevel_handle_v1_set_activated(old->foreign, false);
@@ -18,16 +16,17 @@ void deactivate_toplevel(struct sh_server *server) {
     refresh_frame(old);
 }
 
-/* Puts the fullscreen windows covering the panels on `toplevel`'s output down among the
- * others, so that it can come to the front over them. */
+/* Puts the fullscreen windows on `toplevel`'s output down among the others, so that it can come
+ * to the front over them: those covering the panels, and the others while still in front. */
 static void lower_fullscreen_covers(struct sh_toplevel *toplevel) {
     struct sh_server *server = toplevel->server;
     struct wlr_output *output = toplevel_output(toplevel);
     struct sh_toplevel *other;
     wl_list_for_each(other, &server->toplevels, link) {
-        if (other != toplevel && other->fullscreen && other->fullscreen_cover &&
-            other->scene_tree && toplevel_output(other) == output)
-            wlr_scene_node_reparent(&other->scene_tree->node, server->windows);
+        if (other != toplevel && other->fullscreen && other->scene_tree &&
+            (other->fullscreen_cover || other->scene_tree->node.parent == server->fullscreen) &&
+            toplevel_output(other) == output)
+            wlr_scene_node_reparent(&other->scene_tree->node, window_layer(other));
     }
 }
 
@@ -77,7 +76,7 @@ void focus_toplevel_raise(struct sh_toplevel *toplevel, bool raise) {
         lower_fullscreen_covers(toplevel);
     if (raise || toplevel->fullscreen) {
         wlr_scene_node_reparent(&toplevel->scene_tree->node,
-                                toplevel->fullscreen ? fullscreen_tree(toplevel) : server->windows);
+                                toplevel->fullscreen ? fullscreen_tree(toplevel) : window_layer(toplevel));
         wlr_scene_node_raise_to_top(&toplevel->scene_tree->node);
     }
     wl_list_remove(&toplevel->link);

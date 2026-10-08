@@ -265,6 +265,7 @@ Edit them in [config/init.lua](config/init.lua).
 | Super + T | Arrange the monitor's windows in a grid (floating mode) |
 | Super + S | [Tiling](docs/features.md#tiling) on or off for the focused monitor |
 | Super + Shift + P | Make the focused window [sticky](docs/features.md#sticky-windows), or not |
+| Super + Ctrl + T | [Keep the focused window above](docs/features.md#keeping-windows-above) the others, or not |
 | Alt + Tab / Alt + Shift + Tab | [Window switcher](docs/features.md#window-switcher) over every window |
 | Super + O | [Overview](docs/features.md#overview) of the monitor's workspace |
 | Super + ` | Back to the previously focused window, on any workspace |
