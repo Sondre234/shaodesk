@@ -52,6 +52,7 @@ all. In short:
 | `tiling.c` | Glue between windows and the layouts in `src/tiling.cpp`. |
 | `workspace.c` | Workspaces per output, sticky windows. |
 | `output.c`, `output_moves.c` | Monitors and their configuration; windows and workspaces moving between outputs. |
+| `output_power.c` | Monitors turned off and on in the layout: wlr-output-power-management. |
 | `layer_shell.c` | Panels and other layer surfaces. |
 | `group.c`, `scratchpad.c`, `swallow.c`, `switcher.c`, `overview.c`, `session.c` | One feature each. |
 | `effects.c` | Dimming, peeking at the desktop or at one window, night light, magnifier, hot corners. |

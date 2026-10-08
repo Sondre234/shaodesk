@@ -5,14 +5,15 @@
 
 /* ext-session-lock-v1: an opaque cover hides the desktop from the moment a lock
  * starts; lock surfaces sit above it, and `locked` is sent once every output has
- * presented a covered frame. */
+ * presented a covered frame. A monitor that is off shows nothing to cover, and its first frame
+ * once it is on again is drawn with the cover. */
 void send_locked_if_presented(struct sh_server *server) {
     struct sh_lock *lock = server->lock;
     if (!lock || lock->locked_sent)
         return;
     struct sh_output *output;
     wl_list_for_each(output, &server->outputs, link) {
-        if (!output->lock_presented)
+        if (!output->lock_presented && !output->powered_off)
             return;
     }
     lock->locked_sent = true;

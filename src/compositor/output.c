@@ -138,7 +138,9 @@ static void publish_output_configuration(struct sh_server *server) {
                 wlr_output_configuration_head_v1_create(config, output->wlr_output);
             if (!head)
                 continue;
-            head->state.enabled = !output->disabled && output->wlr_output->enabled;
+            // A monitor turned off (output_power.c) is still in the layout, as in sway.
+            head->state.enabled =
+                !output->disabled && (output->wlr_output->enabled || output->powered_off);
             struct wlr_box box;
             wlr_output_layout_get_box(server->output_layout, output->wlr_output, &box);
             head->state.x = box.x;
@@ -307,6 +309,9 @@ void configure_output(struct sh_server *server, struct sh_output *output) {
             enable = true;
         }
     }
+    // A monitor that is off stays off as it is until it is turned on, which configures it.
+    if (enable && output->powered_off)
+        return;
 
     struct wlr_output_state state;
     wlr_output_state_init(&state);
@@ -374,6 +379,7 @@ void configure_output(struct sh_server *server, struct sh_output *output) {
         wlr_scene_node_set_enabled(&output->background->node, true);
         wlr_scene_node_set_enabled(&output->lock_blank->node, true);
     } else {
+        output->powered_off = false; // out of the layout, it is simply off
         destroy_output_layers(server, wlr_output);
         wlr_output_layout_remove(server->output_layout, wlr_output);
         wlr_scene_node_set_enabled(&output->background->node, false);
@@ -383,7 +389,7 @@ void configure_output(struct sh_server *server, struct sh_output *output) {
     }
 }
 
-static struct sh_output *sh_output_for(struct sh_server *server, struct wlr_output *wlr_output) {
+struct sh_output *sh_output_for(struct sh_server *server, struct wlr_output *wlr_output) {
     struct wl_list *lists[] = {&server->outputs, &server->disabled_outputs};
     for (size_t i = 0; i < 2; ++i) {
         struct sh_output *output;

@@ -18,7 +18,11 @@ Source SHA-256 checksums:
 65b0f82a6cf129bf1a1c31a2428795abd33886c15ddd5f3ad97e5922d7bdc3a7  wlr-output-management-unstable-v1.xml
 3ff6d540be0bc5228195bf072bde42117ea17945a5c2061add5d3cf97d6bb524  wlr-virtual-pointer-unstable-v1.xml
 7ad7870003ecd592cae47dc19d277a609b7f18fd7b7be012623cf3225a7294f5  virtual-keyboard-unstable-v1.xml
+7ebd98f3449d246a57829e4b4dd9fbc3ef98e3dd42fa94ea102f14f490eb20de  wlr-output-power-management-unstable-v1.xml
 ```
+
+`wlr-output-power-management-unstable-v1.xml`, which wlopm and idle daemons use to turn monitors
+off and on, was vendored from the same upstream on 2026-10-08.
 
 The virtual pointer and virtual keyboard protocols are used only by the test client
 `tests/pointer_probe.c`. `virtual-keyboard-unstable-v1.xml` is the copy in the

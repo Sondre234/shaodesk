@@ -132,7 +132,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
     set(WLR_CLIENT_PROTOCOL_SOURCES)
     # wlroots implements the wlr protocols; shaodesk-window-control-v1 is the compositor's own.
     foreach(PROTOCOL wlr-layer-shell-unstable-v1 wlr-foreign-toplevel-management-unstable-v1
-            wlr-output-management-unstable-v1 shaodesk-window-control-v1)
+            wlr-output-management-unstable-v1 shaodesk-window-control-v1
+            wlr-output-power-management-unstable-v1)
         add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROTOCOL}-protocol.h
             COMMAND ${WAYLAND_SCANNER} server-header
             ${CMAKE_CURRENT_SOURCE_DIR}/protocols/${PROTOCOL}.xml
@@ -202,6 +203,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/lock.c
         src/compositor/output.c
         src/compositor/output_moves.c
+        src/compositor/output_power.c
         src/compositor/overview.c
         src/compositor/placement.c
         src/compositor/power.c

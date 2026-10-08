@@ -402,6 +402,11 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     server.output_manager = wlr_output_manager_v1_create(server.wl_display);
     add_listener(&server.output_manager->events.apply, &server.output_apply, output_config_apply);
     add_listener(&server.output_manager->events.test, &server.output_test, output_config_test);
+    // wlopm and idle daemons turn monitors off and on, keeping them in the layout.
+    struct wlr_output_power_manager_v1 *output_power =
+        wlr_output_power_manager_v1_create(server.wl_display);
+    add_listener(&output_power->events.set_mode, &server.output_power_set_mode,
+                 output_power_set_mode);
     struct wlr_idle_inhibit_manager_v1 *idle_inhibit =
         wlr_idle_inhibit_v1_create(server.wl_display);
     add_listener(&idle_inhibit->events.new_inhibitor, &server.new_inhibitor, server_new_inhibitor);
@@ -510,6 +515,7 @@ finish:
     wl_list_remove(&server.new_inhibitor.link);
     wl_list_remove(&server.output_apply.link);
     wl_list_remove(&server.output_test.link);
+    wl_list_remove(&server.output_power_set_mode.link);
 #if WLR_HAS_SESSION
     if (server.session)
         wl_list_remove(&server.session_active.link);
