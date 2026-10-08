@@ -603,6 +603,17 @@ int main(int argc, char **argv) {
                     mpv.width == 100 && mpv.height == 200 && mpv.floating == -1 && mpv.sticky,
                 "later rule did not override an earlier one");
         require(ruled.window_actions("kitty", "My Mail").empty(), "a rule matched the wrong window");
+        require(!mpv.no_shortcuts_inhibit && !pavu_c.no_shortcuts_inhibit,
+                "a rule without shortcuts_inhibit refused inhibitors");
+        // shortcuts_inhibit = false alone is a rule's action, which a later rule may undo.
+        auto inhibit = shaodesk::parse_config(
+            "return {windows={rules={{app_id='^remmina$',shortcuts_inhibit=false},"
+            "{app_id='^remmina$',title='^Trusted',shortcuts_inhibit=true}}}}");
+        require(!inhibit.window_actions("remmina", "Host").empty() &&
+                    inhibit.window_actions("remmina", "Host").to_c().no_shortcuts_inhibit &&
+                    !inhibit.window_actions("remmina", "Trusted host").to_c().no_shortcuts_inhibit &&
+                    inhibit.window_actions("kitty", "").empty(),
+                "shortcuts_inhibit rules mismatch");
         // Opacity: the first rule that sets it wins; action-only rules leave it alone.
         require(ruled.window_opacity("pavucontrol", "Volume", true) == 0.95F &&
                     ruled.window_opacity("mpv", "", true) == 0.5F,
@@ -626,6 +637,7 @@ int main(int argc, char **argv) {
         rejects("return {windows={rules={{app_id='x',floating='yes'}}}}");
         rejects("return {windows={rules={{app_id='x',focus=0}}}}");
         rejects("return {windows={rules={{app_id='x',sticky='yes'}}}}");
+        rejects("return {windows={rules={{app_id='x',shortcuts_inhibit=0}}}}");
         rejects("return {windows={rules={{app_id='x',fullscreen='true'}}}}");
         rejects("return {windows={rules={{app_id='x',workspace=5}}}}");
         rejects("return {windows={rules={{app_id='x',workspace=0}}}}");

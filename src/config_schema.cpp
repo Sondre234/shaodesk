@@ -347,6 +347,9 @@ const Option options[] = {
      "`false` opens the window without focusing it."},
     {"windows.rules[].sticky", "boolean", "unset", "", none, none,
      "Show on every workspace of its monitor."},
+    {"windows.rules[].shortcuts_inhibit", "boolean", "unset", "", none, none,
+     "`false` refuses the window's requests for the keys the bindings take (see "
+     "`keyboard.shortcuts_inhibit`)."},
 
     {"peek", "table", "", "", none, none,
      "Peek: `peek` (hold a key) and `peek_toggle` make every window nearly transparent to show "

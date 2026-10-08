@@ -63,6 +63,7 @@ struct Launcher {
 struct WindowActions {
     enum class Position { Unset, Center, At };
     std::optional<bool> floating, fullscreen, maximize, focus, sticky;
+    std::optional<bool> shortcuts_inhibit; // false: the window's inhibitors are refused
     std::optional<int> workspace;      // from 1
     std::optional<std::string> output; // connector, or "desc:" and the start of its description
     std::optional<std::pair<int, int>> size;

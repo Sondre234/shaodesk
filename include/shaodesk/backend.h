@@ -484,6 +484,7 @@ struct sh_window_rule {
     bool fullscreen, maximize;
     bool no_focus;
     bool sticky; /* only with features.sticky */
+    bool no_shortcuts_inhibit; /* shortcuts_inhibit = false: its inhibitors are refused */
 };
 
 /* What a key binding asks for besides its action (sh_callbacks.binding_flags). */

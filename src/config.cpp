@@ -753,6 +753,7 @@ WindowRule window_rule(lua_State *L, int workspaces) {
     actions.maximize = optional_boolean(L, "maximize");
     actions.focus = optional_boolean(L, "focus");
     actions.sticky = optional_boolean(L, "sticky");
+    actions.shortcuts_inhibit = optional_boolean(L, "shortcuts_inhibit");
     lua_getfield(L, -1, "workspace");
     bool has_workspace = !lua_isnil(L, -1);
     lua_pop(L, 1);
@@ -2148,7 +2149,7 @@ bool WindowRule::matches(const std::string &app_id, const std::string &title) co
 
 bool WindowActions::empty() const {
     return !floating && !fullscreen && !maximize && !focus && !sticky && !workspace && !output &&
-           !size && position == Position::Unset;
+           !size && position == Position::Unset && !shortcuts_inhibit;
 }
 
 void WindowActions::merge(const WindowActions &other) {
@@ -2156,7 +2157,8 @@ void WindowActions::merge(const WindowActions &other) {
                                   {&fullscreen, &other.fullscreen},
                                   {&maximize, &other.maximize},
                                   {&focus, &other.focus},
-                                  {&sticky, &other.sticky}})
+                                  {&sticky, &other.sticky},
+                                  {&shortcuts_inhibit, &other.shortcuts_inhibit}})
         if (*source)
             *target = *source;
     if (other.workspace)
@@ -2189,6 +2191,7 @@ sh_window_rule WindowActions::to_c() const {
     rule.maximize = maximize.value_or(false);
     rule.no_focus = !focus.value_or(true);
     rule.sticky = sticky.value_or(false);
+    rule.no_shortcuts_inhibit = !shortcuts_inhibit.value_or(true);
     return rule;
 }
 
