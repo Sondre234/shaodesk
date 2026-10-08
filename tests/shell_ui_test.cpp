@@ -9,6 +9,7 @@
 #include <QElapsedTimer>
 #include <QFile>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QImage>
 #include <QJSValue>
 #include <QLocalServer>
@@ -99,6 +100,14 @@ int main(int argc, char **argv) {
         otherFile.write("[Desktop Entry]\nType=Application\nName=Other app\nExec=true\n") < 0)
         return fail("could not write the other application");
     otherFile.close();
+    // One the menus leave out, whose icon its windows still get.
+    QFile hiddenFile(screens.filePath("data/applications/shaodesk-test-hidden.desktop"));
+    if (!hiddenFile.open(QIODevice::WriteOnly) ||
+        hiddenFile.write("[Desktop Entry]\nType=Application\nName=Hidden app\nExec=true\n"
+                         "NoDisplay=true\nIcon=shaodesk-hidden-icon\n"
+                         "StartupWMClass=HiddenThing\n") < 0)
+        return fail("could not write the hidden application");
+    hiddenFile.close();
     qputenv("XDG_DATA_HOME", screens.filePath("data").toLocal8Bit());
     qputenv("XDG_DATA_DIRS", screens.filePath("none").toLocal8Bit());
     qputenv("XDG_STATE_HOME", screens.filePath("state").toLocal8Bit());
@@ -258,10 +267,37 @@ int main(int argc, char **argv) {
     }
     // An application picks its own app ID: a path in it is no icon to load from disk.
     if (controller.iconFor("/etc/hostname") != "application-x-executable" ||
-        controller.iconFor("../../x") != "application-x-executable" ||
-        controller.iconFor("org.example.App") != "org.example.App") {
+        controller.iconFor("../../x") != "application-x-executable") {
         std::cerr << "a window's app ID can name a file for the icon\n";
         return 1;
+    }
+    // A window no installed application matches gets an icon the theme has by a name guessed
+    // from its app ID, else the generic one.
+    {
+        const auto theme = screens.filePath("data/icons/hicolor");
+        QDir().mkpath(theme + "/16x16/apps");
+        QFile index(theme + "/index.theme");
+        QImage picture(16, 16, QImage::Format_ARGB32);
+        picture.fill(Qt::red);
+        if (!index.open(QIODevice::WriteOnly) ||
+            index.write("[Icon Theme]\nName=Hicolor\nDirectories=16x16/apps\n\n"
+                        "[16x16/apps]\nSize=16\nType=Fixed\n") < 0 ||
+            !picture.save(theme + "/16x16/apps/shaodesk-guessed.png"))
+            return fail("could not write the icon theme");
+        index.close();
+        QIcon::setThemeSearchPaths({screens.filePath("data/icons")});
+        QIcon::setThemeName("hicolor");
+        if (controller.iconFor("Shaodesk-Guessed-1.2") != "shaodesk-guessed" ||
+            controller.iconFor("org.example.App") != "application-x-executable" ||
+            controller.iconFor("Fake") != "application-x-executable") {
+            std::cerr << "a window's icon is not guessed from its app ID\n";
+            return 1;
+        }
+        if (controller.iconFor("HiddenThing") != "shaodesk-hidden-icon" ||
+            !controller.appFor("HiddenThing").isEmpty()) {
+            std::cerr << "a window of an application the menus leave out has not its icon\n";
+            return 1;
+        }
     }
     // An application's desktop actions are listed in its entry's order with their icons, and run
     // as the application is started; a failure, or an action that is not there, shows across the

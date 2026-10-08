@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "controller.hpp"
+#include "icons.hpp"
 #include "preview.hpp"
 #include "version.h"
 #include "view.hpp"
@@ -93,6 +94,8 @@ int main(int argc, char **argv) {
                                                              "icons",
                                                              QStandardPaths::LocateDirectory));
         QIcon::setThemeName(parser.value("icon-theme"));
+    } else {
+        useDesktopIconTheme();
     }
     if (!parser.isSet("config"))
         parser.showHelp(1);

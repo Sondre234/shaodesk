@@ -20,8 +20,8 @@ Button {
     required property bool urgent
     // The panel it is on, whose menus and group list it opens.
     required property Item panel
-    // A window names its own app ID; a path in it is no icon to load from disk.
-    property string iconName: appId.indexOf("/") >= 0 ? "application-x-executable" : appId
+    // The icon of the application the window belongs to, else one guessed from its app ID.
+    property string iconName: shell.iconFor(appId)
     property TaskFilter group: null
     // Where the hover list finds the group's windows (see the panel's groupSlot).
     property string groupSlot: ""

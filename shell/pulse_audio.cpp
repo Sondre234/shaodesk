@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "app_match.hpp"
 #include "audio.hpp"
 #include <QIcon>
 #include <QTimer>
@@ -209,9 +210,12 @@ class PulseAudio : public Audio {
             name = QString::fromUtf8(info->name);
         self->pending_.state.streams.push_back(
             {info->index, name, {}, percent(info->volume), bool(info->mute), bool(info->corked)});
+        // Its program's name as a window's app id would give it: firefox-bin is firefox's.
+        const auto binary = propertyOf(info->proplist, PA_PROP_APPLICATION_PROCESS_BINARY);
         self->pending_.iconCandidates.push_back(
             {propertyOf(info->proplist, PA_PROP_APPLICATION_ICON_NAME),
-             propertyOf(info->proplist, PA_PROP_APPLICATION_PROCESS_BINARY), name.toLower()});
+             propertyOf(info->proplist, PA_PROP_APPLICATION_ID), binary,
+             app_match::trimmed(binary), name.toLower(), app_match::trimmed(name)});
         self->pending_.streamVolumes[info->index] = info->volume;
         self->pending_.processIds.push_back(
             propertyOf(info->proplist, PA_PROP_APPLICATION_PROCESS_ID).toInt());

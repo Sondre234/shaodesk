@@ -9,3 +9,11 @@ class Icons : public QQuickImageProvider {
     Icons() : QQuickImageProvider(QQuickImageProvider::Image) {}
     QImage requestImage(const QString &id, QSize *size, const QSize &requested) override;
 };
+
+// The icon theme the desktop names: GNOME's setting where the user set it (GNOME Settings,
+// gsettings, nwg-look), else GTK's settings.ini, else KDE's kdeglobals; empty when none does.
+QString desktopIconTheme();
+// Looks icons up in desktopIconTheme() when the platform names no theme but hicolor, as it
+// does without a platform theme such as qt6ct's or KDE's, and after the theme in a broad one
+// that is installed, so that generic names such as utilities-terminal find an icon.
+void useDesktopIconTheme();

@@ -157,8 +157,7 @@ Item {
                     objectName: "dockApp:" + appId
                     panel: dock.panel
                     readonly property var record: dock.panel.appRecord(appId)
-                    // A window names its own app ID; a path in it is no icon to load from disk.
-                    iconName: record ? record.icon : appId.indexOf("/") >= 0 ? "application-x-executable" : appId
+                    iconName: record ? record.icon : shell.iconFor(appId)
                     name: record ? record.name : appId || title
                     // A window without an app id stands alone.
                     windows: TaskFilter {

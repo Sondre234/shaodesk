@@ -43,6 +43,15 @@ shadows.
   Effects' `RectangularShadow`, new in 6.9.
 - Buttons, search fields, the crosses that close or clear things, and what an empty list says look
   the same everywhere, and a ring in the accent colour shows the button the keyboard is at.
+- Many more windows get their application's icon: the shell matches a window's app id to a
+  desktop entry in many more ways (versions as in `gimp-2.10`, `-bin` and `-desktop` suffixes,
+  the program an entry runs, reverse-DNS names either way, Steam games, NixOS wrappers,
+  AppImages, entries the menus leave out), and guesses an icon name when none matches. The
+  taskbar's window buttons and the dock's running applications now show the matched
+  application's icon rather than the one their app id names.
+- Icons follow the desktop's icon theme (GNOME's setting, GTK's `settings.ini` or KDE's
+  `kdeglobals`) when no Qt platform theme names one, rather than hicolor alone, and fall back to
+  Breeze, Adwaita or Papirus, so that generic icons are found.
 
 ### The taskbar
 
