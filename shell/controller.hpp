@@ -14,6 +14,7 @@
 #include "system_status.hpp"
 #include "task_model.hpp"
 #include "tray.hpp"
+#include "wifi.hpp"
 #include <QColor>
 #include <QHash>
 #include <QLocalSocket>
@@ -109,6 +110,9 @@ class ShellController : public QObject {
     Q_PROPERTY(Media *media READ media CONSTANT)
     // The power mode (power-profiles-daemon), which Quick Settings switches.
     Q_PROPERTY(PowerMode *powerMode READ powerMode CONSTANT)
+    // Wi-Fi and the connection out (NetworkManager), which Quick Settings and the network widget
+    // show and control.
+    Q_PROPERTY(Wifi *wifi READ wifi CONSTANT)
     // The notification daemon (cards, history, do-not-disturb) and the on-screen display.
     Q_PROPERTY(NotificationCenter *notifications READ notifications CONSTANT)
     Q_PROPERTY(Osd *osd READ osd CONSTANT)
@@ -240,6 +244,7 @@ class ShellController : public QObject {
     Backlight *backlight() { return &backlight_; }
     Media *media() { return media_.get(); }
     PowerMode *powerMode() { return powerMode_.get(); }
+    Wifi *wifi() { return wifi_.get(); }
     NotificationCenter *notifications() { return &notifications_; }
     Osd *osd() { return &osd_; }
     QString focusedOutput() const { return focusedOutput_; }
@@ -374,6 +379,7 @@ class ShellController : public QObject {
                          qEnvironmentVariableIsSet("SHAODESK_SYSFS") ? 100 : 0};
     std::unique_ptr<Media> media_ = makeMedia();
     std::unique_ptr<PowerMode> powerMode_ = makePowerMode();
+    std::unique_ptr<Wifi> wifi_ = makeWifi();
     QString focusedOutput_, cardsOutput_;
     QVariantMap keyboardLayout_;
     bool nightLight_ = false;

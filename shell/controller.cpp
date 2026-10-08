@@ -69,6 +69,7 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
     });
     connect(&backlight_, &Backlight::failed, this, &ShellController::report);
     connect(powerMode_.get(), &PowerMode::failed, this, &ShellController::report);
+    connect(wifi_.get(), &Wifi::failed, this, &ShellController::report);
 }
 ShellController::~ShellController() {
     delete engine_; // Before the objects its context refers to go away.
