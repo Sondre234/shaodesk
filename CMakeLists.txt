@@ -624,6 +624,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/pointer_gestures_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:input_probe>)
         set_tests_properties(pointer_gestures_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME touchpad_gestures_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/touchpad_gestures_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:input_probe>)
+        set_tests_properties(touchpad_gestures_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME spawn_at_pointer_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/spawn_at_pointer_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>)
