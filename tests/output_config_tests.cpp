@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Configuration of what a monitor shows: mirroring another one.
+// Configuration of what a monitor shows: mirroring another one, and the display_mode action.
 #include "shaodesk/config.hpp"
 #include <iostream>
 #include <stdexcept>
@@ -41,6 +41,24 @@ int main() {
         rejects("return {outputs={monitors={['HDMI-A-1']={mirror='HDMI-A-1'}}}}");
         rejects("return {outputs={monitors={['HDMI-A-1']={mirror=1}}}}");
         rejects("return {outputs={monitors={['HDMI-A-1']={mirror={'eDP-1'}}}}}");
+
+        // display_mode takes one of Win+P's choices, or none for the popup.
+        auto modes = shaodesk::parse_config(
+            "return {bindings={{key='XF86Display',action='display_mode'},"
+            "{mods={'Super'},key='F7',action='display_mode',mode='duplicate'},"
+            "{switch='lid',state='open',action='display_mode',mode='extend'}}}");
+        const auto &b = modes.bindings;
+        require(b.size() == 3 && b[0].action == SH_DISPLAY_MODE &&
+                    b[0].mode == SH_DISPLAY_MODE_STEP && b[1].mode == SH_DISPLAY_MODE_DUPLICATE &&
+                    b[2].mode == SH_DISPLAY_MODE_EXTEND,
+                "display_mode bindings not parsed");
+        require(shaodesk::parse_display_mode("internal") == SH_DISPLAY_MODE_INTERNAL &&
+                    shaodesk::parse_display_mode("external") == SH_DISPLAY_MODE_EXTERNAL,
+                "display modes by name");
+        require(shaodesk::parse_action("display_mode") == SH_DISPLAY_MODE, "display_mode action");
+        rejects("return {bindings={{key='p',action='display_mode',mode='mirror'}}}");
+        rejects("return {bindings={{key='p',action='display_mode',mode=2}}}");
+        rejects("return {bindings={{key='p',action='display_mode',output='eDP-1'}}}");
     } catch (const std::exception &error) {
         std::cerr << "output_config: " << error.what() << '\n';
         return 1;

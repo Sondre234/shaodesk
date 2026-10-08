@@ -344,7 +344,7 @@ struct Runtime {
             *argument = binding->amount;
         if (binding->action == SH_SWITCH_LAYOUT)
             *argument = binding->layout;
-        if (binding->action == SH_MODE)
+        if (binding->action == SH_MODE || binding->action == SH_DISPLAY_MODE)
             *argument = binding->mode;
         self.target = binding->output;
         self.flags = (binding->locked ? SH_BINDING_LOCKED : 0) |
@@ -373,7 +373,7 @@ struct Runtime {
             *argument = binding->amount;
         if (binding->action == SH_SWITCH_LAYOUT)
             *argument = binding->layout;
-        if (binding->action == SH_MODE)
+        if (binding->action == SH_MODE || binding->action == SH_DISPLAY_MODE)
             *argument = binding->mode;
         self.target = binding->output;
         return binding->action;
@@ -391,14 +391,16 @@ struct Runtime {
             *argument = binding->amount;
         if (binding->action == SH_SWITCH_LAYOUT)
             *argument = binding->layout;
+        if (binding->action == SH_DISPLAY_MODE)
+            *argument = binding->mode;
         self.target = binding->output;
         return binding->action;
     }
     /* Control requests: "<action> [workspace]", "screenshot [region|output|window]",
      * "resize_<direction> [pixels]", "volume_up|volume_down|brightness_up|brightness_down
      * [percent]", "switcher_confirm [N]", "switch_layout [next|prev|N]", "mode NAME|default",
-     * "display_off [OUTPUT]" (and on, toggle), "profile NAME|next|prev", or
-     * "spawn PROGRAM [ARGS...]". */
+     * "display_off [OUTPUT]" (and on, toggle), "display_mode [extend|duplicate|internal|
+     * external]", "profile NAME|next|prev", or "spawn PROGRAM [ARGS...]". */
     static sh_action command(void *data, const char *request, int *argument, char *error,
                              size_t error_size) {
         auto &self = *static_cast<Runtime *>(data);
@@ -448,6 +450,12 @@ struct Runtime {
                     throw std::runtime_error(words[0] + " takes a monitor's connector name, or "
                                                         "none for every monitor");
                 self.target = target;
+            } else if (action == SH_DISPLAY_MODE) {
+                if (words.size() > 2)
+                    throw std::runtime_error("display_mode takes one mode: extend, duplicate, "
+                                             "internal or external; none for the popup");
+                *argument = words.size() == 2 ? shaodesk::parse_display_mode(words[1])
+                                              : SH_DISPLAY_MODE_STEP;
             } else if (action == SH_SCREENSHOT) {
                 if (words.size() > 2)
                     throw std::runtime_error(

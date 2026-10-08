@@ -1187,6 +1187,35 @@ mirror costs little, and nothing while the picture stands still. Closing a lapto
 another monitor mirrors its panel turns the panel off as in [clamshell mode](#the-laptop-lid),
 and the other monitor then shows the desktop itself.
 
+### Display modes (Win + P)
+
+The `display_mode` action sets the monitors up as Windows' Win + P does: `extend` puts every
+connected monitor in the layout, `duplicate` has the others mirror the main monitor, `internal`
+keeps the main monitor alone (Windows' "PC screen only") and `external` every monitor but it
+("Second screen only"). The main monitor is a laptop's built-in panel; on a machine without one,
+the primary monitor (`outputs.primary`, else the first connected one in `outputs.order`, else the
+first by connector name). A choice keeps each monitor's mode, scale and position, and lasts until
+the configuration is reloaded, as wlr-output-management changes do. With one monitor connected,
+only `extend` can be had.
+
+XF86Display, the key a laptop sends for Fn and its display key, runs `display_mode` without a
+choice: a popup on the focused monitor shows the four with the one in force selected, each
+further press moves the selection on, and a second and a half after the last press the selected
+one is taken. While the popup is open the arrow keys move the selection, Return takes it at once
+and Escape closes the popup without changing anything; a click takes a choice too. Win + P
+itself opens the command palette.
+
+```lua
+bindings = {
+    { mods = {}, key = "XF86Display", action = "display_mode" },
+    { mods = { "Super", "Ctrl" }, key = "p", action = "display_mode", mode = "duplicate" },
+},
+```
+
+`shaodesk msg display_mode duplicate` picks one from a script (and says why it cannot, with one
+monitor), and `shaodesk msg get display_mode` prints the choice in force and, while the popup is
+open, the one it shows and its monitor (`-` for both while it is closed).
+
 ### Turning monitors off
 
 A monitor can also be turned off without leaving the layout: it keeps its place, its windows,

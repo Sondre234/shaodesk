@@ -538,7 +538,9 @@ const Option options[] = {
      "description; without one, every monitor."},
     {"bindings[].mode", "enum", "\"region\"", "", none, none,
      "With `screenshot`: `\"region\"`, `\"output\"`, or `\"window\"`. With `mode` (required): "
-     "`\"default\"` or the name of one of `modes`."},
+     "`\"default\"` or the name of one of `modes`. With `display_mode`: `\"extend\"`, "
+     "`\"duplicate\"`, `\"internal\"` or `\"external\"`; without one, the popup that steps "
+     "through them."},
     {"bindings[].amount", "integer", "40; 5 for volume and brightness", "", 1, 4000,
      "With `resize_*`: pixels moved per press. With `volume_up`, `volume_down`, `brightness_up` "
      "and `brightness_down`: percent per press, up to 100."},
