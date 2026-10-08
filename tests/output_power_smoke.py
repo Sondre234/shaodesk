@@ -165,4 +165,24 @@ with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) a
                                   '["HEADLESS-2"] = { enabled = false }'))
     assert outputs()["HEADLESS-2"][::5] == (False, "off"), outputs()
     assert power("list") == ["HEADLESS-1", "on"]
+
+# Unplugged while off, a monitor's windows move to another as they would otherwise, and they return
+# with it, on.
+with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) as desktop:
+    msg, wait_for = desktop.msg, desktop.wait_for
+
+    def placed():
+        """(output, power of its monitor) per window."""
+        power = {r[0]: r[10] for r in desktop.rows("outputs")}
+        return [(r[10], power.get(r[10])) for r in desktop.rows("windows")]
+
+    msg("output", "HEADLESS-2", "workspace", "1")
+    desktop.spawn([probe, "--window-only"])
+    wait_for(lambda: placed() == [("HEADLESS-2", "on")], "the window opened on HEADLESS-2")
+    msg("display_off", "HEADLESS-2")
+    assert placed() == [("HEADLESS-2", "off")], placed()
+    msg("headless_output", "remove", "HEADLESS-2")
+    wait_for(lambda: placed() == [("HEADLESS-1", "on")], "the window moved to HEADLESS-1")
+    msg("headless_output", "add", "HEADLESS-2")
+    wait_for(lambda: placed() == [("HEADLESS-2", "on")], "the window returned with HEADLESS-2")
 print("Monitors turned off and on through wlr-output-power-management keep their place")
