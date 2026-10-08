@@ -250,6 +250,16 @@ The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `t
 `power.cpp`, `palette.cpp`. `preview.cpp` has stand-ins for all of them for
 `--preview-popup`.
 
+A window is known by its app id alone. `app_match.cpp` finds the desktop entry it belongs to: an
+`app_match::Index` of the entries, which `refreshApps` builds, tries each way of matching from the
+most exact down, each against every entry before the next, and `ShellController::appFor` keeps
+what it found for each app id until the entries change. `iconFor` gives the entry's icon, else
+that of an entry the menus leave out (a second index), else the first of `iconGuesses` the icon
+theme has. QML names a window's icon through `shell.iconFor(appId)`, never by its app id, which
+may be a path. `icons.cpp` serves `image://icons/NAME` and, at startup, picks the icon theme the
+desktop names when no platform theme does (`useDesktopIconTheme`). `tests/app_icons_test.cpp`
+tests both with real applications' entries and app ids.
+
 The pictures of the windows on the taskbar's card (`WindowThumbnails.qml`, with `shell.thumbnails`)
 are `TaskModel`'s: its `picture` role is `image://windows/<taskId>/<serial>` once a window has one,
 `""` until then, the serial new with every picture so that an `Image` with `cache: false` loads it
