@@ -1310,7 +1310,11 @@ name with `notifyd`, `notificationd`, `notification-daemon` or `notification-cen
 (xfce4-notifyd, lxqt-notificationd, mate-notification-daemon) are notification daemons; snixembed,
 status-notifier-watcher and the indicator-application-service of Ayatana and Ubuntu are tray
 watchers. xembedsniproxy, which shows the old X11 tray icons through the shell's watcher, is
-started.
+started. Another polkit authentication agent is skipped while the shell's is on
+(`shell.polkit_agent`, see [Administrator passwords](#administrator-passwords)): any program or
+file name with `polkit` or `policykit` in it (polkit-gnome-authentication-agent-1,
+polkit-kde-authentication-agent-1, lxpolkit, lxqt-policykit-agent, mate-polkit, xfce-polkit,
+hyprpolkitagent), and soteria.
 
 ```lua
 autostart = {
@@ -1464,6 +1468,32 @@ power = {
     countdown = 5,         -- the confirmation's seconds
 },
 ```
+
+## Administrator passwords
+
+The shell is the session's polkit authentication agent, as KDE's and GNOME's are. When a program
+asks polkit for something only an administrator may do (`pkexec`, GParted, an updater, a disk
+tool, or powering off while others are logged in, which logind answers with `challenge`), a
+dialog in the middle of the focused monitor says what is asked (polkit's message, and the command
+`pkexec` would run), names the user to answer as, or lists them to choose from when several may
+(the one logged in chosen first, else root), and asks for that user's password. Enter or
+Authenticate answers, Up and Down choose another user, Escape or Cancel gives the request up, and
+a click beside the dialog does nothing, so that a stray click loses no typing. A wrong password
+shakes the dialog and asks again. A request that comes while one is open waits its turn, and one
+its program gives up closes. The password goes to polkit's own helper (`polkit-agent-helper-1`),
+which checks it with PAM.
+
+Only the shell of a standalone session is the agent, for its login session; a nested one leaves
+that to the host's. When another agent serves the session already (polkit-gnome started by hand,
+say), the shell says so in the log and stays out of its way; the XDG autostart of a standalone
+session leaves other agents out while the shell's is on (see
+[Starting the session](#starting-the-session)). `shell = { polkit_agent = false }` leaves it to
+another agent, and a reload follows the setting. The agent needs libpolkit-agent-1 at build time;
+without it (or with `-DSHAODESK_POLKIT=OFF`) the shell builds without it.
+
+The tests run the agent against a stand-in for polkitd on a private bus (`shell_polkit_agent`),
+and the dialog in its view (`shell_auth_dialog`) and its model (`shell_authentication`) with
+stand-ins for polkit's helper; none of them reaches the machine's polkit.
 
 ## Screenshots and screen sharing
 

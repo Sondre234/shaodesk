@@ -221,6 +221,8 @@ return {
         -- icons_only = true, -- taskbar buttons as small icons; false adds each window's title
         -- group_windows = true, -- one button per application, its windows listed on hover;
         --                          false gives every window its own button
+        -- polkit_agent = true, -- ask for administrator passwords (pkexec, GParted); false
+        --                         leaves that to another polkit agent
         -- Resting the pointer on a window's taskbar button shows a small picture of it (a stack's
         -- of each of its windows); the macOS style's dock lists them by name instead:
         -- thumbnails = {

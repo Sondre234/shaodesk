@@ -271,6 +271,18 @@ what was there.
 | `AuthDialog.qml` | The polkit authentication dialog (`shell.authentication`), an overlay surface of its own: the request, the user to answer as, the password. |
 | `SwitcherCards.qml` | The switcher's windows as cards with their pictures, in rows, with `shell.thumbnails` outside the macOS style. |
 
+The authentication dialog's model is `Authentication` (`authentication.cpp`): polkit's requests,
+one at a time, each answered through an `AuthConversation` for the chosen user. The agent
+(`polkit_agent.cpp`, with `SHAODESK_POLKIT`) is a `PolkitAgentListener` subclass registered for
+the session's `unix-session` subject, whose requests it hands to the model, and whose
+conversations are polkit's `PolkitAgentSession`s; it completes polkit's `GTask` as the model is
+done with a request, and withdraws one when polkit cancels it (from a queued call, as completing
+disconnects the cancellable's handler, which would wait for itself). libpolkit-agent-1 is
+GObject's and runs on the thread-default GLib main context, which Qt's event loop on Linux is
+(`QEventDispatcherGlib`); the agent checks that before it registers. The compositor marks the
+shell of a login session with `SHAODESK_POLKIT_AGENT=1`, and only that one registers, so no test
+reaches the machine's polkit. `tests/fake_polkitd.c` stands in for polkitd on a private bus.
+
 The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `task_filter.cpp`
 (the taskbar's slots and groups), `audio.cpp` with `pulse_audio.cpp`, `system_status.cpp`
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,

@@ -44,6 +44,8 @@ you save it.
 - **Power controls** through logind (systemd-logind or elogind): lock, suspend, hibernate,
   restart, power off and log out, locking before any sleep and closing windows first so that
   applications can save.
+- **Administrator passwords:** the shell is the session's polkit agent, so `pkexec`, GParted and
+  updaters ask for a password in a dialog of their own.
 - **Effects:** interruptible animations with spring curves, dimming of inactive windows, peek,
   night light, a magnifier, and hot corners.
 - **Lua configuration** that is validated with file and line, reloads on save, can extend
