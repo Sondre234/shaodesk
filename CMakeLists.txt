@@ -67,7 +67,7 @@ if(BUILD_TESTING)
     add_executable(config_robustness_tests tests/config_robustness_tests.cpp)
     target_link_libraries(config_robustness_tests PRIVATE shaodesk_config)
     add_test(NAME config_robustness COMMAND config_robustness_tests ${EXAMPLE_CONFIG})
-    set_tests_properties(config_robustness PROPERTIES TIMEOUT 120)
+    set_tests_properties(config_robustness PROPERTIES TIMEOUT 900)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
     add_test(NAME docs_consistency COMMAND ${Python3_EXECUTABLE}
              ${CMAKE_CURRENT_SOURCE_DIR}/tests/docs_consistency.py ${CMAKE_CURRENT_SOURCE_DIR})

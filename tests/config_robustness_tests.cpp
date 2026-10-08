@@ -10,6 +10,20 @@
 #include <stdexcept>
 #include <string>
 
+// The mutation fuzz's time limit, which catches parsing that turns slow (quadratic or worse). The
+// sanitizers' build unwinds the stack on every allocation for its leak reports and runs dozens of
+// times slower, so it gets room for that; the normal build checks the speed.
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define SHAODESK_ASAN 1
+#endif
+#endif
+#if defined(__SANITIZE_ADDRESS__) || defined(SHAODESK_ASAN)
+constexpr auto parse_budget = std::chrono::seconds(600);
+#else
+constexpr auto parse_budget = std::chrono::seconds(60);
+#endif
+
 namespace {
 void require(bool condition, const char *message) {
     if (!condition)
@@ -97,7 +111,7 @@ int main(int argc, char **argv) {
             (parses(mutant) ? accepted : rejected)++;
         }
         require(rejected > 0, "mutations should break some configurations");
-        require(std::chrono::steady_clock::now() - start < std::chrono::seconds(60),
+        require(std::chrono::steady_clock::now() - start < parse_budget,
                 "mutated configurations parsed too slowly");
         std::cout << "Configuration robustness passed (" << accepted << " mutants accepted, "
                   << rejected << " rejected)\n";
