@@ -528,6 +528,16 @@ quarter, and `maximize` fills it; `restore` gives a snapped or maximized window 
 place back. Snapping a window to the half it is in already moves it to the near half of the next
 monitor that way. These float a tile, as dragging one does.
 
+`snap_cycle_left`, `snap_cycle_right`, `snap_cycle_up` and `snap_cycle_down` step the focused
+window as Windows' Win + arrows do. Left and right put a window at its own size or maximized
+into that half; from the other half they give it its own size back, and from that half they move
+it on to the next monitor that way, into the half facing back (where there is none, nothing
+happens). Up maximizes a window at its own size, and down minimizes it; down gives a maximized
+window its own size back. Up and down take a half to its top or bottom quarter and a quarter
+back to its half; up from a top quarter maximizes, and down from a bottom quarter minimizes.
+Left and right keep a quarter in its row, moving it on to the next monitor from its own side. A
+fullscreen window leaves fullscreen first, and a tile counts as a window at its own size.
+
 `windows.snap = { enabled = false }` turns snapping by dragging off, the top edge too;
 `corners = false` leaves the corners to the side edges; `preview = false` snaps without the
 preview. `shaodesk msg get snap` says which zone the pointer is in while a window is moved, the

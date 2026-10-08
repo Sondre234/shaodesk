@@ -995,6 +995,7 @@ const char *snap_zone_name(enum sh_action zone);
 void snap_follow(struct sh_server *server);
 bool snap_drop(struct sh_server *server);
 void snap_preview_hide(struct sh_server *server);
+void snap_cycle(struct sh_server *server, enum sh_action direction);
 
 /* swallow.c */
 struct sh_toplevel *swallow_host(struct sh_toplevel *child, bool terminals_only);

@@ -305,6 +305,12 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
         if (current)
             set_floating(current, current->tiled, true);
         break;
+    case SH_SNAP_CYCLE_LEFT:
+    case SH_SNAP_CYCLE_RIGHT:
+    case SH_SNAP_CYCLE_UP:
+    case SH_SNAP_CYCLE_DOWN:
+        snap_cycle(server, action);
+        break;
     default:
         arrange_windows(server, action);
         break;
