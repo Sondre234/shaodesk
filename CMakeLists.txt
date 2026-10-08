@@ -335,6 +335,15 @@ if(SHAODESK_BUILD_COMPOSITOR)
             COMMAND ${WAYLAND_SCANNER} private-code ${ACTIVATION_XML}
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-activation-v1-protocol.c
             DEPENDS ${ACTIVATION_XML})
+        set(TOPLEVEL_ICON_XML ${PROTOCOL_DIR}/staging/xdg-toplevel-icon/xdg-toplevel-icon-v1.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header ${TOPLEVEL_ICON_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-client-protocol.h
+            DEPENDS ${TOPLEVEL_ICON_XML})
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code ${TOPLEVEL_ICON_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-protocol.c
+            DEPENDS ${TOPLEVEL_ICON_XML})
         set(DECORATION_XML ${PROTOCOL_DIR}/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml)
         add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xdg-decoration-unstable-v1-client-protocol.h
             COMMAND ${WAYLAND_SCANNER} client-header ${DECORATION_XML}
@@ -351,6 +360,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-activation-v1-protocol.c
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-decoration-unstable-v1-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-decoration-unstable-v1-protocol.c
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-protocol.c
             ${WLR_CLIENT_PROTOCOL_SOURCES})
         target_include_directories(wayland_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
         target_link_libraries(wayland_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
