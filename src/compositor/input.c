@@ -26,7 +26,7 @@ static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) 
 static int keyboard_repeat(void *data) {
     struct sh_keyboard *keyboard = data;
     struct sh_server *server = keyboard->server;
-    if (server->locked)
+    if (server->locked && !keyboard->repeat_locked)
         return 0;
     run_action(server, keyboard->repeat_action, keyboard->repeat_argument);
     int rate = keyboard->wlr_keyboard->repeat_info.rate;
@@ -419,6 +419,27 @@ static unsigned vt_for_key(uint32_t modifiers, xkb_keysym_t sym) {
 }
 #endif
 
+/* The sh_binding_flag bits of the binding the key callback returned last. */
+static unsigned binding_flags(struct sh_server *server) {
+    return server->callbacks->binding_flags
+               ? server->callbacks->binding_flags(server->callbacks->userdata)
+               : 0;
+}
+
+/* A binding with `repeats` runs its action again while its key is held, after the keyboard's
+ * repeat delay and at its rate. */
+static void start_repeat(struct sh_keyboard *keyboard, uint32_t keycode, enum sh_action action,
+                         int argument, unsigned flags) {
+    if (!(flags & SH_BINDING_REPEATS) || keyboard->wlr_keyboard->repeat_info.rate <= 0 ||
+        !keyboard->repeat_timer)
+        return;
+    keyboard->repeat_keycode = keycode;
+    keyboard->repeat_action = action;
+    keyboard->repeat_argument = argument;
+    keyboard->repeat_locked = flags & SH_BINDING_LOCKED;
+    wl_event_source_timer_update(keyboard->repeat_timer, keyboard->wlr_keyboard->repeat_info.delay);
+}
+
 static bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, uint32_t modifiers,
                               xkb_keysym_t sym) {
     struct sh_server *server = keyboard->server;
@@ -429,8 +450,19 @@ static bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, ui
         return true;
     }
 #endif
-    if (server->locked)
-        return false; // Every other key belongs to the lock screen.
+    if (server->locked) {
+        // Every other key belongs to the lock screen: only bindings marked `locked` run, such as
+        // the volume keys.
+        int argument = 0;
+        enum sh_action action =
+            server->callbacks->key(server->callbacks->userdata, modifiers, sym, &argument);
+        unsigned flags = action != SH_NONE ? binding_flags(server) : 0;
+        if (!(flags & SH_BINDING_LOCKED))
+            return false;
+        run_action(server, action, argument);
+        start_repeat(keyboard, keycode, action, argument, flags);
+        return true;
+    }
     if (server->switcher.open) {
         switcher_key(server, modifiers, sym);
         return true;
@@ -471,15 +503,8 @@ static bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, ui
                       xkb_keysym_to_lower(sym));
         return true;
     }
+    unsigned flags = binding_flags(server);
     run_action(server, action, argument);
-    int rate = keyboard->wlr_keyboard->repeat_info.rate;
-    if (action >= SH_RESIZE_LEFT && action <= SH_RESIZE_DOWN && rate > 0 &&
-        keyboard->repeat_timer) {
-        keyboard->repeat_keycode = keycode;
-        keyboard->repeat_action = action;
-        keyboard->repeat_argument = argument;
-        wl_event_source_timer_update(keyboard->repeat_timer,
-                                     keyboard->wlr_keyboard->repeat_info.delay);
-    }
+    start_repeat(keyboard, keycode, action, argument, flags);
     return true;
 }

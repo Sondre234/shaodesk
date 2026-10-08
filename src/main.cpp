@@ -241,6 +241,7 @@ struct Runtime {
     // The running screenshot script; another request is refused until it exits.
     pid_t screenshot_pid = -1;
     std::string target{}; // the output target of the action last resolved
+    unsigned flags = 0;   // the sh_binding_flag bits of the key binding last resolved
     shaodesk::Command program{}; // the program of the spawn action last resolved
     bool watch = false; // whether saving a configuration file reloads (off in headless tests)
     int watch_fd = -1;
@@ -314,8 +315,11 @@ struct Runtime {
         if (binding->action == SH_SWITCH_LAYOUT)
             *argument = binding->layout;
         self.target = binding->output;
+        self.flags = (binding->locked ? SH_BINDING_LOCKED : 0) |
+                     (binding->repeats ? SH_BINDING_REPEATS : 0);
         return binding->action;
     }
+    static unsigned binding_flags(void *data) { return static_cast<Runtime *>(data)->flags; }
     static sh_action button(void *data, uint32_t modifiers, uint32_t button,
                             sh_pointer_target target, const char *app_id, int *argument) {
         auto &self = *static_cast<Runtime *>(data);
@@ -871,7 +875,7 @@ int main(int argc, char **argv) {
             Runtime::command,   Runtime::reload,   Runtime::startup,      Runtime::child_exited,
             Runtime::opacity,   Runtime::screenshot, Runtime::window_rule,
             Runtime::hot_corner, Runtime::action_target, Runtime::config_watch,
-            Runtime::config_changed, Runtime::lock, Runtime::launch};
+            Runtime::config_changed, Runtime::lock, Runtime::launch, Runtime::binding_flags};
         int result = sh_run(&callbacks, mode);
         if (runtime.shell_pid > 0)
             kill(runtime.shell_pid, SIGTERM);
