@@ -19,7 +19,7 @@ covers branches, building, testing and committing; [features.md](features.md) de
 | Where | Language | What |
 | --- | --- | --- |
 | `src/compositor/` | C | The compositor proper, on wlroots. Shares one private header, `server.h`. |
-| `src/*.c`, `include/shaodesk/*.h` | C | Pieces the compositor uses that stand on their own: animations, window controls, shadows and tab strips (pixels), effect arithmetic, overview thumbnails, session files, the logind client. Several are unit tested. |
+| `src/*.c`, `include/shaodesk/*.h` | C | Pieces the compositor uses that stand on their own: animations, window controls, shadows and tab strips (pixels), effect arithmetic, touchpad swipes' arithmetic, overview thumbnails, session files, the logind client. Several are unit tested. |
 | `src/config.cpp`, `src/config_schema.cpp` | C++ | The Lua configuration: parsing, validation, the action table and the settings schema. |
 | `src/tiling.cpp`, `src/layout.cpp`, `src/window_placement.cpp`, `src/overview_layout.cpp` | C++ | Pure geometry (tiling layouts, snapping, placement, the overview grid), with a C interface in `backend.h` and unit tests. |
 | `src/import/` | C++ | `shaodesk import` from Hyprland and Waybar. |
@@ -44,7 +44,7 @@ all. In short:
 | `input.c` | Keyboards, key bindings, pointers' libinput settings, virtual devices, selection and drag-and-drop. |
 | `keymap.c` | The keymap from the keyboard settings, given to every keyboard but virtual ones. |
 | `cursor.c` | What is under the pointer, focus on hover, button bindings, scrolling, the cursor image. |
-| `gestures.c` | Touchpad gestures: swipes, pinches and holds passed on to the surface under the pointer (pointer-gestures-unstable-v1). |
+| `gestures.c` | Touchpad gestures: the swipes `gestures` takes (workspaces and the overview following the fingers, requests), and the rest passed on to the surface under the pointer (pointer-gestures-unstable-v1). |
 | `grab.c` | Moving and resizing with the pointer, magnetic edges, dropping. |
 | `focus.c` | Keyboard focus and urgent windows. |
 | `toplevel.c` | Windows: xdg-shell toplevels and popups, opening by window rules, maximize, fullscreen, minimize. |
@@ -191,6 +191,29 @@ is read again. `send_window` sends `icon` (the name, or null) and `icon_image` t
 libwayland sends a copy of it, so the compositor closes its own at once. `shaodesk msg get
 window_icons` lists each window's number, app id and icon's name and size, and
 `tests/window_icon_smoke.py` tests them.
+
+### Touchpad swipes
+
+`gestures.c` hears the cursor's swipes. One of as many fingers as a swipe of `gestures` has waits
+(`SH_SWIPE_WAITING`) until `src/swipe.c` gives it a direction, past `SH_SWIPE_THRESHOLD` of
+travel along the axis it went most; a direction no swipe has hands it to the window under the
+pointer, which hears its begin and the travel so far at once. `swipe.c` also measures how far
+along a step the fingers are (`gestures.distance` a step), their speed over the last 80 ms before
+they lift, and whether that finishes the step (`sh_swipe_finishes`: past half way, or a flick
+toward it; never a flick away). `tests/swipe_tests.cpp` tests it.
+
+Workspaces follow the fingers through the slide `switch_workspace` plays, held at the fingers'
+progress instead of the clock: `workspace_swipe_hold` (`workspace.c`) holds each window of the
+output's workspace with `sh_anim_hold` (`animation.c`), its `content` offset and its buffers
+faded as far as the slide would have them, and the windows of the workspace it heads for, hidden
+still, as held copies of their buffers (`sh_anim_hold_copy`). A held animation lies outside the
+animator's running list, so neither the clock, a late frame nor turning animations off moves it,
+and each frame lays the hold again over what a client drew. `workspace_swipe_end` either switches
+(the leaving windows going on as copies with `sh_anim_slide_away`, the arriving ones taking over
+from their copies with `sh_anim_slide_from`, each in what remains of the slide's time) or slides
+everything back. The overview follows them through `overview_hold` and `overview_release`, which
+set its `progress` in place of its timer's. `tests/touchpad_gestures_smoke.py` drives all of it
+with a headless pointer, at the event times it gives.
 
 ## The shell (`shell/`)
 

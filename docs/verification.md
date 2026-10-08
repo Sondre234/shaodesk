@@ -585,5 +585,16 @@ Once the compositor offered the gestures, `tray_smoke` found the tray deaf to th
 then takes the seat's pointer for a touchpad, and a `WheelHandler` hears only mice by default.
 Every one in the shell now takes both.
 
-Not checked: a real touchpad through libinput, and real applications' use of the gestures
-(pinch-zoom in Firefox and Chromium, a hold stopping kinetic scrolling, GTK's gestures).
+The swipes the compositor takes have unit tests of their arithmetic (`swipe`: direction, progress,
+speed across libinput's 32-bit times, finishing and flicks), of the held slide (`animation`:
+holds that time and a late frame leave alone, copies of hidden windows, sliding on from either)
+and of the settings (`input_config`). `touchpad_gestures_smoke` drives them with event times of
+its own: the slide held at the fingers' progress (`get gesture`), finishing past half way and
+with a flick, going back when short, flicked back or cancelled and at the last workspace, the
+overview opening and closing with the fingers, a short swipe and an unbound direction reaching the
+window from their beginning, a request, inversion, and gestures turned off.
+
+Not checked: a real touchpad through libinput (its units and speeds, against the default distance
+of 300 and the flick at 0.5 a millisecond), how the slide held under the fingers looks on a real
+display at 144 or 200 Hz, and real applications' use of the gestures (pinch-zoom in Firefox and
+Chromium, a hold stopping kinetic scrolling, GTK's gestures).
