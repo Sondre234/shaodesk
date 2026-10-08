@@ -1456,6 +1456,11 @@ bindings = {
 monitor), and `shaodesk msg get display_mode` prints the choice in force and, while the popup is
 open, the one it shows and its monitor (`-` for both while it is closed).
 
+### Display settings
+
+The `display_settings` action asks the shell for its display settings window, on the monitor
+under the pointer.
+
 ### Turning monitors off
 
 A monitor can also be turned off without leaving the layout: it keeps its place, its windows,

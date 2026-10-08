@@ -214,6 +214,8 @@ enum sh_action {
      * panel alone or the other monitors alone (enum sh_display_mode); without one, a popup that
      * steps through the four. */
     SH_DISPLAY_MODE,
+    /* Asks the shell for its display settings window on the output under the pointer. */
+    SH_DISPLAY_SETTINGS,
 };
 
 /* The display_mode action's choices. */
