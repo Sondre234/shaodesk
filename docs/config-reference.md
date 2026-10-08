@@ -303,6 +303,14 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | --- | --- | --- | --- | --- |
 | `startup` | list of commands | unset | - | Commands started once when the compositor starts (not on reload), at most 32; each is an argument list, e.g. `{ { "kitty" } }`. |
 
+## `autostart`
+
+| Setting | Type | Default | Range | Description |
+| --- | --- | --- | --- | --- |
+| `autostart` | table | - | - | XDG autostart: the desktop entries applications put in `~/.config/autostart` and `/etc/xdg/autostart` to start at login. A standalone session (`--session`) starts them after `startup`; a nested one leaves them to the host, which has started them already. `shaodesk msg get autostart` lists what was started or skipped, and why. |
+| `autostart.xdg` | boolean | true | - | Start the autostart entries. |
+| `autostart.exclude` | list of strings | unset | - | File names of autostart entries never to start, at most 128, whichever directory holds them. |
+
 ## `shell`
 
 | Setting | Type | Default | Range | Description |

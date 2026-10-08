@@ -151,6 +151,12 @@ struct NotificationsConfig {
     int history = 100;       // notifications kept in the history popover
 };
 
+// Lua `autostart`: the XDG autostart entries a standalone session starts after `startup`.
+struct AutostartConfig {
+    bool xdg = true;                  // start them
+    std::vector<std::string> exclude; // their file names ("foo.desktop") never started
+};
+
 struct OsdConfig {
     bool enabled = true;      // the on-screen display for volume, brightness and `shaodesk msg osd`
     bool top = false;         // position = "top": near the top edge instead of the bottom
@@ -285,6 +291,7 @@ struct Config {
     std::array<std::string, 4> hot_corners;
     std::vector<Binding> bindings;
     std::vector<Command> startup;
+    AutostartConfig autostart;
     // The terminal the `terminal` action opens; empty: $TERMINAL or the first one installed.
     Command terminal;
     ShellConfig shell;

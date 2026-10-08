@@ -2,6 +2,7 @@
 // XDG autostart: splitting Exec, which entries are started and why the others are not, which
 // directory's file counts, and the entries for what the shell provides itself.
 #include "shaodesk/autostart.hpp"
+#include "shaodesk/config.hpp"
 
 #include <cstdlib>
 #include <fstream>
@@ -31,6 +32,14 @@ static void splits(const std::string &exec, const Words &expected) {
 static void broken(const std::string &exec) {
     auto words = shaodesk::parse_exec(exec);
     require(!words, "Exec=" + exec + " should not split, but gave " + show(words));
+}
+static void rejects(const std::string &source) {
+    try {
+        (void)shaodesk::parse_config(source);
+    } catch (const std::exception &) {
+        return;
+    }
+    throw std::runtime_error("invalid configuration was accepted: " + source);
 }
 static void write(const fs::path &path, const std::string &text) {
     fs::create_directories(path.parent_path());
@@ -203,6 +212,23 @@ int main() {
                 "directories by default");
         setenv("XDG_CURRENT_DESKTOP", "shaodesk:wlroots", 1);
         require(shaodesk::current_desktops() == Words{"shaodesk", "wlroots"}, "desktops");
+
+        // The settings.
+        auto defaults = shaodesk::parse_config("return {}");
+        require(defaults.autostart.xdg && defaults.autostart.exclude.empty(), "defaults");
+        auto custom = shaodesk::parse_config(
+            "return {autostart={xdg=false,exclude={'a.desktop','org.b.c.desktop'}}}");
+        require(!custom.autostart.xdg &&
+                    custom.autostart.exclude == Words{"a.desktop", "org.b.c.desktop"},
+                "autostart not parsed");
+        rejects("return {autostart=true}");
+        rejects("return {autostart={xdg='yes'}}");
+        rejects("return {autostart={exclude='a.desktop'}}");
+        rejects("return {autostart={exclude={'a'}}}");
+        rejects("return {autostart={exclude={'.desktop'}}}");
+        rejects("return {autostart={exclude={'/etc/xdg/autostart/a.desktop'}}}");
+        rejects("return {autostart={exclude={1}}}");
+        rejects("return {autostart={xdgs=true}}");
         std::cout << "autostart passed\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';

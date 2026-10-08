@@ -517,6 +517,17 @@ const Option options[] = {
      "Commands started once when the compositor starts (not on reload), at most 32; each is "
      "an argument list, e.g. `{ { \"kitty\" } }`."},
 
+    {"autostart", "table", "", "", none, none,
+     "XDG autostart: the desktop entries applications put in `~/.config/autostart` and "
+     "`/etc/xdg/autostart` to start at login. A standalone session (`--session`) starts them "
+     "after `startup`; a nested one leaves them to the host, which has started them already. "
+     "`shaodesk msg get autostart` lists what was started or skipped, and why."},
+    {"autostart.xdg", "boolean", "true", "true", none, none, "Start the autostart entries."},
+    {"autostart.exclude", "list of strings", "unset", "{ \"org.kde.discover.notifier.desktop\" }",
+     none, none,
+     "File names of autostart entries never to start, at most 128, whichever directory holds "
+     "them."},
+
     {"shell", "table", "", "", none, none, "The desktop shell: panel, wallpaper, launchers."},
     {"shell.enabled", "boolean", "true", "true", none, none,
      "Start the shell with the compositor."},

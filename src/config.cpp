@@ -1557,6 +1557,27 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
     }
     lua_pop(L, 1);
     current_section.clear();
+    if (section(L, "autostart")) {
+        boolean(L, "xdg", "autostart.xdg", config.autostart.xdg);
+        lua_getfield(L, -1, "exclude");
+        if (!lua_isnil(L, -1)) {
+            auto size = array_size(L, -1, 128);
+            for (size_t i = 1; i <= size; ++i) {
+                lua_rawgeti(L, -1, static_cast<lua_Integer>(i));
+                auto name = string(L, -1, "autostart.exclude entry");
+                lua_pop(L, 1);
+                if (name.find('/') != std::string::npos || !name.ends_with(".desktop") ||
+                    name.size() == 8)
+                    fail("autostart.exclude names a desktop file by its file name, such as "
+                         "\"foo.desktop\", not '" + name + "'",
+                         "exclude");
+                config.autostart.exclude.push_back(std::move(name));
+            }
+        }
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+    current_section.clear();
 
     current_section.clear();
     check_keymap(config.settings);
