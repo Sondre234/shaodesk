@@ -353,6 +353,48 @@ static void try_deep_format(struct sh_output *output, struct wlr_output_state *s
                 output->wlr_output->name);
 }
 
+/* Under --headless, whether `state` asks for the size the variable `name` names ("1600x900"),
+ * which a test has outputs refuse: SHAODESK_TEST_REFUSE_MODE in the display settings' test
+ * (test_monitor), SHAODESK_TEST_REFUSE_COMMIT in configure_output's own, as a monitor that passed
+ * the one and fails as its settings are committed. */
+static bool refused_size(struct sh_output *output, const struct wlr_output_state *state,
+                         const char *name) {
+    const char *refused = getenv(name);
+    int width, height;
+    return refused && headless_backend(output->server) &&
+           (state->committed & WLR_OUTPUT_STATE_MODE) &&
+           state->mode_type == WLR_OUTPUT_STATE_MODE_CUSTOM &&
+           sscanf(refused, "%dx%d", &width, &height) == 2 &&
+           state->custom_mode.width == width && state->custom_mode.height == height;
+}
+
+/* Whether `output` takes `monitor`'s mode, scale, transform and adaptive sync (the defaults for
+ * NULL) or being turned off, as configure_output commits them: the backend's test, as
+ * wlr-output-management's test asks it of each head. */
+bool test_monitor(struct sh_output *output, const struct sh_monitor *monitor) {
+    struct wlr_output *wlr_output = output->wlr_output;
+    struct wlr_output_state state;
+    wlr_output_state_init(&state);
+    bool enable = !monitor || monitor->enabled;
+    wlr_output_state_set_enabled(&state, enable);
+    if (enable) {
+        struct wlr_output_mode *mode = pick_mode(wlr_output, monitor);
+        if (mode)
+            wlr_output_state_set_mode(&state, mode);
+        else if (monitor && monitor->width > 0 && wl_list_empty(&wlr_output->modes))
+            wlr_output_state_set_custom_mode(&state, monitor->width, monitor->height,
+                                             monitor->refresh);
+        wlr_output_state_set_scale(&state, monitor && monitor->scale > 0 ? monitor->scale : 1);
+        wlr_output_state_set_transform(&state, monitor ? monitor->transform : 0);
+        if (wlr_output->adaptive_sync_supported)
+            wlr_output_state_set_adaptive_sync_enabled(&state, monitor && monitor->vrr);
+    }
+    bool ok = !refused_size(output, &state, "SHAODESK_TEST_REFUSE_MODE") &&
+              wlr_output_test_state(wlr_output, &state);
+    wlr_output_state_finish(&state);
+    return ok;
+}
+
 static void destroy_output_layers(struct sh_server *server, struct wlr_output *wlr_output) {
     struct sh_layer *layer, *temporary;
     wl_list_for_each_safe(layer, temporary, &server->layers, link) {
@@ -429,7 +471,8 @@ void configure_output(struct sh_server *server, struct sh_output *output) {
         else if (!deep && wlr_output->render_format != DRM_FORMAT_XRGB8888)
             wlr_output_state_set_render_format(&state, DRM_FORMAT_XRGB8888);
     }
-    if (state.committed != 0 && !wlr_output_test_state(wlr_output, &state)) {
+    if (state.committed != 0 && (refused_size(output, &state, "SHAODESK_TEST_REFUSE_COMMIT") ||
+                                 !wlr_output_test_state(wlr_output, &state))) {
         // Fall back to the defaults; a new monitor must still light up.
         wlr_log(WLR_ERROR, "%s rejected its configured settings", wlr_output->name);
         wlr_output_state_finish(&state);
