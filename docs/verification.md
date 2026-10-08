@@ -858,3 +858,28 @@ default ignoring the lid while another monitor is connected, and whether logind 
 monitor as docked while the idle steps or `display_off` have turned it off, or suspends the
 closed laptop then); a convertible's tablet-mode switch; and a switch's binding while the session
 is locked.
+
+## Applications that take the shortcuts
+
+Added 2026-10-08. `shortcuts_inhibit_smoke` types on a headless keyboard into windows of
+`input_probe --inhibit`, which asks for the shortcuts through keyboard-shortcuts-inhibit and prints
+the keys it gets and what the compositor says of its request: while it has the keyboard Super + T
+reaches it and its binding does not run, and the bindings are back as another window has the
+keyboard, as the window lets go and as it closes; Super + Shift + Escape and `shaodesk msg
+toggle_shortcuts_inhibit` turn its request off (the window hears `inactive`, the on-screen display
+line says so, Escape stays the compositor's) and on again, and it stays off as focus leaves and
+comes back; a window rule and `keyboard.shortcuts_inhibit = false` refuse requests, the window
+never hearing `active` and the binding not turning them on, and a reload applies a change either
+way; the request taking effect leaves a binding mode; the shell's notice line comes once for each
+window. `xwayland_grab_smoke` has an X11 probe grab the keyboard (XGrabKeyboard) under Xwayland:
+the grab reaches the compositor through xwayland-keyboard-grab, holds the keys as a request does
+(the X11 window prints them), takes the binding and a window rule, and ends as the probe lets go;
+a Wayland client is not offered the global. `shell_osd` checks the notice as a notification card,
+and on the on-screen display under do not disturb; `config`, `keyboard_config` and
+`example_snippets` the setting, the rule, the default binding and the keys it is named by.
+
+Not checked: real applications asking (virt-manager and GNOME Boxes through GTK's keyboard grab,
+QEMU's GTK and SDL windows, Remmina, FreeRDP, Moonlight, games), none of which is installed here;
+X11 programs that grab the keyboard (VirtualBox, Xephyr, an X11 VNC viewer) and the X11 menus that
+grab it briefly while open; the notification's look on the desktop; and a lock screen that asks for
+the shortcuts itself (its `locked` bindings still run, by the code, not by a test).

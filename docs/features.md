@@ -1462,8 +1462,8 @@ to it again, the on-screen display saying which. A window turned off this way st
 binding turns it on again or it asks anew. The first time a window takes the keys, a notification
 says so and names the binding ("Shortcuts go to win11 on QEMU/KVM", "Super + Shift + Escape gives
 them back"); while notifications are off or do not disturb is on, the on-screen display says the
-first part. A window that asks again, as virt-manager does each time it grabs the keyboard, is not
-announced again.
+first part. A window that asks again, as a GTK 3 application may each time it grabs the
+keyboard, is not announced again.
 
 Switching virtual terminals (Ctrl + Alt + F1 to F12) and mouse button bindings work as ever, and
 so does the lock screen: the `locked` bindings run there whatever a window asked for. A binding

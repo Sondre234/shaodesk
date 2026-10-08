@@ -242,6 +242,15 @@ shadows.
   prints it, and subscribers hear `mode NAME`. A reload and locking the session leave it. The
   shipped configuration has a resize mode, commented out. An unknown mode, or one with no binding
   that leaves it, is refused with its line.
+- Virtual machines, remote desktop clients and games can have the keys the bindings take, as they
+  ask through keyboard-shortcuts-inhibit, so that Super, Alt + Tab and the rest reach the system
+  they show while their window has the keyboard; an X11 window's keyboard grab does the same
+  through Xwayland. Super + Shift + Escape (`toggle_shortcuts_inhibit`) still runs: it takes the
+  keys back from the window and gives them to it again. The first time a window takes them a
+  notification names the keys that take them back. `keyboard.shortcuts_inhibit = false` refuses
+  every application and a window rule's `shortcuts_inhibit = false` one; `shaodesk msg get
+  shortcuts` tells who holds the keys. The example `display_off` binding moves to Super + Alt +
+  Escape.
 - `windows.controls = "traffic_lights"` draws the controls of the windows shaodesk decorates as
   red, yellow and green circles at their top-left, as macOS does: grey while the window has no
   focus, their symbols shown while the pointer is on one, darker while pressed.
