@@ -739,6 +739,43 @@ void OsdView::update() {
         std::cerr << "shaodesk osd hidden on " << outputScreen_->name().toStdString() << '\n';
     }
 }
+DisplayModeView::DisplayModeView(ShellController &controller, QScreen *screen)
+    : QQuickView(controller.engine(), nullptr), outputScreen_(screen) {
+    setScreen(screen);
+    setTitle("shaodesk display mode");
+    setColor(Qt::transparent);
+    setResizeMode(QQuickView::SizeViewToRootObject);
+    setFlags(Qt::FramelessWindowHint);
+    setInitialProperties({{"outputName", screen->name()}});
+#if SHAODESK_LAYER_SHELL
+    using W = LayerShellQt::Window;
+    layer_ = W::get(this);
+    layer_->setScreen(screen);
+    layer_->setScope("shaodesk-display-mode");
+    layer_->setLayer(W::LayerOverlay);
+    layer_->setAnchors(W::Anchors());
+    layer_->setExclusiveZone(-1);
+    layer_->setKeyboardInteractivity(W::KeyboardInteractivityNone);
+    layer_->setActivateOnShow(false);
+#endif
+    setSource(QUrl("qrc:/shell/ShaodeskShell/DisplayMode.qml"));
+    if (auto *root = rootObject()) {
+        connect(root, SIGNAL(visibleNowChanged()), this, SLOT(update()));
+        followRoot(this, layer_, root);
+    }
+}
+void DisplayModeView::update() {
+    const bool want = rootObject() && rootObject()->property("visibleNow").toBool();
+    if (want && !isVisible()) {
+        show();
+        std::cerr << "shaodesk display mode shown on " << outputScreen_->name().toStdString()
+                  << '\n';
+    } else if (!want && isVisible()) {
+        hide();
+        std::cerr << "shaodesk display mode hidden on " << outputScreen_->name().toStdString()
+                  << '\n';
+    }
+}
 ConfigErrorView::ConfigErrorView(ShellController &controller, QScreen *screen)
     : QQuickView(controller.engine(), nullptr), outputScreen_(screen) {
     setScreen(screen);
