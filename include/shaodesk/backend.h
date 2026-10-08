@@ -168,6 +168,11 @@ enum sh_action {
     /* Asks the shell to give the keyboard to the taskbar (or the dock) on the focused output, to
      * walk its buttons and their windows with the arrows, as Windows' Win+T; again, to leave. */
     SH_TASKBAR_FOCUS,
+    /* Snapping into a quarter of the output, as SH_SNAP_LEFT and SH_SNAP_RIGHT into a half. */
+    SH_SNAP_TOP_LEFT,
+    SH_SNAP_TOP_RIGHT,
+    SH_SNAP_BOTTOM_LEFT,
+    SH_SNAP_BOTTOM_RIGHT,
 };
 
 enum sh_screenshot_mode {

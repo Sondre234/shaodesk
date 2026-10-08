@@ -15,7 +15,11 @@ extern "C" bool sh_placement(sh_action action, sh_rect area, int gap, int index,
     int columns = 2, rows = 1, column = 0, row = 0;
     if (action == SH_SNAP_RIGHT)
         column = 1;
-    else if (action == SH_TILE) {
+    else if (action >= SH_SNAP_TOP_LEFT && action <= SH_SNAP_BOTTOM_RIGHT) {
+        rows = 2;
+        column = action == SH_SNAP_TOP_RIGHT || action == SH_SNAP_BOTTOM_RIGHT;
+        row = action == SH_SNAP_BOTTOM_LEFT || action == SH_SNAP_BOTTOM_RIGHT;
+    } else if (action == SH_TILE) {
         columns = static_cast<int>(std::ceil(std::sqrt(count)));
         rows = (count + columns - 1) / columns;
         column = index % columns;
