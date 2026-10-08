@@ -223,6 +223,20 @@ inhibitors come and go and the VT changes) restarts the count once released. `id
 `src/power_supply.c`'s answer, from `$SHAODESK_SYSFS` in the tests; power.c's waking up after
 sleep calls `idle_activity` as input would.
 
+### The lid
+
+`switches.c` follows libinput's switches (`WLR_INPUT_DEVICE_SWITCH`), one `sh_switch_device`
+each, keeping what each last said of the lid and of tablet mode from its toggle events;
+`sh_server.lid_closed` is any of them saying the lid is closed. `configure_output` asks
+`lid_holds_off` of every output, which applies `src/lid.c`'s decision (a built-in connector, the
+lid closed, clamshell mode, a monitor that is not built in in the layout), and when the lid holds
+an output off it goes out of the layout as with `enabled = false`, but its windows keep their
+workspaces as when it is unplugged. `apply_lid` configures the built-in panels again, and arranges
+the outputs and windows when one changed, as the lid changes and after an output is added or
+destroyed (before an empty layout would end a nested or headless session). Each toggle counts
+as input and runs the binding `sh_callbacks.switch_toggled` returns. Under `--headless`,
+`headless_switch` adds switches for the tests (`lid_smoke`).
+
 ## The shell (`shell/`)
 
 `ShellController` (`controller.cpp`) loads the configuration, keeps the compositor's state from
@@ -639,9 +653,10 @@ them in `shell/controller.cpp`.
   characters or fewer: the control socket goes in it, a Unix socket's path is limited to about
   107 bytes, and a Gentoo package build runs the tests in a `TMPDIR` of 43 characters or more.
   Under `--headless`, `shaodesk msg headless_output` and `headless_keyboard` plug in outputs and
-  keyboards (`headless_keyboard key NAME CODE press` types on one; see `keymap_smoke.py`), and
-  `wayland_probe --keymap` prints the keymap an application gets. A `wayland_probe` window with
-  `SHAODESK_PROBE_DRAG=source` drags a line of text on a button press of `pointer_probe`'s, and
+  keyboards (`headless_keyboard key NAME CODE press` types on one; see `keymap_smoke.py`),
+  `headless_switch` a lid or tablet-mode switch (`headless_switch toggle NAME on` closes a lid;
+  see `lid_smoke.py`), and `wayland_probe --keymap` prints the keymap an application gets. A
+  `wayland_probe` window with `SHAODESK_PROBE_DRAG=source` drags a line of text on a button press of `pointer_probe`'s, and
   one with `=target` takes it, each printing what it hears; `get seat` says where the drag is
   (see `drag_focus_smoke.py`). `SHAODESK_PROBE_ICON` gives a `wayland_probe` window an icon
   through xdg-toplevel-icon-v1 and an `x11_probe` window `_NET_WM_ICON`, and their commands

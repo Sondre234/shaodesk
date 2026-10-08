@@ -1096,6 +1096,35 @@ still list it as enabled, as sway does, and a reload or `wlr-randr` leaves it of
 again, it takes whatever settings they gave it meanwhile. A screen lock does not wait for a
 monitor that is off; the lock covers it from its first frame once it is on.
 
+### The laptop lid
+
+Closing a laptop's lid while another monitor is on turns its built-in panel (a connector named
+eDP, LVDS or DSI, as `eDP-1`) off, as KDE and Windows do: the panel leaves the layout and its
+windows move to another monitor, keeping their workspaces, as when a monitor is unplugged.
+Opening the lid brings the panel back and, with `outputs.return_windows`, its windows with it.
+The panel follows the other monitors too: one plugged in while the lid is closed turns the panel
+off, and unplugging the last one brings the panel back on. A lid that is closed as shaodesk
+starts, which libinput reports as the lid switch appears, holds the panel off from the start.
+With no other monitor nothing changes: the panel stays on, and logind decides what closing the
+lid does (by default it suspends, and shaodesk locks the screen first, see [Power](#power)).
+`outputs.lid = "ignore"` leaves the panel on whatever the lid does. Opening the lid counts as
+input, so monitors the [idle steps](#power-saving-when-idle) turned off come on with it.
+
+Bindings can act on a switch, as Hyprland's `bindl = , switch:on:Lid Switch` does: `switch`
+is `"lid"`, with `state` `"close"` or `"open"`, or `"tablet"` (a convertible's tablet mode), with
+`"on"` or `"off"`. They take no key, button or modifiers, and run even while the session is
+locked.
+
+```lua
+bindings = {
+    { switch = "lid", state = "close", action = "lock" },
+    { switch = "tablet", state = "on", action = "spawn", command = { "wvkbd-mobintl" } },
+},
+```
+
+`shaodesk msg get switches` prints `lid closed` or `lid open`, then a line per switch device: its
+name, whether it says the lid is closed and whether it says tablet mode is on (1 or 0).
+
 ## Input
 
 The `keyboard` table sets the XKB `layout`, `variant`, `model`, `options` and `rules`, and the

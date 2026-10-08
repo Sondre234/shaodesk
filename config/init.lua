@@ -176,6 +176,8 @@ return {
         -- Per-monitor mode, scale, position, rotation (0-7), vrr, tiling, or enabled = false,
         -- keyed by connector or by "desc:" and the start of "make model serial", e.g.:
         -- monitors = { ["DP-3"] = { mode = "2560x1440@200", scale = 1.25, tiling = true } },
+        -- A laptop's lid closed with another monitor on turns its panel off ("ignore": not):
+        -- lid = "clamshell",
     },
     screenshots = {
         -- Saved as Screenshot_<date>_<time>.png; "~/" means your home directory. Empty or unset:
@@ -338,6 +340,8 @@ return {
         -- Turn every monitor off until a key or the mouse wakes it (display_on and
         -- display_toggle too; output = "HDMI-A-1" picks one monitor), e.g.:
         -- { mods = { mod, "Shift" }, key = "Escape", action = "display_off" },
+        -- Switches act too: the lid ("close", "open") and tablet mode ("on", "off"), e.g.:
+        -- { switch = "lid", state = "close", action = "lock" },
         { mods = { mod }, key = "1", action = "workspace", workspace = 1 },
         { mods = { mod }, key = "2", action = "workspace", workspace = 2 },
         { mods = { mod }, key = "3", action = "workspace", workspace = 3 },
