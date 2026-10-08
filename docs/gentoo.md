@@ -84,8 +84,9 @@ between release series. Relevant Gentoo packages are:
 
 Standalone operation requires wlroots built with `drm`, `libinput`, and `session`
 USE flags. X11 applications additionally need wlroots with the `X` USE flag and
-`x11-base/xwayland`; shaodesk then links `x11-libs/libxcb` and enables XWayland
-automatically (the XWM waker also needs `xcb-xfixes`, part of libxcb). To fix wlroots' lost X11 windows at the source, copy
+`x11-base/xwayland`; shaodesk then links `x11-libs/libxcb` and `x11-libs/xcb-util-wm` (for X11
+windows' icons) and enables XWayland automatically (the XWM waker also needs `xcb-xfixes`, part
+of libxcb). To fix wlroots' lost X11 windows at the source, copy
 `packaging/patches/wlroots-xwm-drain.patch` into `/etc/portage/patches/gui-libs/wlroots/`,
 re-emerge wlroots, and configure shaodesk with `-DSHAODESK_XWM_WAKER=OFF`. Rounded corners on
 tiled windows (`windows.corner_radius`) need

@@ -93,6 +93,7 @@ static void xwayland_destroy(struct wl_listener *listener, void *data) {
     wl_list_remove(&toplevel->x_decorations.link);
     wl_list_remove(&toplevel->x_attention.link);
     wl_list_remove(&toplevel->x_hints.link);
+    wl_list_remove(&toplevel->x_icon.link);
     free_toplevel(toplevel);
 }
 
@@ -166,6 +167,46 @@ static void xwayland_set_hints(struct wl_listener *listener, void *data) {
     xwayland_attention(toplevel, urgent);
 }
 
+/* _NET_WM_ICON changed, or the window was associated, when wlroots reads its properties: the
+ * window's icon is the size icon_size_rank prefers of those it gives, its colours premultiplied
+ * as wl_shm's are, where X11 gives them as they are beside their alpha. X11 icons have no name.
+ * Menus and tooltips have no place on the taskbar, so theirs are not read. */
+static void xwayland_set_icon(struct wl_listener *listener, void *data) {
+    struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, x_icon);
+    struct sh_icon icon = {0};
+    xcb_ewmh_get_wm_icon_reply_t reply;
+    if (toplevel->xsurface->override_redirect ||
+        !wlr_xwayland_surface_fetch_icon(toplevel->xsurface, &reply)) {
+        set_toplevel_icon(toplevel, icon);
+        return;
+    }
+    xcb_ewmh_wm_icon_iterator_t best = {0};
+    int best_rank = 0;
+    for (xcb_ewmh_wm_icon_iterator_t each = xcb_ewmh_get_wm_icon_iterator(&reply); each.rem;
+         xcb_ewmh_get_wm_icon_next(&each)) {
+        int rank = icon_size_rank(each.width, each.height);
+        if (rank > best_rank) {
+            best = each;
+            best_rank = rank;
+        }
+    }
+    size_t count = (size_t)best.width * best.height;
+    icon.pixels = best_rank ? malloc(count * 4) : NULL;
+    if (icon.pixels) {
+        icon.width = (int)best.width;
+        icon.height = (int)best.height;
+        for (size_t i = 0; i < count; ++i) {
+            uint32_t pixel = best.data[i], alpha = pixel >> 24;
+            uint32_t red = (pixel >> 16 & 0xff) * alpha, green = (pixel >> 8 & 0xff) * alpha;
+            uint32_t blue = (pixel & 0xff) * alpha;
+            icon.pixels[i] = alpha << 24 | (red + 127) / 255 << 16 | (green + 127) / 255 << 8 |
+                             (blue + 127) / 255;
+        }
+    }
+    xcb_ewmh_get_wm_icon_reply_wipe(&reply);
+    set_toplevel_icon(toplevel, icon);
+}
+
 /* X11 grab requests carry no serial; accept them only while a button is held. */
 static void xwayland_request_move(struct wl_listener *listener, void *data) {
     struct sh_toplevel *toplevel = wl_container_of(listener, toplevel, request_move);
@@ -230,6 +271,7 @@ void server_new_xwayland_surface(struct wl_listener *listener, void *data) {
     add_listener(&xsurface->events.request_demands_attention, &toplevel->x_attention,
                  xwayland_demands_attention);
     add_listener(&xsurface->events.set_hints, &toplevel->x_hints, xwayland_set_hints);
+    add_listener(&xsurface->events.set_icon, &toplevel->x_icon, xwayland_set_icon);
     add_listener(&xsurface->events.set_title, &toplevel->title_changed, toplevel_title_changed);
     add_listener(&xsurface->events.set_class, &toplevel->app_id_changed, toplevel_app_id_changed);
     add_listener(&xsurface->events.request_move, &toplevel->request_move, xwayland_request_move);

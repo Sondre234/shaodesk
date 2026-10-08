@@ -591,7 +591,7 @@ struct sh_toplevel {
     struct wlr_xwayland_surface *xsurface; // NULL for xdg-shell windows
     bool unmanaged, associated;            // unmanaged: override-redirect menus and tooltips
     struct wl_listener x_associate, x_dissociate, x_configure, x_activate, x_geometry;
-    struct wl_listener x_decorations, x_attention, x_hints;
+    struct wl_listener x_decorations, x_attention, x_hints, x_icon;
     bool x_hint_urgent; // the client's WM_HINTS ask for attention
 #endif
     /* scene_tree sits at the window's place; content holds everything drawn for it, so an

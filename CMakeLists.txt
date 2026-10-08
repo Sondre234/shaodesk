@@ -253,14 +253,16 @@ if(SHAODESK_BUILD_COMPOSITOR)
         message(STATUS "No sd-bus (libsystemd, libelogind, basu); other desktops may suspend "
             "the machine while shaodesk is on screen")
     endif()
-    # X11 support follows the wlroots build; the XWM waker needs xcb directly.
+    # X11 support follows the wlroots build; the XWM waker needs xcb directly, and reading an
+    # X11 window's icon xcb-ewmh.
     find_file(SHAODESK_WLR_CONFIG_H wlr/config.h PATHS ${WLROOTS_INCLUDE_DIRS} NO_DEFAULT_PATH)
     file(READ ${SHAODESK_WLR_CONFIG_H} SHAODESK_WLR_CONFIG)
     if(SHAODESK_WLR_CONFIG MATCHES "WLR_HAS_XWAYLAND 1")
         # Unpatched wlroots strands X events; see packaging/patches/wlroots-xwm-drain.patch.
         option(SHAODESK_XWM_WAKER "Nudge wlroots' X11 window manager (off only for patched wlroots)" ON)
         pkg_check_modules(XCB REQUIRED IMPORTED_TARGET xcb)
-        target_link_libraries(shaodesk PRIVATE PkgConfig::XCB)
+        pkg_check_modules(XCB_EWMH REQUIRED IMPORTED_TARGET xcb-ewmh)
+        target_link_libraries(shaodesk PRIVATE PkgConfig::XCB PkgConfig::XCB_EWMH)
         if(SHAODESK_XWM_WAKER)
             pkg_check_modules(XCB_XFIXES REQUIRED IMPORTED_TARGET xcb-xfixes)
             target_link_libraries(shaodesk PRIVATE PkgConfig::XCB_XFIXES)

@@ -24,7 +24,7 @@ jobs:
         run: |
           pacman -Syu --noconfirm --needed base-devel git cmake ninja pkgconf python \
             lua wlroots0.20 wayland wayland-protocols libxkbcommon libinput \
-            xorg-xwayland libxcb libpulse systemd-libs dbus \
+            xorg-xwayland libxcb xcb-util-wm libpulse systemd-libs dbus \
             qt6-base qt6-declarative qt6-wayland layer-shell-qt glib2 grim
       - uses: actions/checkout@v7
       - name: Configure

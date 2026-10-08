@@ -43,7 +43,10 @@ COMMON_DEPEND="
 		sys-auth/elogind
 		sys-libs/basu
 	)
-	X? ( x11-libs/libxcb:= )
+	X? (
+		x11-libs/libxcb:=
+		x11-libs/xcb-util-wm
+	)
 	shell? (
 		dev-libs/glib:2
 		>=dev-qt/qtbase-6.9:6[gui,network,wayland]
