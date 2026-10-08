@@ -340,6 +340,9 @@ shadows.
   `internal` (the built-in panel, or the primary monitor, alone) or `external`, until the
   configuration is reloaded. A laptop's display key (XF86Display) runs it without a choice, which
   opens a popup that steps through the four and takes the one shown once the key rests.
+- `outputs.monitors[NAME].bit_depth = 10` draws a monitor in 10 bits per channel where the monitor
+  and the renderer take it, staying at 8 where they do not; `shaodesk import` carries Hyprland's
+  `bitdepth` over, and `shaodesk msg get outputs` ends each line with the depth.
 
 ### Working on the shell
 
