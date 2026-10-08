@@ -72,15 +72,16 @@ QVariantList Media::players() const {
     return list;
 }
 
-// Playing first, the one that started last ahead; then those seen playing or paused, by when
-// they last played; then the rest, the newest first. One stopped with no track is not shown.
+// Playing first, the one that started last ahead; then those seen playing, by when they last
+// played; then the rest, the newest first, as those already paused or stopped when they came,
+// whose last playing is not known. One stopped with no track is not shown.
 void Media::sort() {
     shown_.clear();
     for (const auto &entry : players_)
         if (!entry.player.title.isEmpty() || entry.player.status != "Stopped")
             shown_.push_back(&entry);
     auto rank = [](const Entry *entry) {
-        return entry->player.status == "Playing" ? 2 : entry->played || entry->player.status == "Paused" ? 1 : 0;
+        return entry->player.status == "Playing" ? 2 : entry->played ? 1 : 0;
     };
     std::stable_sort(shown_.begin(), shown_.end(), [&rank](const Entry *a, const Entry *b) {
         return rank(a) != rank(b) ? rank(a) > rank(b) : a->order > b->order;
