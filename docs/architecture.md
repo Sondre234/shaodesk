@@ -216,6 +216,18 @@ everything back. The overview follows them through `overview_hold` and `overview
 set its `progress` in place of its timer's. `tests/touchpad_gestures_smoke.py` drives all of it
 with a headless pointer, at the event times it gives.
 
+### Touchscreens
+
+`touch.c` hears the cursor's touch events. A finger coming down asks `press_target_at`
+(`cursor.c`) what a press there reaches: a client's surface, or nothing where the compositor takes
+presses itself (window controls and their corner, tab strips, drag strips, resize bands) or there
+is only the desktop. A surface whose client bound wl_touch (`wlr_surface_accepts_touch`) gets the
+finger through the seat, and where the surface was in the layout is kept, so that the finger's
+motion stays in its coordinates when it leaves it. Anything else gets the first finger as the
+pointer: the cursor warps to it and `server_cursor_button` hears a left button as from a mouse, so
+the controls, the drag strip, button bindings and the overview take it as a click.
+`map_touchscreens`, which `arrange_outputs` calls, maps each device to its output.
+
 ## The shell (`shell/`)
 
 `ShellController` (`controller.cpp`) loads the configuration, keeps the compositor's state from
