@@ -80,15 +80,15 @@ static void control_describe_output(struct sh_server *server, int fd, struct sh_
     char line[512], description[256];
     output_description(o, description, sizeof(description));
     // name, enabled, x, y, logical width, height, scale, transform, mode, description, power:
-    // "on" while it shows a picture, "off" while turned off (output_power.c) or disabled, and the
-    // output it mirrors (mirror.c), "-" for none.
+    // "on" while it shows a picture, "off" while turned off (output_power.c) or disabled, the
+    // output it mirrors (mirror.c), "-" for none, and the bits per channel it is drawn in.
     const struct sh_output *source = mirrored_output(output);
-    snprintf(line, sizeof(line), "%s\t%d\t%d\t%d\t%d\t%d\t%g\t%d\t%dx%d@%.3f\t%s\t%s\t%s\n",
+    snprintf(line, sizeof(line), "%s\t%d\t%d\t%d\t%d\t%d\t%g\t%d\t%dx%d@%.3f\t%s\t%s\t%s\t%d\n",
              o->name, !output->disabled, box.x, box.y, box.width, box.height, o->scale,
              o->transform, o->width, o->height, o->refresh / 1000.0, description,
              (!output->disabled || output->mirror) && !output->powered_off && o->enabled ? "on"
                                                                                          : "off",
-             source ? source->wlr_output->name : "-");
+             source ? source->wlr_output->name : "-", deep_format(o->render_format) ? 10 : 8);
     control_reply(fd, line);
 }
 
