@@ -1215,9 +1215,10 @@ only `extend` can be had.
 XF86Display, the key a laptop sends for Fn and its display key, runs `display_mode` without a
 choice: a popup on the focused monitor shows the four in Windows' order (PC screen only,
 duplicate, extend, second screen only) with the one in force selected, each further press moves
-the selection on, and a second and a half after the last press the selected one is taken. While the popup is open the arrow keys move the selection, Return takes it at once
-and Escape closes the popup without changing anything; a click takes a choice too. Win + P
-itself opens the command palette.
+the selection on, and a second and a half after the last press the selected one is taken. While
+the popup is open the arrow keys move the selection, Return takes it at once and Escape closes
+the popup without changing anything; a click takes a choice too, and while the pointer rests on
+the popup it stays open. Win + P itself opens the command palette.
 
 ```lua
 bindings = {
