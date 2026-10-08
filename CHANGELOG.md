@@ -260,6 +260,19 @@ shadows.
 - A tiled window alone on its workspace has no gaps around it and fills the space the panels
   leave, inside its border; a second tile brings the gaps back for both. `layout.smart_gaps =
   false` keeps them around a lone tile as before.
+- `toggle_above` (Super + Ctrl + T) keeps the focused window above the others, as KDE's Keep
+  Above Others, Hyprland's pinned windows and PowerToys' Always on Top do: over the floating
+  windows and tiles of its monitor through focus changes, workspace switches, snapping, groups and
+  sticky, and under fullscreen windows, the panels and the overlays. A window's menu on the
+  taskbar has Keep above others and the macOS style's Window menu Keep Above Others, checked while
+  it is; the window rule `above = true` keeps a window above as it opens. `shaodesk msg get
+  windows` says which are in a sixteenth column, and `get stacking` lists the windows front to
+  back. shaodesk-window-control-v1 is at version 6 for it.
+- `layout.floating_above_tiles = true` keeps floating windows over the tiles, as sway and Hyprland
+  do. It is off by default: as before, the window brought forward last is in front, tile or not.
+- A fullscreen window stays in front of its monitor while another monitor has the focus, as
+  fullscreen a program asks for did already, until a window of its own monitor is brought
+  forward.
 - The compositor tells the shell whether night light is on and whether the schedule decides
   (`night-light ACTIVE MODE` on the control socket's state stream).
 - `shaodesk msg get layers` says which layer surface holds the keyboard, in a fifth column.

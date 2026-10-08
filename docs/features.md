@@ -29,8 +29,9 @@ the dock.
   the `power_menu` action opens it too. The focused application's name, in bold ("Desktop" when
   no window has focus), opens its menu: its desktop actions, New Window, Hide, Hide Others and
   Quit. The **Window** menu acts on the focused window: Minimize, Zoom, Tile Window to Left or
-  Right of Screen, Enter Full Screen, Float, Keep on All Workspaces, Move to a workspace or
-  monitor, the application's other windows, and Close Window. While one menu is open, pointing at
+  Right of Screen, Enter Full Screen, Float, Keep on All Workspaces, Keep Above Others (checked
+  while the window is [kept above](#keeping-windows-above)), Move to a workspace or monitor, the
+  application's other windows, and Close Window. While one menu is open, pointing at
   another title or pressing Left and Right switches to it. At the right are the widgets
   `shell.widgets` puts on the bar, a search button (the command palette, drawn as Spotlight), a
   Control Center button (Quick Settings) and the date and time, which open Notification Center:
@@ -325,8 +326,9 @@ its desktop entry; the window's app id without one) over the window's title. The
 - **Move to workspace**, beside it the workspaces of its monitor (named as
   `layout.workspace_names` names them), the one it is on marked; **Move to monitor**, with two or
   more monitors, from left to right; **Keep on all workspaces**, making it
-  [sticky](#sticky-windows) (not with `features = { sticky = false }`); and where its workspace
-  tiles, **Float**, checked while it is kept out of the tiling;
+  [sticky](#sticky-windows) (not with `features = { sticky = false }`); **Keep above others**,
+  checked while it is [kept above](#keeping-windows-above) the other windows; and where its
+  workspace tiles, **Float**, checked while it is kept out of the tiling;
 - **Pin to taskbar** or **Unpin from taskbar** for an installed application, **Close window**
   in the danger colour, and last **Kill process**, which ends the process that made the window
   with `SIGKILL`, for one that does not close (only once its process is known; never the shell's
@@ -426,7 +428,9 @@ keeps it through workspace switches, snapping, tiling (a tile kept above stays a
 sticky, and window groups, whose windows share it as they share their slot: a window joining a
 group takes the group's, and toggling one toggles them all. A fullscreen window covers the
 windows kept above on its monitor; the panels, their popups and menus, and the overlays (the
-switcher, the start menu, notifications) stay over all of them.
+switcher, the start menu, notifications) stay over all of them. A window's menu on the taskbar
+has **Keep above others** and the macOS style's Window menu **Keep Above Others**, checked while
+the window is kept above, and the window rule `above = true` keeps a window above as it opens.
 
 ### Borders, opacity and rounded corners
 
