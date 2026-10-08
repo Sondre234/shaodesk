@@ -35,7 +35,7 @@ Item {
     // An application's record, when the keyboard is at one.
     readonly property var currentApp: currentResult && currentResult.kind === "app" ? currentResult : null
     readonly property var headings: ({ best: "Best match", apps: "Apps", windows: "Open windows", actions: "Actions",
-                                       files: "Files" })
+                                       files: "Files", web: "Search the web" })
     // Where the pointer was last seen over the results.
     property point pointer: Qt.point(-1, -1)
 

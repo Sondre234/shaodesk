@@ -49,6 +49,8 @@ class StartMenu : public QObject {
     int searchRevision() const { return searchRevision_; }
     // The files its search finds; none until set.
     void setFiles(FileIndex *files);
+    // The search engine of its search's last result (web_search::entry); empty for none.
+    void setWebSearch(const QString &engine) { webSearch_ = engine; }
 
     // The applications, as the controller's records, and the taskbar's pins, which seed the
     // start menu's own until it has them.
@@ -78,7 +80,8 @@ class StartMenu : public QObject {
     // a `title` and a `subtitle`, with its `group` and `score` added. A calculation's value
     // (calculator::entry) is the best match when there is one. Files (FileIndex::search) come
     // last, as "files", and are the best match only when they match better than the rest; a
-    // leading / finds only files.
+    // leading / finds only files. Search the web for “…” (web_search::entry) is the very last,
+    // as "web", and the best match when nothing else is found.
     Q_INVOKABLE QVariantList search(const QString &query, const QVariantList &others) const;
     // When `then` was, said from `now`: "Just now", "5 min ago", "2 hours ago", "Yesterday", a
     // day of the week, or a date.
@@ -112,6 +115,7 @@ class StartMenu : public QObject {
     bool ownPins_ = false, previewOnly_ = false, userSet_ = false;
     FileIndex *files_ = nullptr;
     int searchRevision_ = 0;
+    QString webSearch_;
     LaunchHistory history_;
     QString userName_;
     QUrl userIcon_;

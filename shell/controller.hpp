@@ -228,6 +228,10 @@ class ShellController : public QObject {
     // Opens a file in its default application, or with `folder` the folder that holds it; a
     // failure shows across the panel.
     Q_INVOKABLE bool openFile(const QString &path, bool folder = false);
+    // shell.search.web: the search engine's address, %s where the words go; empty for none.
+    QString webSearch() const { return QString::fromStdString(config_.shell.search.web); }
+    // Opens an address in the default browser; a failure shows across the panel.
+    Q_INVOKABLE bool openUrl(const QString &url);
     // Sends the compositor a request (an action, or "session restore NAME"), as `shaodesk msg`
     // would; `done` gets its whole reply. Without a session, `done` is not called.
     void ask(const QByteArray &line, std::function<void(const QByteArray &)> done);
@@ -356,8 +360,8 @@ class ShellController : public QObject {
     };
     // Loads the configuration, or the default one with configError_ set when it has an error.
     void loadConfig();
-    // Hands the file index shell.search's settings.
-    void configureFiles();
+    // Hands the file index and the start menu shell.search's settings.
+    void configureSearch();
     std::filesystem::path path_;
     shaodesk::Config config_;
     TaskModel tasks_;

@@ -54,7 +54,7 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
     connect(&startMenu_, &StartMenu::failed, this, &ShellController::report);
     connect(&startMenu_, &StartMenu::installedChanged, this, &ShellController::refreshApps);
     startMenu_.setFiles(&files_);
-    configureFiles();
+    configureSearch();
     refreshApps();
     subscribe();
     notifications_.configure(config_.notifications);
@@ -465,7 +465,7 @@ bool ShellController::openTrash() {
     clearError();
     return true;
 }
-void ShellController::configureFiles() {
+void ShellController::configureSearch() {
     const auto &search = config_.shell.search;
     FileIndex::Settings settings;
     settings.enabled = search.files;
@@ -478,6 +478,24 @@ void ShellController::configureFiles() {
     settings.depth = search.depth;
     settings.limit = search.max_files;
     files_.configure(settings);
+    startMenu_.setWebSearch(webSearch());
+}
+bool ShellController::openUrl(const QString &url) {
+    // In the default browser, as the shell's own platform settings are not its.
+    GAppLaunchContext *context = g_app_launch_context_new();
+    g_app_launch_context_unsetenv(context, "QT_WAYLAND_SHELL_INTEGRATION");
+    GError *error = nullptr;
+    const bool success = g_app_info_launch_default_for_uri(url.toUtf8().constData(), context, &error);
+    g_object_unref(context);
+    if (!success) {
+        report("Could not open " + url + ": " +
+               QString::fromUtf8(error ? error->message : "unknown error"));
+        if (error)
+            g_error_free(error);
+        return false;
+    }
+    clearError();
+    return true;
 }
 bool ShellController::openFile(const QString &path, bool folder) {
     const auto error = FileIndex::open(path, folder);
@@ -601,7 +619,7 @@ void ShellController::reload() {
         notifications_.configure(config_.notifications);
         osd_.configure(config_.osd);
         power_.setCountdown(config_.power.countdown);
-        configureFiles();
+        configureSearch();
         updateNotificationService();
         updateTrayHost();
         refreshApps();

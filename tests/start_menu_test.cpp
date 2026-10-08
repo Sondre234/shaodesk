@@ -344,6 +344,17 @@ class StartMenuTest : public QObject {
         const auto file = menu.search("quarterly", others).first().toMap();
         QCOMPARE(file["kind"].toString(), QString("file"));
         QCOMPARE(file["target"].toString(), QString("/srv/docs/Quarterly report.pdf"));
+        // Searching the web comes last, and is the best match when nothing else is found; not
+        // for a prefix's search.
+        menu.setWebSearch("https://duckduckgo.com/?q=%s");
+        QCOMPARE(found("kate").last(), QString("web:Search the web for “kate”"));
+        QCOMPARE(found("zqxw"), QStringList{"best:Search the web for “zqxw”"});
+        QCOMPARE(found("@zqxw"), QStringList{});
+        QCOMPARE(found("/kate"), QStringList{"best:Kate notes.txt"});
+        QCOMPARE(menu.search("zqxw", others).first().toMap()["target"].toString(),
+                 QString("https://duckduckgo.com/?q=zqxw"));
+        menu.setWebSearch({});
+        QCOMPARE(found("zqxw"), QStringList{});
         // An application's result is its record, with what the menu shows of it.
         const auto best = menu.search("kate", others).first().toMap();
         QCOMPARE(best["kind"].toString(), QString("app"));

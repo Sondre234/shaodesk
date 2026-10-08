@@ -3,6 +3,7 @@
 #include "calculator.hpp"
 #include "file_index.hpp"
 #include "fuzzy.hpp"
+#include "web_search.hpp"
 #include <QAbstractEventDispatcher>
 #include <QDir>
 #include <QFile>
@@ -360,6 +361,8 @@ QVariantList StartMenu::search(const QString &query, const QVariantList &others)
         add(item.toMap(), "actions");
     for (const auto &item : files)
         add(item.toMap(), "files");
+    if (const auto web = web_search::entry(webSearch_, query); !web.isEmpty())
+        add(web, results.isEmpty() ? "best" : "web");
     return results;
 }
 

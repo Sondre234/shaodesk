@@ -3,6 +3,7 @@
 #include "calculator.hpp"
 #include "controller.hpp"
 #include "fuzzy.hpp"
+#include "web_search.hpp"
 #include <QClipboard>
 #include <QGuiApplication>
 
@@ -231,6 +232,9 @@ void Palette::refreshResults() {
     }
     if (!calc.isEmpty())
         results_.prepend(calc);
+    // Searching the web for the words comes after what was found.
+    if (const auto web = web_search::entry(controller_.webSearch(), query_); !web.isEmpty())
+        results_.push_back(web);
     // Saving the arrangement under the name typed is offered last, once the text can be a name.
     if (fuzzy::validSessionName(typed) && !typed.startsWith('>') && !typed.startsWith('@') &&
         !typed.startsWith('#') && !typed.startsWith('%'))
@@ -302,6 +306,8 @@ void Palette::run(const QVariantMap &item, const QString &output) {
         QGuiApplication::clipboard()->setText(target);
     } else if (kind == "file") {
         controller_.openFile(target);
+    } else if (kind == "web") {
+        controller_.openUrl(target);
     } else if (item["power"].toBool()) {
         controller_.power()->request(target, output);
     } else if (kind == "app") {
