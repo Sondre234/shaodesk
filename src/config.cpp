@@ -1125,7 +1125,6 @@ void instruction_limit(lua_State *L, lua_Debug *) {
     if (--*remaining <= 0)
         luaL_error(L, "configuration exceeded its instruction budget");
 }
-// `directory` is the configuration file's, which relative paths in it start from.
 // The key binding among `bindings` for these modifiers and keysym, or nothing.
 const Binding *find_key(const std::vector<Binding> &bindings, uint32_t modifiers, uint32_t keysym) {
     constexpr uint32_t relevant = SH_SHIFT | SH_CTRL | SH_ALT | SH_LOGO;
@@ -1344,6 +1343,7 @@ void read_modes(lua_State *L, Config &config) {
                  mode.name);
     }
 }
+// `directory` is the configuration file's, which relative paths in it start from.
 Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
     Config config;
     table(L, -1, "configuration result");
