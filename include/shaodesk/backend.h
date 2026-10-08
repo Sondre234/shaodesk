@@ -452,13 +452,13 @@ struct sh_settings {
     /* idle: the steps on mains, and while the machine runs on battery. */
     struct sh_idle_steps idle, idle_battery;
     int lid; /* enum sh_lid_mode, outputs.lid */
+    /* keyboard.shortcuts_inhibit: applications may ask for the keys the bindings take
+     * (keyboard-shortcuts-inhibit), as virtual machines and remote desktops do. */
+    bool shortcuts_inhibit;
 };
 
 /* What a login session keeps of the last one: nothing; where its windows were, for those that open
  * again (from startup, autostart or by hand); or that, and the programs missing started again. */
-    /* keyboard.shortcuts_inhibit: applications may ask for the keys the bindings take
-     * (keyboard-shortcuts-inhibit), as virtual machines and remote desktops do. */
-    bool shortcuts_inhibit;
 enum sh_session_restore {
     SH_SESSION_RESTORE_OFF,
     SH_SESSION_RESTORE_WINDOWS,
