@@ -240,6 +240,10 @@ int main(int argc, char **argv) {
     bool holdSessions = false;
     QString powerRefusal; // what the compositor answers a power action with; "" for ok
     QLocalSocket *pendingSessions = nullptr;
+    // What `get monitors` answers, and what `monitors apply` and `monitors reset` are refused
+    // with ("" for a trial).
+    QByteArray monitorsReply;
+    QString monitorsRefusal;
     // What the compositor does with "profile NAME": saves it and reloads the shell.
     std::function<void(const QString &)> pickProfile;
     QObject::connect(&compositor, &QLocalServer::newConnection, [&] {
@@ -282,6 +286,22 @@ int main(int argc, char **argv) {
                 requests.push_back(QString::fromUtf8(request).trimmed());
                 client->write(powerRefusal.isEmpty() ? QByteArray("ok\n")
                                                      : ("error: " + powerRefusal + "\n").toUtf8());
+                client->disconnectFromServer();
+            } else if (request == "get monitors\n") {
+                client->write("ok\n" + monitorsReply);
+                client->disconnectFromServer();
+            } else if (request.startsWith("monitors ")) {
+                requests.push_back(QString::fromUtf8(request).trimmed());
+                const bool trial = request.startsWith("monitors apply ") || request == "monitors reset\n";
+                if (trial && !monitorsRefusal.isEmpty()) {
+                    client->write(("error: " + monitorsRefusal + "\n").toUtf8());
+                } else if (trial) {
+                    client->write("ok\n15000\n");
+                    subscriber->write("monitors-trial 15000\n");
+                } else {
+                    client->write("ok\n");
+                    subscriber->write(request == "monitors keep\n" ? "monitors-kept\n" : "monitors-reverted asked\n");
+                }
                 client->disconnectFromServer();
             } else if (request == "session list\n") {
                 if (holdSessions) { // answered later, by the test
@@ -4720,6 +4740,176 @@ ListModel {
         if (!rewrite(lua))
             return fail("could not restore the configuration");
         controller.reload();
+    }
+    // The display settings window. Quick Settings opens it on this monitor, which the compositor
+    // says is beside another; a click selects a monitor and a drag moves it, snapping beside the
+    // other. A setting changed and Apply put every monitor's settings on trial, and the question
+    // counts down with the keyboard on Revert: Keep keeps them, Escape takes them back, and a
+    // trial that runs out says so. A refusal says why. HDR shows only where it can be had, else
+    // why not; the last monitor showing the desktop stays on. Reset to configuration, the palette's
+    // entry, and closing, which takes a trial back.
+    {
+        DisplaySettingsView window(controller, app.primaryScreen());
+        if (window.status() != QQuickView::Ready) {
+            for (const auto &error : window.errors())
+                std::cerr << error.toString().toStdString() << '\n';
+            return 1;
+        }
+        auto *settings = controller.displaySettings();
+        auto item = [&](const QString &name) { return find(window.rootObject(), name); };
+        auto monitor = [](DisplaySettings *settings, const QString &name) {
+            for (const auto &entry : settings->monitors())
+                if (entry.toMap()["name"] == name)
+                    return entry.toMap();
+            return QVariantMap();
+        };
+        auto inWindow = [&](const QString &name) {
+            auto *found = item(name);
+            return found && found->isVisible() && found->window() == &window;
+        };
+        auto trialShown = [&] { return item("displayTrial")->property("opacity").toReal() == 1; };
+        auto trialGone = [&] { return !item("displayTrial")->isVisible(); };
+        monitorsReply = (output +
+                         "\tTest Maker Panel 1\t0\tconfig\t1\ton\t-\t0\t0\t1280x720@60.000\t1\t0\t-\t8\t8\toff\tsdr\t"
+                         "the monitor does not offer BT.2020 with PQ\t1\t1280x720@60.000*\n"
+                         "EXT-1\tOther Maker Monitor 2\t0\tdefault\t1\ton\t-\t1280\t0\t1920x1080@60.000\t1\t0\toff\t8\t8\t"
+                         "off\tsdr\t-\t0\t1920x1080@60.000*,1920x1080@144.000,1280x720@60.000\n").toUtf8();
+        // Quick Settings' entry closes the flyout and opens the window on this monitor.
+        auto *button = find(view.rootObject(), "quickSettingsButton");
+        auto *quick = find(view.rootObject(), "quickSettings");
+        click(button);
+        if (!quick || !QTest::qWaitFor([&] { return inPopover(quick); }) || !find(quick, "quickDisplaySettings"))
+            return fail("Quick Settings did not open with its display settings entry");
+        QTest::qWait(50); // laid out
+        click(find(quick, "quickDisplaySettings"));
+        if (!QTest::qWaitFor([&] { return window.isVisible() && !popover->isVisible(); }) ||
+            settings->output() != output ||
+            !QTest::qWaitFor([&] { return settings->monitors().size() == 2 && !settings->busy(); }) ||
+            settings->selected() != output || !inWindow("displayTile:" + output) || !inWindow("displayTile:EXT-1"))
+            return fail("Quick Settings' entry did not open the display settings window on the monitors");
+        QTest::qWait(50); // laid out
+        if (!window.rootObject()->hasActiveFocus() && !QTest::qWaitFor([&] { return window.rootObject()->hasActiveFocus(); }))
+            return fail("the display settings window did not take the keyboard");
+        // The monitor is chosen by a click on it; this one has HDR to be had, the other says why
+        // it has not.
+        click(item("displayTile:EXT-1"));
+        if (!QTest::qWaitFor([&] { return settings->selected() == "EXT-1"; }) || !inWindow("displayHdr") ||
+            inWindow("displayHdrUnavailable") || !inWindow("displayVrr"))
+            return fail("a click did not choose a monitor, or HDR does not show where it can be had");
+        click(item("displayTile:" + output));
+        if (!QTest::qWaitFor([&] { return settings->selected() == output; }) || inWindow("displayHdr") ||
+            !inWindow("displayHdrUnavailable") ||
+            !item("displayNote")->property("text").toString().contains("HDR cannot be had: the monitor does not offer BT.2020 with PQ."))
+            return fail("a monitor without HDR does not say why");
+        // A drag of EXT-1 to below this monitor puts it there, snapping under it.
+        {
+            auto *tile = item("displayTile:EXT-1");
+            auto *mine = item("displayTile:" + output);
+            const QPoint from = centre(tile);
+            const QPointF below = mine->mapToScene(QPointF(mine->width() / 2, mine->height() * 1.6));
+            QTest::mousePress(&window, Qt::LeftButton, Qt::NoModifier, from);
+            for (int step = 1; step <= 10; ++step)
+                QTest::mouseMove(&window, (QPointF(from) + (below - QPointF(from)) * step / 10.0).toPoint(), 10);
+            const bool ghost = item("displayGhost")->isVisible();
+            QTest::mouseRelease(&window, Qt::LeftButton, Qt::NoModifier, below.toPoint());
+            const auto ext = monitor(settings, "EXT-1");
+            if (!ghost || ext["y"].toInt() != 720 || ext["x"].toInt() < -1919 || ext["x"].toInt() > 1279 ||
+                settings->selected() != "EXT-1" || !settings->changed())
+                return fail("a drag did not move a monitor under the other, showing where it would snap");
+        }
+        // A setting through the keyboard: Down on the scale takes the next.
+        settings->reload();
+        if (!QTest::qWaitFor([&] { return !settings->changed() && !settings->busy(); }))
+            return fail("the display settings did not read the monitors again");
+        settings->select("EXT-1");
+        item("displayScale")->forceActiveFocus();
+        QTest::keyClick(&window, Qt::Key_Down);
+        if (!QTest::qWaitFor([&] { return monitor(settings, "EXT-1")["scale"].toDouble() == 1.25; }) ||
+            !item("displayApply")->isEnabled())
+            return fail("Down on the scale did not take the next one");
+        // Apply: every monitor's settings on trial, the question counting down from 15 seconds
+        // with the keyboard on Revert.
+        requests.clear();
+        click(item("displayApply"));
+        if (!QTest::qWaitFor([&] { return trialShown() && settings->trial(); }) || requests.size() != 1 ||
+            !requests[0].startsWith("monitors apply " + output + " enabled=on mode=1280x720@60.000 scale=1 ") ||
+            !requests[0].contains(" EXT-1 enabled=on mode=1920x1080@60.000 scale=1.25 transform=0 position=1280,0 vrr=off ") ||
+            !item("displayCountdown")->property("text").toString().contains("15 seconds") ||
+            !QTest::qWaitFor([&] { return item("displayRevert")->hasActiveFocus(); }))
+            return fail("Apply did not put the settings on trial and ask whether to keep them");
+        if (item("displayApply")->isEnabled() || item("displayResolution")->isEnabled())
+            return fail("the window could be changed while settings were on trial");
+        click(item("displayKeep"));
+        if (!QTest::qWaitFor([&] { return trialGone() && !settings->trial(); }) || !requests.contains("monitors keep"))
+            return fail("Keep did not keep the settings");
+        // Again, and Escape takes them back.
+        settings->setScale("EXT-1", 1.5);
+        click(item("displayApply"));
+        if (!QTest::qWaitFor([&] { return trialShown(); }))
+            return fail("Apply did not put the settings on trial again");
+        QTest::keyClick(&window, Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return trialGone(); }) || !requests.contains("monitors revert") || !window.isVisible())
+            return fail("Escape on the question did not take the settings back, leaving the window open");
+        // A trial that runs out says so.
+        subscriber->write("monitors-trial 1000\n");
+        if (!QTest::qWaitFor([&] { return trialShown(); }) ||
+            !item("displayCountdown")->property("text").toString().contains("1 second."))
+            return fail("a trial the compositor told of did not ask whether to keep it");
+        subscriber->write("monitors-reverted timeout\n");
+        if (!QTest::qWaitFor([&] { return trialGone(); }) ||
+            item("displayMessage")->property("text") != "The settings were not kept; the previous ones are back.")
+            return fail("a trial that ran out did not say so");
+        // A refusal says why.
+        monitorsRefusal = "EXT-1 refused these settings; nothing changed";
+        settings->setScale("EXT-1", 2);
+        click(item("displayApply"));
+        if (!QTest::qWaitFor([&] {
+                return item("displayMessage")->property("text") == "EXT-1 refused these settings; nothing changed.";
+            }) || settings->trial())
+            return fail("a refusal did not say why");
+        monitorsRefusal.clear();
+        // The last monitor showing the desktop stays on: with EXT-1 off, this one cannot be.
+        settings->select("EXT-1");
+        click(item("displayEnabled"));
+        if (!QTest::qWaitFor([&] { return inWindow("displayChip:EXT-1") && !inWindow("displayTile:EXT-1"); }))
+            return fail("a monitor turned off did not leave the arrangement for the row under it");
+        click(item("displayTile:" + output));
+        if (!QTest::qWaitFor([&] { return settings->selected() == output; }) || item("displayEnabled")->isEnabled())
+            return fail("the last monitor showing the desktop could be turned off");
+        click(item("displayChip:EXT-1"));
+        if (!QTest::qWaitFor([&] { return settings->selected() == "EXT-1"; }))
+            return fail("a click on a monitor under the arrangement did not choose it");
+        // Reset to configuration, where the window's settings are kept, puts the configuration's on
+        // trial.
+        monitorsReply.replace("\tdefault\t", "\twindow\t");
+        settings->reload();
+        if (!QTest::qWaitFor([&] { return item("displayReset")->isEnabled(); }))
+            return fail("Reset to configuration is not offered where the window's settings are kept");
+        requests.clear();
+        click(item("displayReset"));
+        if (!QTest::qWaitFor([&] { return trialShown(); }) || requests.value(0) != "monitors reset")
+            return fail("Reset to configuration did not put the configuration's settings on trial");
+        // Closing takes a trial back; the cross closes.
+        click(item("displaySettingsClose"));
+        if (!QTest::qWaitFor([&] { return !window.isVisible() && !settings->open(); }) ||
+            !requests.contains("monitors revert"))
+            return fail("closing during a trial did not take it back");
+        // The command palette offers it, through the compositor's action.
+        const auto entries = controller.palette()->entries(nullptr);
+        if (std::none_of(entries.begin(), entries.end(), [](const QVariant &entry) {
+                return entry.toMap()["title"] == "Display settings" && entry.toMap()["target"] == "display_settings";
+            }))
+            return fail("the command palette does not offer the display settings");
+        // The compositor's display-settings line opens it; Escape closes it.
+        subscriber->write(("display-settings " + output + "\n").toUtf8());
+        if (!QTest::qWaitFor([&] { return window.isVisible(); }))
+            return fail("the compositor's display-settings line did not open the window");
+        QTest::qWait(50);
+        window.rootObject()->forceActiveFocus();
+        QTest::keyClick(&window, Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !window.isVisible() && !settings->open(); }))
+            return fail("Escape did not close the display settings window");
+        monitorsReply.clear();
     }
     // Quick Settings' media card: the current player's track and controls, the other players a
     // step away, and none without a player or with shell.widgets.media off. The players are put
