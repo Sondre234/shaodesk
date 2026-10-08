@@ -60,6 +60,7 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
     subscribe();
     notifications_.configure(config_.notifications);
     osd_.configure(config_.osd);
+    connect(&displayModes_, &DisplayModes::request, this, &ShellController::send);
     power_.setCountdown(config_.power.countdown);
     connect(&power_, &Power::failed, this, &ShellController::report);
     connect(notifications_.cards(), &NotificationModel::countChanged, this,
@@ -714,6 +715,8 @@ void ShellController::subscribe() {
                         osd_.show(words[1] == "-" ? overlayOutput() : words[1],
                                   QStringList(words.mid(3)).join(' '), percent);
                 }
+                continue;
+            } else if (displayModes_.handle(line)) {
                 continue;
             } else if (line.startsWith("notifications ")) {
                 Q_EMIT notificationsRequested(line.sliced(14));

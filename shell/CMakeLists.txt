@@ -54,6 +54,8 @@ set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_ima
 # What the compositor passes on from the volume, microphone and brightness keys, which feeds the
 # on-screen display too.
 list(APPEND SHAODESK_NOTIFY_SOURCES volume_keys.cpp volume_keys.hpp)
+# The display mode popup's model, which the controller holds too.
+list(APPEND SHAODESK_NOTIFY_SOURCES display_modes.cpp display_modes.hpp)
 # The QML is compiled ahead of time into the binary (qmlcachegen), so starting the shell parses
 # and compiles none of it. It lives at qrc:/shell/ShaodeskShell/*.qml.
 qt_add_library(shaodesk_shell_qml STATIC)
@@ -390,6 +392,16 @@ if(BUILD_TESTING)
     target_link_libraries(volume_keys_test PRIVATE shaodesk_config Qt6::Core Qt6::Test)
     add_test(NAME shell_volume_keys COMMAND volume_keys_test)
     set_tests_properties(shell_volume_keys PROPERTIES TIMEOUT 30)
+    # The display mode popup's model.
+    add_executable(display_modes_test ${PROJECT_SOURCE_DIR}/tests/display_modes_test.cpp
+        display_modes.cpp display_modes.hpp)
+    set_target_properties(display_modes_test PROPERTIES AUTOMOC ON)
+    target_include_directories(display_modes_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(display_modes_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(display_modes_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(display_modes_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME shell_display_modes COMMAND display_modes_test)
+    set_tests_properties(shell_display_modes PROPERTIES TIMEOUT 30)
     # Which window's process plays a stream of the sound server, on a made-up procfs and the real
     # one.
     add_executable(window_sound_test ${PROJECT_SOURCE_DIR}/tests/window_sound_test.cpp
