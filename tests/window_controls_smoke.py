@@ -87,8 +87,9 @@ with harness.Compositor(compositor, config("traffic_lights")) as desktop:
     pointer("move", *point("A", MINIMIZE), "click", "left")
     wait_for(lambda: windows()["A"][2] == "1", "minimize light minimized A")
     pointer("move", *point("B", CLOSE), "click", "left")
-    wait_for(lambda: "B" not in windows(), "close light closed B")
+    # The client exits as its window closes; reaped first, its exit fails no wait.
     assert desktop.reap(second) == 0
+    wait_for(lambda: "B" not in windows(), "close light closed B")
 
     # Fullscreen fills the screen, and the light there brings the window back.
     third = open_window("C")
@@ -102,7 +103,7 @@ with harness.Compositor(compositor, config("traffic_lights")) as desktop:
     wait_for(lambda: frames()["C"][3] == "flat", "reload switched the controls")
     width = int(windows()["C"][6])
     pointer("move", *point("C", (100, 100)), "move", *point("C", (width - 20, 20)), "click", "left")
-    wait_for(lambda: "C" not in windows(), "flat close button closed C")
     assert desktop.reap(third) == 0
+    wait_for(lambda: "C" not in windows(), "flat close button closed C")
 print("Traffic lights show near their corner, act on a click, and give way to the flat strip"
       + ("" if grim else " (pixels not checked: grim missing)"))
