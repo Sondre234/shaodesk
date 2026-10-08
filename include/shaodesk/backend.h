@@ -430,6 +430,10 @@ struct sh_callbacks {
     /* Starts the program of the SH_SPAWN that key, button, command or hot_corner returned
      * last, or for SH_TERMINAL the terminal. False, with the reason, when it cannot. */
     bool (*launch)(void *, enum sh_action action, char *error, size_t error_size);
+    /* What XDG autostart did as the session started, for `get autostart`: a line per desktop
+     * entry with its file name, "started", "skipped" or "failed", the command it ran or why
+     * not, and its file, separated by tabs. "" when autostart did not run. */
+    const char *(*autostart)(void *);
 };
 
 enum sh_backend_mode { SH_BACKEND_NESTED, SH_BACKEND_HEADLESS, SH_BACKEND_SESSION };

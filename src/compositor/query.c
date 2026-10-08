@@ -553,6 +553,14 @@ static void describe_surface(struct sh_server *server, int fd, const char *what,
     control_reply(fd, line);
 }
 
+/* What XDG autostart started or skipped as the session started, and why (main.cpp). */
+static void get_autostart(struct sh_server *server, int fd, const char *arguments) {
+    const struct sh_callbacks *callbacks = server->callbacks;
+    control_reply(fd, "ok\n");
+    if (callbacks->autostart)
+        control_reply(fd, callbacks->autostart(callbacks->userdata));
+}
+
 static void get_seat(struct sh_server *server, int fd, const char *arguments) {
     // What has the keyboard, what the pointer is on, and, while a drag is under way, what it is
     // over (each as describe_surface has it). During a drag the pointer is on nothing: its events
@@ -599,6 +607,7 @@ static const struct {
     {"power", get_power, false},
     {"pictures", get_pictures, false},
     {"seat", get_seat, false},
+    {"autostart", get_autostart, false},
 };
 
 /* Answers `request` if it is a query; false if it is not one. */

@@ -161,6 +161,10 @@ service may also open in the host session instead.
 started a D-Bus session bus, as is usual without systemd, it starts one with `dbus-run-session`:
 notifications, the tray and portals need one.
 
+A standalone session starts the `startup` commands of the configuration and then the
+applications set to start at login, the XDG autostart entries in `~/.config/autostart` and
+`/etc/xdg/autostart` (see [Starting the session](docs/features.md#starting-the-session)).
+
 Without `~/.config/shaodesk/init.lua`, the installed [config/init.lua](config/init.lua) is
 used. It starts in the macOS style; the profiles in the system menu (the spiral at the top left)
 switch to dark or to the taskbar. Super + R opens Launchpad (the start menu in the taskbar),

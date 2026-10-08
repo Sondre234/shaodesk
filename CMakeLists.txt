@@ -29,7 +29,8 @@ option(SHAODESK_SHELL_PREVIEW_ONLY "Build only the shell UI preview without Laye
 
 add_library(shaodesk_config STATIC src/curve.c src/session.c src/tabs.c src/config.cpp src/config_schema.cpp src/layout.cpp src/tiling.cpp
     src/overview_layout.cpp src/window_placement.cpp
-    src/import/common.cpp src/import/hyprland.cpp src/import/waybar.cpp src/import/import.cpp)
+    src/import/common.cpp src/import/hyprland.cpp src/import/waybar.cpp src/import/import.cpp
+    src/autostart.cpp)
 target_include_directories(shaodesk_config PUBLIC include)
 target_link_libraries(shaodesk_config PRIVATE shaodesk_effects PkgConfig::LUA PUBLIC PkgConfig::XKB)
 target_compile_options(shaodesk_config PRIVATE -Wall -Wextra -Wpedantic)
@@ -117,6 +118,9 @@ if(BUILD_TESTING)
     add_executable(power_config_tests tests/power_config_tests.cpp)
     target_link_libraries(power_config_tests PRIVATE shaodesk_config)
     add_test(NAME power_config COMMAND power_config_tests)
+    add_executable(autostart_tests tests/autostart_tests.cpp)
+    target_link_libraries(autostart_tests PRIVATE shaodesk_config)
+    add_test(NAME autostart COMMAND autostart_tests)
 endif()
 option(SHAODESK_BUILD_COMPOSITOR "Build the wlroots compositor" ON)
 if(SHAODESK_BUILD_COMPOSITOR)
@@ -502,6 +506,9 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/launch_smoke.py
             $<TARGET_FILE:shaodesk> ${EXAMPLE_CONFIG})
         set_tests_properties(launch_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME autostart_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/autostart_smoke.py $<TARGET_FILE:shaodesk>)
+        set_tests_properties(autostart_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME startup_failure_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/startup_failure_smoke.py
             $<TARGET_FILE:shaodesk> ${EXAMPLE_CONFIG})

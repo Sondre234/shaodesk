@@ -225,6 +225,15 @@ shadows.
 - `shaodesk msg get seat` says what has the keyboard, what the pointer is on, and what a drag is
   over.
 
+### Starting and ending a session
+
+- A standalone session starts the XDG autostart entries after `startup`, so applications' "start
+  at login" settings work: `~/.config/autostart` over `/etc/xdg/autostart` by file name, skipping
+  `Hidden`, `OnlyShowIn`/`NotShownIn` that leave shaodesk out, a missing `TryExec`, entries
+  GNOME's setting turns off, and another notification daemon or tray watcher while the shell's
+  is on. `autostart = { xdg = false }` turns it off, `autostart.exclude` leaves entries out by
+  file name, and `shaodesk msg get autostart` lists what was started or skipped, and why.
+
 ### Working on the shell
 
 - `shaodesk-shell --preview-popup NAME` shows one of the taskbar's popups or overlays on stand-in

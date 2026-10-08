@@ -1284,6 +1284,46 @@ The tests use a bus of their own and `tray_probe`, an item with a menu of every 
 menus), `shell_ui` (clicks, the wheel and the menu in the panel) and `tray_smoke` (a headless
 compositor with two monitors and the shell, checked with screenshots).
 
+## Starting the session
+
+`startup` in the configuration lists commands the compositor starts once, as it starts (not on
+a reload). A standalone session (`--session`, as a display manager or `shaodesk-session` starts
+it) then starts the XDG autostart entries: the desktop files applications put in
+`~/.config/autostart` (`$XDG_CONFIG_HOME/autostart`) when told to start at login, and those the
+system has in `/etc/xdg/autostart` (the `autostart` directory of each of `$XDG_CONFIG_DIRS`). As
+the [specification](https://specifications.freedesktop.org/autostart-spec/latest/) says, a file in
+your directory hides the system's of the same name, so a copy that says `Hidden=true` turns a
+system-wide entry off. An entry is skipped when it says `Hidden=true` or
+`X-GNOME-Autostart-enabled=false`, when its `OnlyShowIn` leaves out `shaodesk` (the session's
+`XDG_CURRENT_DESKTOP`) or its `NotShownIn` names it, when the program its `TryExec` names is not
+installed, and when it would run in a terminal (`Terminal=true`). Its `Exec` line is split into
+arguments as the specification says (single quotes too, as GLib and KDE take them), the field codes
+for files and URLs (`%f`, `%F`, `%u`, `%U`) are left out, and the program starts in the entry's
+`Path` when it has one. A nested session starts none of them: the host session has already.
+
+Entries for what the shell does itself are skipped as well, so that two programs do not fight
+over it: another notification daemon while the shell's is on (`notifications.enabled`), and
+another tray watcher (`org.kde.StatusNotifierWatcher`) while the shell's tray is on
+(`shell.widgets.tray`). They are told by the program the entry runs (after an `env` and its
+settings), its `TryExec` or its file name: dunst, mako, swaync, fnott, notify-osd, wired, and any
+name with `notifyd`, `notificationd`, `notification-daemon` or `notification-center` in it
+(xfce4-notifyd, lxqt-notificationd, mate-notification-daemon) are notification daemons; snixembed,
+status-notifier-watcher and the indicator-application-service of Ayatana and Ubuntu are tray
+watchers. xembedsniproxy, which shows the old X11 tray icons through the shell's watcher, is
+started.
+
+```lua
+autostart = {
+    xdg = true, -- false starts none of them
+    exclude = { "org.kde.discover.notifier.desktop" }, -- file names, in either directory
+},
+```
+
+`shaodesk msg get autostart` prints a tab-separated line per entry: its file name, `started`,
+`skipped` or `failed`, the command it ran or why not, and the file that counts. It prints nothing
+when autostart did not run (a nested session, or `xdg = false`); the session log counts what was
+started and skipped, and says why an entry failed to start.
+
 ## Sessions
 
 `shaodesk msg session save NAME` writes what the desktop looks like to

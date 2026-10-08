@@ -249,6 +249,9 @@ return {
     -- The screen locker the lock action starts ({} for none):
     -- power = { lock_command = { "swaylock", "-f" } },
     startup = {}, -- e.g. { { "kitty" } }
+    -- A standalone session then starts the XDG autostart entries (~/.config/autostart,
+    -- /etc/xdg/autostart), but for those named here:
+    -- autostart = { xdg = true, exclude = { "org.kde.discover.notifier.desktop" } },
     bindings = {
         -- Mouse buttons bind too: left, right, middle, side, extra (most mice's back and
         -- forward thumb buttons), forward, back. app_id (a regular expression) limits one to
