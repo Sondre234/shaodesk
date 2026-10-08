@@ -1716,7 +1716,7 @@ started and skipped, and says why an entry failed to start.
 `$XDG_STATE_HOME/shaodesk/sessions/NAME` (`~/.local/state/shaodesk/sessions`): each monitor's
 current workspace, tiling on or off and the tiling layouts of its workspaces, and for every
 window its monitor, workspace, floating place, tiled, floating, minimized, sticky, maximized,
-fullscreen, scratchpad and focus state, the app ID and title to find it by, and the command line
+fullscreen, scratchpad, kept-above and focus state, the app ID and title to find it by, and the command line
 it was started with. `session restore NAME` puts every window that matches back where it was (app
 ID and title first, then app ID alone; a window is matched once), switches the monitors to their
 saved workspaces and refocuses the window that had focus. Windows of applications that are no

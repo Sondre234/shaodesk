@@ -30,6 +30,7 @@ enum sh_session_flag {
     SH_SESSION_MAXIMIZED = 32,
     SH_SESSION_SCRATCHPAD = 64,
     SH_SESSION_FOCUSED = 128,  /* had the keyboard focus */
+    SH_SESSION_ABOVE = 256,    /* kept above the other windows */
 };
 
 struct sh_session_output {

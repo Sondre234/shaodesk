@@ -85,7 +85,8 @@ static void session_capture(struct sh_server *server, struct sh_session *session
                         ? SH_SESSION_MAXIMIZED
                         : 0) |
                    (toplevel->scratchpad ? SH_SESSION_SCRATCHPAD : 0) |
-                   (server->focused_toplevel == toplevel ? SH_SESSION_FOCUSED : 0);
+                   (server->focused_toplevel == toplevel ? SH_SESSION_FOCUSED : 0) |
+                   (toplevel->above ? SH_SESSION_ABOVE : 0);
         // A tile is saved with the place it floats at; a window that has none floats on its tile.
         struct wlr_box box = toplevel_box(toplevel);
         if (toplevel->tiled && toplevel->restore_box.width > 0 && toplevel->restore_box.height > 0)
@@ -212,6 +213,7 @@ static void session_place(struct sh_server *server, struct sh_toplevel *toplevel
         place_by_hand(toplevel, SH_MAXIMIZE);
     if (saved->flags & SH_SESSION_STICKY && settings->sticky)
         set_sticky(toplevel, true, false);
+    set_above(toplevel, saved->flags & SH_SESSION_ABOVE);
     wlr_scene_node_set_enabled(&toplevel->scene_tree->node, toplevel_visible(toplevel));
     if (saved->flags & SH_SESSION_SCRATCHPAD)
         hide_in_scratchpad(toplevel);
@@ -437,6 +439,7 @@ bool session_claim(struct sh_server *server, struct sh_toplevel *toplevel,
         rule->fullscreen = saved->flags & SH_SESSION_FULLSCREEN;
         rule->maximize = saved->flags & SH_SESSION_MAXIMIZED;
         rule->sticky = saved->flags & SH_SESSION_STICKY;
+        rule->above = saved->flags & SH_SESSION_ABOVE;
         rule->no_focus = !(saved->flags & SH_SESSION_FOCUSED);
         rule->width = rule->height = 0;
         rule->position = SH_RULE_POSITION_UNSET;
