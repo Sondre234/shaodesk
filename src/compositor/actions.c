@@ -303,6 +303,9 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
     case SH_MEDIA_STOP:
         send_shell_line(server, "media stop\n");
         break;
+    case SH_CLIPBOARD_HISTORY:
+        request_shell(server, "clipboard");
+        break;
     case SH_POWER_OFF:
     case SH_REBOOT:
     case SH_SUSPEND:

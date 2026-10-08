@@ -214,6 +214,9 @@ enum sh_action {
      * panel alone or the other monitors alone (enum sh_display_mode); without one, a popup that
      * steps through the four. */
     SH_DISPLAY_MODE,
+    /* Asks the shell for its clipboard history on the output under the pointer, as Windows'
+     * Win+V. */
+    SH_CLIPBOARD_HISTORY,
 };
 
 /* The display_mode action's choices. */

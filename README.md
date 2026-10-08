@@ -261,6 +261,7 @@ Edit them in [config/init.lua](config/init.lua).
 | Super + Escape | [Power menu](docs/features.md#power): lock, suspend, hibernate, restart, power off, log out |
 | Super + Shift + Escape | Take the keys back from a virtual machine, remote desktop or game [holding them](docs/features.md#applications-that-take-the-shortcuts), or give them back to it (`toggle_shortcuts_inhibit`) |
 | Super + V | Float or tile the focused window |
+| Super + Shift + V | [Clipboard history](docs/features.md#clipboard-history): what was copied lately, to copy again |
 | Super + F | Fullscreen |
 | Super + T | Arrange the monitor's windows in a grid (floating mode) |
 | Super + S | [Tiling](docs/features.md#tiling) on or off for the focused monitor |

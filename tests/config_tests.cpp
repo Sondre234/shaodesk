@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
     try {
         require(argc == 2, "example config path required");
         auto config = shaodesk::load_config(argv[1]);
-        require(config.bindings.size() == 84, "example shortcuts missing");
+        require(config.bindings.size() == 85, "example shortcuts missing");
         auto *louder = config.binding(0, XKB_KEY_XF86AudioRaiseVolume);
         auto *microphone = config.binding(0, XKB_KEY_XF86AudioMicMute);
         auto *dimmer = config.binding(0, XKB_KEY_XF86MonBrightnessDown);
@@ -845,6 +845,20 @@ int main(int argc, char **argv) {
         rejects("return {shell={search={web='https://example.org/search'}}}");
         rejects("return {shell={search={web='file:///etc/%s'}}}");
         rejects("return {shell={search={web=1}}}");
+        // The clipboard history: on, 50 entries, pictures too, in memory only by default.
+        require(even.shell.clipboard.enabled && even.shell.clipboard.max_entries == 50 &&
+                    even.shell.clipboard.images && !even.shell.clipboard.persist,
+                "the clipboard history does not default to on, 50 entries, pictures, in memory");
+        auto clipboard = shaodesk::parse_config(
+            "return {shell={clipboard={enabled=false,max_entries=500,images=false,persist=true}}}");
+        require(!clipboard.shell.clipboard.enabled && clipboard.shell.clipboard.max_entries == 500 &&
+                    !clipboard.shell.clipboard.images && clipboard.shell.clipboard.persist,
+                "shell.clipboard not parsed");
+        rejects("return {shell={clipboard=true}}");
+        rejects("return {shell={clipboard={max_entries=0}}}");
+        rejects("return {shell={clipboard={max_entries=501}}}");
+        rejects("return {shell={clipboard={persist='yes'}}}");
+        rejects("return {shell={clipboard={size=10}}}");
         using shaodesk::WidgetPlace;
         auto widgets = shaodesk::parse_config(
             "return {shell={widgets={battery=false,calendar=false,workspaces=false}}}");
@@ -916,7 +930,7 @@ int main(int argc, char **argv) {
         // A configuration extending the defaults holds only its changes.
         setenv("SHAODESK_DEFAULT_CONFIG", argv[1], 1);
         auto bare = shaodesk::parse_config("return {extends='default'}");
-        require(bare.bindings.size() == 84 && bare.shell.launchers.empty() &&
+        require(bare.bindings.size() == 85 && bare.shell.launchers.empty() &&
                     bare.settings.workspaces == 4,
                 "extends did not supply the defaults");
         auto layered = shaodesk::parse_config(
@@ -926,7 +940,7 @@ int main(int argc, char **argv) {
             "{mods={'Super'}, key='e', action='spawn', command={'dolphin'}}}}");
         require(layered.settings.gap_inner == 3 && layered.settings.workspaces == 4,
                 "extending configuration settings not layered over the defaults");
-        require(layered.bindings.size() == 84 && !layered.binding(SH_LOGO, XKB_KEY_v),
+        require(layered.bindings.size() == 85 && !layered.binding(SH_LOGO, XKB_KEY_v),
                 "action none did not remove a default binding");
         require(layered.binding(SH_LOGO, XKB_KEY_q)->command == shaodesk::Command{"foot"} &&
                     layered.binding(SH_LOGO, XKB_KEY_e)->command == shaodesk::Command{"dolphin"},

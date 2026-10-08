@@ -5,6 +5,7 @@
 #include "controller.hpp"
 #include "system_status.hpp"
 #include "view.hpp"
+#include <QBuffer>
 #include <QDir>
 #include <QFile>
 #include <QLinearGradient>
@@ -514,7 +515,7 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
 QStringList PreviewData::surfaces() {
     return {"osd-volume", "osd-text", "cards",    "power-dialog",
             "palette", "switcher", "overview", "palette-empty", "auth-dialog", "snap-assist",
-            "osd-microphone", "display-mode", "palette-calculator", "palette-files"};
+            "osd-microphone", "display-mode", "palette-calculator", "palette-files", "clipboard"};
 }
 
 namespace {
@@ -614,6 +615,31 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
                    {{"unix-user:" + QString::number(getuid()), "ada", "Ada Lovelace", getuid()},
                     {"unix-user:0", "root", "", 0}}},
                   {});
+    } else if (name == "clipboard") {
+        file = "ClipboardPicker.qml";
+        properties = {{"screenSize", ShellView::previewSize()}, {"shown", true}};
+        // What was copied lately: text, a picture, the second pinned.
+        QImage picture(640, 400, QImage::Format_RGB32);
+        {
+            QPainter painter(&picture);
+            QLinearGradient gradient(0, 0, 640, 400);
+            gradient.setColorAt(0, QColor("#4a64dc"));
+            gradient.setColorAt(1, QColor("#b8456b"));
+            painter.fillRect(picture.rect(), gradient);
+        }
+        QByteArray png;
+        QBuffer buffer(&png);
+        buffer.open(QIODevice::WriteOnly);
+        picture.save(&buffer, "PNG");
+        controller_.clipboard()->preview(
+            {{{"text/plain", "cmake --build build && ctest --test-dir build"}},
+             {{"text/plain", "Quarterly report: revenue up 12 %, costs flat. The board meets "
+                             "on Thursday to agree the budget for next year."}},
+             {{"image/png", png}},
+             {{"text/plain", "https://example.org/shaodesk/features"}},
+             {{"text/plain", "Robin Lee\n4 Market Street\nOldtown"}}},
+            {1});
+        controller_.clipboard()->toggle(output);
     } else if (paletteQueries().contains(name)) {
         file = "Palette.qml";
         properties = {{"screenSize", ShellView::previewSize()}, {"shown", true}};
@@ -713,7 +739,7 @@ QImage PreviewData::withSurface(QImage desktop) const {
         // bottom.
         at = QPoint((output.width() - size.width()) / 2,
                     controller_.osd()->top() ? 48 : output.height() - controller_.osdBottom() - size.height());
-    } else if (surfaceName_.startsWith("palette")) {
+    } else if (surfaceName_.startsWith("palette") || surfaceName_ == "clipboard") {
         // PaletteView: centred, below the bars by ShellController::paletteDrop.
         at = QPoint(usable.left() + (usable.width() - size.width()) / 2,
                     usable.top() + controller_.paletteDrop(output.height()));

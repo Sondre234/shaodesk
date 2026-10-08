@@ -174,6 +174,17 @@ shadows.
 - Spotlight lists its results by kind under their headings after the top hit, rather than a
   heading for every run of one kind.
 
+### The clipboard history
+
+- `clipboard_history` (Super + Shift + V) opens a history of what was copied in any application,
+  as Windows' Win + V does: text and pictures, newest first, with a search. Enter copies an entry
+  again, and entries can be pinned, forgotten one by one, or cleared but for the pinned. The
+  shell keeps it as a client of the compositor's `ext-data-control-v1`, leaving out what a
+  password manager marks as secret and anything copied while the session is locked, in memory
+  only unless `shell.clipboard.persist` is set; `shell.clipboard` also sets how many entries it
+  keeps, whether pictures too, and turns it off.
+- The control socket's subscribers hear `locked on|off` as the session locks and unlocks.
+
 ### The clock and Quick Settings
 
 - The clock opens one flyout at the bar's right end, as on Windows 11: the notifications above

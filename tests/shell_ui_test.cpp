@@ -2,6 +2,7 @@
 #include "audio.hpp"
 #include "controller.hpp"
 #include "system_status.hpp"
+#include "picker_view.hpp"
 #include "view.hpp"
 #include <QAbstractItemModel>
 #include <QClipboard>
@@ -3693,6 +3694,79 @@ ListModel {
         if (!controller.error().startsWith("Could not open shaodesk-test-scheme:evening: "))
             return fail("a web search from the palette did not ask GIO for the browser");
         controller.clearError();
+    }
+    // The clipboard history's popup: the compositor's clipboard_history action opens it on an
+    // output; it lists what was copied, newest first, searches it, copies an entry again with
+    // Enter (here through Qt's clipboard, without data-control) and closes, pins one with Ctrl+P,
+    // forgets one with Delete, and closes with Escape. The compositor saying the session is
+    // locked stops it keeping anything.
+    {
+        PickerView clipboardView(controller, app.primaryScreen(), "clipboard", "ClipboardPicker.qml",
+                                 controller.clipboard());
+        if (clipboardView.status() != QQuickView::Ready) {
+            for (const auto &error : clipboardView.errors())
+                std::cerr << error.toString().toStdString() << '\n';
+            return 1;
+        }
+        auto *history = controller.clipboard();
+        history->preview({{{"text/plain", "git log --oneline"}},
+                          {{"text/plain", "https://example.org/report"}},
+                          {{"text/plain", "Quarterly numbers"}}});
+        auto texts = [&] {
+            QStringList list;
+            for (const auto &entry : history->entries())
+                list << entry.toMap()["text"].toString();
+            return list;
+        };
+        auto *list = find(clipboardView.rootObject(), "clipboardList");
+        auto shownRows = [&] { return list->property("count").toInt(); };
+        auto type = [&](const QString &text) {
+            for (const auto &c : text)
+                QTest::keyClick(&clipboardView, c.toLatin1());
+        };
+        auto openHistory = [&] {
+            subscriber->write(("clipboard " + output + "\n").toUtf8());
+            return QTest::qWaitFor([&] { return clipboardView.isVisible() && history->output() == output; }) &&
+                   QTest::qWaitFor([&] { return find(clipboardView.rootObject(), "clipboardSearch")->hasActiveFocus(); });
+        };
+        if (!openHistory())
+            return fail("the clipboard_history action did not open the clipboard history");
+        if (texts() != QStringList({"git log --oneline", "https://example.org/report", "Quarterly numbers"}) ||
+            shownRows() != 3)
+            return fail("the clipboard history does not list what was copied, newest first");
+        QGuiApplication::clipboard()->clear();
+        type("example");
+        if (!QTest::qWaitFor([&] { return shownRows() == 1; }))
+            return fail("the clipboard history's search did not narrow it");
+        QTest::keyClick(&clipboardView, Qt::Key_Return);
+        if (!QTest::qWaitFor([&] { return QGuiApplication::clipboard()->text() == "https://example.org/report"; }) ||
+            !QTest::qWaitFor([&] { return !clipboardView.isVisible(); }) || !history->output().isEmpty() ||
+            texts().value(0) != "https://example.org/report")
+            return fail("Enter did not copy the clipboard history's entry again and close it");
+        if (!openHistory() || shownRows() != 3)
+            return fail("the clipboard history did not open afresh");
+        QTest::keyClick(&clipboardView, Qt::Key_P, Qt::ControlModifier);
+        if (!history->entries().value(0).toMap()["pinned"].toBool())
+            return fail("Ctrl+P did not pin the clipboard history's entry");
+        QTest::keyClick(&clipboardView, Qt::Key_Down);
+        QTest::keyClick(&clipboardView, Qt::Key_Delete);
+        if (!QTest::qWaitFor([&] { return shownRows() == 2; }) ||
+            texts() != QStringList({"https://example.org/report", "Quarterly numbers"}))
+            return fail("Delete did not forget the clipboard history's entry");
+        click(find(clipboardView.rootObject(), "clipboardClear"));
+        if (!QTest::qWaitFor([&] { return texts() == QStringList{"https://example.org/report"}; }))
+            return fail("Clear all did not forget all but the pinned entries");
+        QTest::keyClick(&clipboardView, Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !clipboardView.isVisible(); }) || !history->output().isEmpty())
+            return fail("Escape did not close the clipboard history");
+        subscriber->write("locked on\n");
+        if (!QTest::qWaitFor([&] { return history->locked(); }) ||
+            history->record({{"text/plain", "while locked"}}))
+            return fail("the clipboard history kept what was copied while the session was locked");
+        subscriber->write("locked off\n");
+        if (!QTest::qWaitFor([&] { return !history->locked(); }) ||
+            !history->record({{"text/plain", "unlocked"}}))
+            return fail("the clipboard history kept nothing once the session was unlocked");
     }
     // The start menu: its pinned applications and those launched lately, every application from
     // A to Z, and a search over applications, windows and actions, each moved through with the

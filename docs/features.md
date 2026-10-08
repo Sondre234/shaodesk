@@ -1031,6 +1031,40 @@ prefixes (`>`, `@`, `#`, `%`, `=`, `/`) leaves it out, and so says it found noth
 DuckDuckGo is the default (`"https://duckduckgo.com/?q=%s"`); any `http` or `https` address with
 `%s` in it will do, and `shell.search.web = false` leaves the entry out.
 
+## Clipboard history
+
+`clipboard_history` (Super + Shift + V, or `shaodesk msg clipboard_history`) opens the shell's
+history of what was copied, as Windows' Win + V does, on the monitor under the pointer: a card
+near the top of the screen, as the command palette's, in either style. It lists what was copied in
+any application, the pinned entries first and each part newest first: a text by its first three
+lines, a picture small with its size, and when each was copied. Typing searches the texts (every
+word must be in one); Up and Down (or Tab) choose, and Enter or a click copies the entry again and
+closes the card, so that the next paste pastes it. Ctrl + P pins or unpins the entry, Delete (with
+the cursor at the end of the search) forgets it, and Escape clears the search, then closes. A
+row's buttons pin and forget it, and Clear all forgets every entry but the pinned ones.
+
+The shell follows the clipboard as a client of the compositor's `ext-data-control-v1`, on a
+Wayland connection of its own, without taking the keyboard. Of what is copied it keeps the text
+(by its best name, up to 1 MB), HTML and a list of files when they come with it, and a picture
+(PNG, JPEG, WebP, GIF, BMP or TIFF, up to 16 MB), and copies them back under the names they came
+with, the text also as `text/plain`, `UTF8_STRING`, `TEXT` and `STRING`, so that a program pastes
+them as it would the original. Copying something kept already moves it up. It keeps nothing a
+password manager marks as secret (`x-kde-passwordManagerHint` set to `secret`, as KeePassXC does)
+and nothing copied while the session is locked, which the compositor tells it (`locked on|off`).
+The entries are kept in memory only, `shell.clipboard.max_entries` (50) of them besides the
+pinned ones, the oldest going first, unless `shell.clipboard.persist = true` keeps them in
+`$XDG_STATE_HOME/shaodesk/clipboard`, which only the user may read and which is removed while
+persistence is off. `shell.clipboard.images = false` keeps text alone, and
+`shell.clipboard.enabled = false` keeps nothing and forgets what was kept. Without the
+compositor's data-control the history keeps nothing, and copying an entry again goes through Qt's
+clipboard.
+
+Choosing an entry copies it but does not paste it into the window that had the keyboard, as
+Windows does: no keystroke pastes in every program (terminals take Ctrl + Shift + V, Emacs
+Ctrl + Y), and typing what was copied into the window would lose pictures and formatting, so the
+paste stays the user's. `tests/clipboard_smoke.py` and `tests/clipboard_shell_smoke.py` test it
+with a program copying and pasting through data-control.
+
 ## Terminal
 
 The `terminal` action (`shaodesk msg terminal`) opens a terminal: the program and arguments of
@@ -2257,7 +2291,9 @@ opens or a listed window closes, `switcher-select N` as the selection moves (bot
 from 0), and `switcher-close`. ID is the window's number, which the compositor gives each window as
 it appears and never gives another; a taskbar gets the same number for its handle of the window
 from `shaodesk-window-control-v1` (version 4), and so finds the window the line means where two
-share a title. The state ends with `power ACTIONS`, the power actions that may
+share a title. The state tells whether the session is locked, `locked on|off`, again as it locks
+and unlocks (the shell's clipboard history records nothing meanwhile), and ends with
+`power ACTIONS`, the power actions that may
 run (`lock,suspend,reboot,poweroff,logout`, in the order menus list them, or `-`), a power
 action that fails or is cancelled after it was accepted sends `power-error MESSAGE`, a program
 that `spawn` or `terminal` could not start sends `spawn-error MESSAGE` (the panel shows either

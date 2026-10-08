@@ -89,6 +89,9 @@ Item {
         // (drawn in Lucide's manner, not one of its icons).
         "shell": "M14 11a2 2 0 1 1-4 0 4 4 0 0 1 8 0 6 6 0 0 1-12 0 8 8 0 0 1 16 0 10 10 0 1 1-20 0 11.93 11.93 0 0 1 2.42-7.22 2 2 0 1 1 3.16 2.44",
         "toggles": "M7 3h10a4 4 0 0 1 0 8H7a4 4 0 0 1 0-8z M6 7a1 1 0 1 0 2 0a1 1 0 1 0-2 0 M7 13h10a4 4 0 0 1 0 8H7a4 4 0 0 1 0-8z M16 17a1 1 0 1 0 2 0a1 1 0 1 0-2 0",
+        // The clipboard history: its empty state, and deleting an entry.
+        "clipboard": "M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2",
+        "trash-2": "M3 6h18 M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6 M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2 M10 11v6 M14 11v6",
         // The search's files: opening the folder one is in.
         "folder-open": "M6 14l1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"
     })

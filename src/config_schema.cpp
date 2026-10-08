@@ -785,6 +785,20 @@ const Option options[] = {
      "The search engine of the last result, Search the web for “…”, which opens the default "
      "browser at this http or https address, `%s` replaced by the words typed (URL-encoded); "
      "`false` leaves it out."},
+    {"shell.clipboard", "table", "", "", none, none,
+     "The history of what is copied, which `clipboard_history` (Super + Shift + V) opens, as "
+     "Windows' Win + V does."},
+    {"shell.clipboard.enabled", "boolean", "true", "true", none, none,
+     "Keep the history, as a client of the compositor's data-control protocol. What a password "
+     "manager marks as secret (`x-kde-passwordManagerHint`), and anything copied while the "
+     "session is locked, is never kept; `false` keeps nothing."},
+    {"shell.clipboard.max_entries", "integer", "50", "50", 1, 500,
+     "How many entries are kept besides the pinned ones, the oldest going first."},
+    {"shell.clipboard.images", "boolean", "true", "true", none, none,
+     "Keep pictures copied too (PNG, JPEG and the like, up to 16 MB), not only text."},
+    {"shell.clipboard.persist", "boolean", "false", "false", none, none,
+     "Keep the history across sessions in `$XDG_STATE_HOME/shaodesk/clipboard`, readable by "
+     "the user alone; `false` keeps it in memory only, and removes that file."},
     {"shell.workspaces_shown", "integer", "0", "3", 0, 10,
      "How many of the monitor's workspaces the workspace indicator shows, the current one in "
      "the middle: `3` shows it with the one before and the one after, or the first or last "

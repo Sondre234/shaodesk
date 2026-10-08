@@ -529,6 +529,10 @@ static void describe_state(struct sh_server *server, char *state, size_t size) {
                            server->night_mode == SH_NIGHT_ON    ? "on"
                            : server->night_mode == SH_NIGHT_OFF ? "off"
                                                                 : "auto");
+    // "locked on|off": whether the session is locked, for the shell to record nothing then.
+    if (length < size)
+        length += snprintf(state + length, size - length, "locked %s\n",
+                           server->locked ? "on" : "off");
     // "power ACTIONS": the power actions that may run, as "lock,suspend,poweroff", or "-".
     if (length < size) {
         char actions[128];
@@ -581,8 +585,8 @@ static void request_shell_on(struct sh_server *server, const char *what,
     send_event(server, line, (size_t)length);
 }
 
-/* Asks the shell to open something (`what`: "launcher", "palette", "notifications" or
- * "power-menu") on the output under the pointer. */
+/* Asks the shell to open something (`what`: "launcher", "palette", "notifications",
+ * "power-menu" or "clipboard") on the output under the pointer. */
 void request_shell(struct sh_server *server, const char *what) {
     struct wlr_cursor *cursor = server->cursor;
     request_shell_on(server, what,

@@ -68,6 +68,11 @@ set(SHAODESK_AUTH_SOURCES authentication.cpp authentication.hpp)
 # controller; their D-Bus backends only in the shell.
 set(SHAODESK_SERVICE_SOURCES media.cpp media.hpp power_mode.cpp power_mode.hpp wifi.cpp wifi.hpp
     row_model.hpp bluetooth.cpp bluetooth.hpp)
+# The clipboard history, its pictures, and the overlay its popup shows in, in everything that
+# builds the controller.
+set(SHAODESK_PICKER_SOURCES clipboard.cpp clipboard.hpp clipboard_images.hpp picker_view.cpp
+    picker_view.hpp ${PROJECT_BINARY_DIR}/ext-data-control-v1-protocol.c
+    ${PROJECT_BINARY_DIR}/ext-data-control-v1-client-protocol.h)
 set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_images.cpp
     notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp tray.cpp tray.hpp
     tray_images.cpp tray_images.hpp)
@@ -133,7 +138,8 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     WifiList.qml
     WifiPopup.qml
     BluetoothList.qml
-    DisplayMode.qml)
+    DisplayMode.qml
+    ClipboardPicker.qml)
 # The protocols task_model.cpp and window_pictures.cpp speak, generated in the top-level build
 # directory.
 set(SHAODESK_TASK_PROTOCOL_SOURCES
@@ -152,6 +158,7 @@ set_target_properties(shaodesk-shell PROPERTIES AUTOMOC ON RUNTIME_OUTPUT_DIRECT
 target_sources(shaodesk-shell PRIVATE ${SHAODESK_START_SOURCES})
 target_sources(shaodesk-shell PRIVATE ${SHAODESK_AUTH_SOURCES})
 target_sources(shaodesk-shell PRIVATE ${SHAODESK_SERVICE_SOURCES})
+target_sources(shaodesk-shell PRIVATE ${SHAODESK_PICKER_SOURCES})
 target_include_directories(shaodesk-shell PRIVATE ${PROJECT_BINARY_DIR})
 target_link_libraries(shaodesk-shell PRIVATE shaodesk_config Qt6::Core Qt6::Gui Qt6::Network Qt6::Qml Qt6::Quick
     PkgConfig::GIO PkgConfig::SHELL_WAYLAND)
@@ -228,6 +235,7 @@ if(BUILD_TESTING)
     target_sources(shell_ui_test PRIVATE ${SHAODESK_START_SOURCES})
     target_sources(shell_ui_test PRIVATE ${SHAODESK_AUTH_SOURCES})
     target_sources(shell_ui_test PRIVATE ${SHAODESK_SERVICE_SOURCES})
+    target_sources(shell_ui_test PRIVATE ${SHAODESK_PICKER_SOURCES})
     target_include_directories(shell_ui_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
     target_compile_definitions(shell_ui_test PRIVATE QT_NO_KEYWORDS SHAODESK_LAYER_SHELL=0)
     target_compile_options(shell_ui_test PRIVATE -Wall -Wextra -Wpedantic)
@@ -245,6 +253,7 @@ if(BUILD_TESTING)
     target_sources(task_filter_test PRIVATE ${SHAODESK_START_SOURCES})
     target_sources(task_filter_test PRIVATE ${SHAODESK_AUTH_SOURCES})
     target_sources(task_filter_test PRIVATE ${SHAODESK_SERVICE_SOURCES})
+    target_sources(task_filter_test PRIVATE ${SHAODESK_PICKER_SOURCES})
     target_include_directories(task_filter_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
     target_compile_definitions(task_filter_test PRIVATE QT_NO_KEYWORDS SHAODESK_LAYER_SHELL=0)
     target_compile_options(task_filter_test PRIVATE -Wall -Wextra -Wpedantic)
@@ -347,6 +356,20 @@ if(BUILD_TESTING)
         $<TARGET_FILE:wayland_probe> ${EXAMPLE_CONFIG}
         $<TARGET_FILE:task_model_test>)
     set_tests_properties(shell_tasks PROPERTIES TIMEOUT 60)
+    # The clipboard history against a private compositor, with clipboard_probe copying.
+    add_executable(clipboard_test ${PROJECT_SOURCE_DIR}/tests/clipboard_test.cpp
+        clipboard.cpp clipboard.hpp clipboard_images.hpp
+        ${PROJECT_BINARY_DIR}/ext-data-control-v1-protocol.c
+        ${PROJECT_BINARY_DIR}/ext-data-control-v1-client-protocol.h)
+    set_target_properties(clipboard_test PROPERTIES AUTOMOC ON)
+    target_include_directories(clipboard_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
+    target_compile_definitions(clipboard_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(clipboard_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(clipboard_test PRIVATE Qt6::Gui Qt6::Quick Qt6::Test PkgConfig::SHELL_WAYLAND)
+    add_test(NAME shell_clipboard COMMAND ${Python3_EXECUTABLE}
+        ${PROJECT_SOURCE_DIR}/tests/clipboard_smoke.py $<TARGET_FILE:shaodesk>
+        $<TARGET_FILE:clipboard_probe> $<TARGET_FILE:clipboard_test>)
+    set_tests_properties(shell_clipboard PROPERTIES TIMEOUT 120)
     # The window pictures' formats and sizes, without a compositor.
     add_executable(window_pictures_test ${PROJECT_SOURCE_DIR}/tests/window_pictures_test.cpp
         window_pictures.cpp window_pictures.hpp ${SHAODESK_TASK_PROTOCOL_SOURCES})
@@ -424,6 +447,7 @@ if(BUILD_TESTING)
     target_sources(osd_test PRIVATE ${SHAODESK_START_SOURCES})
     target_sources(osd_test PRIVATE ${SHAODESK_AUTH_SOURCES})
     target_sources(osd_test PRIVATE ${SHAODESK_SERVICE_SOURCES})
+    target_sources(osd_test PRIVATE ${SHAODESK_PICKER_SOURCES})
     target_include_directories(osd_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
     target_compile_definitions(osd_test PRIVATE QT_NO_KEYWORDS SHAODESK_LAYER_SHELL=0)
     target_compile_options(osd_test PRIVATE -Wall -Wextra -Wpedantic)
@@ -440,7 +464,7 @@ if(BUILD_TESTING)
         ${SHAODESK_TASK_PROTOCOL_SOURCES})
     set_target_properties(auth_dialog_test PROPERTIES AUTOMOC ON)
     target_sources(auth_dialog_test PRIVATE ${SHAODESK_START_SOURCES} ${SHAODESK_AUTH_SOURCES}
-                   ${SHAODESK_SERVICE_SOURCES})
+                   ${SHAODESK_SERVICE_SOURCES} ${SHAODESK_PICKER_SOURCES})
     target_include_directories(auth_dialog_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
     target_compile_definitions(auth_dialog_test PRIVATE QT_NO_KEYWORDS SHAODESK_LAYER_SHELL=0)
     target_compile_options(auth_dialog_test PRIVATE -Wall -Wextra -Wpedantic)
@@ -605,6 +629,10 @@ if(BUILD_TESTING)
             ${PROJECT_SOURCE_DIR}/tests/overlay_exit_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(overlay_exit_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME clipboard_shell_smoke COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/clipboard_shell_smoke.py $<TARGET_FILE:shaodesk>
+            $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:clipboard_probe>)
+        set_tests_properties(clipboard_shell_smoke PROPERTIES TIMEOUT 60)
         # A few of the gallery's popups and overlays through the GPU (Mesa's software OpenGL, in a
         # private compositor), where effects are drawn. Not under the sanitizers: now and then
         # Qt's Wayland platform leaks a surface of a preview that quits soon after showing.
