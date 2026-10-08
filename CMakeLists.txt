@@ -526,6 +526,9 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/mirror_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:lock_probe>)
         set_tests_properties(mirror_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME display_mode_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/display_mode_smoke.py $<TARGET_FILE:shaodesk>)
+        set_tests_properties(display_mode_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME lid_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/lid_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
