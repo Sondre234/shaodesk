@@ -2,7 +2,8 @@
 """Input methods, as fcitx5 and ibus are: the compositor relays between an application's text
 input (text-input-unstable-v3, `text_input_probe`) and the input method (input-method-unstable-v2,
 `input_method_probe`). The text input of the window with the keyboard activates the input method
-and tells it its surrounding text, content type and text cursor; the input method's preedit,
+as it is enabled, and deactivates it as it is disabled, and tells it its surrounding text, content
+type and text cursor; the input method's preedit,
 committed text and deletions go back to it. Its keyboard grab gets the keys no binding takes, and
 what it passes on through its virtual keyboard reaches the window. Its popup sits under the text
 cursor, kept on the output, above it where there is no room below, drawn over the window and under
@@ -132,6 +133,15 @@ with harness.Compositor(compositor, CONFIG) as desktop:
     desktop.wait_for(lambda: since("ime", mark) == [
         "surrounding hello world 11 11", f"cause {OTHER}",
         f"content_type {SPELLCHECK} {NORMAL}", "done"], "the new surrounding text")
+    # Disabled, as a text field loses focus, the text input turns the input method off; enabled,
+    # on again.
+    mark = len(log("ime"))
+    tell(writer, "disable")
+    desktop.wait_for(lambda: since("ime", mark) == ["deactivate", "done"], "the text input off")
+    assert state()[:2] == ((True, False, False), [(False, False, "Writer")]), state()
+    tell(writer, "enable")
+    desktop.wait_for(lambda: activated("ime", mark + 2, "hello world"), "the text input on")
+    assert state()[:2] == ((True, True, False), [(True, True, "Writer")]), state()
 
     # Its keyboard grab gets the keys no binding takes; a binding still runs, its key never
     # reaching the grab, and the window hears none of them.
