@@ -32,6 +32,10 @@ int main(int argc, char **argv) {
                     microphone->action == SH_MIC_MUTE && dimmer &&
                     dimmer->action == SH_BRIGHTNESS_DOWN,
                 "example volume, microphone and brightness keys missing");
+        // They work on the lock screen, and the steps repeat while held; the mutes do not.
+        require(louder->locked && louder->repeats && microphone->locked && !microphone->repeats &&
+                    dimmer->locked && dimmer->repeats && !config.binding(SH_LOGO, XKB_KEY_q)->locked,
+                "example volume, microphone and brightness keys not locked or repeating");
         require(config.binding(SH_ALT, XKB_KEY_Tab)->action == SH_SWITCHER_NEXT &&
                     config.binding(SH_ALT | SH_SHIFT, XKB_KEY_Tab)->action == SH_SWITCHER_PREV,
                 "example window switcher bindings missing");
