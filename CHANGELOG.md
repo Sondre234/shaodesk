@@ -168,6 +168,11 @@ shadows.
   Enter opens a file in its default application and Ctrl + Enter (or a button) its folder; a
   leading `/` searches only files. `shell.search` turns it off or names other folders, and sets
   how deep and how many names are read.
+- The last result is Search the web for “…”, which opens the default browser at DuckDuckGo with
+  the words; `shell.search.web` names another engine's address, or `false` none. In the start
+  menu it is the best match when nothing else is found.
+- Spotlight lists its results by kind under their headings after the top hit, rather than a
+  heading for every run of one kind.
 
 ### The clock and Quick Settings
 

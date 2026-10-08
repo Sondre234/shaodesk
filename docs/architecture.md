@@ -271,8 +271,8 @@ what was there.
 The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `task_filter.cpp`
 (the taskbar's slots and groups), `audio.cpp` with `pulse_audio.cpp`, `system_status.cpp`
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
-`power.cpp`, `palette.cpp` (with `fuzzy.cpp`, and `calculator.cpp` and `file_index.cpp`, which the
-start menu's search shares). `preview.cpp` has stand-ins for all of them for `--preview-popup`.
+`power.cpp`, `palette.cpp` (with `fuzzy.cpp`, and `calculator.cpp`, `file_index.cpp` and
+`web_search.cpp`, which the start menu's search shares). `preview.cpp` has stand-ins for all of them for `--preview-popup`.
 
 A window is known by its app id alone. `app_match.cpp` finds the desktop entry it belongs to: an
 `app_match::Index` of the entries, which `refreshApps` builds, tries each way of matching from the
