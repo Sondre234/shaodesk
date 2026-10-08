@@ -858,3 +858,29 @@ default ignoring the lid while another monitor is connected, and whether logind 
 monitor as docked while the idle steps or `display_off` have turned it off, or suspends the
 closed laptop then); a convertible's tablet-mode switch; and a switch's binding while the session
 is locked.
+
+## Mirroring and display modes
+
+Added 2026-10-08. `mirror_smoke` mirrors a headless output of 1024 by 768 onto another of 1280 by
+720 and reads the mirror's picture with `headless_output capture`: it leaves the layout and has no
+workspaces, shows the source's desktop and a fullscreen window at 0.8 of their size between black
+bars, the source's (software) cursor where it is, scaled, rotated upright on a mirror turned by 90
+degrees and of a source turned by 90 degrees (against grim's picture of the source), goes off and on
+with its source, holds a lock up, joins the layout while its source is unplugged and leaves it as it
+returns, and joins it on a reload without `mirror`. `display_mode_smoke` takes each of the four
+choices with a headless `eDP-1` beside two monitors, a reload, the popup by XF86Display with the
+arrows, Return and Escape, the primary monitor without a panel, and one monitor;
+`display_mode_shell_smoke` shows the popup in the shell and takes duplicate by a click on it.
+`shell_display_modes` reads the compositor's lines, `output_config` the settings, `import`
+Hyprland's `mirror`, and the gallery pictures the popup in both styles.
+
+Not checked, for want of the hardware here: a mirror on real monitors through DRM, with the GPU
+renderers (sampling the source's scan-out buffers, implicit sync, a source and mirror on two GPUs,
+where importing the buffer may fail and the mirror stays black), at different refresh rates, and
+across a VT switch; a hardware cursor drawn onto the mirror (the headless backend has none, so its
+cursor is in the source's frames), including a client's cursor surface and a rotated or scaled
+source; a direct scan-out on the source (a fullscreen game or video) seen on the mirror; a mirror of
+a source with a gamma table set by `wlsunset` (applied by the source's CRTC, so the mirror shows the
+picture without it); a real laptop's lid with a projector mirroring its panel; the XF86Display key a
+real laptop's Fn key sends (some send Super+P instead, which the palette takes); and kanshi or
+wdisplays beside a mirror.
