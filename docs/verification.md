@@ -912,3 +912,23 @@ Disconnect, the switch and the tile's chevron.
 Not checked: a real NetworkManager (this desktop has none) with a real Wi-Fi card, its polkit
 rules, WPA3 and Enhanced Open access points, scans as NetworkManager rate-limits them, a laptop's
 rfkill switch, and the bars on the bar following a real signal.
+
+## Bluetooth
+
+Added 2026-10-08. The tile, the device list and a pairing question were looked at in the gallery
+in both themes of both styles (`quick-settings-bluetooth`, `quick-settings-pairing`).
+`bluetooth_test` checks the model's lists (the paired devices, connected first; those found while
+looking, with a name, the strongest first), rows kept in place, what the controls ask of BlueZ and
+when they ask nothing, and the answers to its questions. `bluez_dbus_test` drives the backend
+against a stand-in BlueZ on a private bus, which calls the shell's agent as BlueZ does: BlueZ coming
+and going, no agent until asked, the adapter switched and a refusal undone, connecting and a
+connection refused, forgetting, looking for devices (registering the agent once, as the default),
+devices and a battery coming and going, a signal dropped, pairing with a passkey confirmed (then
+trusted and connected), a PIN and a passkey typed, the user's no, a code shown and a pairing
+cancelled from it, BlueZ cancelling a question, and services authorized for paired devices only.
+`shell_ui` clicks through the tile and the list against a stand-in model, typing a PIN.
+
+Not checked: a real BlueZ (this desktop has no Bluetooth adapter) and real devices (headphones,
+keyboards that show a code, phones that confirm a passkey, controllers), batteries BlueZ reads
+from headsets, rfkill blocking the adapter, another agent (blueman, KDE's) running alongside, and a
+device asking to pair by itself.

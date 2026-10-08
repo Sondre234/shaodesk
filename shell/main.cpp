@@ -75,8 +75,9 @@ int main(int argc, char **argv) {
                       "task-menu, stack-menu, pin-menu, group, thumbnails, keyboard, tray-menu, "
                       "tray-submenu, calendar, clock-empty, calendar-years, mixer, outputs, "
                       "profiles, wallpapers, notifications, wifi, "
-                      "quick-settings, quick-settings-mixer, quick-settings-power or "
-                      "quick-settings-wifi; in the macOS style system-menu, "
+                      "quick-settings, quick-settings-mixer, quick-settings-power, "
+                      "quick-settings-wifi, quick-settings-bluetooth or quick-settings-pairing; in "
+                      "the macOS style system-menu, "
                       "app-menu, window-menu or window-submenu too; or an overlay over the bar: "
                       "osd-volume, osd-text, osd-microphone, cards, power-dialog, auth-dialog, "
                       "palette, palette-empty, switcher, overview or snap-assist",

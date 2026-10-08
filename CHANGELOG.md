@@ -192,6 +192,12 @@ shadows.
   and forgetting the connection added for it, when refused), or disconnects. The network widget
   names the network and its signal, and on the bar opens the same list under a switch. Without
   NetworkManager nothing changes; `-DSHAODESK_NETWORKMANAGER=OFF` builds without it.
+- Bluetooth through BlueZ: while it has an adapter, Quick Settings' Bluetooth tile turns it on and
+  off and its chevron lists the paired devices (with their battery where BlueZ reports it) to
+  connect, disconnect and forget, and, after Pair a new device, those in range to pair with, which
+  are then trusted and connected. The shell is BlueZ's agent from the first time it is asked to
+  pair, for passkeys to confirm, PINs and passkeys to type and codes to type on a keyboard.
+  `shell.widgets.bluetooth = false` leaves it out and `-DSHAODESK_BLUETOOTH=OFF` builds without it.
 
 ### Notifications and the overlays
 

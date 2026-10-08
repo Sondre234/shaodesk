@@ -221,13 +221,14 @@ Left of the clock, as on Windows 11, the Quick Settings button shows the volume 
 small icons, and the network only while its link is down, dimmed and struck through as a warning
 (a link that is up shows only in Quick Settings); its wheel changes the volume and a middle click
 mutes. Clicking it opens Quick Settings at the bar's right end: what is playing
-([media controls](#media-controls)), tiles for do-not-disturb, night light (on or off against its
-schedule, through the compositor), tiling on this monitor (greyed out where tiling is not
-available), the [power mode](#power-mode) while power-profiles-daemon runs, the appearance profile
-(listing the profiles under it) and the wallpaper (opening the same picker as the bar's button),
-and [Wi-Fi](#wi-fi) where NetworkManager has a Wi-Fi device, else the network's state on a disc
-rather than a tile, as it is only shown (Wi-Fi, wired or down, and the interface, or
-NetworkManager's name for the connection); a brightness slider where the screen has a backlight
+([media controls](#media-controls)), tiles for [Wi-Fi](#wi-fi) where NetworkManager has a Wi-Fi
+device, [Bluetooth](#bluetooth) while BlueZ has an adapter, do-not-disturb, night light (on or off
+against its schedule, through the compositor), tiling on this monitor (greyed out where tiling is
+not available), the [power mode](#power-mode) while power-profiles-daemon runs, the appearance
+profile (listing the profiles under it) and the wallpaper (opening the same picker as the bar's
+button), and without NetworkManager's Wi-Fi the network's state on a disc rather than a tile, as it
+is only shown (Wi-Fi, wired or down, and the interface, or NetworkManager's name for the
+connection); a brightness slider where the screen has a backlight
 (set through logind's `SetBrightness`, so no privileges are needed); the volume with its mute, the
 outputs to play through and each application's volume a click away; and the battery's charge
 along the foot.
@@ -294,15 +295,36 @@ rules have it. A switch on the machine that holds the radio off (rfkill) greys t
 networks are not listed. Without NetworkManager everything stays as described above, read from
 `/sys/class/net`; `-DSHAODESK_NETWORKMANAGER=OFF` builds without it.
 
+### Bluetooth
+
+While BlueZ runs with an adapter, Quick Settings has a Bluetooth tile, as Windows 11 and GNOME
+have: a click turns the adapter on or off, and its chevron lists the paired devices under it, the
+connected ones first, each with its kind (headphones, a speaker, a keyboard, a mouse, a phone, a
+game controller, a computer) and, where BlueZ reports it, its battery's charge. The tile names the
+device connected, or how many are. A click opens a device: Connect or Disconnect, and Forget, which
+removes the pairing. Pair a new device looks for the devices in range while the list is open, the
+strongest first and only those that give a name; a click on one and Pair pairs with it, then trusts
+it (so that it connects by itself from then on) and connects. What BlueZ asks while a device pairs
+shows over the list: a passkey to compare with the one the device shows, a PIN or a passkey to
+type, a code to type on a keyboard, or whether a device may pair; Cancel says no, and a pairing the
+user refused is not reported as a failure. Pairing "just works" where the device asks nothing.
+
+The shell answers BlueZ as an agent of its own (`org.bluez.Agent1`, with the KeyboardDisplay
+capability), registered as the default agent the first time the user looks for devices or pairs,
+so that a shell never asked takes no part in pairing; a device that asks to pair by itself before
+then is handled by another agent, or refused. A connection or pairing that fails is said across the
+panel. Without BlueZ the tile is not there, and `shell.widgets.bluetooth = false` leaves it out;
+`-DSHAODESK_BLUETOOTH=OFF` builds without it.
+
 ### Where the widgets go
 
 Each widget is switched off from Lua: `shell = { widgets = { battery = false, calendar = false } }`,
 with `workspaces`, `battery`, `network`, `volume`, `clock`, `calendar` (the clock stays, the
 calendar goes), `tiling`, `profiles` (the appearance profile picker), `wallpapers`,
 `notifications` (do-not-disturb), `keyboard_layout`, `power` (the [power button](#power) in the
-start menu), `tray` (the [system tray](#system-tray)), `media` (the card of what is playing,
-in Quick Settings) and `power_mode` (its [power mode](#power-mode) tile) all on by default.
-Those that can move sit
+start menu), `tray` (the [system tray](#system-tray)), `media` (the card of what is playing, in
+Quick Settings), `power_mode` (its [power mode](#power-mode) tile) and `bluetooth` (its
+[Bluetooth](#bluetooth) tile) all on by default. Those that can move sit
 on the bar with `"bar"` or in Quick Settings with `"quick"`, and `true` leaves them in their default
 place: `network`, `battery`, `volume`, `profiles` and `notifications` are in Quick Settings and
 `tiling` and `wallpapers` on the bar. Placed on the bar, each has its button there

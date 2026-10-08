@@ -371,6 +371,7 @@ what was there.
 | `CalendarPopup.qml`, `NotificationHistory.qml` | The clock flyout's cards: the month calendar, and the notifications grouped by application. |
 | `QuickTile.qml` | A tile of Quick Settings: a toggle, a list it opens, or a state. |
 | `MediaCard.qml` | Quick Settings' card of what is playing: the current media player's cover, track, position and controls. |
+| `BluetoothList.qml` | The Bluetooth devices under Quick Settings' Bluetooth tile: the paired ones to connect, disconnect and forget, those in range to pair with while looking, and what BlueZ asks as one pairs. |
 | `WifiList.qml`, `WifiPopup.qml` | The Wi-Fi networks in range, to connect to (with a password field where one is needed) or disconnect from, under Quick Settings' Wi-Fi tile; and the network widget's popup on the bar with them under a switch for the radio. |
 | `Icon.qml`, `FadingIcon.qml`, `SpeakerIcon.qml`, `BatteryIcon.qml` | Line icons (Lucide), drawn as vectors in any colour; one that crossfades as the state it shows changes, the loudspeaker for a volume, and a battery filled to its charge. |
 | `FlatButton.qml`, `ButtonFill.qml` | The frameless button of the bar and of menus, and its background, which fades between the hover, pressed and active states. |
@@ -409,22 +410,23 @@ The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `t
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
 `volume_keys.cpp` (what the compositor passes on from the volume, microphone and brightness keys),
 `power.cpp`, `palette.cpp`, `media.cpp` with `mpris.cpp`, `power_mode.cpp` with
-`power_profiles_daemon.cpp`, `wifi.cpp` with `network_manager.cpp`. `preview.cpp` has stand-ins for
-all of them for `--preview-popup`.
+`power_profiles_daemon.cpp`, `wifi.cpp` with `network_manager.cpp`, `bluetooth.cpp` with `bluez.cpp`.
+`preview.cpp` has stand-ins for all of them for `--preview-popup`.
 
 The services Quick Settings controls over D-Bus each have a model the QML reads, built into
 everything that builds the controller (`SHAODESK_SERVICE_SOURCES`), and a backend on the bus built
 into the shell alone, as `audio.cpp` has `pulse_audio.cpp`: `media.cpp` (the media players in
 order, the current one, its controls and its position between reads) with `mpris.cpp` on the
-session bus, and `power_mode.cpp` with `power_profiles_daemon.cpp` and `wifi.cpp` with
-`network_manager.cpp` on the system bus. The backend fills the model and carries out its
-requests, virtual `send*` functions; without Qt's D-Bus module, or without a bus, one that never
-finds anything takes its place (`makeMedia`, `makePowerMode`, `makeWifi`). A system service's
-backend watches its name and is unavailable while nobody owns it, so a machine without the
-service shows nothing of it. Each reaches `Panel.qml` through a property (`mediaSource`,
-`powerModeSource`, `wifiSource`) that the preview and `shell_ui_test` point at stand-ins, and each
-backend is tested against stand-in services (`tests/fake_dbus.hpp`) on a private bus, which the
-tests hand the backend as its connection.
+session bus, and `power_mode.cpp` with `power_profiles_daemon.cpp`, `wifi.cpp` with
+`network_manager.cpp` and `bluetooth.cpp` with `bluez.cpp` on the system bus. The backend fills the
+model and carries out its requests, virtual `send*` functions; without Qt's D-Bus module, or
+without a bus, one that never finds anything takes its place (`makeMedia`, `makePowerMode`,
+`makeWifi`, `makeBluetooth`). A system service's backend watches its name and is unavailable while
+nobody owns it, so a machine without the service shows nothing of it. Each reaches `Panel.qml`
+through a property (`mediaSource`, `powerModeSource`, `wifiSource`, `bluetoothSource`) that the
+preview and `shell_ui_test` point at stand-ins, and each backend is tested against stand-in
+services (`tests/fake_dbus.hpp`) on a private bus, which the tests hand the backend as its
+connection.
 
 `NetworkManager` mirrors the objects it needs (the manager, the devices and their Wi-Fi
 interfaces, the access points, the active connections) from GetAll, follows them through the one
@@ -434,7 +436,18 @@ dropping what it no longer does, and lists the known networks from the settings
 the state once a burst of changes is over. A list a row can be typed in (Wi-Fi's networks, with
 their password field) is a `QAbstractListModel` updated in place (`WifiNetworks`), rows changed and
 moved rather than made again, as `AudioStreams` is; a list rebuilt from a `QVariantList` would
-drop what was typed, and the row whose handler is running, at every change. The media actions reach the shell as `media VERB` lines, which the controller hands
+drop what was typed, and the row whose handler is running, at every change. `RowModel`
+(`row_model.hpp`) does that for Wi-Fi's networks and Bluetooth's devices.
+
+`BlueZ` mirrors BlueZ's objects from its ObjectManager (`GetManagedObjects`, then
+`InterfacesAdded`, `InterfacesRemoved` and PropertiesChanged, an invalidated property dropped) and
+takes the first adapter. Pairing goes through an agent of its own, a `QDBusVirtualObject` at
+`/org/shaodesk/BluetoothAgent`, registered with `AgentManager1` as the default the first time the
+user looks for devices or pairs, so that test shells and sessions that never pair leave BlueZ's
+agents alone. A question the agent is asked (`RequestConfirmation`, `RequestPinCode`,
+`RequestPasskey`, `RequestAuthorization`) is kept unanswered, its message copied, until the user
+answers in the list (`Bluetooth::ask`, then `sendAnswer`), and one still waiting is cancelled as
+another comes; `DisplayPinCode` and `DisplayPasskey` are answered at once and the code shown. The media actions reach the shell as `media VERB` lines, which the controller hands
 to `Media::command`; `tests/mpris_probe.cpp` is a player for `media_smoke`, which follows a key
 from the compositor to a player.
 

@@ -26,10 +26,12 @@ FlatButton {
         if (showBattery) lines.push(status.batteryText)
         return lines.length > 0 ? lines.join("\n") : "Quick settings"
     }
-    // The media card counts while it has a player to show, the power mode while its daemon runs.
+    // The media card counts while it has a player to show, the power mode while its daemon runs,
+    // Bluetooth while BlueZ has an adapter.
     readonly property bool showMedia: !!widgets.media && !!panel.mediaSource && panel.mediaSource.available
     readonly property bool showPowerMode: !!widgets.power_mode && !!panel.powerModeSource && panel.powerModeSource.available
-    visible: showMedia || showPowerMode ||
+    readonly property bool showBluetooth: !!widgets.bluetooth && !!panel.bluetoothSource && panel.bluetoothSource.available
+    visible: showMedia || showPowerMode || showBluetooth ||
              ["network", "battery", "volume", "tiling", "profiles", "wallpapers", "notifications"]
                  .some(function(name) { return button.widgets[name] === "quick" })
     Layout.preferredWidth: icons.implicitWidth + 2 * Theme.spacingM

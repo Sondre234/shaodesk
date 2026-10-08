@@ -787,6 +787,10 @@ const Option options[] = {
     {"shell.widgets.power_mode", "boolean", "true", "true", none, none,
      "The power mode tile in Quick Settings: Power saver, Balanced or Performance, through "
      "power-profiles-daemon; shown while the daemon runs."},
+    {"shell.widgets.bluetooth", "boolean", "true", "true", none, none,
+     "The Bluetooth tile in Quick Settings, through BlueZ: it turns the adapter on and off, and "
+     "lists the paired devices to connect and those in range to pair with; shown while BlueZ has "
+     "an adapter."},
     {"shell.launchers", "list of tables", "unset", "", none, none,
      "Pinned commands for programs without a desktop file, at most 64."},
     {"shell.launchers[].name", "string", "", "", none, none, "Label, 1 to 128 bytes. Required."},

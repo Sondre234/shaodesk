@@ -24,13 +24,11 @@ bool withKey(const QString &security) { return security == "wpa-psk" || security
 bool withoutKey(const QString &security) { return security == "open" || security == "owe"; }
 } // namespace
 
-int WifiNetworks::rowCount(const QModelIndex &parent) const {
-    return parent.isValid() ? 0 : count();
-}
 QVariant WifiNetworks::data(const QModelIndex &index, int role) const {
-    if (!index.isValid() || index.row() >= count())
+    const auto *row = at(index);
+    if (!row)
         return {};
-    const auto &network = rows_[size_t(index.row())];
+    const auto &network = *row;
     switch (role) {
     case Qt::DisplayRole:
     case SsidRole:
@@ -54,44 +52,6 @@ QHash<int, QByteArray> WifiNetworks::roleNames() const {
     return {{SsidRole, "ssid"},   {StrengthRole, "strength"}, {SecurityRole, "security"},
             {SecuredRole, "secured"}, {KnownRole, "known"}, {ActiveRole, "active"},
             {ConnectingRole, "connecting"}};
-}
-void WifiNetworks::update(const std::vector<Network> &networks) {
-    const int before = count();
-    auto listed = [&networks](const QString &ssid) {
-        return std::any_of(networks.begin(), networks.end(), [&ssid](const Network &n) { return n.ssid == ssid; });
-    };
-    for (int i = count() - 1; i >= 0; --i)
-        if (!listed(rows_[size_t(i)].ssid)) {
-            beginRemoveRows({}, i, i);
-            rows_.erase(rows_.begin() + i);
-            endRemoveRows();
-        }
-    // Each place in turn: the network already there, moved up from further down, or new.
-    for (int i = 0; i < int(networks.size()); ++i) {
-        const auto &next = networks[size_t(i)];
-        if (i >= count() || rows_[size_t(i)].ssid != next.ssid) {
-            auto it = std::find_if(rows_.begin() + i, rows_.end(),
-                                   [&next](const Network &row) { return row.ssid == next.ssid; });
-            if (it == rows_.end()) {
-                beginInsertRows({}, i, i);
-                rows_.insert(rows_.begin() + i, next);
-                endInsertRows();
-                continue;
-            }
-            const int from = int(it - rows_.begin());
-            beginMoveRows({}, from, from, {}, i);
-            const Network moved = *it;
-            rows_.erase(it);
-            rows_.insert(rows_.begin() + i, moved);
-            endMoveRows();
-        }
-        if (!(rows_[size_t(i)] == next)) {
-            rows_[size_t(i)] = next;
-            Q_EMIT dataChanged(index(i), index(i));
-        }
-    }
-    if (count() != before)
-        Q_EMIT countChanged();
 }
 
 QString Wifi::security(uint flags, uint wpaFlags, uint rsnFlags) {
