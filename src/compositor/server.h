@@ -320,6 +320,14 @@ struct sh_server {
     /* Magnetic edges: guide lines over the windows while a dragged one is held by an edge. */
     struct wlr_scene_tree *guide_layer;
     struct wlr_scene_rect *guides[2]; /* a vertical and a horizontal line */
+    /* Snapping a dragged window at the edges of its output (snap.c): the zone the pointer is
+     * in (the arrangement a drop gives, SH_NONE for none) and its slot, and the window's
+     * floating box as the drag began. */
+    struct {
+        enum sh_action zone;
+        struct sh_rect slot;
+        struct wlr_box start;
+    } snap;
 
     /* Windows a session restore launched and has yet to place: the first new window with the
      * app ID takes the saved place, workspace and state, until the deadline (milliseconds on
@@ -805,6 +813,7 @@ void server_new_decoration(struct wl_listener *listener, void *data);
 
 /* grab.c */
 void reset_cursor_mode(struct sh_server *server);
+bool drop_tiles(struct sh_server *server, struct wlr_output *output);
 void finish_grab(struct sh_server *server);
 void process_cursor_move(struct sh_server *server);
 void process_cursor_resize(struct sh_server *server);
@@ -916,6 +925,10 @@ struct wlr_box rebase_box(struct sh_server *server, struct wlr_box box,
 void restore_toplevel(struct sh_toplevel *toplevel);
 void place_maximized(struct sh_toplevel *toplevel);
 void place_by_hand(struct sh_toplevel *toplevel, enum sh_action action);
+bool placed_slot(struct sh_server *server, enum sh_action action, struct wlr_output *output,
+                 struct sh_rect *slot);
+void place_by_hand_on(struct sh_toplevel *toplevel, enum sh_action action,
+                      struct wlr_output *output);
 void arrange_windows(struct sh_server *server, enum sh_action action);
 void reflow_output(struct sh_server *server, struct wlr_output *output);
 struct sh_rect floating_area(struct sh_server *server, struct wlr_output *output);
@@ -970,6 +983,12 @@ bool session_restore(struct sh_server *server, const char *name, bool launch,
                      size_t error_size);
 bool session_claim(struct sh_server *server, struct sh_toplevel *toplevel,
                    struct sh_window_rule *rule, bool ruled);
+
+/* snap.c */
+const char *snap_zone_name(enum sh_action zone);
+void snap_follow(struct sh_server *server);
+bool snap_drop(struct sh_server *server);
+void snap_preview_hide(struct sh_server *server);
 
 /* swallow.c */
 struct sh_toplevel *swallow_host(struct sh_toplevel *child, bool terminals_only);

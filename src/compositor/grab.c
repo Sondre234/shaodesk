@@ -12,6 +12,7 @@ static void magnet_hide_guides(struct sh_server *server) {
 
 void reset_cursor_mode(struct sh_server *server) {
     magnet_hide_guides(server);
+    snap_preview_hide(server);
     // A window dropped on another output takes up that output's corners.
     if (server->grabbed_toplevel)
         refresh_frame(server->grabbed_toplevel);
@@ -22,33 +23,35 @@ void reset_cursor_mode(struct sh_server *server) {
     server->grab_fullscreen = false;
 }
 
-/* The pointer reached the top edge of its output, or a panel along it. The pointer decides, not
- * the window: clients such as Firefox draw their tab strip above their reported geometry. */
-static bool dropped_at_top(struct sh_server *server) {
-    struct wlr_output *output =
-        wlr_output_layout_output_at(server->output_layout, server->cursor->x, server->cursor->y);
-    return output && server->cursor->y < usable_area(server, output).y + 1;
+/* A window floating only because it was snapped or maximized, or because its output does not
+ * tile, joins the tiling of another output it is dropped on; one floated on purpose stays
+ * floating. */
+static bool joins_tiling(struct sh_server *server, struct sh_toplevel *toplevel,
+                         struct wlr_output *output) {
+    return toplevel && server->cursor_mode == SH_CURSOR_MOVE && !toplevel->tiled &&
+           !toplevel->sticky && (!toplevel->floating || toplevel->placed) && output &&
+           output != server->grab_output && output_tiles(server, output);
+}
+
+/* Whether dropping the grabbed window with the pointer on `output` puts it into the tiling
+ * there: a tile lifted out to be moved, or a window joining another output's tiling. */
+bool drop_tiles(struct sh_server *server, struct wlr_output *output) {
+    struct sh_toplevel *toplevel = server->grabbed_toplevel;
+    return joins_tiling(server, toplevel, output) ||
+           (server->grab_retile && toplevel && wants_tiling(toplevel, output));
 }
 
 /* Dropping a window dragged out of the tiling splits the tile under the pointer; dropping one
- * at the top of the screen maximizes it instead, below the panels, like Super+Shift+Up. */
+ * at an edge of the screen snaps it there instead (snap.c), at the top maximized below the
+ * panels, like Super+Shift+Up. */
 void finish_grab(struct sh_server *server) {
     struct sh_toplevel *toplevel = server->grabbed_toplevel;
-    bool maximize = toplevel && server->cursor_mode == SH_CURSOR_MOVE &&
-                    !server->grab_fullscreen && dropped_at_top(server);
-    if (maximize) {
-        server->grab_retile = false;
-        place_by_hand(toplevel, SH_MAXIMIZE);
+    if (snap_drop(server))
         return;
-    }
     struct wlr_output *output =
         wlr_output_layout_output_at(server->output_layout, server->cursor->x, server->cursor->y);
-    // A window floating only because it was snapped or maximized, or because its output does
-    // not tile, joins the tiling of another output it is dropped on; one floated on purpose
-    // stays floating. A tile dropped on an output that does not tile floats there.
-    if (toplevel && server->cursor_mode == SH_CURSOR_MOVE && !toplevel->tiled &&
-        !toplevel->sticky && (!toplevel->floating || toplevel->placed) && output &&
-        output != server->grab_output && output_tiles(server, output)) {
+    // A tile dropped on an output that does not tile floats there.
+    if (joins_tiling(server, toplevel, output)) {
         toplevel->floating = toplevel->placed = false;
         server->grab_retile = true;
     }
@@ -284,6 +287,7 @@ void process_cursor_move(struct sh_server *server) {
     int x = (int)(server->cursor->x - server->grab_x), y = (int)(server->cursor->y - server->grab_y);
     magnet_snap(server, toplevel, &x, &y);
     toplevel_set_position(toplevel, x, y);
+    snap_follow(server);
 }
 
 void process_cursor_resize(struct sh_server *server) {
@@ -386,6 +390,7 @@ void begin_interactive(struct sh_toplevel *toplevel, enum sh_cursor_mode mode,
     if (mode == SH_CURSOR_MOVE) {
         server->grab_x = server->cursor->x - toplevel->scene_tree->node.x;
         server->grab_y = server->cursor->y - toplevel->scene_tree->node.y;
+        server->snap.start = toplevel_box(toplevel); // where a snap restores it to
     } else {
         struct wlr_box geo_box = toplevel_geometry(toplevel);
 
