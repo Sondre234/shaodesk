@@ -364,6 +364,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     wl_list_init(&server.headless_keyboards);
     wl_list_init(&server.headless_pointers);
     wl_list_init(&server.headless_touches);
+    wl_list_init(&server.headless_tablets);
     wl_list_init(&server.pointers);
     add_listener(&server.backend->events.new_input, &server.new_input, server_new_input);
     struct wlr_virtual_keyboard_manager_v1 *virtual_keyboards =

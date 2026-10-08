@@ -40,7 +40,7 @@ all. In short:
 | `actions.c` | `run_action`: one `case` per action, handing it to the module that does it. |
 | `control.c` | The control socket: reading requests, commands that are not actions, subscribers and shell events. |
 | `query.c` | `shaodesk msg get ...`: one function per query, and the table that names them. |
-| `headless_input.c` | Input devices without hardware for tests under `--headless`: pointers that move and make touchpad gestures, and touchscreens. |
+| `headless_input.c` | Input devices without hardware for tests under `--headless`: pointers that move and make touchpad gestures, touchscreens, and drawing tablets with a pen, an eraser and a pad. |
 | `input.c` | Keyboards, key bindings, pointers' libinput settings, virtual devices, selection and drag-and-drop. |
 | `keymap.c` | The keymap from the keyboard settings, given to every keyboard but virtual ones. |
 | `cursor.c` | What is under the pointer, focus on hover, button bindings, scrolling, the cursor image. |

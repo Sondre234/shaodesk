@@ -496,6 +496,7 @@ struct sh_server {
     struct wl_list headless_keyboards; // added by tests with "headless_keyboard add"
     struct wl_list headless_pointers;  // and "headless_pointer add" (headless_input.c)
     struct wl_list headless_touches;   // and "headless_touch add"
+    struct wl_list headless_tablets;   // and "headless_tablet add"
     struct wl_list pointers; /* struct sh_pointer */
     enum sh_cursor_mode cursor_mode;
     struct sh_toplevel *grabbed_toplevel;
@@ -910,6 +911,7 @@ void dissolve_groups(struct sh_server *server);
 /* headless_input.c */
 void control_headless_pointer(struct sh_server *server, int fd, const char *arguments);
 void control_headless_touch(struct sh_server *server, int fd, const char *arguments);
+void control_headless_tablet(struct sh_server *server, int fd, const char *arguments);
 void destroy_headless_inputs(struct sh_server *server);
 
 /* input.c */
