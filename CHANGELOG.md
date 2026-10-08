@@ -268,6 +268,11 @@ shadows.
   it is; the window rule `above = true` keeps a window above as it opens. `shaodesk msg get
   windows` says which are in a sixteenth column, and `get stacking` lists the windows front to
   back. shaodesk-window-control-v1 is at version 6 for it.
+- `windows.border_color` and `border_inactive_color` take a gradient of 2 to 10 colours at an
+  angle, as Hyprland's borders do: `{ "#33ccffee", "#00ff99ee", angle = 45 }`. Borders then ease
+  from one gradient to the other with focus and round with their windows, drawn from a strip per
+  side and a square per corner rather than a buffer as large as the window. `shaodesk msg get
+  frames` says how each border is drawn in a last column.
 - Window rules with `dynamic = true` follow a window's title and app ID as they change, as
   Hyprland's dynamic rules do: while they match, they hold the window to their `floating`,
   `sticky` and `above`, and once they no longer do the window gets back what it had, keeping
