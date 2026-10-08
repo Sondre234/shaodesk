@@ -612,6 +612,42 @@ void overview_close(struct sh_server *server, struct sh_toplevel *chosen, int wo
     wlr_log(WLR_INFO, "Overview closed");
 }
 
+/* A swipe holds the open overview `progress` of the way (0: the windows where they are, 1: the
+ * grid), whatever the time, until it is held again or let go. */
+void overview_hold(struct sh_server *server, double progress) {
+    struct sh_overview *overview = &server->overview;
+    if (!overview->open)
+        return;
+    progress = progress < 0 ? 0 : progress > 1 ? 1 : progress;
+    overview->from = overview->to = overview->progress = progress;
+    overview->span = 0;
+    overview_refresh(server);
+}
+
+/* Lets the held overview go: it glides open the rest of the way, or closes from where it is. */
+void overview_release(struct sh_server *server, bool open) {
+    struct sh_overview *overview = &server->overview;
+    if (!overview->open)
+        return;
+    if (!open) {
+        overview_close(server, NULL, -1);
+        return;
+    }
+    const struct sh_settings *settings = server_settings(server);
+    overview->from = overview->progress;
+    overview->to = 1;
+    overview->started = now_ms();
+    overview->span = settings->overview_animation && settings->animations
+                         ? (int)(settings->overview_duration * (1 - overview->progress) /
+                                 (settings->animation_speed > 0 ? settings->animation_speed : 1))
+                         : 0;
+    if (overview->span <= 0)
+        overview->progress = 1;
+    overview_render(server);
+    if (overview->progress != overview->to)
+        overview_touch(server, false);
+}
+
 /* Closes at once, without the glide: the session locks, or the output goes. */
 void overview_dismiss(struct sh_server *server) {
     struct sh_overview *overview = &server->overview;

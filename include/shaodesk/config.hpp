@@ -2,6 +2,7 @@
 #pragma once
 
 #include "shaodesk/backend.h"
+#include "shaodesk/swipe.h"
 #include <array>
 #include <filesystem>
 #include <optional>
@@ -288,7 +289,15 @@ struct Config {
                          .close_windows = true,
                          .close_timeout = 5000,
                          .close_force = false,
-                         .session_restore = SH_SESSION_RESTORE_WINDOWS};
+                         .session_restore = SH_SESSION_RESTORE_WINDOWS,
+                         .gestures = {.enabled = true,
+                                      .distance = 300,
+                                      .invert = false,
+                                      .swipes = {{3, SH_SWIPE_LEFT, SH_WORKSPACE_NEXT, "workspace_next"},
+                                                 {3, SH_SWIPE_RIGHT, SH_WORKSPACE_PREV, "workspace_prev"},
+                                                 {3, SH_SWIPE_UP, SH_OVERVIEW_TOGGLE, "toggle_overview"},
+                                                 {3, SH_SWIPE_DOWN, SH_OVERVIEW_CANCEL, "overview_cancel"}},
+                                      .swipe_count = 4}};
     // layout.workspace_names: the label of workspace N is names[N - 1]; "" or past the end: none.
     std::vector<std::string> workspace_names;
     // hot_corners: what each corner runs, as a control request; "" for nothing.

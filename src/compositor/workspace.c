@@ -197,6 +197,131 @@ void switch_workspace(struct sh_server *server, struct wlr_output *output, int w
     }
 }
 
+/* The workspace slide driven by a touchpad swipe (gestures.c): the output's windows held part of
+ * the way through the slide of switch_workspace, and copies of the windows of the workspace it
+ * heads for coming in, until the fingers lift and the slide goes on or back from there. */
+
+/* Whether `toplevel` would show on `output` if it showed `workspace`. */
+static bool shows_on(struct sh_toplevel *toplevel, struct wlr_output *output, int workspace) {
+    return !toplevel->minimized && !toplevel->group_hidden && !toplevel->swallowed &&
+           toplevel->workspace == workspace && slides(toplevel->server, toplevel, output);
+}
+
+static void drop_swipe_copies(struct sh_workspace_swipe *swipe) {
+    while (swipe->copy_count > 0)
+        sh_anim_finish(swipe->copies[--swipe->copy_count]);
+}
+
+/* Starts a slide on `output`, from the workspace it shows. */
+void workspace_swipe_begin(struct sh_server *server, struct sh_workspace_swipe *swipe,
+                           struct wlr_output *output) {
+    if (server->grabbed_toplevel)
+        reset_cursor_mode(server);
+    snprintf(swipe->output, sizeof(swipe->output), "%s", output->name);
+    swipe->from = swipe->target = *output_workspace(server, output->name);
+    swipe->copy_count = 0;
+    swipe->shown = 0;
+}
+
+/* Holds the slide `t` of the way (0 to 1) to `target`. A target past the first or the last
+ * workspace pulls the windows a little that way, against a growing resistance, and one that is
+ * the workspace shown holds them at rest. */
+void workspace_swipe_hold(struct sh_server *server, struct sh_workspace_swipe *swipe, int target,
+                          double t) {
+    struct wlr_output *output = find_output(server, swipe->output);
+    if (!output)
+        return;
+    int count = server_settings(server)->workspaces;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    int sign = target > swipe->from ? 1 : -1;
+    bool real = target >= 0 && target < count && target != swipe->from;
+    if (target != swipe->target)
+        drop_swipe_copies(swipe);
+    swipe->target = target;
+    swipe->shown = real ? t : 0;
+    double distance = slide_distance(server, output);
+    // Out of workspaces: the windows give a little and no more.
+    double offset = real ? t : target == swipe->from ? 0 : 0.5 * t / (1 + t);
+    struct sh_toplevel *toplevel;
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (slides(server, toplevel, output) && toplevel_visible(toplevel))
+            sh_anim_hold(server->animator, &toplevel->anim, toplevel->content,
+                         -sign * offset * distance, 0, real ? 1 - t : 1);
+    }
+    if (!real)
+        return;
+    if (!swipe->copy_count) {
+        wl_list_for_each(toplevel, &server->toplevels, link) {
+            if (swipe->copy_count < (int)(sizeof(swipe->copies) / sizeof(*swipe->copies)) &&
+                shows_on(toplevel, output, target)) {
+                struct sh_anim *copy =
+                    sh_anim_hold_copy(server->animator, &toplevel->scene_tree->node,
+                                      toplevel->content, sign * (1 - t) * distance, 0, t);
+                if (copy)
+                    swipe->copies[swipe->copy_count++] = copy;
+            }
+        }
+    }
+    for (int i = 0; i < swipe->copy_count; ++i)
+        sh_anim_hold(server->animator, swipe->copies[i], swipe->copies[i]->tree,
+                     sign * (1 - t) * distance, 0, t);
+}
+
+/* Lets the slide go: with `finish`, the output switches to the workspace it heads for, the
+ * slide going on from where it was held; else everything slides back. */
+void workspace_swipe_end(struct sh_server *server, struct sh_workspace_swipe *swipe, bool finish) {
+    struct wlr_output *output = find_output(server, swipe->output);
+    int count = server_settings(server)->workspaces;
+    int target = swipe->target, sign = target > swipe->from ? 1 : -1;
+    double t = swipe->shown, distance = output ? slide_distance(server, output) : 0;
+    finish = finish && output && target >= 0 && target < count && target != swipe->from &&
+             *output_workspace(server, output->name) == swipe->from;
+    struct sh_toplevel *toplevel;
+    if (!finish) {
+        wl_list_for_each(toplevel, &server->toplevels, link) {
+            if (toplevel->anim.held)
+                sh_anim_slide_from(server->animator, &toplevel->anim, toplevel->content,
+                                   (int)lround(toplevel->anim.held_x), 0,
+                                   toplevel->anim.held_alpha, t > 0 ? t : 0.5);
+        }
+        for (int i = 0; i < swipe->copy_count; ++i)
+            sh_anim_slide_away(server->animator, swipe->copies[i], (int)(sign * distance), 0, 0,
+                               t);
+        swipe->copy_count = 0;
+        swipe->shown = 0;
+        return;
+    }
+    // The windows leaving go on as copies, from where they were held.
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (!toplevel->anim.held)
+            continue;
+        double x = toplevel->anim.held_x;
+        float alpha = toplevel->anim.held_alpha;
+        sh_anim_finish(&toplevel->anim);
+        struct sh_anim *away = sh_anim_hold_copy(server->animator, &toplevel->scene_tree->node,
+                                                 toplevel->content, x, 0, alpha);
+        if (away)
+            sh_anim_slide_away(server->animator, away, (int)(-sign * distance), 0, 0, 1 - t);
+    }
+    drop_swipe_copies(swipe);
+    struct sh_toplevel *focused = server->focused_toplevel;
+    bool refocus = !focused || find_output(server, focused->output) == output;
+    if (refocus)
+        deactivate_toplevel(server);
+    show_workspace(server, output->name, target);
+    // The windows arriving take over from their copies.
+    wl_list_for_each(toplevel, &server->toplevels, link) {
+        if (slides(server, toplevel, output) && toplevel_visible(toplevel))
+            sh_anim_slide_from(server->animator, &toplevel->anim, toplevel->content,
+                               (int)lround(sign * (1 - t) * distance), 0, (float)t, 1 - t);
+    }
+    if (refocus) {
+        focus_top_on(server, output);
+        set_active_output(server, output->name);
+    }
+    swipe->shown = 0;
+}
+
 /* Makes the window sticky, floating it, or returns it to how it floated or tiled before.
  * Without `retile`, the caller puts a window that tiled before back into the tiling. */
 void set_sticky(struct sh_toplevel *toplevel, bool sticky, bool retile) {

@@ -561,6 +561,12 @@ static void get_autostart(struct sh_server *server, int fd, const char *argument
         control_reply(fd, callbacks->autostart(callbacks->userdata));
 }
 
+static void get_gesture(struct sh_server *server, int fd, const char *arguments) {
+    // The touchpad swipe under way, and the workspaces following it (see describe_gesture).
+    control_reply(fd, "ok\n");
+    describe_gesture(server, fd);
+}
+
 static void get_seat(struct sh_server *server, int fd, const char *arguments) {
     // What has the keyboard, what the pointer is on, and, while a drag is under way, what it is
     // over (each as describe_surface has it). During a drag the pointer is on nothing: its events
@@ -608,6 +614,7 @@ static const struct {
     {"pictures", get_pictures, false},
     {"seat", get_seat, false},
     {"autostart", get_autostart, false},
+    {"gesture", get_gesture, false},
 };
 
 /* Answers `request` if it is a query; false if it is not one. */

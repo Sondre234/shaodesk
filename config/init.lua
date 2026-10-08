@@ -166,6 +166,15 @@ return {
     -- The overview (Super + O): thumbnails glide into a grid over `duration` milliseconds, with a
     -- strip of workspaces; `hot_corner` opens it when the pointer enters that screen corner.
     -- overview = { gap = 24, duration = 180, strip = true, dim = 0.86, hot_corner = "top-left" },
+    -- Touchpad swipes: three fingers sideways move between workspaces, the windows following
+    -- the fingers, and up and down open and close the overview. A list of swipes replaces these;
+    -- an action is a request as a hot corner's ("workspace 2", "spawn foot"). Other swipes,
+    -- pinches and holds go to the window under the pointer.
+    -- gestures = { enabled = true, distance = 300, invert = false, swipes = {
+    --     { fingers = 3, direction = "left", action = "workspace_next" },
+    --     { fingers = 3, direction = "right", action = "workspace_prev" },
+    --     { fingers = 3, direction = "up", action = "toggle_overview" },
+    --     { fingers = 3, direction = "down", action = "overview_cancel" } } },
     -- Windows fade in and out and tiles glide into place, over `duration` milliseconds:
     -- animations = { enabled = true, duration = 120, speed = 1, curve = "ease-out",
     --                move = { curve = "spring" }, open = { duration = 160 } },

@@ -18,6 +18,7 @@ struct sh_animator {
     void *clock_data;
     int64_t last_tick;      // when a frame last advanced the animations; 0 while none run
     struct wl_list running; // struct sh_anim
+    struct wl_list held;    // struct sh_anim held by a gesture, whatever the time
     struct wl_list tweens;  // struct sh_tween
     struct wl_event_source *timer;
 };
@@ -175,12 +176,27 @@ static void walk(struct sh_anim *anim, struct wlr_scene_tree *tree, int ox, int 
     }
 }
 
+/* A held animation where the gesture put it: its tree offset from where it rests and every node
+ * at its opacity times the hold's. */
+static void apply_hold(struct sh_anim *anim) {
+    wlr_scene_node_set_position(&anim->tree->node, anim->base_x + (int)lround(anim->held_x),
+                                anim->base_y + (int)lround(anim->held_y));
+    walk(anim, anim->tree, 0, 0, false, 1, anim->held_alpha);
+}
+
+/* A held window's tree and nodes back at rest; a copy has no rest but its hold. */
+static void rest_hold(struct sh_anim *anim) {
+    wlr_scene_node_set_position(&anim->tree->node, anim->base_x, anim->base_y);
+    if (!anim->owned)
+        walk(anim, anim->tree, 0, 0, true, 1, 1);
+}
+
 static void stop(struct sh_anim *anim) {
     if (!anim->animator)
         return;
     wl_list_remove(&anim->link);
     anim->animator = NULL;
-    anim->fx = anim->glide = false;
+    anim->fx = anim->glide = anim->held = false;
     if (anim->owned) {
         wlr_scene_node_destroy(&anim->tree->node);
         free(anim->records);
@@ -245,6 +261,8 @@ void sh_anim_finish(struct sh_anim *anim) {
         wlr_scene_node_set_position(&anim->tree->node, anim->base_x, anim->base_y);
     if (anim->fx && !anim->owned)
         walk(anim, anim->tree, 0, 0, true, 1, 1);
+    if (anim->held && !anim->owned)
+        rest_hold(anim);
     stop(anim);
 }
 
@@ -320,11 +338,14 @@ static void rest_anim(struct sh_anim *anim) {
         wlr_scene_node_set_position(&anim->tree->node, anim->base_x, anim->base_y);
     if (anim->fx && !anim->owned)
         walk(anim, anim->tree, 0, 0, true, 1, 1);
+    if (anim->held && !anim->owned)
+        rest_hold(anim);
 }
 
 void sh_animator_rest(struct sh_animator *animator) {
     struct sh_anim *anim;
     wl_list_for_each(anim, &animator->running, link) rest_anim(anim);
+    wl_list_for_each(anim, &animator->held, link) rest_anim(anim);
 }
 
 /* Whether a buffer or rectangle below `tree`, whose parent is at (ox, oy), has a box that
@@ -380,6 +401,7 @@ void sh_animator_rest_at(struct sh_animator *animator, double px, double py) {
         if (matters)
             rest_anim(anim);
     }
+    wl_list_for_each(anim, &animator->held, link) rest_anim(anim);
 }
 
 void sh_animator_resume(struct sh_animator *animator) {
@@ -392,6 +414,14 @@ void sh_animator_resume(struct sh_animator *animator) {
         if (anim->owned)
             wlr_scene_node_set_enabled(&anim->tree->node, true);
         step(anim, now);
+    }
+    wl_list_for_each(anim, &animator->held, link) {
+        if (!anim->rested)
+            continue;
+        anim->rested = false;
+        if (anim->owned)
+            wlr_scene_node_set_enabled(&anim->tree->node, true);
+        apply_hold(anim);
     }
 }
 
@@ -416,6 +446,8 @@ void sh_animator_tick(struct sh_animator *animator) {
         if (!step(anim, now))
             stop(anim);
     }
+    // What a client drew since keeps the hold's opacity.
+    wl_list_for_each(anim, &animator->held, link) apply_hold(anim);
     step_tweens(animator, now, false);
     if (wl_list_empty(&animator->running) && wl_list_empty(&animator->tweens))
         animator->last_tick = 0;
@@ -571,10 +603,10 @@ static void copy(struct wlr_scene_tree *target, struct wlr_scene_tree *tree, int
     }
 }
 
-/* A tree just above `window` holding a copy of what is visible under `content`, owned by a new
- * animation that has not started; NULL if there is nothing to copy. */
-static struct sh_anim *snapshot(struct sh_animator *animator, struct wlr_scene_node *window,
-                                struct wlr_scene_tree *content, int duration) {
+/* A tree just above `window` holding a copy of what is visible under `content`, where the
+ * window is, owned by a new animation that is neither running nor held; NULL if there is nothing
+ * to copy. */
+static struct sh_anim *make_copy(struct wlr_scene_node *window, struct wlr_scene_tree *content) {
     struct sh_anim *anim = calloc(1, sizeof(*anim));
     struct wlr_scene_tree *tree = anim ? wlr_scene_tree_create(window->parent) : NULL;
     if (!tree) {
@@ -591,7 +623,16 @@ static struct sh_anim *snapshot(struct sh_animator *animator, struct wlr_scene_n
     wlr_scene_node_set_position(&tree->node, window->x + content->node.x,
                                 window->y + content->node.y);
     anim->owned = true;
-    start(animator, anim, tree, duration);
+    anim->tree = tree;
+    return anim;
+}
+
+/* make_copy's copy, started. */
+static struct sh_anim *snapshot(struct sh_animator *animator, struct wlr_scene_node *window,
+                                struct wlr_scene_tree *content, int duration) {
+    struct sh_anim *anim = make_copy(window, content);
+    if (anim)
+        start(animator, anim, anim->tree, duration);
     return anim;
 }
 
@@ -623,11 +664,104 @@ void sh_anim_slide_out(struct sh_animator *animator, struct wlr_scene_node *wind
     step(anim, anim->fx_start);
 }
 
+void sh_anim_hold(struct sh_animator *animator, struct sh_anim *anim, struct wlr_scene_tree *tree,
+                  double dx, double dy, float alpha) {
+    if (anim->owned && !anim->held)
+        return; // a copy that is running is the animator's alone
+    if (anim->animator && (!anim->held || anim->tree != tree))
+        sh_anim_finish(anim); // what ran lands, and the hold starts from rest
+    anim->tree = tree;
+    if (!anim->animator) {
+        anim->animator = animator;
+        anim->held = true;
+        wl_list_insert(animator->held.prev, &anim->link);
+    }
+    anim->held_x = dx, anim->held_y = dy;
+    anim->held_alpha = alpha;
+    apply_hold(anim);
+}
+
+struct sh_anim *sh_anim_hold_copy(struct sh_animator *animator, struct wlr_scene_node *window,
+                                  struct wlr_scene_tree *content, double dx, double dy,
+                                  float alpha) {
+    if (!window->parent)
+        return NULL;
+    struct sh_anim *anim = make_copy(window, content);
+    if (!anim)
+        return NULL;
+    // It rests where the window is, and the hold moves it from there.
+    anim->base_x = anim->tree->node.x;
+    anim->base_y = anim->tree->node.y;
+    anim->animator = animator;
+    anim->held = true;
+    wl_list_insert(animator->held.prev, &anim->link);
+    anim->held_x = dx, anim->held_y = dy;
+    anim->held_alpha = alpha;
+    apply_hold(anim);
+    return anim;
+}
+
+/* The workspace slide's time, cut to `share` of it (a quarter at least), or 0 when it is off. */
+static int slide_duration(const struct sh_animator *animator, double share) {
+    int duration = animator->config.enabled ? duration_of(animator, SH_ANIM_WORKSPACE) : 0;
+    if (!duration)
+        return 0;
+    share = share < 0.25 ? 0.25 : share > 1 ? 1 : share;
+    return (int)fmax(1, lround(duration * share));
+}
+
+void sh_anim_slide_from(struct sh_animator *animator, struct sh_anim *anim,
+                        struct wlr_scene_tree *tree, int dx, int dy, float alpha, double share) {
+    if (anim->owned)
+        return;
+    sh_anim_finish(anim); // from rest, as the hold or what ran left it
+    int duration = slide_duration(animator, share);
+    if (!duration || (dx == 0 && dy == 0 && alpha >= 1))
+        return;
+    start(animator, anim, tree, duration);
+    if (dx || dy)
+        glide_begin(animator, anim, tree, dx, dy, SH_ANIM_WORKSPACE, duration);
+    fx_begin(animator, anim, SH_ANIM_WORKSPACE, duration, 1, 1, alpha, 1, 0, 0);
+    step(anim, anim->fx_start);
+}
+
+void sh_anim_slide_away(struct sh_animator *animator, struct sh_anim *anim, int dx, int dy,
+                        float alpha, double share) {
+    if (!anim->animator || !anim->owned)
+        return;
+    int duration = slide_duration(animator, share);
+    if (!duration) {
+        stop(anim);
+        return;
+    }
+    double from_x = anim->held ? anim->held_x : 0, from_y = anim->held ? anim->held_y : 0;
+    float from_alpha = anim->held ? anim->held_alpha : 1;
+    if (anim->held) {
+        wl_list_remove(&anim->link);
+        anim->animator = NULL;
+        anim->held = false;
+    }
+    start(animator, anim, anim->tree, duration);
+    // It rests where it slides to, and starts from where it was held, back from there.
+    anim->base_x += dx;
+    anim->base_y += dy;
+    anim->glide_x = from_x - dx;
+    anim->glide_y = from_y - dy;
+    anim->glide_vx = anim->glide_vy = 0;
+    anim->glide_duration = duration;
+    anim->glide_curve = animator->config.styles[SH_ANIM_WORKSPACE].curve;
+    anim->glide = true;
+    anim->glide_start = now_ms(animator);
+    fx_begin(animator, anim, SH_ANIM_WORKSPACE, duration, 1, 1, from_alpha, alpha, 0, 0);
+    step(anim, anim->fx_start);
+}
+
 struct sh_animator *sh_animator_create(struct wl_event_loop *loop) {
     struct sh_animator *animator = calloc(1, sizeof(*animator));
     if (!animator)
         return NULL;
     wl_list_init(&animator->running);
+    wl_list_init(&animator->held);
     wl_list_init(&animator->tweens);
     animator->clock = real_clock;
     animator->config.speed = 1;
@@ -660,6 +794,8 @@ void sh_animator_destroy(struct sh_animator *animator) {
     if (!animator)
         return;
     sh_animator_finish_all(animator);
+    struct sh_anim *anim, *next;
+    wl_list_for_each_safe(anim, next, &animator->held, link) sh_anim_finish(anim);
     wl_event_source_remove(animator->timer);
     free(animator);
 }

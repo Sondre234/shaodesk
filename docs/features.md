@@ -1135,9 +1135,50 @@ the click, kept inside the area the panels leave free, unless a window rule give
 
 ### Touchpad gestures
 
-Swipes of three or more fingers, pinches and holds on a touchpad (libinput's gestures) go to the
-window under the pointer through pointer-gestures-unstable-v1: Firefox and Chromium zoom a page on
-a pinch, Firefox stops kinetic scrolling when fingers come to rest on the touchpad (a hold), and
+Three fingers swiped sideways on a touchpad move to the next or previous workspace of the monitor
+under the pointer, as on Hyprland, GNOME and macOS: the windows follow the fingers through the
+workspace slide (`animations.workspace`), sliding and fading out as the next workspace's slide in,
+and once the fingers lift the slide goes on to that workspace if they went past half of
+`gestures.distance`, or back if not. A flick, a quick swipe however short, goes on; one flicked
+back the other way at the end stays. Back past where they began, the fingers head for the other
+neighbour. There is none before the first workspace or after the last: the windows give a little
+against the fingers and come back, rather than wrap around as `workspace_next` does. Three fingers
+up open the overview the same way, the windows gliding into its grid with the fingers, and down
+close it; sideways while it is open, it shows the next or previous workspace as the fingers lift,
+as its strip does. These are the defaults; `gestures` changes them:
+
+```lua
+gestures = {
+    distance = 300, -- the fingers' travel for a whole workspace, in the touchpad's units
+    invert = false, -- true: swipes count the other way, and the workspaces move against them
+    swipes = {
+        { fingers = 3, direction = "left", action = "workspace_next" },
+        { fingers = 3, direction = "right", action = "workspace_prev" },
+        { fingers = 3, direction = "up", action = "toggle_overview" },
+        { fingers = 3, direction = "down", action = "overview_cancel" },
+        { fingers = 4, direction = "down", action = "peek_toggle" },
+    },
+},
+```
+
+A list of `swipes` replaces the default one. A swipe's `action` is a request as a hot corner's
+is (`workspace 2`, `spawn foot`, `move_to_workspace 3`), run as the fingers lift past half of
+`distance` or flick; `none` takes the swipe for nothing. `workspace_next` and `workspace_prev`
+follow the fingers as above, and so do `toggle_overview` (which opens the overview, or closes it
+when it is open) and `overview_cancel` (which closes it). A swipe is the compositor's only once it
+has a direction, after about 16 pixels of travel: until then nothing moves and the window under
+the pointer hears nothing, and if its fingers and direction are no swipe's, the window gets it
+from its beginning, the travel it waited through at once. Every swipe of other finger counts,
+every pinch and every hold goes to the window, as does everything with `gestures.enabled = false`
+or while the screen is locked. `shaodesk msg get gesture` says what the swipe under way is
+(`waiting`, `passed`, `workspace`, `overview`, `action`, or `none`), with its fingers, direction
+and progress in thousandths of a step, and for workspaces a line with the output, the workspace
+it began on and the one it heads for (from 1, 0 for none), how far the slide is held, and how
+many windows are held and coming in.
+
+Swipes of three or more fingers, pinches and holds the compositor does not take go to the window
+under the pointer through pointer-gestures-unstable-v1: Firefox and Chromium zoom a page on a
+pinch, Firefox stops kinetic scrolling when fingers come to rest on the touchpad (a hold), and
 GTK 3 and 4 applications get their swipes and pinches. The pointer stays where it is while the
 fingers move, and the window it is on gets the gesture whether it has focus or not; a window that
 never asked for gestures gets none. Two fingers scroll, as before.

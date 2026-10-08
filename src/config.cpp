@@ -1034,6 +1034,65 @@ void read_effects(lua_State *L, Config &config) {
     lua_pop(L, 1);
     current_section.clear();
 }
+// `gestures`: the touchpad swipes the compositor takes, each running a request as a hot corner
+// does. A list of swipes replaces the default one.
+void read_gestures(lua_State *L, Config &config) {
+    auto &gestures = config.settings.gestures;
+    current_section.clear();
+    if (section(L, "gestures")) {
+        boolean(L, "enabled", "gestures.enabled", gestures.enabled);
+        gestures.distance = integer(L, "distance", gestures.distance, 50, 2000);
+        boolean(L, "invert", "gestures.invert", gestures.invert);
+        lua_getfield(L, -1, "swipes");
+        if (!lua_isnil(L, -1)) {
+            current_section = "gestures.swipes";
+            gestures.swipe_count = 0;
+            auto size = array_size(L, -1, std::size(gestures.swipes));
+            for (size_t i = 1; i <= size; ++i) {
+                lua_rawgeti(L, -1, static_cast<lua_Integer>(i));
+                table(L, -1, "swipe");
+                keys(L, -1, "gestures.swipes[]");
+                sh_swipe_binding swipe{};
+                swipe.fingers = integer(L, "fingers", 3, 3, 5);
+                auto direction = field(L, "direction");
+                for (int d = SH_SWIPE_LEFT; d <= SH_SWIPE_DOWN; ++d)
+                    if (direction == sh_swipe_direction_name(static_cast<sh_swipe_direction>(d)))
+                        swipe.direction = d;
+                if (!swipe.direction)
+                    unknown("direction", direction, {"left", "right", "up", "down"}, "direction");
+                auto request = field(L, "action");
+                std::istringstream stream(request);
+                std::vector<std::string> words{std::istream_iterator<std::string>(stream), {}};
+                if (words.empty())
+                    fail("gestures.swipes action is blank", "action");
+                swipe.action = words[0] == "none" ? SH_NONE : parse_action(words[0]);
+                if (swipe.action == SH_SPAWN && words.size() < 2)
+                    fail("gestures.swipes action needs a program after spawn", "action");
+                if (action_takes_workspace(swipe.action)) {
+                    std::string name;
+                    for (size_t w = 1; w < words.size(); ++w)
+                        name += (w > 1 ? " " : "") + words[w];
+                    if (!config.workspace_number(name))
+                        fail("gestures.swipes action needs a workspace number or name after " +
+                                 words[0],
+                             "action");
+                }
+                copy_text(request, swipe.request, "gestures.swipes action");
+                for (int j = 0; j < gestures.swipe_count; ++j)
+                    if (gestures.swipes[j].fingers == swipe.fingers &&
+                        gestures.swipes[j].direction == swipe.direction)
+                        fail("two swipes of " + std::to_string(swipe.fingers) + " fingers " +
+                                 direction,
+                             "direction");
+                gestures.swipes[gestures.swipe_count++] = swipe;
+                lua_pop(L, 1);
+            }
+        }
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+    current_section.clear();
+}
 // A path as the configuration writes it, made absolute: "~/..." in the home directory, else
 // relative to the configuration file's `directory`.
 std::filesystem::path config_relative(const std::string &path,
@@ -1305,6 +1364,7 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
     lua_pop(L, 1);
     current_section.clear();
     read_effects(L, config);
+    read_gestures(L, config);
     if (section(L, "overview")) {
         auto &settings = config.settings;
         boolean(L, "enabled", "overview.enabled", settings.overview);

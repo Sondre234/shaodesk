@@ -250,6 +250,12 @@ shadows.
 - Touchpad swipes, pinches and holds reach the window under the pointer
   (pointer-gestures-unstable-v1): browsers zoom on a pinch, and GTK applications get their
   gestures.
+- Three fingers swiped sideways move to the next or previous workspace, the windows following the
+  fingers through the workspace slide and going on or back as they lift (on past half way, or
+  with a flick); three fingers up and down open and close the overview the same way. `gestures`
+  sets the swipes the compositor takes (fingers and direction to a request, as hot corners take),
+  the distance of a step and inversion; every other gesture still reaches the window.
+  `shaodesk msg get gesture` says what the swipe under way does.
 
 ### Working on the shell
 
