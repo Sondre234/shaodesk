@@ -208,6 +208,15 @@ if(BUILD_TESTING)
     target_compile_options(web_search_test PRIVATE -Wall -Wextra -Wpedantic)
     target_link_libraries(web_search_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME web_search COMMAND web_search_test)
+    # The emoji picker's table and model.
+    add_executable(emoji_test ${PROJECT_SOURCE_DIR}/tests/emoji_test.cpp emoji.cpp emoji.hpp)
+    set_target_properties(emoji_test PROPERTIES AUTOMOC ON)
+    target_include_directories(emoji_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(emoji_test PRIVATE QT_NO_KEYWORDS
+        SHAODESK_EMOJI_TABLE="${PROJECT_SOURCE_DIR}/vendor/emoji/emoji.tsv")
+    target_compile_options(emoji_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(emoji_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME emoji COMMAND emoji_test)
     # The start menu's model: its pins, the launch history and its search.
     add_executable(start_menu_test ${PROJECT_SOURCE_DIR}/tests/start_menu_test.cpp
         ${SHAODESK_START_SOURCES} fuzzy.cpp fuzzy.hpp)
