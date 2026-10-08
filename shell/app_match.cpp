@@ -5,6 +5,7 @@
 #include <QRegularExpression>
 #include <QStringList>
 #include <algorithm>
+#include <functional>
 
 namespace app_match {
 
@@ -71,6 +72,71 @@ QString program(const QString &exec) {
         }
         return file;
     }
+    return {};
+}
+
+Index::Index(const QList<Entry> &entries) {
+    static const QRegularExpression steamGame(R"(steam://rungameid/(\d+))");
+    for (const auto &entry : entries) {
+        Keys keys;
+        keys.id = entry.id;
+        keys.base = entry.id.endsWith(".desktop") ? entry.id.chopped(8) : entry.id;
+        // A reverse-DNS name's parts: org.gnome.Calculator's Calculator and gnomecalculator.
+        const auto parts = keys.base.split('.');
+        if (parts.size() >= 2)
+            keys.last = parts.last();
+        if (parts.size() >= 3) {
+            keys.lastKey = key(keys.last);
+            keys.lastTwoKey = key(parts[parts.size() - 2] + parts.last());
+        }
+        keys.wmClass = entry.wmClass;
+        keys.steamGame = steamGame.match(entry.exec).captured(1);
+        keys.baseKey = key(keys.base);
+        keys.wmClassKey = key(entry.wmClass);
+        keys.programKey = key(program(entry.exec));
+        keys.nameKey = key(entry.name);
+        entries_.push_back(std::move(keys));
+    }
+}
+
+QString Index::find(const QString &appId) const {
+    if (appId.isEmpty())
+        return {};
+    static const QRegularExpression steamApp(R"(^steam_app_(\d+)$)",
+                                             QRegularExpression::CaseInsensitiveOption);
+    const auto steamGame = steamApp.match(appId).captured(1);
+    const auto appKey = key(appId);
+    // The last part of a reverse-DNS app id, unless it says nothing of the application.
+    static const QStringList vague{"desktop",  "app", "application", "client", "main",
+                                   "launcher", "gui", "qt",          "gtk",    "electron"};
+    const auto parts = appId.split('.');
+    auto appLastKey = parts.size() >= 3 ? key(parts.last()) : QString();
+    if (appLastKey.size() < 3 || vague.contains(appLastKey))
+        appLastKey.clear();
+    auto same = [](const QString &a, const QString &b) { return !a.isEmpty() && a == b; };
+    const std::function<bool(const Keys &)> matches[] = {
+        [&](const Keys &e) { return e.base == appId; },
+        [&](const Keys &e) { return e.base.compare(appId, Qt::CaseInsensitive) == 0; },
+        [&](const Keys &e) {
+            return !e.wmClass.isEmpty() && e.wmClass.compare(appId, Qt::CaseInsensitive) == 0;
+        },
+        [&](const Keys &e) { return same(steamGame, e.steamGame); },
+        [&](const Keys &e) {
+            return !e.last.isEmpty() && e.last.compare(appId, Qt::CaseInsensitive) == 0;
+        },
+        [&](const Keys &e) { return same(appKey, e.baseKey) || same(appKey, e.wmClassKey); },
+        [&](const Keys &e) { return same(appKey, e.programKey); },
+        [&](const Keys &e) { return same(appKey, e.lastTwoKey) || same(appKey, e.lastKey); },
+        [&](const Keys &e) {
+            return same(appLastKey, e.baseKey) || same(appLastKey, e.lastKey) ||
+                   same(appLastKey, e.programKey);
+        },
+        [&](const Keys &e) { return appKey.size() >= 3 && same(appKey, e.nameKey); },
+    };
+    for (const auto &match : matches)
+        for (const auto &entry : entries_)
+            if (match(entry))
+                return entry.id;
     return {};
 }
 

@@ -106,6 +106,75 @@ class AppIconsTest : public QObject {
         QCOMPARE(program(""), QString());
         QCOMPARE(program("env"), QString());
     }
+    void findsTheEntry() {
+        // Desktop entries as their applications ship them.
+        const app_match::Index index({
+            {"firefox-bin.desktop", "", "/usr/bin/firefox-bin %u", "Mozilla Firefox (bin)"},
+            {"firefox.desktop", "", "firefox %u", "Firefox"},
+            {"org.gnome.Calculator.desktop", "", "gnome-calculator", "Calculator"},
+            {"org.gnome.Nautilus.desktop", "", "nautilus --new-window %U", "Files"},
+            {"gimp.desktop", "", "gimp-2.10 %U", "GNU Image Manipulation Program"},
+            {"code.desktop", "Code", "/usr/share/code/code %F", "Visual Studio Code"},
+            {"org.telegram.desktop.desktop", "TelegramDesktop", "telegram-desktop -- %u",
+             "Telegram"},
+            {"signal-desktop.desktop", "Signal", "signal-desktop --no-sandbox %U", "Signal"},
+            {"steam.desktop", "Steam", "/usr/bin/steam %U", "Steam"},
+            {"Dota 2.desktop", "", "steam steam://rungameid/570", "Dota 2"},
+            {"blueman-manager.desktop", "", "blueman-manager", "Bluetooth Manager"},
+            {"wine-Programs-Notepad++-Notepad++.desktop", "notepad++.exe",
+             "env WINEPREFIX=\"/home/u/.wine\" wine C:\\\\Notepad++.exe", "Notepad++"},
+            {"com.obsproject.Studio.desktop", "", "obs", "OBS Studio"},
+            {"firefox-developer-edition.desktop", "",
+             "/usr/lib/firefox-developer-edition/firefox --class=firefoxdeveloperedition %u",
+             "Firefox Developer Edition"},
+            {"org.mozilla.Thunderbird.desktop", "", "thunderbird %u", "Thunderbird"},
+            {"chromium-browser.desktop", "", "chromium-browser %U", "Chromium"},
+            {"spotify-launcher.desktop", "", "spotify-launcher", "Spotify"},
+            {"thunar.desktop", "", "thunar %F", "Thunar File Manager"},
+            {"jetbrains-idea-ce-7f2a.desktop", "jetbrains-idea-ce", "idea.sh %f",
+             "IntelliJ IDEA Community"},
+            {"Alacritty.desktop", "", "alacritty", "Alacritty"},
+        });
+        const QList<std::pair<QString, QString>> windows{
+            // The desktop file's own name, exactly or in another case.
+            {"firefox", "firefox.desktop"},
+            {"org.gnome.Calculator", "org.gnome.Calculator.desktop"},
+            {"alacritty", "Alacritty.desktop"},
+            // StartupWMClass, as X11 clients and Electron give it.
+            {"Code", "code.desktop"},
+            {"signal", "signal-desktop.desktop"},
+            {"TelegramDesktop", "org.telegram.desktop.desktop"},
+            {"notepad++.exe", "wine-Programs-Notepad++-Notepad++.desktop"},
+            {"jetbrains-idea-ce", "jetbrains-idea-ce-7f2a.desktop"},
+            // A Steam game by its number.
+            {"steam_app_570", "Dota 2.desktop"},
+            // The last part of a reverse-DNS name.
+            {"nautilus", "org.gnome.Nautilus.desktop"},
+            {"thunderbird", "org.mozilla.Thunderbird.desktop"},
+            // What programs add to the name.
+            {"gimp-2.10", "gimp.desktop"},
+            {"code-url-handler", "code.desktop"},
+            {".blueman-manager-wrapped", "blueman-manager.desktop"},
+            {"firefoxdeveloperedition", "firefox-developer-edition.desktop"},
+            {"chromium", "chromium-browser.desktop"},
+            // The program the entry runs.
+            {"gnome-calculator", "org.gnome.Calculator.desktop"},
+            {"telegram-desktop", "org.telegram.desktop.desktop"},
+            {"obs", "com.obsproject.Studio.desktop"},
+            // A reverse-DNS app id for an entry without one.
+            {"org.xfce.Thunar", "thunar.desktop"},
+            // The entry's name.
+            {"Spotify", "spotify-launcher.desktop"},
+        };
+        for (const auto &[appId, id] : windows)
+            QVERIFY2(index.find(appId) == id,
+                     qPrintable(appId + " gave " + index.find(appId) + ", not " + id));
+        QCOMPARE(index.find("steam_app_440"), QString());
+        QCOMPARE(index.find("something-else"), QString());
+        QCOMPARE(index.find("org.example.desktop"), QString());
+        QCOMPARE(index.find(""), QString());
+        QCOMPARE(app_match::Index().find("firefox"), QString());
+    }
 };
 
 QTEST_GUILESS_MAIN(AppIconsTest)

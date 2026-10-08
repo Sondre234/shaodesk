@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include <QList>
 #include <QString>
 
 // Which desktop entry a window belongs to, by the app id it gives. Most windows give their
@@ -9,6 +10,33 @@
 // (gnome-calculator for org.gnome.Calculator), a NixOS wrapper's name
 // (.blueman-manager-wrapped), or a Steam game's number (steam_app_570).
 namespace app_match {
+
+// What a desktop entry is known by.
+struct Entry {
+    QString id;      // its desktop file id, org.gnome.Nautilus.desktop
+    QString wmClass; // StartupWMClass
+    QString exec;    // the Exec line
+    QString name;    // Name
+};
+
+// Entries, with what each is known by worked out once.
+class Index {
+  public:
+    Index() = default;
+    explicit Index(const QList<Entry> &entries);
+    // The id of the entry a window with this app id belongs to, or an empty string. The ways
+    // to match are tried from the most exact down, each against every entry before the next.
+    QString find(const QString &appId) const;
+
+  private:
+    struct Keys {
+        QString id, base, last, wmClass, steamGame;
+        // Folded with key(): the base, its last part and last two parts as a reverse-DNS name,
+        // StartupWMClass, the program and Name.
+        QString baseKey, lastKey, lastTwoKey, wmClassKey, programKey, nameKey;
+    };
+    QList<Keys> entries_;
+};
 
 // The name lowered, with what programs add to it taken off: a leading dot and -wrapped
 // (NixOS), a file extension (.exe, .AppImage), a version (-2.10, _1.20.1), an architecture
