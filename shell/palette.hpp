@@ -40,9 +40,6 @@ class Palette : public QObject {
     Q_INVOKABLE QVariantList entries(QObject *windows) const;
     // Runs one of its entries as choosing it here does, on monitor `output`.
     Q_INVOKABLE void run(const QVariantMap &entry, const QString &output);
-    // The entry of the calculator's value for `query` (see calculator::answer), or an empty map
-    // when it is no calculation.
-    static QVariantMap calculation(const QString &query);
   Q_SIGNALS:
     void openChanged();
     void queryChanged();

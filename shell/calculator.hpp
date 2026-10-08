@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include <QString>
+#include <QVariantMap>
 #include <optional>
 
 // The calculator of the command palette and the start menu's search: arithmetic on what is typed,
@@ -41,4 +42,8 @@ std::optional<Answer> answer(const QString &query);
 // without trailing zeros, in scientific notation (`1.5e-10`, `6.02214076e23`) when very small or
 // large.
 QString format(double value);
+
+// The search result for `query`'s answer, an empty map when there is none: {kind: "calc", title
+// (the number and its unit), subtitle, icon, target (the number, which choosing it copies)}.
+QVariantMap entry(const QString &query);
 } // namespace calculator

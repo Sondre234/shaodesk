@@ -53,14 +53,6 @@ QVariantMap entry(const QString &kind, const QString &title, const QString &subt
 
 } // namespace
 
-QVariantMap Palette::calculation(const QString &query) {
-    const auto answer = calculator::answer(query);
-    if (!answer)
-        return {};
-    return entry("calc", answer->text(), "Calculator · Enter copies the result",
-                 "accessories-calculator", answer->number);
-}
-
 Palette::Palette(ShellController &controller) : QObject(&controller), controller_(controller) {}
 
 void Palette::open(const QString &output) {
@@ -191,7 +183,7 @@ QVariantList Palette::entries(QObject *windows) const {
 
 void Palette::refreshResults() {
     // A calculation's value comes first; a leading = asks for nothing else.
-    const auto calc = calculation(query_);
+    const auto calc = calculator::entry(query_);
     results_ = query_.trimmed().startsWith('=') ? QVariantList() : fuzzy::rank(entries_, query_);
     if (!calc.isEmpty())
         results_.prepend(calc);

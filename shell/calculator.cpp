@@ -709,3 +709,14 @@ QString calculator::format(double value) {
     }
     return text;
 }
+
+QVariantMap calculator::entry(const QString &query) {
+    const auto found = answer(query);
+    if (!found)
+        return {};
+    return {{"kind", "calc"},
+            {"title", found->text()},
+            {"subtitle", "Calculator · Enter copies the result"},
+            {"icon", "accessories-calculator"},
+            {"target", found->number}};
+}
