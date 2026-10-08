@@ -172,6 +172,7 @@ PopupMenu {
         if (w.workspace > 0 && shell.stickyWindows)
             place.push({ text: "Keep on All Workspaces", toggle: "check", checked: w.sticky === true, objectName: "windowMenu:sticky",
                          run: function() { tasks.setSticky(id, w.sticky !== true) } })
+        place = place.concat(WindowMenu.aboveEntries(w, tasks, "Keep Above Others", "windowMenu:above"))
         place = place.concat(WindowMenu.placeEntries([w], tasks))
         // Its application's windows, to bring one up, the focused one marked.
         var windows = appWindows.windows.length > 1 ? appWindows.windows.map(function(other) {

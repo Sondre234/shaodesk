@@ -151,6 +151,7 @@ PopupMenu {
         if (window.workspace > 0 && shell.stickyWindows)
             entries.push({ text: "Keep on all workspaces", toggle: "check", checked: window.sticky === true,
                            run: function() { tasks.setSticky(id, window.sticky !== true) } })
+        entries = entries.concat(WindowMenu.aboveEntries(window, tasks, "Keep above others", "contextMenuAbove"))
         // Only where windows tile is there a tiling to leave.
         if (window.workspace > 0 && window.tiling === true)
             entries.push({ text: "Float", toggle: "check", checked: window.floating === true,
