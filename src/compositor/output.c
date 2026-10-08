@@ -372,7 +372,6 @@ void configure_output(struct sh_server *server, struct sh_output *output) {
     struct sh_output *source = enable ? mirror_source(server, output) : NULL;
     bool in_layout = enable && !source;
 
-
     struct wlr_output_state state;
     wlr_output_state_init(&state);
     if (!enable) {
