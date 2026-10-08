@@ -272,7 +272,8 @@ shadows.
   angle, as Hyprland's borders do: `{ "#33ccffee", "#00ff99ee", angle = 45 }`. Borders then ease
   from one gradient to the other with focus and round with their windows, drawn from a strip per
   side and a square per corner rather than a buffer as large as the window. `shaodesk msg get
-  frames` says how each border is drawn in a last column.
+  frames` says how each border is drawn in a last column, and `shaodesk import` carries a
+  Hyprland border's gradient over with its angle, where it took the first colour before.
 - Window rules with `dynamic = true` follow a window's title and app ID as they change, as
   Hyprland's dynamic rules do: while they match, they hold the window to their `floating`,
   `sticky` and `above`, and once they no longer do the window gets back what it had, keeping
