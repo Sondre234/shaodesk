@@ -370,13 +370,14 @@ void configure_output(struct sh_server *server, struct sh_output *output) {
     // A laptop's panel with its lid closed stays dark while another monitor shows the desktop.
     bool by_lid = lid_holds_off(server, output);
     bool enable = (monitor == NULL || monitor->enabled) && !by_lid;
+    output->kept_on = false;
     if (!enable) {
         bool others = false;
         struct sh_output *candidate;
         wl_list_for_each(candidate, &server->outputs, link) others |= candidate != output;
         if (!others) {
             wlr_log(WLR_ERROR, "Keeping %s on: it is the only output", wlr_output->name);
-            enable = true;
+            enable = output->kept_on = true;
         }
     }
     // A monitor that is off stays off as it is until it is turned on, which configures it.
@@ -688,6 +689,12 @@ void server_new_output(struct wl_listener *listener, void *data) {
     wlr_log(WLR_INFO, "Output %s: %s", wlr_output->name, description);
     apply_output_layout(server, wlr_output);
     configure_output(server, output);
+    // One kept on only as the first to appear, such as one turned off at startup, goes off now.
+    struct sh_output *other, *temporary;
+    wl_list_for_each_safe(other, temporary, &server->outputs, link) {
+        if (other != output && other->kept_on)
+            configure_output(server, other);
+    }
     if (wlr_output_is_wl(wlr_output))
         wlr_wl_output_set_title(wlr_output, "shaodesk — nested desktop");
     arrange_outputs(server);

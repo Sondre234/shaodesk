@@ -689,6 +689,7 @@ struct sh_output {
      * but the wlr_output is disabled, so it neither scans out nor draws frames. */
     bool powered_off;
     bool idle_off; /* turned off by the idle display_off step (idle.c), which input undoes */
+    bool kept_on;  /* on though its settings say off, as the only output (configure_output) */
     /* Settings a wlr-output-management client (wlr-randr, kanshi) or display_mode applied at
      * runtime. They replace the configured monitor until the configuration is reloaded or the
      * display settings window applies its own. */
