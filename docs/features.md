@@ -1442,7 +1442,10 @@ far it shows through the peek and its opacity (both in thousandths), and its tit
 msg get seat` prints what has the keyboard, what the pointer is on and, while something is
 dragged, what the drag is over: a line each, `keyboard`, `pointer` or `drag`, followed by
 `window` and its title, `layer` and its namespace, `other` (a popup, the lock screen) and `-`,
-or `-` twice for nothing; during a drag the pointer is on nothing. A client
+or `-` twice for nothing; during a drag the pointer is on nothing. `shaodesk msg get gesture`,
+`get touch` and `get tablet` say what a touchpad's swipe, a touchscreen's fingers and a drawing
+tablet's tools are doing (see [Touchpad gestures](#touchpad-gestures),
+[Touchscreens](#touchscreens) and [Drawing tablets](#drawing-tablets)). A client
 that sends `subscribe` keeps its connection and receives `tiling on|off` and
 `workspace N` (the focused monitor's), one `output NAME N USED TILING` line per monitor
 (as in `get workspaces`), and `keyboard-layout N COUNT SHORT NAME` (the active
