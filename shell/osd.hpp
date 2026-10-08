@@ -14,7 +14,8 @@ class Osd : public QObject {
     Q_PROPERTY(QString text READ text NOTIFY changed)
     // 0 to 100, or -1 for a label alone.
     Q_PROPERTY(int percent READ percent NOTIFY changed)
-    // "volume", "muted", "brightness" or "text": which icon goes with it.
+    // "volume", "muted", "brightness", "microphone", "microphone-muted", "dnd", "notifications" or
+    // "text": which icon goes with it.
     Q_PROPERTY(QString kind READ kind NOTIFY changed)
     Q_PROPERTY(bool top READ top NOTIFY configChanged)
   public:
