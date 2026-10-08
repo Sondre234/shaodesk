@@ -225,6 +225,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/gestures.c
         src/compositor/grab.c
         src/compositor/group.c
+        src/compositor/hdr.c
         src/compositor/headless_input.c
         src/compositor/idle.c
         src/compositor/input.c

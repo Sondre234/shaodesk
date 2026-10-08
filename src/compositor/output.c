@@ -22,7 +22,9 @@ static void output_frame(struct wl_listener *listener, void *data) {
         wlr_output_schedule_frame(output->wlr_output);
     if (tick_idle(output->server)) // the screens dimming
         wlr_output_schedule_frame(output->wlr_output);
-    struct wlr_scene_output_state_options night = {.color_transform = output->server->night_transform};
+    // Night light's colours do not go with an HDR output's, which the scene converts to itself.
+    struct wlr_scene_output_state_options night = {
+        .color_transform = output_is_hdr(output) ? NULL : output->server->night_transform};
     double level = zoom_level(output->server, now_ms());
     bool zoomed = false;
     struct wlr_output *pointed = wlr_output_layout_output_at(
@@ -400,8 +402,14 @@ void configure_output(struct sh_server *server, struct sh_output *output) {
         if (wlr_output->adaptive_sync_supported &&
             vrr != (wlr_output->adaptive_sync_status == WLR_OUTPUT_ADAPTIVE_SYNC_ENABLED))
             wlr_output_state_set_adaptive_sync_enabled(&state, vrr);
+        // HDR where asked for and possible (hdr.c), which wants 10 bits too.
+        bool hdr = output_want_hdr(output, monitor, source != NULL, &state);
+        if (hdr && !wlr_output_test_state(wlr_output, &state)) {
+            output_drop_hdr(output, &state);
+            hdr = false;
+        }
         // 10 bits per channel where asked for and taken; else the default 8.
-        bool deep = monitor && monitor->bit_depth == 10;
+        bool deep = monitor && (monitor->bit_depth == 10 || hdr);
         if (deep && !deep_format(wlr_output->render_format))
             try_deep_format(output, &state);
         else if (!deep && wlr_output->render_format != DRM_FORMAT_XRGB8888)
@@ -477,6 +485,7 @@ static void head_monitor(struct sh_server *server, const struct sh_output *outpu
     memset(monitor, 0, sizeof(*monitor));
     monitor->tiling = configured ? configured->tiling : -1;
     monitor->bit_depth = configured ? configured->bit_depth : 8; // no head state says it
+    monitor->hdr = configured && configured->hdr;
     snprintf(monitor->name, sizeof(monitor->name), "%s", output->wlr_output->name);
     monitor->enabled = head->enabled;
     if (!head->enabled)

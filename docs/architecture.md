@@ -61,6 +61,7 @@ all. In short:
 | `output.c`, `output_moves.c` | Monitors and their configuration; windows and workspaces moving between outputs. |
 | `output_power.c` | Monitors turned off and on in the layout: wlr-output-power-management. |
 | `mirror.c` | Mirroring: a monitor out of the layout showing another's frames, scaled to fit, with its hardware cursor. |
+| `hdr.c` | HDR (`outputs.monitors`' `hdr`): monitors driven in BT.2020 with PQ where they, the renderer and the test allow, and color-management-v1 for applications' colours. |
 | `tearing.c` | Tearing (tearing-control-v1, `windows.allow_tearing`): which fullscreen window may have its frames shown at once, and the asynchronous page flips. |
 | `display_mode.c` | The display_mode action (Windows' Win+P): extend, duplicate, internal, external, and the popup that steps through them. |
 | `layer_shell.c` | Panels and other layer surfaces. |
