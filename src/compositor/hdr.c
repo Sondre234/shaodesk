@@ -65,10 +65,10 @@ static void fake_hdr_monitor(struct sh_output *output) {
     }
 }
 
-/* Why `output` cannot be driven in HDR, or NULL when it can be tried: the monitor's EDID offers
- * no BT.2020 with PQ (or its connector lacks the properties), the renderer cannot convert colours,
- * or it mirrors another monitor, whose picture it shows as it is. */
-static const char *hdr_refused(struct sh_output *output, bool mirrors) {
+/* Why `output` cannot be driven in HDR whatever its settings, or NULL when it can be tried: the
+ * monitor's EDID offers no BT.2020 with PQ (or its connector lacks the properties), or the
+ * renderer cannot convert colours. */
+const char *hdr_unavailable(struct sh_output *output) {
     struct wlr_output *wlr_output = output->wlr_output;
     fake_hdr_monitor(output);
     if (!(wlr_output->supported_primaries & WLR_COLOR_NAMED_PRIMARIES_BT2020) ||
@@ -76,6 +76,15 @@ static const char *hdr_refused(struct sh_output *output, bool mirrors) {
         return "the monitor does not offer BT.2020 with PQ";
     if (!output->server->renderer->features.output_color_transform)
         return "the renderer cannot convert colours (in wlroots 0.20 only Vulkan can)";
+    return NULL;
+}
+
+/* Why `output` cannot be driven in HDR now, or NULL when it can be tried: as hdr_unavailable, or
+ * it mirrors another monitor, whose picture it shows as it is. */
+static const char *hdr_refused(struct sh_output *output, bool mirrors) {
+    const char *unavailable = hdr_unavailable(output);
+    if (unavailable)
+        return unavailable;
     if (mirrors)
         return "it mirrors another monitor";
     return NULL;

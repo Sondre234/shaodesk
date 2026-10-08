@@ -1010,6 +1010,7 @@ void display_settings_load(struct sh_server *server);
 const struct sh_output_saved *saved_output(const struct sh_output *output);
 const char *primary_output_name(struct sh_server *server);
 bool hdr_asked(struct sh_server *server);
+void describe_monitors(struct sh_server *server, int fd);
 
 /* effects.c */
 void update_dim(struct sh_toplevel *toplevel);
@@ -1118,6 +1119,7 @@ bool output_want_hdr(struct sh_output *output, const struct sh_monitor *monitor,
                      struct wlr_output_state *state);
 void output_drop_hdr(struct sh_output *output, struct wlr_output_state *state);
 bool output_is_hdr(const struct sh_output *output);
+const char *hdr_unavailable(struct sh_output *output);
 
 /* headless_input.c */
 void control_headless_pointer(struct sh_server *server, int fd, const char *arguments);
