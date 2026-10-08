@@ -273,6 +273,7 @@ return {
         { mods = { mod }, key = "m", action = "quit" },
         { mods = { mod }, key = "v", action = "toggle_floating" },
         { mods = { mod, "Shift" }, key = "v", action = "clipboard_history" }, -- copied lately
+        { mods = { mod }, key = "semicolon", action = "emoji_picker" }, -- as Windows' Win + ;
         { mods = { mod }, key = "f", action = "fullscreen" },
         { mods = { mod }, key = "t", action = "tile" },
         { mods = { mod }, key = "s", action = "toggle_tiling" },

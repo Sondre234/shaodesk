@@ -544,7 +544,7 @@ static void request_shell_on(struct sh_server *server, const char *what,
 }
 
 /* Asks the shell to open something (`what`: "launcher", "palette", "notifications",
- * "power-menu" or "clipboard") on the output under the pointer. */
+ * "power-menu", "clipboard" or "emoji") on the output under the pointer. */
 void request_shell(struct sh_server *server, const char *what) {
     struct wlr_cursor *cursor = server->cursor;
     request_shell_on(server, what,

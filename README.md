@@ -240,6 +240,7 @@ Edit them in [config/init.lua](config/init.lua).
 | Super + Escape | [Power menu](docs/features.md#power): lock, suspend, hibernate, restart, power off, log out |
 | Super + V | Float or tile the focused window |
 | Super + Shift + V | [Clipboard history](docs/features.md#clipboard-history): what was copied lately, to copy again |
+| Super + semicolon | [Emoji picker](docs/features.md#emoji-picker): an emoji typed into the focused window |
 | Super + F | Fullscreen |
 | Super + T | Arrange the monitor's windows in a grid (floating mode) |
 | Super + S | [Tiling](docs/features.md#tiling) on or off for the focused monitor |

@@ -171,6 +171,8 @@ enum sh_action {
     /* Asks the shell for its clipboard history on the output under the pointer, as Windows'
      * Win+V. */
     SH_CLIPBOARD_HISTORY,
+    /* Asks the shell for its emoji picker on the output under the pointer, as Windows' Win+. */
+    SH_EMOJI_PICKER,
 };
 
 enum sh_screenshot_mode {

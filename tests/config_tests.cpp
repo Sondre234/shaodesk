@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
     try {
         require(argc == 2, "example config path required");
         auto config = shaodesk::load_config(argv[1]);
-        require(config.bindings.size() == 67, "example shortcuts missing");
+        require(config.bindings.size() == 68, "example shortcuts missing");
         require(config.binding(SH_ALT, XKB_KEY_Tab)->action == SH_SWITCHER_NEXT &&
                     config.binding(SH_ALT | SH_SHIFT, XKB_KEY_Tab)->action == SH_SWITCHER_PREV,
                 "example window switcher bindings missing");
@@ -688,7 +688,7 @@ int main(int argc, char **argv) {
         // A configuration extending the defaults holds only its changes.
         setenv("SHAODESK_DEFAULT_CONFIG", argv[1], 1);
         auto bare = shaodesk::parse_config("return {extends='default'}");
-        require(bare.bindings.size() == 67 && bare.shell.launchers.empty() &&
+        require(bare.bindings.size() == 68 && bare.shell.launchers.empty() &&
                     bare.settings.workspaces == 4,
                 "extends did not supply the defaults");
         auto layered = shaodesk::parse_config(
@@ -698,7 +698,7 @@ int main(int argc, char **argv) {
             "{mods={'Super'}, key='e', action='spawn', command={'dolphin'}}}}");
         require(layered.settings.gap_inner == 3 && layered.settings.workspaces == 4,
                 "extending configuration settings not layered over the defaults");
-        require(layered.bindings.size() == 67 && !layered.binding(SH_LOGO, XKB_KEY_v),
+        require(layered.bindings.size() == 68 && !layered.binding(SH_LOGO, XKB_KEY_v),
                 "action none did not remove a default binding");
         require(layered.binding(SH_LOGO, XKB_KEY_q)->command == shaodesk::Command{"foot"} &&
                     layered.binding(SH_LOGO, XKB_KEY_e)->command == shaodesk::Command{"dolphin"},

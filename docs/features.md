@@ -791,6 +791,12 @@ Ctrl + Y), and typing what was copied into the window would lose pictures and fo
 paste stays the user's. `tests/clipboard_smoke.py` and `tests/clipboard_shell_smoke.py` test it
 with a program copying and pasting through data-control.
 
+## Emoji picker
+
+`emoji_picker` (Super + semicolon, or `shaodesk msg emoji_picker`) opens the shell's emoji picker,
+as Windows' Win + . and Win + ; do, on the monitor under the pointer; the emoji picked is typed
+into the window that had the keyboard.
+
 ## Terminal
 
 The `terminal` action (`shaodesk msg terminal`) opens a terminal: the program and arguments of
