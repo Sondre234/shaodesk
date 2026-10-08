@@ -512,6 +512,9 @@ static bool handle_keybinding(struct sh_keyboard *keyboard, uint32_t keycode, ui
             return true;
         }
     }
+    // An application holding the shortcuts (shortcuts_inhibit.c) has the keys.
+    if (shortcuts_inhibited(server))
+        return false;
     int argument = 0;
     enum sh_action action =
         server->callbacks->key(server->callbacks->userdata, modifiers, sym, &argument);

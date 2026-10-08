@@ -237,6 +237,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/scaled_capture.c
         src/compositor/scratchpad.c
         src/compositor/session.c
+        src/compositor/shortcuts_inhibit.c
         src/compositor/snap.c
         src/compositor/swallow.c
         src/compositor/switcher.c
@@ -420,7 +421,19 @@ if(SHAODESK_BUILD_COMPOSITOR)
             COMMAND ${WAYLAND_SCANNER} private-code ${TABLET_XML}
             ${CMAKE_CURRENT_BINARY_DIR}/tablet-v2-protocol.c
             DEPENDS ${TABLET_XML})
+        set(SHORTCUTS_INHIBIT_XML
+            ${PROTOCOL_DIR}/unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header ${SHORTCUTS_INHIBIT_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h
+            DEPENDS ${SHORTCUTS_INHIBIT_XML})
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/keyboard-shortcuts-inhibit-unstable-v1-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code ${SHORTCUTS_INHIBIT_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/keyboard-shortcuts-inhibit-unstable-v1-protocol.c
+            DEPENDS ${SHORTCUTS_INHIBIT_XML})
         add_executable(input_probe tests/input_probe.c
+            ${CMAKE_CURRENT_BINARY_DIR}/keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/keyboard-shortcuts-inhibit-unstable-v1-protocol.c
             ${CMAKE_CURRENT_BINARY_DIR}/tablet-v2-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/tablet-v2-protocol.c
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client-protocol.h
@@ -916,6 +929,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/locked_bindings_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:lock_probe>)
         set_tests_properties(locked_bindings_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME shortcuts_inhibit_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/shortcuts_inhibit_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:input_probe>)
+        set_tests_properties(shortcuts_inhibit_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME window_capture_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_capture_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>

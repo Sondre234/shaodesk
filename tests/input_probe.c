@@ -14,14 +14,24 @@
  *   tool wheel DEGREES CLICKS | tool button CODE pressed|released | tool frame
  *   pad enter | pad leave | pad button N pressed|released
  * (pressure, distance and the slider in 65535ths). Usage: input_probe [--no-gestures]
- * [--no-touch] [--no-tablet] [--layer] [TITLE]: without the gestures, touch or tablets it never
- * binds them, as most applications; with --layer it is a panel along the bottom of the output,
- * 60 pixels high, rather than a window. */
+ * [--no-touch] [--no-tablet] [--layer] [--keys] [--inhibit] [--commands] [TITLE]: without the
+ * gestures, touch or tablets it never binds them, as most applications; with --layer it is a
+ * panel along the bottom of the output, 60 pixels high, rather than a window. --keys prints the
+ * keyboard's events too:
+ *   keyboard enter | keyboard leave | key CODE pressed|released (an evdev code)
+ * --inhibit asks for the compositor's shortcuts as it is ready
+ * (keyboard-shortcuts-inhibit-unstable-v1), as a virtual machine's window does, and prints what
+ * the compositor says of it:
+ *   shortcuts active | shortcuts inactive
+ * --commands reads lines on standard input: "inhibit" asks for the shortcuts, "release" lets
+ * them go (destroying the inhibitor). */
 #define _GNU_SOURCE
+#include "keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h"
 #include "pointer-gestures-unstable-v1-client-protocol.h"
 #include "tablet-v2-client-protocol.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
+#include <poll.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -57,6 +67,11 @@ struct probe {
     struct xdg_toplevel *toplevel;
     int width, height;
     bool ready;
+    bool want_keys;
+    struct wl_keyboard *keyboard;
+    struct zwp_keyboard_shortcuts_inhibit_manager_v1 *inhibit_manager;
+    struct zwp_keyboard_shortcuts_inhibitor_v1 *inhibitor;
+    bool inhibit; // --inhibit: ask for the shortcuts once ready
 };
 
 static void die(const char *message) {
@@ -322,8 +337,62 @@ static void pad_added(void *data, struct zwp_tablet_seat_v2 *seat, struct zwp_ta
 static const struct zwp_tablet_seat_v2_listener tablet_seat_listener = {
     .tablet_added = tablet_added, .tool_added = tool_added, .pad_added = pad_added};
 
+static void keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int32_t fd,
+                            uint32_t size) {
+    close(fd);
+}
+static void keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial,
+                           struct wl_surface *surface, struct wl_array *keys) {
+    say("keyboard enter");
+}
+static void keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial,
+                           struct wl_surface *surface) {
+    say("keyboard leave");
+}
+static void keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint32_t time,
+                         uint32_t key, uint32_t state) {
+    say("key %u %s", key, state == WL_KEYBOARD_KEY_STATE_PRESSED ? "pressed" : "released");
+}
+static void keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial,
+                               uint32_t depressed, uint32_t latched, uint32_t locked,
+                               uint32_t group) {}
+static void keyboard_repeat_info(void *data, struct wl_keyboard *keyboard, int32_t rate,
+                                 int32_t delay) {}
+static const struct wl_keyboard_listener keyboard_listener = {.keymap = keyboard_keymap,
+                                                              .enter = keyboard_enter,
+                                                              .leave = keyboard_leave,
+                                                              .key = keyboard_key,
+                                                              .modifiers = keyboard_modifiers,
+                                                              .repeat_info = keyboard_repeat_info};
+
+static void inhibitor_active(void *data, struct zwp_keyboard_shortcuts_inhibitor_v1 *inhibitor) {
+    say("shortcuts active");
+}
+static void inhibitor_inactive(void *data, struct zwp_keyboard_shortcuts_inhibitor_v1 *inhibitor) {
+    say("shortcuts inactive");
+}
+static const struct zwp_keyboard_shortcuts_inhibitor_v1_listener inhibitor_listener = {
+    .active = inhibitor_active, .inactive = inhibitor_inactive};
+
+/* Asks for the compositor's shortcuts on the probe's surface, or lets them go. */
+static void inhibit(struct probe *probe, bool on) {
+    if (on && !probe->inhibitor) {
+        probe->inhibitor = zwp_keyboard_shortcuts_inhibit_manager_v1_inhibit_shortcuts(
+            probe->inhibit_manager, probe->surface, probe->seat);
+        zwp_keyboard_shortcuts_inhibitor_v1_add_listener(probe->inhibitor, &inhibitor_listener,
+                                                         probe);
+    } else if (!on && probe->inhibitor) {
+        zwp_keyboard_shortcuts_inhibitor_v1_destroy(probe->inhibitor);
+        probe->inhibitor = NULL;
+    }
+}
+
 static void seat_capabilities(void *data, struct wl_seat *seat, uint32_t capabilities) {
     struct probe *probe = data;
+    if ((capabilities & WL_SEAT_CAPABILITY_KEYBOARD) && !probe->keyboard && probe->want_keys) {
+        probe->keyboard = wl_seat_get_keyboard(seat);
+        wl_keyboard_add_listener(probe->keyboard, &keyboard_listener, probe);
+    }
     if ((capabilities & WL_SEAT_CAPABILITY_TOUCH) && !probe->touch && probe->want_touch) {
         probe->touch = wl_seat_get_touch(seat);
         wl_touch_add_listener(probe->touch, &touch_listener, probe);
@@ -374,6 +443,9 @@ static void global(void *data, struct wl_registry *registry, uint32_t name, cons
         probe->tablets = wl_registry_bind(registry, name, &zwp_tablet_manager_v2_interface, 1);
     } else if (!strcmp(interface, zwlr_layer_shell_v1_interface.name)) {
         probe->layer_shell = wl_registry_bind(registry, name, &zwlr_layer_shell_v1_interface, 1);
+    } else if (!strcmp(interface, zwp_keyboard_shortcuts_inhibit_manager_v1_interface.name)) {
+        probe->inhibit_manager =
+            wl_registry_bind(registry, name, &zwp_keyboard_shortcuts_inhibit_manager_v1_interface, 1);
     } else if (!strcmp(interface, zwp_pointer_gestures_v1_interface.name)) {
         probe->gestures_version = version < 3 ? version : 3;
         probe->gestures = wl_registry_bind(registry, name, &zwp_pointer_gestures_v1_interface,
@@ -409,6 +481,8 @@ static void frame_done(void *data, struct wl_callback *callback, uint32_t time) 
     if (!probe->ready) {
         probe->ready = true;
         say("ready");
+        if (probe->inhibit)
+            inhibit(probe, true);
     }
 }
 static const struct wl_callback_listener frame_listener = {.done = frame_done};
@@ -454,7 +528,7 @@ int main(int argc, char **argv) {
     struct probe probe = {
         .want_gestures = true, .want_touch = true, .want_tablet = true, .width = 400, .height = 300};
     const char *title = "input probe";
-    bool layer = false;
+    bool layer = false, commands = false;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--no-gestures"))
             probe.want_gestures = false;
@@ -464,6 +538,12 @@ int main(int argc, char **argv) {
             probe.want_tablet = false;
         else if (!strcmp(argv[i], "--layer"))
             layer = true;
+        else if (!strcmp(argv[i], "--keys"))
+            probe.want_keys = true;
+        else if (!strcmp(argv[i], "--inhibit"))
+            probe.inhibit = true;
+        else if (!strcmp(argv[i], "--commands"))
+            commands = true;
         else
             title = argv[i];
     }
@@ -480,6 +560,8 @@ int main(int argc, char **argv) {
         die("zwp_pointer_gestures_v1 is not offered");
     if (probe.want_tablet && !probe.tablets)
         die("zwp_tablet_manager_v2 is not offered");
+    if ((probe.inhibit || commands) && !probe.inhibit_manager)
+        die("zwp_keyboard_shortcuts_inhibit_manager_v1 is not offered");
     if (probe.want_tablet)
         zwp_tablet_seat_v2_add_listener(
             zwp_tablet_manager_v2_get_tablet_seat(probe.tablets, probe.seat),
@@ -505,7 +587,39 @@ int main(int argc, char **argv) {
         xdg_toplevel_set_app_id(probe.toplevel, "input-probe");
     }
     wl_surface_commit(probe.surface);
-    while (wl_display_dispatch(display) >= 0)
-        ;
-    die("the connection broke");
+    char pending[256];
+    size_t length = 0;
+    for (;;) {
+        while (wl_display_prepare_read(display) != 0)
+            wl_display_dispatch_pending(display);
+        wl_display_flush(display);
+        struct pollfd fds[2] = {{wl_display_get_fd(display), POLLIN, 0},
+                                {commands ? 0 : -1, POLLIN, 0}};
+        int ready = poll(fds, 2, -1);
+        if (ready < 0 || !(fds[0].revents & POLLIN))
+            wl_display_cancel_read(display);
+        else if (wl_display_read_events(display) < 0)
+            die("the connection broke");
+        if (wl_display_dispatch_pending(display) < 0)
+            die("the connection broke");
+        if (ready <= 0 || !(fds[1].revents & (POLLIN | POLLHUP)))
+            continue;
+        ssize_t count = read(0, pending + length, sizeof(pending) - 1 - length);
+        if (count <= 0) {
+            commands = false;
+            continue;
+        }
+        length += (size_t)count;
+        pending[length] = '\0';
+        char *newline;
+        while ((newline = strchr(pending, '\n'))) {
+            *newline = '\0';
+            if (!strcmp(pending, "inhibit") || !strcmp(pending, "release"))
+                inhibit(&probe, !strcmp(pending, "inhibit"));
+            else
+                die("unknown command");
+            length -= (size_t)(newline + 1 - pending);
+            memmove(pending, newline + 1, length + 1);
+        }
+    }
 }
