@@ -370,6 +370,7 @@ what was there.
 | `ClockFlyout.qml`, `QuickSettings.qml`, `AudioMixer.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml`, `WindowThumbnails.qml`, `MenuBarMenu.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
 | `CalendarPopup.qml`, `NotificationHistory.qml` | The clock flyout's cards: the month calendar, and the notifications grouped by application. |
 | `QuickTile.qml` | A tile of Quick Settings: a toggle, a list it opens, or a state. |
+| `MediaCard.qml` | Quick Settings' card of what is playing: the current media player's cover, track, position and controls. |
 | `Icon.qml`, `FadingIcon.qml`, `SpeakerIcon.qml`, `BatteryIcon.qml` | Line icons (Lucide), drawn as vectors in any colour; one that crossfades as the state it shows changes, the loudspeaker for a volume, and a battery filled to its charge. |
 | `FlatButton.qml`, `ButtonFill.qml` | The frameless button of the bar and of menus, and its background, which fades between the hover, pressed and active states. |
 | `PushButton.qml` | A framed button with text: raised, or filled for what a click mostly does or for a destructive action, with a ring for the keyboard; a dialog's, a notification's, the start menu's. |
@@ -406,8 +407,20 @@ The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `t
 (the taskbar's slots and groups), `audio.cpp` with `pulse_audio.cpp`, `system_status.cpp`
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
 `volume_keys.cpp` (what the compositor passes on from the volume, microphone and brightness keys),
-`power.cpp`, `palette.cpp`. `preview.cpp` has stand-ins for all of them for
-`--preview-popup`.
+`power.cpp`, `palette.cpp`, `media.cpp` with `mpris.cpp`. `preview.cpp` has stand-ins for all of
+them for `--preview-popup`.
+
+The services Quick Settings controls over D-Bus each have a model the QML reads, built into
+everything that builds the controller (`SHAODESK_SERVICE_SOURCES`), and a backend on the bus built
+into the shell alone, as `audio.cpp` has `pulse_audio.cpp`: `media.cpp` (the media players in
+order, the current one, its controls and its position between reads) with `mpris.cpp`. The
+backend fills the model and carries out its requests, virtual `send*` functions; without Qt's
+D-Bus module, or without a bus, one that never finds anything takes its place (`makeMedia`). Each
+reaches `Panel.qml` through a property (`mediaSource`) that the preview and `shell_ui_test` point
+at stand-ins, and each backend is tested against stand-in services (`tests/fake_dbus.hpp`) on a
+private bus. The media actions reach the shell as `media VERB` lines, which the controller hands
+to `Media::command`; `tests/mpris_probe.cpp` is a player for `media_smoke`, which follows a key
+from the compositor to a player.
 
 A window is known by its app id alone. `app_match.cpp` finds the desktop entry it belongs to: an
 `app_match::Index` of the entries, which `refreshApps` builds, tries each way of matching from the

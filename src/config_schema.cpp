@@ -779,6 +779,10 @@ const Option options[] = {
      "Do-not-disturb and the unread notifications: `\"bar\"` (a bell that opens them, with "
      "their count; a right-click toggles do-not-disturb) or `\"quick\"` (a do-not-disturb "
      "tile). The clock does both either way. By default in Quick Settings."},
+    {"shell.widgets.media", "boolean", "true", "true", none, none,
+     "The now-playing card at the top of Quick Settings: the cover, title and artist of the "
+     "media player playing most lately (MPRIS), with previous, play or pause, next and the "
+     "position; shown while a player is there."},
     {"shell.launchers", "list of tables", "unset", "", none, none,
      "Pinned commands for programs without a desktop file, at most 64."},
     {"shell.launchers[].name", "string", "", "", none, none, "Label, 1 to 128 bytes. Required."},

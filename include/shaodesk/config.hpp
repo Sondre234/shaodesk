@@ -107,6 +107,7 @@ struct ShellWidgets {
     // Do-not-disturb, as a tile, or a bell on the bar with the unread count; the clock shows both
     // either way.
     WidgetPlace notifications = WidgetPlace::Quick;
+    bool media = true; // the now-playing card in Quick Settings, only while a media player is there
 };
 
 // Lua `shell.thumbnails`: pictures of the windows of a taskbar button resting under the pointer.

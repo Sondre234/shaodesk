@@ -13,15 +13,19 @@ endif()
 # without them and the panel leaves out the bell and the tray.
 option(SHAODESK_NOTIFICATIONS "Serve org.freedesktop.Notifications from the shell (needs Qt6 DBus)" ON)
 option(SHAODESK_TRAY "Show applications' status icons (StatusNotifierItem) in the panel (needs Qt6 DBus)" ON)
+# Quick Settings' services on D-Bus; without QtDBus they are left out and their widgets never show.
+option(SHAODESK_MEDIA "Control media players (MPRIS) from Quick Settings and the media keys (needs Qt6 DBus)" ON)
 set(SHAODESK_DBUS OFF)
 set(SHAODESK_TRAY_DBUS OFF)
-if(SHAODESK_NOTIFICATIONS OR SHAODESK_TRAY)
+set(SHAODESK_MEDIA_DBUS OFF)
+if(SHAODESK_NOTIFICATIONS OR SHAODESK_TRAY OR SHAODESK_MEDIA)
     find_package(Qt6 6.9 QUIET COMPONENTS DBus)
     if(Qt6DBus_FOUND)
         set(SHAODESK_DBUS ${SHAODESK_NOTIFICATIONS})
         set(SHAODESK_TRAY_DBUS ${SHAODESK_TRAY})
+        set(SHAODESK_MEDIA_DBUS ${SHAODESK_MEDIA})
     else()
-        message(STATUS "Qt6 DBus not found: the notification daemon and the tray are left out")
+        message(STATUS "Qt6 DBus not found: the notification daemon, the tray and Quick Settings' D-Bus services are left out")
     endif()
 endif()
 # The polkit authentication agent asks for the password pkexec, GParted or an updater needs; it
@@ -48,6 +52,9 @@ endif()
 set(SHAODESK_START_SOURCES start_menu.cpp start_menu.hpp launch_history.cpp launch_history.hpp)
 # The authentication dialog's model, which the controller holds, in everything that builds it.
 set(SHAODESK_AUTH_SOURCES authentication.cpp authentication.hpp)
+# The models of the services Quick Settings controls over D-Bus, in everything that builds the
+# controller; their D-Bus backends only in the shell.
+set(SHAODESK_SERVICE_SOURCES media.cpp media.hpp)
 set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_images.cpp
     notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp tray.cpp tray.hpp
     tray_images.cpp tray_images.hpp)
@@ -106,7 +113,8 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     MenuBarMenu.qml
     QuickSettings.qml
     QuickTile.qml
-    BindingMode.qml)
+    BindingMode.qml
+    MediaCard.qml)
 # The protocols task_model.cpp and window_pictures.cpp speak, generated in the top-level build
 # directory.
 set(SHAODESK_TASK_PROTOCOL_SOURCES
@@ -124,6 +132,7 @@ add_dependencies(shaodesk-shell shaodesk_wlr_client_protocols shaodesk_version)
 set_target_properties(shaodesk-shell PROPERTIES AUTOMOC ON RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 target_sources(shaodesk-shell PRIVATE ${SHAODESK_START_SOURCES})
 target_sources(shaodesk-shell PRIVATE ${SHAODESK_AUTH_SOURCES})
+target_sources(shaodesk-shell PRIVATE ${SHAODESK_SERVICE_SOURCES})
 target_include_directories(shaodesk-shell PRIVATE ${PROJECT_BINARY_DIR})
 target_link_libraries(shaodesk-shell PRIVATE shaodesk_config Qt6::Core Qt6::Gui Qt6::Network Qt6::Qml Qt6::Quick
     PkgConfig::GIO PkgConfig::SHELL_WAYLAND)
@@ -155,6 +164,11 @@ if(SHAODESK_POLKIT_AGENT)
         target_compile_definitions(shaodesk PRIVATE SHAODESK_SHELL_POLKIT=1)
     endif()
 endif()
+if(SHAODESK_MEDIA_DBUS)
+    target_sources(shaodesk-shell PRIVATE mpris.cpp mpris.hpp)
+    target_link_libraries(shaodesk-shell PRIVATE Qt6::DBus)
+    target_compile_definitions(shaodesk-shell PRIVATE SHAODESK_MEDIA=1)
+endif()
 if(SHAODESK_PULSEAUDIO AND PULSE_FOUND)
     target_sources(shaodesk-shell PRIVATE pulse_audio.cpp)
     target_link_libraries(shaodesk-shell PRIVATE PkgConfig::PULSE)
@@ -179,6 +193,7 @@ if(BUILD_TESTING)
     set_target_properties(shell_ui_test PROPERTIES AUTOMOC ON)
     target_sources(shell_ui_test PRIVATE ${SHAODESK_START_SOURCES})
     target_sources(shell_ui_test PRIVATE ${SHAODESK_AUTH_SOURCES})
+    target_sources(shell_ui_test PRIVATE ${SHAODESK_SERVICE_SOURCES})
     target_include_directories(shell_ui_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
     target_compile_definitions(shell_ui_test PRIVATE QT_NO_KEYWORDS SHAODESK_LAYER_SHELL=0)
     target_compile_options(shell_ui_test PRIVATE -Wall -Wextra -Wpedantic)
@@ -195,6 +210,7 @@ if(BUILD_TESTING)
     set_target_properties(task_filter_test PROPERTIES AUTOMOC ON)
     target_sources(task_filter_test PRIVATE ${SHAODESK_START_SOURCES})
     target_sources(task_filter_test PRIVATE ${SHAODESK_AUTH_SOURCES})
+    target_sources(task_filter_test PRIVATE ${SHAODESK_SERVICE_SOURCES})
     target_include_directories(task_filter_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
     target_compile_definitions(task_filter_test PRIVATE QT_NO_KEYWORDS SHAODESK_LAYER_SHELL=0)
     target_compile_options(task_filter_test PRIVATE -Wall -Wextra -Wpedantic)
@@ -345,6 +361,7 @@ if(BUILD_TESTING)
     set_target_properties(osd_test PROPERTIES AUTOMOC ON)
     target_sources(osd_test PRIVATE ${SHAODESK_START_SOURCES})
     target_sources(osd_test PRIVATE ${SHAODESK_AUTH_SOURCES})
+    target_sources(osd_test PRIVATE ${SHAODESK_SERVICE_SOURCES})
     target_include_directories(osd_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
     target_compile_definitions(osd_test PRIVATE QT_NO_KEYWORDS SHAODESK_LAYER_SHELL=0)
     target_compile_options(osd_test PRIVATE -Wall -Wextra -Wpedantic)
@@ -360,7 +377,8 @@ if(BUILD_TESTING)
         task_filter.cpp task_filter.hpp icons.cpp icons.hpp app_match.cpp app_match.hpp wallpapers.cpp wallpapers.hpp window_images.cpp window_images.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
         ${SHAODESK_TASK_PROTOCOL_SOURCES})
     set_target_properties(auth_dialog_test PROPERTIES AUTOMOC ON)
-    target_sources(auth_dialog_test PRIVATE ${SHAODESK_START_SOURCES} ${SHAODESK_AUTH_SOURCES})
+    target_sources(auth_dialog_test PRIVATE ${SHAODESK_START_SOURCES} ${SHAODESK_AUTH_SOURCES}
+                   ${SHAODESK_SERVICE_SOURCES})
     target_include_directories(auth_dialog_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
     target_compile_definitions(auth_dialog_test PRIVATE QT_NO_KEYWORDS SHAODESK_LAYER_SHELL=0)
     target_compile_options(auth_dialog_test PRIVATE -Wall -Wextra -Wpedantic)
@@ -400,6 +418,35 @@ if(BUILD_TESTING)
     target_compile_options(window_sound_test PRIVATE -Wall -Wextra -Wpedantic)
     target_link_libraries(window_sound_test PRIVATE Qt6::Gui Qt6::Test)
     add_test(NAME shell_window_sound COMMAND window_sound_test)
+    # The media players' model: their order, the current one, and what the controls ask of it.
+    add_executable(media_test ${PROJECT_SOURCE_DIR}/tests/media_test.cpp media.cpp media.hpp)
+    set_target_properties(media_test PROPERTIES AUTOMOC ON)
+    target_include_directories(media_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(media_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(media_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(media_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME shell_media COMMAND media_test)
+    if(SHAODESK_MEDIA_DBUS)
+        # The MPRIS backend against stand-in players on a bus of its own, the environment's made
+        # unusable.
+        add_executable(media_dbus_test ${PROJECT_SOURCE_DIR}/tests/media_dbus_test.cpp
+            ${PROJECT_SOURCE_DIR}/tests/fake_dbus.hpp media.cpp media.hpp mpris.cpp mpris.hpp)
+        set_target_properties(media_dbus_test PROPERTIES AUTOMOC ON)
+        target_include_directories(media_dbus_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+        target_compile_definitions(media_dbus_test PRIVATE QT_NO_KEYWORDS SHAODESK_MEDIA=1)
+        target_compile_options(media_dbus_test PRIVATE -Wall -Wextra -Wpedantic)
+        target_link_libraries(media_dbus_test PRIVATE Qt6::Core Qt6::DBus Qt6::Test)
+        add_test(NAME shell_media_dbus COMMAND media_dbus_test)
+        set_tests_properties(shell_media_dbus PROPERTIES TIMEOUT 60
+            ENVIRONMENT "DBUS_SESSION_BUS_ADDRESS=disabled:;DBUS_SYSTEM_BUS_ADDRESS=disabled:")
+        # A media player for the end-to-end test (media_smoke), as a program of its own.
+        add_executable(mpris_probe ${PROJECT_SOURCE_DIR}/tests/mpris_probe.cpp
+            ${PROJECT_SOURCE_DIR}/tests/fake_dbus.hpp)
+        set_target_properties(mpris_probe PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
+        target_compile_definitions(mpris_probe PRIVATE QT_NO_KEYWORDS)
+        target_compile_options(mpris_probe PRIVATE -Wall -Wextra -Wpedantic)
+        target_link_libraries(mpris_probe PRIVATE Qt6::Core Qt6::DBus)
+    endif()
     add_test(NAME shell_preview COMMAND ${Python3_EXECUTABLE}
         ${PROJECT_SOURCE_DIR}/tests/shell_preview.py $<TARGET_FILE:shaodesk-shell>
         ${EXAMPLE_CONFIG})
@@ -489,6 +536,12 @@ if(BUILD_TESTING)
                 ${PROJECT_SOURCE_DIR}/tests/notifications_smoke.py $<TARGET_FILE:shaodesk>
                 $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:notify_probe> $<TARGET_FILE:pointer_probe>)
             set_tests_properties(notifications_smoke PROPERTIES TIMEOUT 90)
+        endif()
+        if(SHAODESK_MEDIA_DBUS)
+            add_test(NAME media_smoke COMMAND ${Python3_EXECUTABLE}
+                ${PROJECT_SOURCE_DIR}/tests/media_smoke.py $<TARGET_FILE:shaodesk>
+                $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:mpris_probe>)
+            set_tests_properties(media_smoke PROPERTIES TIMEOUT 90)
         endif()
         if(SHAODESK_TRAY_DBUS)
             add_test(NAME tray_smoke COMMAND ${Python3_EXECUTABLE}

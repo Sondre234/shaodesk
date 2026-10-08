@@ -363,7 +363,8 @@ QVariantMap ShellController::widgets() const {
             {"tiling", place(w.tiling)},        {"profiles", place(w.profiles)},
             {"wallpapers", place(w.wallpapers)}, {"keyboard_layout", w.keyboard_layout},
             {"power", w.power},                 {"tray", w.tray},
-            {"notifications", place(w.notifications)}};
+            {"notifications", place(w.notifications)},
+            {"media", w.media}};
 }
 QStringList ShellController::profiles() const {
     QStringList names;
@@ -717,6 +718,10 @@ void ShellController::subscribe() {
                 continue;
             } else if (line.startsWith("notifications ")) {
                 Q_EMIT notificationsRequested(line.sliced(14));
+                continue;
+            } else if (line.startsWith("media ")) {
+                // media VERB: a media key, for the current player.
+                media_->command(line.sliced(6));
                 continue;
             } else if (line.startsWith("power ")) {
                 // power ACTIONS: those that may run, as "lock,suspend,logout", or "-".

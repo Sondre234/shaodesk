@@ -26,7 +26,9 @@ FlatButton {
         if (showBattery) lines.push(status.batteryText)
         return lines.length > 0 ? lines.join("\n") : "Quick settings"
     }
-    visible: ["network", "battery", "volume", "tiling", "profiles", "wallpapers", "notifications"]
+    // The media card counts while it has a player to show.
+    readonly property bool showMedia: !!widgets.media && !!panel.mediaSource && panel.mediaSource.available
+    visible: showMedia || ["network", "battery", "volume", "tiling", "profiles", "wallpapers", "notifications"]
         .some(function(name) { return button.widgets[name] === "quick" })
     Layout.preferredWidth: icons.implicitWidth + 2 * Theme.spacingM
     Layout.preferredHeight: Theme.barButtonHeight

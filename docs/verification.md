@@ -858,3 +858,21 @@ default ignoring the lid while another monitor is connected, and whether logind 
 monitor as docked while the idle steps or `display_off` have turned it off, or suspends the
 closed laptop then); a convertible's tablet-mode switch; and a switch's binding while the session
 is locked.
+
+## Media controls
+
+Added 2026-10-08. The now-playing card was looked at in the gallery in both themes of both styles
+(`quick-settings`, with a stand-in music player and a paused browser). `media_test` checks the
+model's order of players (playing, then by when they last played, then those found paused), the
+player picked staying current until another starts playing, the controls reaching only what a
+player offers, and the position between reads; `media_dbus_test` the MPRIS backend against
+stand-in players on a private bus: players there before it and coming after, their changes and
+invalidated properties, Seeked, the calls the controls make, players going, and playerctld left
+out. `shell_ui` clicks the card's controls, its position and its arrows to another player against
+a stand-in model, and checks `shell.widgets.media` and the Quick Settings button staying for a
+player. `media_keys_smoke` presses the bound keys on a headless keyboard and hears the `media`
+lines the shell would, and `media_smoke` follows them through the shell to `mpris_probe` players.
+
+Not checked: real players (Spotify, mpv, VLC, Elisa, Firefox and Chromium tabs), their covers
+from `https:` and `file:` URLs, players that give no track id or length, a real keyboard's media
+keys, and players under playerctld or KDE Connect.

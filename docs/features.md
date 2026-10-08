@@ -220,14 +220,37 @@ it goes on.
 Left of the clock, as on Windows 11, the Quick Settings button shows the volume and the battery in
 small icons, and the network only while its link is down, dimmed and struck through as a warning
 (a link that is up shows only in Quick Settings); its wheel changes the volume and a middle click
-mutes. Clicking it opens Quick Settings at the bar's right end: tiles for do-not-disturb, night
-light (on or off against its schedule, through the compositor), tiling on this monitor (greyed out
-where tiling is not available), the appearance profile (listing the profiles under it) and the
+mutes. Clicking it opens Quick Settings at the bar's right end: what is playing
+([media controls](#media-controls)), tiles for do-not-disturb, night light (on or off against its
+schedule, through the compositor), tiling on this monitor (greyed out where tiling is not
+available), the appearance profile (listing the profiles under it) and the
 wallpaper (opening the same picker as the bar's button), and the network's state on a disc rather
 than a tile, as it is only shown (Wi-Fi, wired or down, and the interface; shaodesk does not
 manage connections); a brightness slider where the screen has a backlight (set through logind's
 `SetBrightness`, so no privileges are needed); the volume with its mute, the outputs to play
 through and each application's volume a click away; and the battery's charge along the foot.
+
+### Media controls
+
+What is playing shows at the top of Quick Settings, as on Windows 11 (Now Playing in the macOS
+style's Control Center): the cover, the title and the artists, the player's icon and name, where
+the track is and how long it is, and previous, play or pause and next, greyed out where the player
+does not offer them. A press or a drag on the position seeks, where the player can; a click on the
+player's name brings its window forward. With several players, arrows beside the name step
+through them, and the one picked stays until another starts playing. The card is there only
+while a player is (`shell.widgets.media = false` leaves it out), and the Quick Settings button
+stays on the bar for it even when every other widget is placed there. The position moves on
+while the flyout is open; closed, nothing is read or redrawn.
+
+The media keys (Play/Pause, Next, Previous and Stop, bound to the actions `media_play_pause`,
+`media_next`, `media_previous` and `media_stop`, which `shaodesk msg` runs too) control the same
+player, as on Windows 11 and KDE. The shell finds players through MPRIS
+(`org.mpris.MediaPlayer2.*` on the session bus), which music and video players offer, and
+browsers for a tab playing sound or video. The players playing come first, the one that started
+last ahead; then those that played, by when they stopped; then those already paused or stopped
+when the shell found them. A player stopped with nothing loaded is left out. The keys do nothing
+while there is no player, and the shell needs Qt's D-Bus module at build time for any
+(`-DSHAODESK_MEDIA=OFF` builds without them).
 
 ### Where the widgets go
 
@@ -235,7 +258,8 @@ Each widget is switched off from Lua: `shell = { widgets = { battery = false, ca
 with `workspaces`, `battery`, `network`, `volume`, `clock`, `calendar` (the clock stays, the
 calendar goes), `tiling`, `profiles` (the appearance profile picker), `wallpapers`,
 `notifications` (do-not-disturb), `keyboard_layout`, `power` (the [power button](#power) in the
-start menu) and `tray` (the [system tray](#system-tray)) all on by default. Those that can move sit
+start menu), `tray` (the [system tray](#system-tray)) and `media` (the card of what is playing,
+in Quick Settings) all on by default. Those that can move sit
 on the bar with `"bar"` or in Quick Settings with `"quick"`, and `true` leaves them in their default
 place: `network`, `battery`, `volume`, `profiles` and `notifications` are in Quick Settings and
 `tiling` and `wallpapers` on the bar. Placed on the bar, each has its button there

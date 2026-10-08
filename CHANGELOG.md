@@ -174,6 +174,13 @@ shadows.
   by default and the tiling button and the wallpaper picker on the bar; `shell.widgets.NAME = "bar"` or `"quick"`
   places each, `true` leaving it where it goes by default, so configurations with `true` and
   `false` keep working. `shell.widgets.notifications = "bar"` is the bell.
+- Media controls, as on Windows 11 and KDE: Quick Settings (Control Center's Now Playing) shows
+  what the media player playing most lately plays, through MPRIS: its cover, title and artist,
+  the player, the position (which a press or a drag seeks), and previous, play or pause and next;
+  arrows step to other players. The media keys (XF86AudioPlay, Pause, Next, Prev and Stop) are
+  bound to the new actions `media_play_pause`, `media_next`, `media_previous` and `media_stop`,
+  which the shell sends to the same player. `shell.widgets.media = false` leaves the card out and
+  `-DSHAODESK_MEDIA=OFF` builds without them.
 
 ### Notifications and the overlays
 

@@ -198,6 +198,11 @@ enum sh_action {
     SH_DISPLAY_OFF,
     SH_DISPLAY_ON,
     SH_DISPLAY_TOGGLE,
+    /* The media keys: the shell sends them to the media player playing most lately (MPRIS). */
+    SH_MEDIA_PLAY_PAUSE,
+    SH_MEDIA_NEXT,
+    SH_MEDIA_PREVIOUS,
+    SH_MEDIA_STOP,
 };
 
 enum sh_screenshot_mode {

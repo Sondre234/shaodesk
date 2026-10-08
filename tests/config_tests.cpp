@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
     try {
         require(argc == 2, "example config path required");
         auto config = shaodesk::load_config(argv[1]);
-        require(config.bindings.size() == 76, "example shortcuts missing");
+        require(config.bindings.size() == 81, "example shortcuts missing");
         auto *louder = config.binding(0, XKB_KEY_XF86AudioRaiseVolume);
         auto *microphone = config.binding(0, XKB_KEY_XF86AudioMicMute);
         auto *dimmer = config.binding(0, XKB_KEY_XF86MonBrightnessDown);
@@ -66,6 +66,14 @@ int main(int argc, char **argv) {
         require(config.binding(SH_LOGO | SH_SHIFT | 2, XKB_KEY_R)->action == SH_RELOAD,
                 "shifted shortcut or CapsLock normalization failed");
         require(!config.binding(SH_LOGO | SH_CTRL, XKB_KEY_q), "extra modifiers matched");
+        for (auto [keysym, action] : {std::pair{XKB_KEY_XF86AudioPlay, SH_MEDIA_PLAY_PAUSE},
+                                      {XKB_KEY_XF86AudioPause, SH_MEDIA_PLAY_PAUSE},
+                                      {XKB_KEY_XF86AudioNext, SH_MEDIA_NEXT},
+                                      {XKB_KEY_XF86AudioPrev, SH_MEDIA_PREVIOUS},
+                                      {XKB_KEY_XF86AudioStop, SH_MEDIA_STOP}}) {
+            auto *media = config.binding(0, keysym);
+            require(media && media->action == action, "a media key is not bound");
+        }
         auto *taskbar_keys = config.binding(SH_LOGO, XKB_KEY_b);
         require(taskbar_keys && taskbar_keys->action == SH_TASKBAR_FOCUS,
                 "Super + B does not give the keyboard to the taskbar");
@@ -712,6 +720,9 @@ int main(int argc, char **argv) {
                 "shell widgets not parsed");
         require(shaodesk::parse_config("return {shell={}}").shell.widgets.battery != WidgetPlace::Hidden,
                 "widgets not on by default");
+        require(shaodesk::parse_config("return {shell={}}").shell.widgets.media &&
+                    !shaodesk::parse_config("return {shell={widgets={media=false}}}").shell.widgets.media,
+                "the media card is not on by default, or not switched off");
         // By default the status widgets, the profiles and do-not-disturb are in Quick Settings
         // and tiling and the wallpapers on the bar; `true` puts each there.
         const auto placed_by_default = shaodesk::parse_config("return {shell={}}").shell.widgets;
@@ -760,7 +771,7 @@ int main(int argc, char **argv) {
         // A configuration extending the defaults holds only its changes.
         setenv("SHAODESK_DEFAULT_CONFIG", argv[1], 1);
         auto bare = shaodesk::parse_config("return {extends='default'}");
-        require(bare.bindings.size() == 76 && bare.shell.launchers.empty() &&
+        require(bare.bindings.size() == 81 && bare.shell.launchers.empty() &&
                     bare.settings.workspaces == 4,
                 "extends did not supply the defaults");
         auto layered = shaodesk::parse_config(
@@ -770,7 +781,7 @@ int main(int argc, char **argv) {
             "{mods={'Super'}, key='e', action='spawn', command={'dolphin'}}}}");
         require(layered.settings.gap_inner == 3 && layered.settings.workspaces == 4,
                 "extending configuration settings not layered over the defaults");
-        require(layered.bindings.size() == 76 && !layered.binding(SH_LOGO, XKB_KEY_v),
+        require(layered.bindings.size() == 81 && !layered.binding(SH_LOGO, XKB_KEY_v),
                 "action none did not remove a default binding");
         require(layered.binding(SH_LOGO, XKB_KEY_q)->command == shaodesk::Command{"foot"} &&
                     layered.binding(SH_LOGO, XKB_KEY_e)->command == shaodesk::Command{"dolphin"},

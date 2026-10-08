@@ -53,6 +53,21 @@ class FakeAudio : public Audio {
     }
 };
 
+// Records what the panel asks of the media players.
+class FakeMedia : public Media {
+  public:
+    QStringList requests;
+
+  protected:
+    void sendCommand(const QString &name, const QString &method) override {
+        requests << method + " " + name;
+    }
+    void sendPosition(const QString &name, const QString &trackId, qint64 position) override {
+        requests << QString("SetPosition %1 %2 %3").arg(name, trackId).arg(position);
+    }
+    void queryPosition(const QString &) override {}
+};
+
 // Pictures for the stand-in windows, image://test-windows/WIDTHxHEIGHT: that large, in one colour.
 class TestPictures : public QQuickImageProvider {
   public:
@@ -4638,6 +4653,111 @@ ListModel {
         if (!rewrite(lua))
             return fail("could not restore the configuration");
         controller.reload();
+    }
+    // Quick Settings' media card: the current player's track and controls, the other players a
+    // step away, and none without a player or with shell.widgets.media off. The players are put
+    // in the model by hand, as the MPRIS backend puts them.
+    {
+        FakeMedia media;
+        QQmlEngine::setObjectOwnership(&media, QQmlEngine::CppOwnership);
+        view.rootObject()->setProperty("mediaSource", QVariant::fromValue<QObject *>(&media));
+        // With every other widget on the bar, the Quick Settings button is there for a player.
+        if (!rewrite(QString(lua).replace("widgets={", "widgets={notifications=false,")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        auto *button = find(view.rootObject(), "quickSettingsButton");
+        if (!QTest::qWaitFor([&] { return !button->isVisible(); }))
+            return fail("the Quick Settings button shows with nothing placed in it and no player");
+        Media::Player music;
+        music.name = "org.mpris.MediaPlayer2.music";
+        music.identity = "Music";
+        music.status = "Paused";
+        music.title = "Harbour Lights";
+        music.artist = "The Late Ferries";
+        music.trackId = "/track/1";
+        music.length = 214'000'000;
+        music.position = 83'000'000;
+        music.canPlay = music.canPause = music.canGoNext = music.canGoPrevious = music.canSeek = true;
+        music.canRaise = true;
+        media.setPlayer(music);
+        if (!QTest::qWaitFor([&] { return button->isVisible() && button->x() > 0; }))
+            return fail("the Quick Settings button did not show for a player");
+        click(button);
+        auto *quick = find(view.rootObject(), "quickSettings");
+        auto *card = find(quick, "quickMedia");
+        if (!card || !QTest::qWaitFor([&] { return inPopover(quick) && card->isVisible(); }))
+            return fail("Quick Settings did not open on the media card");
+        auto text = [&](const char *name) { return find(card, name)->property("text").toString(); };
+        if (text("quickMediaTitle") != "Harbour Lights" || text("quickMediaArtist") != "The Late Ferries" ||
+            text("quickMediaElapsed") != "1:23")
+            return fail("the media card does not show the track and where it is");
+        click(find(card, "quickMediaPlayPause"));
+        click(find(card, "quickMediaNext"));
+        click(find(card, "quickMediaPrevious"));
+        click(find(card, "quickMediaPlayer"));
+        const QString name = music.name;
+        if (media.requests != QStringList{"PlayPause " + name, "Next " + name, "Previous " + name, "Raise " + name}) {
+            std::cerr << "the media card's controls did not reach the player: "
+                      << media.requests.join(", ").toStdString() << '\n';
+            return 1;
+        }
+        // A press on the position seeks there.
+        media.requests.clear();
+        auto *position = find(card, "quickMediaPosition");
+        const auto track = position->mapRectToScene(QRectF(0, 0, position->width(), position->height()));
+        QTest::mouseClick(popover, Qt::LeftButton, Qt::NoModifier,
+                          QPointF(track.left() + track.width() * 0.5, track.center().y()).toPoint());
+        if (media.requests.size() != 1 || !media.requests[0].startsWith("SetPosition " + name + " /track/1 ") ||
+            std::abs(media.requests[0].section(' ', 3).toLongLong() - 107'000'000) > 12'000'000 ||
+            std::abs(media.position() - 107'000) > 12'000) {
+            std::cerr << "a press on the media card's position did not seek: "
+                      << media.requests.join(", ").toStdString() << '\n';
+            return 1;
+        }
+        // Playing, the button shows pause; a player that cannot go on greys its control out.
+        music.status = "Playing";
+        music.canGoNext = false;
+        media.setPlayer(music);
+        if (!QTest::qWaitFor([&] {
+                return find(card, "quickMediaPlayPause")->property("text").toString() == "Pause" &&
+                       !find(card, "quickMediaNext")->isEnabled();
+            }))
+            return fail("the media card does not follow the player's state");
+        // A second player: arrows step to it, and its track shows.
+        auto *nextPlayer = find(card, "quickMediaNextPlayer");
+        if (nextPlayer->isVisible())
+            return fail("the media card offers other players with one");
+        Media::Player browser = music;
+        browser.name = "org.mpris.MediaPlayer2.firefox";
+        browser.identity = "Firefox";
+        browser.status = "Paused";
+        browser.title = "A walk along the coast";
+        browser.artist = "";
+        media.setPlayer(browser);
+        if (!QTest::qWaitFor([&] { return nextPlayer->isVisible(); }) || text("quickMediaTitle") != "Harbour Lights")
+            return fail("a paused player took the place of the one playing");
+        click(nextPlayer);
+        if (!QTest::qWaitFor([&] { return text("quickMediaTitle") == "A walk along the coast"; }) ||
+            media.player() != browser.name || find(card, "quickMediaArtist")->isVisible())
+            return fail("the media card did not step to the other player");
+        // shell.widgets.media off leaves it out.
+        if (!rewrite(QString(lua).replace("widgets={", "widgets={media=false,")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return !card->isVisible(); }))
+            return fail("the media card stayed with shell.widgets.media off");
+        QTest::keyClick(popover, Qt::Key_Escape);
+        if (!QTest::qWaitFor([&] { return !popover->isVisible(); }))
+            return fail("Quick Settings did not close");
+        // Gone with the players.
+        if (!rewrite(lua))
+            return fail("could not restore the configuration");
+        controller.reload();
+        media.removePlayer(music.name);
+        media.removePlayer(browser.name);
+        if (card->isVisible() || media.available())
+            return fail("the media card stayed without players");
+        view.rootObject()->setProperty("mediaSource", QVariant::fromValue<QObject *>(controller.media()));
     }
     // The system tray: hidden while empty, a button for each item shown in the order they came,
     // and clicks and the wheel passed on to the item's application. The items are put in the
