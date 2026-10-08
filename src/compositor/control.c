@@ -244,6 +244,10 @@ static void control_handle(struct sh_server *server, int fd, const char *request
         control_headless_pointer(server, fd, request + (request[16] ? 17 : 16));
         return;
     }
+    if (!strncmp(request, "headless_touch", 14) && (!request[14] || request[14] == ' ')) {
+        control_headless_touch(server, fd, request + (request[14] ? 15 : 14));
+        return;
+    }
     if (!strncmp(request, "session", 7) && (!request[7] || request[7] == ' ')) {
         control_session(server, fd, request + 7);
         return;
