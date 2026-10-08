@@ -201,6 +201,15 @@ shadows.
 
 ### The compositor
 
+- Dragging a floating window to an edge of its monitor snaps it as it is dropped, as Windows'
+  Aero Snap and KWin's quick tiling do: at the left or right edge into that half, in a corner
+  into that quarter, and at the top edge maximized as before. A translucent preview of the slot,
+  rounded as windows are, eases in under the window while a drop would snap it and fades as the
+  pointer leaves the edge. Edges shared with another monitor do not snap, a tile lifted out of a
+  tiling monitor still goes back into its tiling where it is dropped, and `restore` puts a window
+  snapped by dragging back where it was before the drag. `windows.snap` turns it off and sets the
+  distance, the corners, the preview and its colour; `shaodesk msg get snap` tells the zone and
+  the preview.
 - `windows.controls = "traffic_lights"` draws the controls of the windows shaodesk decorates as
   red, yellow and green circles at their top-left, as macOS does: grey while the window has no
   focus, their symbols shown while the pointer is on one, darker while pressed.

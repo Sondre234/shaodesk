@@ -141,6 +141,11 @@ return {
         -- or "none") held while dragging turns it off.
         -- magnet = { enabled = true, distance = 12, guides = true, guide_color = "#7da8ffb3",
         --            bypass = "Shift" },
+        -- Snapping: a floating window dropped with the pointer within distance pixels of the
+        -- left or right edge fills that half, of a corner that quarter, of the top edge the
+        -- screen; a preview of the slot (color: the focused border's, a quarter opaque) shows
+        -- while it would.
+        -- snap = { enabled = true, distance = 8, corners = true, preview = true },
         -- Buttons of windows that draw their own (Firefox's tab strip, GTK apps), in GTK's
         -- button-layout format; "" keeps the desktop's setting. Applications started from
         -- shaodesk see it; restart to change:
