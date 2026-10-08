@@ -291,6 +291,13 @@ return {
         { mods = { mod, "Shift" }, key = "Right", action = "move_right" },
         { mods = { mod, "Shift" }, key = "Up", action = "move_up" },
         { mods = { mod, "Shift" }, key = "Down", action = "move_down" },
+        -- Windows' Win+arrows: left and right snap to that half, then on to the next monitor;
+        -- up maximizes (from a half, the top quarter); down gives a maximized window its own
+        -- size back and minimizes one at its own size (from a half, the bottom quarter).
+        { mods = { mod, "Alt" }, key = "Left", action = "snap_cycle_left" },
+        { mods = { mod, "Alt" }, key = "Right", action = "snap_cycle_right" },
+        { mods = { mod, "Alt" }, key = "Up", action = "snap_cycle_up" },
+        { mods = { mod, "Alt" }, key = "Down", action = "snap_cycle_down" },
         -- Resize by 40 pixels, or by `amount = N` added to a binding. A tile moves its split on
         -- that side that way (growing), or the one on its other side when it touches the screen
         -- edge (shrinking); a floating window moves its right or bottom edge that way.
@@ -320,14 +327,15 @@ return {
         { mods = { mod }, key = "period", action = "master_less" },
         -- The scroll layout (layout_scroll; see layout.scroll): columns on an endless strip.
         -- master_grow and master_shrink resize the focused column there. Bind these to taste:
-        -- { mods = { mod, "Alt" }, key = "Left", action = "scroll_left" },
-        -- { mods = { mod, "Alt" }, key = "Right", action = "scroll_right" },
+        -- { mods = { mod, "Alt" }, key = "h", action = "scroll_left" },
+        -- { mods = { mod, "Alt" }, key = "l", action = "scroll_right" },
         -- { mods = { mod, "Ctrl" }, key = "r", action = "column_cycle_width" },
         -- { mods = { mod, "Ctrl" }, key = "c", action = "center_column" },
         -- { mods = { mod, "Ctrl" }, key = "bracketleft", action = "consume_left" },
         -- { mods = { mod, "Ctrl" }, key = "bracketright", action = "consume_right" },
         -- { mods = { mod }, key = "e", action = "expel" },
-        -- Also available: snap_left, snap_right (half the screen), maximize, restore.
+        -- Also available: snap_left, snap_right (half the screen), snap_top_left,
+        -- snap_top_right, snap_bottom_left, snap_bottom_right (a quarter), maximize, restore.
         -- Lock with power.lock_command (swaylock -f unless set); the power menu offers lock,
         -- suspend, hibernate, restart, power off and log out. suspend, hibernate, reboot,
         -- poweroff and logout bind directly too, without asking, e.g.:

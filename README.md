@@ -248,6 +248,7 @@ Edit them in [config/init.lua](config/init.lua).
 | Super + ` | Back to the previously focused window, on any workspace |
 | Super + arrows | Focus the nearest window that way |
 | Super + Shift + arrows | Move the window that way: a tile trades places, a floating window goes to the edge, then on to the next monitor |
+| Super + Alt + arrows | [Snap](docs/features.md#snapping) as Windows' Win + arrows: left / right to that half, then on to the next monitor; up maximizes; down restores, then minimizes |
 | Super + Ctrl + Shift + arrows | Resize by 40 pixels |
 | Super + Space / Super + Shift + Space | Next / previous [tiling layout](docs/features.md#tiling-layouts) |
 | Super + Return | Promote the focused tile to master |
