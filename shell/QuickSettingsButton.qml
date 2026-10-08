@@ -78,6 +78,8 @@ FlatButton {
     }
     // Five percent a wheel notch, up for louder.
     WheelHandler {
+        // Qt takes the whole pointer for a touchpad once the compositor offers gestures
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         property real travel: 0
         enabled: button.showVolume
         onWheel: (event) => {

@@ -39,6 +39,8 @@ ListView {
     }
     moveDisplaced: Transition { NumberAnimation { property: "x"; duration: Theme.durationFast; easing.type: Theme.easing } }
     WheelHandler {
+        // Qt takes the whole pointer for a touchpad once the compositor offers gestures
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         enabled: taskList.contentWidth > taskList.width
         onWheel: (event) => {
             var delta = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x
