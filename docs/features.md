@@ -1463,7 +1463,7 @@ open, the one it shows and its monitor (`-` for both while it is closed).
 ### Display settings
 
 A window sets the monitors up, as Windows' Display settings and KDE's Display Configuration do.
-It opens from Quick Settings (Display settings, under the brightness; Display Settings… in Control
+It opens from Quick Settings (Display settings…, under the brightness; Display Settings… in Control
 Center's Display module), from the macOS style's system menu (Displays…), from the command
 palette, and with the `display_settings` action, which opens it on the monitor under the pointer:
 

@@ -371,7 +371,7 @@ PopupCard {
                         }
                         Text {
                             Layout.fillWidth: true
-                            text: Theme.macos ? "Display Settings…" : "Display settings"; elide: Text.ElideRight
+                            text: Theme.macos ? "Display Settings…" : "Display settings…"; elide: Text.ElideRight
                             color: Theme.text; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
                         }
                         Icon {
