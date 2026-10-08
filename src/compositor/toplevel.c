@@ -287,6 +287,7 @@ void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool maximized)
     toplevel->output[0] = '\0';
     toplevel->workspace = 0;
     toplevel->sticky = false;
+    toplevel->above = ruled && rule.above;
     set_toplevel_output(toplevel, output);
     if (ruled && output && rule.workspace > 0 &&
         rule.workspace <= server_settings(server)->workspaces)
@@ -410,6 +411,7 @@ void map_toplevel(struct sh_toplevel *toplevel, bool fullscreen, bool maximized)
         toplevel_set_states(toplevel, false, 0);
         toplevel_configure(toplevel, x, y, resize ? width : 0, resize ? height : 0);
     }
+    restack_toplevel(toplevel); // kept above by a rule, or floating over tiles
     if (focus)
         focus_toplevel(toplevel);
     else
@@ -616,7 +618,7 @@ static void set_fullscreen_focus(struct sh_toplevel *toplevel, bool fullscreen, 
         toplevel->fullscreen_restore =
             rebase_box(server, toplevel->fullscreen_restore, toplevel_output(toplevel));
         toplevel_configure_box(toplevel, toplevel->fullscreen_restore);
-        wlr_scene_node_reparent(&toplevel->scene_tree->node, server->windows);
+        wlr_scene_node_reparent(&toplevel->scene_tree->node, window_layer(toplevel));
         // The usable area may have changed while this window covered the output.
         struct wlr_output *output =
             toplevel->tiled ? tiled_output(toplevel) : toplevel_output(toplevel);

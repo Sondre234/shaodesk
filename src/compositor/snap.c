@@ -161,9 +161,9 @@ static void preview_stack(struct sh_server *server) {
     struct sh_toplevel *toplevel = server->grabbed_toplevel;
     struct wlr_scene_node *window =
         toplevel && toplevel->scene_tree ? &toplevel->scene_tree->node : NULL;
-    if (window && window->parent == server->windows) {
-        if (node->parent != server->windows)
-            wlr_scene_node_reparent(node, server->windows);
+    if (window && is_window_layer(server, window->parent)) {
+        if (node->parent != window->parent)
+            wlr_scene_node_reparent(node, window->parent);
         wlr_scene_node_place_below(node, window);
     } else if (node->parent != server->guide_layer) {
         wlr_scene_node_reparent(node, server->guide_layer);

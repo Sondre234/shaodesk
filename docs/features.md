@@ -404,7 +404,9 @@ A window you fullscreen with a binding or its title bar fills its monitor except
 other bars, which stay shown. Fullscreen a program asks for itself, like a video player or a
 browser's fullscreen video, covers the whole monitor, panels included, and keeps covering it
 while you work on another monitor; bringing another window forward on its monitor puts it
-behind that window and shows the panels again.
+behind that window and shows the panels again. Either kind stays in front of the other windows
+of its monitor, those [kept above](#keeping-windows-above) too, while you work on another
+monitor, until a window of its own monitor is brought forward.
 
 Limitations: window placement during interactive resize is immediate, without waiting for the
 client's next buffer.
@@ -413,6 +415,18 @@ Actions without a section of their own: `quit` ends the session (Super + M), and
 `snap_right` fill half of the monitor with the focused window (no default binding; see
 [Snapping](#snapping) for the quarters and Super + Alt + arrows). `focus_last` (Super + `) focuses the window focused before this one, on any workspace; repeated,
 it flips between two windows.
+
+### Keeping windows above
+
+`toggle_above` keeps the focused window above the others, as KDE's Keep Above Others,
+Hyprland's pinned windows and PowerToys' Always on Top do: it stays over the floating windows and
+tiles of its monitor while they are focused and brought forward, and toggled again it goes back
+among them, in front. Windows kept above stack among themselves as focus raises them. A window
+keeps it through workspace switches, snapping, tiling (a tile kept above stays a tile), being
+sticky, and window groups, whose windows share it as they share their slot: a window joining a
+group takes the group's, and toggling one toggles them all. A fullscreen window covers the
+windows kept above on its monitor; the panels, their popups and menus, and the overlays (the
+switcher, the start menu, notifications) stay over all of them.
 
 ### Borders, opacity and rounded corners
 
@@ -1754,8 +1768,12 @@ enabled, x, y, logical width and height, scale, transform, mode, "make model ser
 whether it shows a picture, `on`, or is [turned off](#turning-monitors-off) or disabled, `off`), and
 `shaodesk msg get windows` prints one tab-separated line per window:
 workspace, focused, minimized, tiled, x, y, width, height, app ID, title, monitor,
-visible, scratchpad (a window hidden there is also minimized), sticky, and its window group
-(a number; 0 for none). `shaodesk msg get pid_at X Y` prints the process ID of the window
+visible, scratchpad (a window hidden there is also minimized), sticky, its window group
+(a number; 0 for none), and whether it is [kept above](#keeping-windows-above). `shaodesk msg
+get stacking` lists the windows front to back as they are drawn, hidden ones where they would
+be: app ID, title, monitor, and the layer it is in (`fullscreen_cover` for fullscreen over the
+panels, `peek` for the window the taskbar peeks at, `fullscreen`, `above`, `floating` for floating
+windows kept over tiles, `normal`). `shaodesk msg get pid_at X Y` prints the process ID of the window
 drawn at that layout point, or nothing over bare desktop. `shaodesk msg get layers` prints one line per panel or other layer-shell surface:
 namespace, output, layer (0 background to 3 overlay), whether it is shown, and whether it holds
 the keyboard.

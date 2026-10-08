@@ -2007,6 +2007,7 @@ constexpr std::pair<std::string_view, sh_action> action_table[] = {
         {"move_to_scratchpad", SH_MOVE_TO_SCRATCHPAD},
         {"scratchpad_show", SH_SCRATCHPAD_SHOW},
         {"toggle_sticky", SH_TOGGLE_STICKY},
+        {"toggle_above", SH_TOGGLE_ABOVE},
         {"resize_left", SH_RESIZE_LEFT},
         {"resize_right", SH_RESIZE_RIGHT},
         {"resize_up", SH_RESIZE_UP},

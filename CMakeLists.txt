@@ -238,6 +238,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/scratchpad.c
         src/compositor/session.c
         src/compositor/snap.c
+        src/compositor/stacking.c
         src/compositor/swallow.c
         src/compositor/switcher.c
         src/compositor/switches.c
@@ -569,6 +570,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(sticky_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME stacking_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/stacking_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(stacking_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME window_control_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_control_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>)

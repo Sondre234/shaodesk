@@ -78,6 +78,7 @@ void hand_over_slot(struct sh_toplevel *from, struct sh_toplevel *to) {
     snprintf(to->output, sizeof(to->output), "%s", from->output);
     to->floating = from->floating;
     to->placed = from->placed;
+    to->above = from->above;
     to->restore_box = from->restore_box;
     to->tile_sized = false;
     wlr_scene_node_set_position(&to->scene_tree->node, from->scene_tree->node.x,
@@ -101,6 +102,8 @@ void hand_over_slot(struct sh_toplevel *from, struct sh_toplevel *to) {
     }
     wlr_scene_node_set_enabled(&from->scene_tree->node, toplevel_visible(from));
     wlr_scene_node_set_enabled(&to->scene_tree->node, toplevel_visible(to));
+    restack_toplevel(from);
+    restack_toplevel(to);
     if (output)
         reflow_output(server, output);
     refresh_frame(from);

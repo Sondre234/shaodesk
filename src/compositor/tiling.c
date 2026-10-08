@@ -93,6 +93,7 @@ void tile_toplevel_at(struct sh_toplevel *toplevel, struct wlr_output *output,
     toplevel->tile_sized = false;
     toplevel->arranged = toplevel->placed = false;
     toplevel->tiled = true;
+    restack_toplevel(toplevel);
     if (toplevel->foreign)
         wlr_foreign_toplevel_handle_v1_set_maximized(toplevel->foreign, false);
     sh_tiling_insert(server->tiling, output->name, toplevel->workspace, toplevel, target, has_point,
@@ -117,6 +118,7 @@ void untile_toplevel(struct sh_toplevel *toplevel, bool restore) {
     struct wlr_output *output = tiled_output(toplevel);
     sh_tiling_remove(server->tiling, toplevel);
     toplevel->tiled = false;
+    restack_toplevel(toplevel);
     toplevel->arranged = !restore;
     toplevel->arrangement = SH_NONE;
     // The floating geometry was saved where the window entered the tiling, maybe elsewhere.

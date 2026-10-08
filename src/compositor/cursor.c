@@ -495,6 +495,7 @@ static bool action_targets_window(enum sh_action action) {
     case SH_FULLSCREEN:
     case SH_TOGGLE_FLOATING:
     case SH_TOGGLE_STICKY:
+    case SH_TOGGLE_ABOVE:
     case SH_SWALLOW_TOGGLE:
     case SH_GROUP_TOGGLE:
     case SH_GROUP_NEXT:

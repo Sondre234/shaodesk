@@ -411,7 +411,7 @@ static void lend_node(struct sh_toplevel *toplevel) {
 static void lift_for_peek(struct sh_toplevel *toplevel) {
     struct sh_server *server = toplevel->server;
     struct wlr_scene_node *node = toplevel->scene_tree ? &toplevel->scene_tree->node : NULL;
-    if (!node || (node->parent != server->windows && node->parent != server->fullscreen))
+    if (!node || (!is_window_layer(server, node->parent) && node->parent != server->fullscreen))
         return;
     server->peek_place = wlr_scene_tree_create(node->parent);
     if (!server->peek_place)

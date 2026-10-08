@@ -51,6 +51,7 @@ all. In short:
 | `touch.c` | Touchscreens: fingers to the surfaces under them (wl_touch), the pointer for clients without touch and the compositor's own controls, and the output each screen is mapped to. |
 | `grab.c` | Moving and resizing with the pointer, magnetic edges, dropping. |
 | `snap.c` | Snapping a window dragged to an edge of its output: the zones, the preview, the drop. |
+| `stacking.c` | The layers windows are drawn in among themselves (tiles, floating windows over them with `layout.floating_above_tiles`, windows kept above the others) and keeping a window above. |
 | `focus.c` | Keyboard focus and urgent windows. |
 | `toplevel.c` | Windows: xdg-shell toplevels and popups, opening by window rules, maximize, fullscreen, minimize. |
 | `xwayland.c` | X11 windows and the XWM waker. |

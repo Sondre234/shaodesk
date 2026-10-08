@@ -93,6 +93,7 @@ void reload_config(struct sh_server *server) {
         empty_scratchpad(server);
     if (!server_settings(server)->groups)
         dissolve_groups(server);
+    restack_windows(server); // layout.floating_above_tiles may have changed
     show_workspaces(server);
     if (server->focused_toplevel && !toplevel_visible(server->focused_toplevel)) {
         deactivate_toplevel(server);
@@ -287,7 +288,8 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     // Stacking order, bottom to top.
     struct wlr_scene_tree **stack[] = {
         &server.backgrounds, &server.layer_trees[0], &server.layer_trees[1],
-        &server.windows,     &server.fullscreen,     &server.peek_layer,     &server.layer_trees[2],
+        &server.windows,     &server.floating_windows, &server.above_windows,
+        &server.fullscreen,     &server.peek_layer,     &server.layer_trees[2],
         &server.fullscreen_cover,
         &server.unmanaged,   &server.guide_layer,    &server.overview_layer, &server.layer_trees[3], &server.drag_icons,
         &server.lock_tree,

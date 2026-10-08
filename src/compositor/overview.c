@@ -529,7 +529,7 @@ static void overview_lower_fullscreen(struct sh_server *server, bool lower) {
         if (!toplevel->fullscreen || !toplevel->scene_tree)
             continue;
         wlr_scene_node_reparent(&toplevel->scene_tree->node,
-                                lower ? server->windows : fullscreen_tree(toplevel));
+                                lower ? window_layer(toplevel) : fullscreen_tree(toplevel));
     }
 }
 
