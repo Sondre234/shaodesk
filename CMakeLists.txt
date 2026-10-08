@@ -543,6 +543,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/bit_depth_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:output_management_probe>)
         set_tests_properties(bit_depth_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME tearing_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/tearing_smoke.py $<TARGET_FILE:shaodesk>
+            $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(tearing_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME display_mode_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/display_mode_smoke.py $<TARGET_FILE:shaodesk>)
         set_tests_properties(display_mode_smoke PROPERTIES TIMEOUT 60)
