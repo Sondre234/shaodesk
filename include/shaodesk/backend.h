@@ -361,6 +361,17 @@ struct sh_settings {
     bool close_windows;
     int close_timeout;
     bool close_force;
+    /* session.restore: enum sh_session_restore, what a login session saves as it ends and puts
+     * back as the next starts. */
+    int session_restore;
+};
+
+/* What a login session keeps of the last one: nothing; where its windows were, for those that open
+ * again (from startup, autostart or by hand); or that, and the programs missing started again. */
+enum sh_session_restore {
+    SH_SESSION_RESTORE_OFF,
+    SH_SESSION_RESTORE_WINDOWS,
+    SH_SESSION_RESTORE_LAUNCH,
 };
 
 /* What a mouse button was pressed over. */

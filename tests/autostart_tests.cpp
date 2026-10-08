@@ -233,6 +233,16 @@ int main() {
                     !shaodesk::parse_config("return {shell={polkit_agent=false}}").shell.polkit_agent,
                 "shell.polkit_agent not parsed");
         rejects("return {shell={polkit_agent='no'}}");
+        require(defaults.settings.session_restore == SH_SESSION_RESTORE_WINDOWS,
+                "session.restore's default");
+        require(shaodesk::parse_config("return {session={restore='off'}}").settings.session_restore ==
+                        SH_SESSION_RESTORE_OFF &&
+                    shaodesk::parse_config("return {session={restore='launch'}}")
+                            .settings.session_restore == SH_SESSION_RESTORE_LAUNCH,
+                "session.restore not parsed");
+        rejects("return {session={restore=true}}");
+        rejects("return {session={restore='all'}}");
+        rejects("return {session={save=true}}");
         std::cout << "autostart passed\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';

@@ -311,6 +311,13 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `autostart.xdg` | boolean | true | - | Start the autostart entries. |
 | `autostart.exclude` | list of strings | unset | - | File names of autostart entries never to start, at most 128, whichever directory holds them. |
 
+## `session`
+
+| Setting | Type | Default | Range | Description |
+| --- | --- | --- | --- | --- |
+| `session` | table | - | - | The last session: what a standalone session saves as it ends (log out, quit, power off, restart) and puts back as the next one starts, after `startup` and autostart. |
+| `session.restore` | enum | "windows" | - | `"windows"` puts the windows that open again back where they were: those already open and those `startup` and autostart start, matched by app ID and title, with each monitor's workspace and tiling. `"launch"` also starts the programs of the other windows again, by the command line they ran. `"off"` saves and restores nothing. The session is `last`, among those `shaodesk msg session list` shows. |
+
 ## `shell`
 
 | Setting | Type | Default | Range | Description |
