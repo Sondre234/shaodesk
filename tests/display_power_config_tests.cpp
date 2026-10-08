@@ -105,6 +105,7 @@ int main() {
         rejects("return {bindings={{switch='lid',state='close',mods={'Super'},action='lock'}}}");
         rejects("return {bindings={{switch='lid',state='close',key='l',action='lock'}}}");
         rejects("return {bindings={{key='l',state='close',action='lock'}}}");
+        rejects("return {bindings={{switch='lid',state='close',action='resize_left',repeats=true}}}");
         rejects("return {bindings={{switch='lid',state='close',action='lock'},"
                 "{switch='lid',state='close',action='suspend'}}}");
         std::cout << "display power configuration passed\n";

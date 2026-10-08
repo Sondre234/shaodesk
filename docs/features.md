@@ -1206,7 +1206,8 @@ input, so monitors the [idle steps](#power-saving-when-idle) turned off come on 
 Bindings can act on a switch, as Hyprland's `bindl = , switch:on:Lid Switch` does: `switch`
 is `"lid"`, with `state` `"close"` or `"open"`, or `"tablet"` (a convertible's tablet mode), with
 `"on"` or `"off"`. They take no key, button or modifiers, and run even while the session is
-locked.
+locked, so `locked` and `repeats` are for key bindings alone; a [binding
+mode](#binding-modes) holds none.
 
 ```lua
 bindings = {
