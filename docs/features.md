@@ -1156,6 +1156,37 @@ settings replace the `outputs.monitors` entry of the outputs they touch until th
 configuration is reloaded, which brings the configured setup back. The last enabled output
 cannot be turned off.
 
+### Mirroring
+
+A monitor can show another's picture, as Windows' Duplicate and KDE's display mirroring do:
+
+```lua
+outputs = {
+    monitors = {
+        ["HDMI-A-1"] = { mirror = "eDP-1" }, -- the projector shows the laptop's panel
+    },
+},
+```
+
+`mirror` names the monitor to show, by connector name or `"desc:"` description as the keys of
+`outputs.monitors` do. The mirroring monitor leaves the layout: it has no workspaces, windows or
+panels of its own, and applications do not see it as an output. It shows the whole picture of the
+monitor it mirrors, everything on it with the pointer, the magnifier, night light and the lock
+screen, scaled to fit its own mode, with black bars where the shapes differ, and upright whichever
+of the two is rotated. Its own `mode` and `transform` apply; its `scale` does not matter. While
+the monitor it mirrors is not in the layout (unplugged, `enabled = false`, or behind a closed
+lid), it joins the layout as any other monitor does, and leaves it again when that one comes
+back, its windows moving as when a monitor is unplugged. It turns off and on with the monitor it
+mirrors (see [Turning monitors off](#turning-monitors-off)), and `shaodesk msg get outputs` names
+that monitor in its last column. One mirroring a monitor that mirrors another shows that other
+one. wlr-output-management clients list it as enabled, at the place of the monitor it mirrors:
+left there, it goes on mirroring; moved elsewhere, it joins the layout there.
+
+The picture is copied from the frames the mirrored monitor shows, one scaled copy for each, so a
+mirror costs little, and nothing while the picture stands still. Closing a laptop's lid while
+another monitor mirrors its panel turns the panel off as in [clamshell mode](#the-laptop-lid),
+and the other monitor then shows the desktop itself.
+
 ### Turning monitors off
 
 A monitor can also be turned off without leaving the layout: it keeps its place, its windows,
