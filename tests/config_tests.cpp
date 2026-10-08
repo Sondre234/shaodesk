@@ -40,6 +40,20 @@ int main(int argc, char **argv) {
         require(config.binding(SH_ALT, XKB_KEY_Tab)->action == SH_SWITCHER_NEXT &&
                     config.binding(SH_ALT | SH_SHIFT, XKB_KEY_Tab)->action == SH_SWITCHER_PREV,
                 "example window switcher bindings missing");
+        // The keys of an action's binding, as the compositor tells them: modifiers in a fixed
+        // order, a letter in capitals; nothing for an action without a key.
+        require(config.binding_keys(SH_TERMINAL) == "Super + Q" &&
+                    config.binding_keys(SH_SWITCHER_PREV) == "Alt + Shift + Tab" &&
+                    config.binding_keys(SH_RESIZE_LEFT) == "Super + Ctrl + Shift + Left" &&
+                    config.binding_keys(SH_POWER_MENU) == "Super + Escape" &&
+                    config.binding_keys(SH_VOLUME_MUTE) == "XF86AudioMute" &&
+                    config.binding_keys(SH_ZOOM_IN).empty(),
+                "binding_keys mismatch");
+        auto clicked = shaodesk::parse_config(
+            "return {bindings={{button='side',action='close'},{mods={'Ctrl'},key='w',"
+            "action='close'},{switch='lid',state='close',action='lock'}}}");
+        require(clicked.binding_keys(SH_CLOSE) == "Ctrl + W" && clicked.binding_keys(SH_LOCK).empty(),
+                "binding_keys gave a button's or a switch's binding");
         // The example starts in the macOS style; its `default` profile is the taskbar.
         require(config.profile == "macos-light" && config.shell.macos_style &&
                     config.shell.enabled && config.shell.panel_height == 64 &&

@@ -2239,6 +2239,25 @@ std::vector<std::string> Config::mode_names() const {
     return names;
 }
 
+std::string Config::binding_keys(sh_action action) const {
+    for (const auto &binding : bindings) {
+        char name[64];
+        if (binding.action != action || binding.button || binding.switch_type >= 0 ||
+            xkb_keysym_get_name(binding.keysym, name, sizeof(name)) <= 0)
+            continue;
+        std::string keys;
+        for (auto [bit, modifier] : {std::pair{SH_LOGO, "Super"}, {SH_CTRL, "Ctrl"},
+                                     {SH_ALT, "Alt"}, {SH_SHIFT, "Shift"}})
+            if (binding.modifiers & bit)
+                keys += std::string(modifier) + " + ";
+        // A letter as printed on the key.
+        if (!name[1])
+            name[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(name[0])));
+        return keys + name;
+    }
+    return {};
+}
+
 const Binding *Config::switch_binding(sh_switch type, bool on) const {
     return find_switch(bindings, type, on);
 }

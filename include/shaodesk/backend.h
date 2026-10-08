@@ -556,6 +556,9 @@ struct sh_callbacks {
     /* The action bound to a switch turning on (a lid closing, tablet mode starting) or off, as
      * `key` returns one; SH_NONE when none is. */
     enum sh_action (*switch_toggled)(void *, enum sh_switch type, bool on, int *argument);
+    /* The keys of the first key binding of `action` outside any mode, as "Super + Shift +
+     * Escape"; "" when no key is bound to it. Valid until the next call. */
+    const char *(*binding_keys)(void *, enum sh_action action);
 };
 
 enum sh_backend_mode { SH_BACKEND_NESTED, SH_BACKEND_HEADLESS, SH_BACKEND_SESSION };

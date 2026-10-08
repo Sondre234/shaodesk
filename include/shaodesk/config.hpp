@@ -366,6 +366,9 @@ struct Config {
     int mode_number(const std::string &name) const;
     // "default" and every mode's name.
     std::vector<std::string> mode_names() const;
+    // The keys of the first key binding of `action` outside any mode, as people read them:
+    // "Super + Shift + Escape"; empty when no key is bound to it.
+    std::string binding_keys(sh_action action) const;
     // The binding of a switch turning on or off, "none" included; nullptr when there is none.
     const Binding *switch_binding(sh_switch type, bool on) const;
     // The first button binding for what lies under the pointer, or nothing (the click belongs
