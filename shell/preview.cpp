@@ -363,7 +363,8 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
 
 QStringList PreviewData::surfaces() {
     return {"osd-volume", "osd-text", "cards",    "power-dialog",
-            "palette",    "switcher", "overview", "palette-empty"};
+            "palette",    "switcher", "overview", "palette-empty",
+            "palette-calculator"};
 }
 
 bool PreviewData::showSurface(QScreen *screen, const QString &name) {
@@ -421,12 +422,15 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
         // Shown as its view shows it, as the palette, the switcher and the overview are below.
         properties = {{"shown", true}};
         controller_.power()->request("poweroff", output);
-    } else if (name == "palette" || name == "palette-empty") {
+    } else if (name == "palette" || name == "palette-empty" || name == "palette-calculator") {
         file = "Palette.qml";
         properties = {{"screenSize", ShellView::previewSize()}, {"shown", true}};
         controller_.palette()->open(output);
-        // A search that finds applications and actions both, or one that finds nothing.
-        controller_.palette()->setQuery(name == "palette" ? "fi" : "> nothing like this");
+        // A search that finds applications and actions both, one that finds nothing, or a
+        // calculation.
+        controller_.palette()->setQuery(name == "palette"         ? "fi"
+                                        : name == "palette-empty" ? "> nothing like this"
+                                                                  : "2*(3+4)");
     } else if (name == "switcher") {
         file = "Switcher.qml";
         // The taskbar's stand-in windows, most recently focused first, the one before the
