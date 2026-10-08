@@ -46,7 +46,8 @@ you save it.
   applications can save; and [power saving when idle](docs/features.md#power-saving-when-idle)
   without an idle daemon: the screens dim, the monitors turn off, the screen locks and the
   machine suspends after their timeouts, shorter on battery if you like, held off while a video
-  plays.
+  plays. A laptop docked with its [lid closed](docs/features.md#the-laptop-lid) turns its own
+  panel off.
 - **Effects:** interruptible animations with spring curves, dimming of inactive windows, peek,
   night light, a magnifier, and hot corners.
 - **Lua configuration** that is validated with file and line, reloads on save, can extend
