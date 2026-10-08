@@ -194,6 +194,11 @@ const Option options[] = {
      "Bits per colour channel the monitor is drawn in: 8, or 10 for smoother gradients on a "
      "monitor that takes them (a render format of `XRGB2101010`, else `XBGR2101010`). Where the "
      "monitor, its connection or the renderer refuses 10 bits it stays at 8."},
+    {"outputs.monitors.<name>.hdr", "boolean", "false", "true", none, none,
+     "Drive the monitor in HDR, BT.2020 colours with the PQ curve, where its EDID offers them, "
+     "the renderer can convert colours (Vulkan alone in wlroots 0.20) and the test of its "
+     "settings passes; else it stays SDR. Drawn in 10 bits where it can be. With any monitor "
+     "asking for it, applications may describe their colours (color-management-v1)."},
     {"outputs.monitors.<name>.mirror", "string", "unset", "\"eDP-1\"", none, none,
      "Show another monitor's picture, a connector name or `\"desc:\"` as the keys are: this one "
      "leaves the layout (no workspaces, windows or panels of its own) and shows that monitor's "
