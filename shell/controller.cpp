@@ -681,6 +681,10 @@ void ShellController::subscribe() {
                     Q_EMIT keyboardLayoutChanged();
                 }
                 continue;
+            } else if (line.startsWith("mode ")) {
+                // mode NAME: the binding mode in use, "default" outside any.
+                setBindingMode(line.sliced(5) == "default" ? QString() : line.sliced(5));
+                continue;
             } else if (line.startsWith("night-light ")) {
                 // night-light ACTIVE MODE
                 const auto words = line.split(' ');
@@ -845,6 +849,7 @@ void ShellController::subscribe() {
         }
         power_.setAvailable("-");
         setNightLight(false, {});
+        setBindingMode({});
         if (urgentCount_ != 0 || !urgentWindows_.isEmpty()) {
             urgentCount_ = 0;
             urgentWindows_.clear();
@@ -860,6 +865,12 @@ void ShellController::subscribe() {
         clearOverview();
     });
     state_->connectToServer(path);
+}
+void ShellController::setBindingMode(const QString &mode) {
+    if (mode == bindingMode_)
+        return;
+    bindingMode_ = mode;
+    Q_EMIT bindingModeChanged();
 }
 void ShellController::setNightLight(bool on, const QString &mode) {
     if (on == nightLight_ && mode == nightLightMode_)

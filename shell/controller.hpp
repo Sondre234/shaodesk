@@ -86,6 +86,8 @@ class ShellController : public QObject {
     // The compositor's night light: whether it warms the screen now, and who decides: "auto"
     // (the schedule), "on" or "off" (an override), or "" without a compositor.
     Q_PROPERTY(bool nightLight READ nightLight NOTIFY nightLightChanged)
+    // The binding mode in use, "" outside any.
+    Q_PROPERTY(QString bindingMode READ bindingMode NOTIFY bindingModeChanged)
     Q_PROPERTY(QString nightLightMode READ nightLightMode NOTIFY nightLightChanged)
     Q_PROPERTY(QVariantList pinned READ pinned NOTIFY appsChanged)
     // Configured launchers and installed applications, as {appId, name, icon, pinned (to the
@@ -212,6 +214,7 @@ class ShellController : public QObject {
     QVariantMap keyboardLayout() const { return keyboardLayout_; }
     bool nightLight() const { return nightLight_; }
     QString nightLightMode() const { return nightLightMode_; }
+    QString bindingMode() const { return bindingMode_; }
     // What the compositor says of night light; the preview's stand-in says it too.
     void setNightLight(bool on, const QString &mode);
     QVariantList pinned() const;
@@ -328,6 +331,7 @@ class ShellController : public QObject {
     void cardsOutputChanged();
     void keyboardLayoutChanged();
     void nightLightChanged();
+    void bindingModeChanged();
     void trashChanged();
     // The compositor asked for the notification history on `output`.
     void notificationsRequested(const QString &output);
@@ -370,6 +374,8 @@ class ShellController : public QObject {
     QVariantMap keyboardLayout_;
     bool nightLight_ = false;
     QString nightLightMode_;
+    QString bindingMode_;
+    void setBindingMode(const QString &mode);
     QObject *notificationService_ = nullptr;
     TrayModel tray_;
     QObject *trayHost_ = nullptr;

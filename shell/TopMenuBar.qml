@@ -145,6 +145,7 @@ Rectangle {
         anchors.right: parent.right; anchors.rightMargin: Theme.spacingM
         anchors.verticalCenter: parent.verticalCenter
         spacing: Theme.spacingXS
+        BindingMode { panel: menuBar.panel }
         WorkspaceIndicator { panel: menuBar.panel }
         WallpapersButton { id: wallpapersButton; panel: menuBar.panel }
         ProfilesButton { id: profilesButton; panel: menuBar.panel }
