@@ -3,7 +3,8 @@
 panel (eDP-1): duplicate mirrors the others onto the panel, internal keeps the panel alone,
 external every monitor but it, extend all of them; a choice lasts until a reload. Without a
 choice, the action (bound to XF86Display) opens a popup on the focused monitor showing the choice
-in force, steps through the four and takes the one shown once the key rests; the arrows step,
+in force, steps through the four in Windows' order (PC screen only, duplicate, extend, second
+screen only) and takes the one shown once the key rests; the arrows step,
 Return takes it at once and Escape closes it without. Subscribers hear of the popup. Without a
 built-in panel the primary monitor stands in for it, and with one monitor only extend is had."""
 from pathlib import Path
@@ -94,7 +95,7 @@ with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) a
     press("display")
     assert mode() == ("extend", "extend", focused), mode()
     wait_for(lambda: events.seen(f"display-mode {focused} extend extend "
-                                 "extend,duplicate,internal,external"), "the shell heard of it")
+                                 "internal,duplicate,extend,external"), "the shell heard of it")
     press("display")
     press("display")
     assert mode() == ("extend", "internal", focused), mode()
@@ -109,16 +110,16 @@ with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) a
     press("right")
     assert mode() == ("internal", "extend", focused), mode()
     press("left")
-    assert mode() == ("internal", "external", focused), mode()
+    assert mode() == ("internal", "duplicate", focused), mode()
     press("escape")
     assert mode() == ("internal", "-", "-"), mode()
     desktop.stays(lambda: mode() == ("internal", "-", "-"), "Escape took nothing")
     press("display")
     press("left")
-    assert mode()[1] == "duplicate", mode()
+    assert mode()[1] == "external", mode()
     press("enter")
-    wait_for(lambda: outputs() == {"HEADLESS-1": mirrors, "HEADLESS-2": mirrors, "eDP-1": ON},
-             "Return took duplicate")
+    wait_for(lambda: outputs() == {"HEADLESS-1": ON, "HEADLESS-2": ON, "eDP-1": OFF},
+             "Return took external")
     # A choice by name closes the popup without taking what it showed.
     press("display")
     press("right")

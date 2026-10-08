@@ -12,6 +12,10 @@
 #define DISPLAY_MODE_SETTLE_MS 1500
 
 static const char *const mode_names[] = {"step", "extend", "duplicate", "internal", "external"};
+/* The order the popup lists and steps through them, Windows': "PC screen only", "Duplicate",
+ * "Extend", "Second screen only". */
+static const enum sh_display_mode popup_order[] = {SH_DISPLAY_MODE_INTERNAL, SH_DISPLAY_MODE_DUPLICATE,
+                                                   SH_DISPLAY_MODE_EXTEND, SH_DISPLAY_MODE_EXTERNAL};
 
 static int connected_outputs(struct sh_server *server) {
     return wl_list_length(&server->outputs) + wl_list_length(&server->disabled_outputs);
@@ -128,7 +132,7 @@ static bool set_mode(struct sh_server *server, enum sh_display_mode mode, char *
 }
 
 /* Tells the shell about the popup: "display-mode OUTPUT SHOWN CURRENT CHOICES", the choices it
- * offers separated by commas, or "display-mode-close". */
+ * offers in its order separated by commas, or "display-mode-close". */
 static void send_popup(struct sh_server *server) {
     char line[256];
     if (!server->display_mode.open) {
@@ -137,7 +141,7 @@ static void send_popup(struct sh_server *server) {
     }
     snprintf(line, sizeof(line), "display-mode %s %s %s %s\n", server->display_mode.output,
              mode_names[server->display_mode.shown], mode_names[current_mode(server)],
-             connected_outputs(server) < 2 ? "extend" : "extend,duplicate,internal,external");
+             connected_outputs(server) < 2 ? "extend" : "internal,duplicate,extend,external");
     send_shell_line(server, line);
 }
 
@@ -161,8 +165,8 @@ static int popup_settled(void *data) {
 }
 
 /* Opens the popup on the focused monitor showing the choice in force, or moves it `step` on
- * through the four, wrapping, while it is open; the time to take it starts again. With one
- * monitor it shows extend alone. */
+ * through the four in the popup's order, wrapping, while it is open; the time to take it starts
+ * again. With one monitor it shows extend alone. */
 static void step_popup(struct sh_server *server, int step) {
     struct wlr_output *output = focused_output(server);
     if (!server->display_mode.open) {
@@ -173,7 +177,10 @@ static void step_popup(struct sh_server *server, int step) {
         snprintf(server->display_mode.output, sizeof(server->display_mode.output), "%s",
                  output->name);
     } else if (connected_outputs(server) >= 2) {
-        server->display_mode.shown = (server->display_mode.shown - 1 + step + 4) % 4 + 1;
+        int at = 0;
+        while (popup_order[at] != server->display_mode.shown)
+            ++at;
+        server->display_mode.shown = popup_order[(at + step + 4) % 4];
     }
     if (!server->display_mode.timer)
         server->display_mode.timer = wl_event_loop_add_timer(
