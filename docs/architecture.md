@@ -229,6 +229,13 @@ pointer: the cursor warps to it and `server_cursor_button` hears a left button a
 the controls, the drag strip, button bindings and the overview take it as a click.
 `map_touchscreens`, which `arrange_outputs` calls, maps each device to its output.
 
+`tablet.c` does the same for drawing tablets' tools: one over a surface that takes tablet-v2
+(`wlr_surface_accepts_tablet_v2`) is near it, as wlroots' tablet tool, and keeps it while its tip
+is down (an implicit grab, its motion in the surface's coordinates as a finger's); over anything
+else it is the pointer, the cursor following it and `server_cursor_button` hearing its tip and
+buttons. Pads follow the keyboard's focus through a listener of their own; wlroots would send
+their buttons to the last surface they entered, so `pad_focused` checks it first.
+
 ## The shell (`shell/`)
 
 `ShellController` (`controller.cpp`) loads the configuration, keeps the compositor's state from
