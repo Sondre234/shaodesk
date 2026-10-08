@@ -331,6 +331,24 @@ out at once. Then it builds the frame with `wlr_scene_output_build_state`, sets
 `tearing_page_flip`, tests it and commits without it where the test, or the commit, refuses.
 `sh_output.tearing` keeps why and the counts for `get tearing`.
 
+### HDR and colour management
+
+`configure_output` asks `output_want_hdr` (`hdr.c`) to put an image description of BT.2020 with
+PQ into a monitor's state when its settings ask for HDR and `wlr_output.supported_primaries` and
+`supported_transfer_functions` (from the EDID and the connector's properties, DRM only) and the
+renderer's `output_color_transform` allow it, tests the state and drops it again where the test
+fails (`output_drop_hdr`), then tries a 10-bit format on top. The image description in the output
+state is all the scene needs: `wlr_scene_output_build_state` converts each buffer from its own
+transfer function and primaries into the output's, and a supplied colour transform cannot go with
+one (wlroots asserts), so `output_frame` gives an HDR output no night light. `color_management_update`,
+at startup and after each reload, creates `wlr_color_manager_v1` once a monitor asks for HDR and
+the renderer converts colours (`input_color_transform`, Vulkan alone in wlroots 0.20), with the
+transfer functions and primaries the renderer lists, and hands it to the scene
+(`wlr_scene_set_color_manager_v1`), which then gives each surface's buffer the colours its client
+describes and tells clients the image description their outputs prefer. `SHAODESK_TEST_HDR` makes
+headless outputs claim BT.2020 with PQ, but the headless backend takes no image description, so a
+test reaches the commit test's refusal at most.
+
 ### Power saving when idle
 
 `idle.c` takes the `idle` steps (`enum sh_idle_step`: dim, display_off, lock, suspend) with one
@@ -817,7 +835,8 @@ whether it has, for something the compositor does another way without it, as the
 picture to a PPM file (see `mirror_smoke.py`), and `SHAODESK_TEST_REFUSE_10BIT=NAME,...` makes
 those headless outputs refuse a 10-bit render format, as a monitor without one does (see
 `bit_depth_smoke.py`), and `SHAODESK_TEST_REFUSE_TEARING` refuses their asynchronous page flips
-(see `tearing_smoke.py`, whose windows ask for them with `SHAODESK_PROBE_TEARING=async`).
+(see `tearing_smoke.py`, whose windows ask for them with `SHAODESK_PROBE_TEARING=async`);
+`SHAODESK_TEST_HDR` makes outputs claim HDR in their EDID (see `hdr_smoke.py`).
 `SHAODESK_PROBE_ICON` gives a `wayland_probe` window an icon
   through xdg-toplevel-icon-v1 and an `x11_probe` window `_NET_WM_ICON`, and their commands
   change it (see `window_icon_smoke.py`). `SHAODESK_LOGIN_SESSION=1` makes a headless
