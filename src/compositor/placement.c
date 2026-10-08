@@ -186,7 +186,8 @@ bool placed_slot(struct sh_server *server, enum sh_action action, struct wlr_out
 }
 
 /* Snaps or maximizes one window within the usable area of `output`, as place_by_hand does
- * on the output it is on: a window dropped at an edge goes to the output under the pointer. */
+ * on the output it is on: a window dropped at an edge goes to the output under the pointer.
+ * Snapped into a half or a quarter, it may bring Snap Assist up beside it. */
 void place_by_hand_on(struct sh_toplevel *toplevel, enum sh_action action,
                       struct wlr_output *output) {
     if (toplevel->tiled || wants_tiling(toplevel, output))
@@ -194,8 +195,10 @@ void place_by_hand_on(struct sh_toplevel *toplevel, enum sh_action action,
     if (toplevel->tiled)
         untile_toplevel(toplevel, false);
     struct sh_rect target;
-    if (placed_slot(toplevel->server, action, output, &target))
-        place_toplevel(toplevel, action, target);
+    if (!placed_slot(toplevel->server, action, output, &target))
+        return;
+    place_toplevel(toplevel, action, target);
+    snap_assist_offer(toplevel);
 }
 
 void arrange_windows(struct sh_server *server, enum sh_action action) {

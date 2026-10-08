@@ -731,6 +731,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/snap_keys_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(snap_keys_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME snap_assist_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/snap_assist_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>)
+        set_tests_properties(snap_assist_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME night_light_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/night_light_smoke.py
             $<TARGET_FILE:shaodesk>)

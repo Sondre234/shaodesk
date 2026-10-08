@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
 /* Snapping a window dragged to an edge of its output (windows.snap), as Windows' Aero Snap and
  * KWin's quick tiling: the zone the pointer is in, the preview of where the window would go,
- * and the drop that puts it there. Also Windows' Win+arrow cycle from the keyboard. */
+ * and the drop that puts it there. Also Windows' Win+arrow cycle from the keyboard, and when
+ * Snap Assist offers the windows to fill the rest with. */
 #include "server.h"
 #if WLR_HAS_GLES2_RENDERER
 #include <wlr/render/gles2.h>
@@ -307,4 +308,30 @@ void snap_cycle(struct sh_server *server, enum sh_action direction) {
         minimize_toplevel(toplevel);
         break;
     }
+}
+
+/* Snap Assist (windows.snap.assist): after `toplevel` snapped into a half or a quarter of its
+ * output, by dragging, from the keyboard or as Snap Assist's pick, the output's other windows
+ * show in the free slot beside it (sh_snap_assist_slot, the quarters the windows snapped there
+ * hold being taken) for one to fill it. Not on an output that tiles, whose tiling places
+ * windows itself. */
+void snap_assist_offer(struct sh_toplevel *toplevel) {
+    struct sh_server *server = toplevel->server;
+    if (!server_settings(server)->snap_assist || server->locked || !toplevel->arranged ||
+        toplevel->tiled || !sh_snap_quarters(toplevel->arrangement))
+        return;
+    struct wlr_output *output = toplevel_output(toplevel);
+    if (!output || output_tiles(server, output))
+        return;
+    unsigned taken = sh_snap_quarters(toplevel->arrangement);
+    struct sh_toplevel *other;
+    wl_list_for_each(other, &server->toplevels, link) {
+        if (other != toplevel && other->arranged && !other->tiled && toplevel_mapped(other) &&
+            toplevel_visible(other) && toplevel_output(other) == output)
+            taken |= sh_snap_quarters(other->arrangement);
+    }
+    enum sh_action slot = sh_snap_assist_slot(toplevel->arrangement, taken);
+    struct sh_rect area;
+    if (slot != SH_NONE && placed_slot(server, slot, output, &area))
+        overview_assist(server, toplevel, output, slot, area, slot_radius(server, slot, output));
 }

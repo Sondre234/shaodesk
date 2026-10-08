@@ -5,7 +5,10 @@
  * thumbnails move with the windows' contents at no cost while nothing changes. The shell
  * draws the text (titles, the filter) over it from the events sent by overview_announce. The
  * overview takes the keyboard and the pointer while open and changes nothing until a window
- * is picked, a workspace chosen, or a thumbnail dropped on the strip. */
+ * is picked, a workspace chosen, or a thumbnail dropped on the strip. Snap Assist is the same
+ * overview in the free slot beside a window just snapped (overview_assist): it lists the
+ * output's other windows there, puts the one picked into the slot, and leaves the pointer to
+ * the rest of the screen. */
 #include "server.h"
 
 static void overview_colour(float out[4], float r, float g, float b, float a) {
@@ -97,6 +100,17 @@ static bool overview_on(struct sh_overview *overview, struct sh_toplevel *toplev
            (toplevel->sticky || toplevel->workspace == workspace);
 }
 
+/* Whether Snap Assist offers a window: one of the output's on the workspace it shows, minimized
+ * ones included, but for the window just snapped, any other snapped into a half or a quarter,
+ * a fullscreen one and one hidden in the scratchpad or a group. */
+static bool assist_lists(struct sh_overview *overview, struct sh_toplevel *toplevel) {
+    return overview_listable(toplevel) && toplevel != overview->assist_from &&
+           !toplevel->fullscreen && !toplevel->scratchpad && !toplevel->group_hidden &&
+           !strcmp(toplevel->output, overview->output) &&
+           (toplevel->sticky || toplevel->workspace == overview->viewed) &&
+           !(toplevel->arranged && sh_snap_quarters(toplevel->arrangement));
+}
+
 /* Lists the windows the grid shows, keeping the selection on its window when it is still
  * there. Without a filter that is the viewed workspace's windows, most recently used first; a
  * filter lists every window that matches, minimized ones and other workspaces' included. */
@@ -117,7 +131,9 @@ static void overview_collect(struct sh_server *server) {
         if (overview->count >= OVERVIEW_MAX || !overview_listable(toplevel))
             continue;
         bool listed;
-        if (overview->filter[0]) {
+        if (overview->assist) {
+            listed = assist_lists(overview, toplevel);
+        } else if (overview->filter[0]) {
             const char *app_id = toplevel_app_id(toplevel), *title = toplevel_title(toplevel);
             char text[512];
             snprintf(text, sizeof(text), "%s %s", app_id ? app_id : "", title ? title : "");
@@ -157,7 +173,8 @@ static void overview_layout(struct sh_server *server) {
     int gap = settings->overview_gap;
     struct sh_rect area = {overview->area.x, overview->area.y, overview->area.width,
                            overview->area.height};
-    int top = area.y + OVERVIEW_TOP;
+    // Snap Assist has no strip, nor room for a search above its slot.
+    int top = area.y + (overview->assist ? gap : OVERVIEW_TOP);
     overview->strip_count = 0;
     if (settings->overview_strip && overview->workspaces > 1) {
         struct sh_rect band = {area.x + gap, top, area.width - 2 * gap,
@@ -175,7 +192,8 @@ static void overview_layout(struct sh_server *server) {
         struct wlr_box box = toplevel_box(overview->windows[i]);
         overview->sizes[i] = (struct sh_rect){0, 0, box.width > 0 ? box.width : 1,
                                               box.height > 0 ? box.height : 1};
-        bool shown = toplevel_visible(overview->windows[i]) &&
+        // Snap Assist's thumbnails show in their cells, as the windows stay where they are.
+        bool shown = toplevel_visible(overview->windows[i]) && !overview->assist &&
                      !strcmp(overview->windows[i]->output, overview->output);
         overview->placed[i] = shown;
         overview->origins[i] = (struct sh_rect){box.x, box.y, overview->sizes[i].width,
@@ -210,10 +228,18 @@ static void overview_render(struct sh_server *server) {
     bool settled = t >= 1;
     float colour[4];
     overview_colour(colour, 0.04f, 0.05f, 0.08f, (float)(settings->overview_dim * t));
-    overview_rect_set(&overview->backdrop, overview->tree,
-                      (struct sh_rect){overview->screen.x, overview->screen.y,
-                                       overview->screen.width, overview->screen.height},
-                      colour);
+    // Snap Assist darkens its slot alone, rounded as a window there would be.
+    struct sh_rect backdrop = overview->assist ? overview->area
+                                               : (struct sh_rect){overview->screen.x,
+                                                                  overview->screen.y,
+                                                                  overview->screen.width,
+                                                                  overview->screen.height};
+    overview_rect_set(&overview->backdrop, overview->tree, backdrop, colour);
+#ifdef SHAODESK_ROUNDED_CORNERS
+    if (overview->backdrop)
+        wlr_scene_rect_set_rounding(overview->backdrop,
+                                    overview->assist ? overview->assist_radius : 0, 0);
+#endif
     // The strip fades in with the backdrop by staying hidden until the grid has settled.
     for (int w = 0; w < OVERVIEW_WORKSPACES; ++w) {
         bool listed = settled && w < overview->strip_count;
@@ -310,16 +336,25 @@ static void overview_render(struct sh_server *server) {
  *     (AREA is what the panels leave, FILTER is "-" when empty)
  *   overview-window X Y WIDTH HEIGHT APP_ID\tTITLE\tWORKSPACE\tURGENT (URGENT is 0 or 1)
  *   overview-strip X Y WIDTH HEIGHT WORKSPACE\tWINDOWS
- * and "overview-select N" as the selection moves, "overview-close" when it closes. */
+ * and "overview-select N" as the selection moves, "overview-close" when it closes. Snap Assist
+ * begins with "overview-assist OUTPUT COUNT SELECTED X Y WIDTH HEIGHT" instead, its slot, and has
+ * no strip. */
 size_t overview_describe(struct sh_server *server, char *text, size_t size) {
     struct sh_overview *overview = &server->overview;
     size_t length = 0;
-    length += snprintf(text + length, size - length, "overview %s %d %d %d %d %d %d %d %d %s\n",
-                       overview->output, overview->count, overview->selected,
-                       overview->viewed + 1, overview->strip_count,
-                       overview->area.x - overview->screen.x,
-                       overview->area.y - overview->screen.y, overview->area.width,
-                       overview->area.height, overview->filter[0] ? overview->filter : "-");
+    if (overview->assist)
+        length += snprintf(text + length, size - length, "overview-assist %s %d %d %d %d %d %d\n",
+                           overview->output, overview->count, overview->selected,
+                           overview->area.x - overview->screen.x,
+                           overview->area.y - overview->screen.y, overview->area.width,
+                           overview->area.height);
+    else
+        length += snprintf(text + length, size - length,
+                           "overview %s %d %d %d %d %d %d %d %d %s\n", overview->output,
+                           overview->count, overview->selected, overview->viewed + 1,
+                           overview->strip_count, overview->area.x - overview->screen.x,
+                           overview->area.y - overview->screen.y, overview->area.width,
+                           overview->area.height, overview->filter[0] ? overview->filter : "-");
     for (int i = 0; i < overview->count && length < size; ++i) {
         struct sh_toplevel *toplevel = overview->windows[i];
         if (!toplevel)
@@ -388,6 +423,10 @@ static void overview_refresh(struct sh_server *server) {
     if (overview->open && overview->dirty) {
         overview->dirty = false;
         overview_collect(server);
+        if (overview->assist && !overview->count) {
+            overview_close(server, NULL, -1); // nothing left to offer
+            return;
+        }
         overview_layout(server);
         overview_announce(server);
     }
@@ -402,6 +441,8 @@ static void overview_hide(struct sh_server *server) {
     overview->dragging = false;
     overview->press = -1;
     overview->dragged = NULL;
+    overview->assist = false;
+    overview->assist_from = NULL;
     for (int i = 0; i < OVERVIEW_MAX; ++i)
         overview_thumb_clear(&overview->thumbs[i]);
     for (int i = 0; i < OVERVIEW_MINI_MAX; ++i)
@@ -472,6 +513,11 @@ void overview_forget(struct sh_toplevel *toplevel) {
         overview->dragging = false;
         overview->press = -1;
     }
+    if (overview->assist && overview->assist_from == toplevel) {
+        overview->assist_from = NULL;
+        overview_close(server, NULL, -1); // the window it was beside went
+        return;
+    }
     overview_touch(server, true);
 }
 
@@ -487,27 +533,23 @@ static void overview_lower_fullscreen(struct sh_server *server, bool lower) {
     }
 }
 
-void overview_open(struct sh_server *server) {
+/* Opens the overview on `output`, or Snap Assist when `assist` is set (and `area` its slot);
+ * false when there is nothing for Snap Assist to offer. */
+static bool overview_begin(struct sh_server *server, struct wlr_output *output, bool assist,
+                           struct sh_rect area) {
     struct sh_overview *overview = &server->overview;
     const struct sh_settings *settings = server_settings(server);
-    if (!settings->overview) {
-        wlr_log(WLR_INFO, "Overview actions ignored: overview.enabled is false");
-        return;
-    }
-    if (overview->open || server->locked || !server->overview_layer)
-        return;
-    struct wlr_output *output = focused_output(server);
-    if (!output)
-        return;
     if (overview->visible) // still gliding closed
         overview_hide(server);
     switcher_close(server, -1);
+    overview->assist = assist;
     snprintf(overview->output, sizeof(overview->output), "%s", output->name);
     wlr_output_layout_get_box(server->output_layout, output, &overview->screen);
     struct sh_rect usable = usable_area(server, output);
-    overview->area = (struct sh_rect){usable.x, usable.y, usable.width, usable.height};
-    overview->workspaces = settings->workspaces < OVERVIEW_WORKSPACES ? settings->workspaces
-                                                                      : OVERVIEW_WORKSPACES;
+    overview->area = assist ? area : (struct sh_rect){usable.x, usable.y, usable.width, usable.height};
+    overview->workspaces = assist                                     ? 0
+                           : settings->workspaces < OVERVIEW_WORKSPACES ? settings->workspaces
+                                                                        : OVERVIEW_WORKSPACES;
     overview->current = overview->viewed = *output_workspace(server, output->name);
     overview->filter[0] = '\0';
     overview->count = 0;
@@ -518,8 +560,10 @@ void overview_open(struct sh_server *server) {
     overview->scroll = 0;
     if (!overview->tree) {
         overview->tree = wlr_scene_tree_create(server->overview_layer);
-        if (!overview->tree)
-            return;
+        if (!overview->tree) {
+            overview->assist = false;
+            return false;
+        }
         float clear[4] = {0, 0, 0, 0};
         overview->backdrop = wlr_scene_rect_create(overview->tree, 1, 1, clear);
         overview->strip = wlr_scene_tree_create(overview->tree);
@@ -529,9 +573,15 @@ void overview_open(struct sh_server *server) {
         overview->timer = wl_event_loop_add_timer(wl_display_get_event_loop(server->wl_display),
                                                   overview_step, server);
     }
-    wlr_scene_node_set_enabled(&overview->tree->node, true);
-    overview_lower_fullscreen(server, true);
     overview_collect(server);
+    if (assist && !overview->count) {
+        overview->assist = false;
+        overview->assist_from = NULL;
+        return false;
+    }
+    wlr_scene_node_set_enabled(&overview->tree->node, true);
+    if (!assist)
+        overview_lower_fullscreen(server, true);
     overview->selected = -1;
     for (int i = 0; i < overview->count; ++i) {
         if (overview->windows[i] == server->focused_toplevel)
@@ -551,14 +601,48 @@ void overview_open(struct sh_server *server) {
     overview->started = now_ms();
     if (overview->span <= 0)
         overview->progress = 1;
-    // The pointer belongs to the overview, not to the window under it.
-    wlr_seat_pointer_clear_focus(server->seat);
-    set_default_cursor(server);
+    // The pointer belongs to the overview, not to the window under it; Snap Assist takes it
+    // only over its slot.
+    if (!assist) {
+        wlr_seat_pointer_clear_focus(server->seat);
+        set_default_cursor(server);
+    }
     overview_render(server);
     if (overview->progress != overview->to)
         overview_touch(server, false);
     overview_announce(server);
-    wlr_log(WLR_INFO, "Overview opened on %s", output->name);
+    wlr_log(WLR_INFO, "%s opened on %s", assist ? "Snap Assist" : "Overview", output->name);
+    return true;
+}
+
+void overview_open(struct sh_server *server) {
+    struct sh_overview *overview = &server->overview;
+    const struct sh_settings *settings = server_settings(server);
+    if (!settings->overview) {
+        wlr_log(WLR_INFO, "Overview actions ignored: overview.enabled is false");
+        return;
+    }
+    if (overview->open || server->locked || !server->overview_layer)
+        return;
+    struct wlr_output *output = focused_output(server);
+    if (output)
+        overview_begin(server, output, false, (struct sh_rect){0});
+}
+
+/* Snap Assist beside `from`, which was just snapped on `output`: the windows snap.c offers in
+ * the free `area`, the slot `slot` (an arrangement), its backdrop rounded by `radius`. It
+ * replaces one open already; the overview itself open keeps it from opening. */
+void overview_assist(struct sh_server *server, struct sh_toplevel *from, struct wlr_output *output,
+                     enum sh_action slot, struct sh_rect area, int radius) {
+    struct sh_overview *overview = &server->overview;
+    if ((overview->open && !overview->assist) || server->locked || !server->overview_layer)
+        return;
+    if (overview->open)
+        overview_close(server, NULL, -1);
+    overview->assist_from = from;
+    overview->assist_slot = slot;
+    overview->assist_radius = radius;
+    overview_begin(server, output, true, area);
 }
 
 /* Closes the overview, focusing `chosen` if any; else, with `workspace` not below 0, showing
@@ -567,6 +651,20 @@ void overview_close(struct sh_server *server, struct sh_toplevel *chosen, int wo
     struct sh_overview *overview = &server->overview;
     if (!overview->open)
         return;
+    if (overview->assist) {
+        // Snap Assist goes at once, and the window picked, if any, takes the slot; snapped
+        // there, it may bring Snap Assist back for the next free slot.
+        enum sh_action slot = overview->assist_slot;
+        struct wlr_output *output = find_output(server, overview->output);
+        send_event(server, "overview-close\n", strlen("overview-close\n"));
+        overview_hide(server);
+        wlr_log(WLR_INFO, "Snap Assist closed");
+        if (chosen && output && !server->locked) {
+            place_by_hand_on(chosen, slot, output);
+            focus_toplevel(chosen);
+        }
+        return;
+    }
     overview->open = false;
     overview->dragging = false;
     overview->press = overview->drop = -1;
@@ -634,7 +732,7 @@ void overview_confirm(struct sh_server *server, int index) {
 /* Shows another workspace of the output in the grid, without switching to it. */
 void overview_view(struct sh_server *server, int workspace) {
     struct sh_overview *overview = &server->overview;
-    if (!overview->open || workspace < 0 || workspace >= overview->workspaces ||
+    if (!overview->open || overview->assist || workspace < 0 || workspace >= overview->workspaces ||
         (workspace == overview->viewed && !overview->filter[0]))
         return;
     overview->viewed = workspace;
@@ -646,7 +744,7 @@ void overview_view(struct sh_server *server, int workspace) {
 
 void overview_set_filter(struct sh_server *server, const char *text) {
     struct sh_overview *overview = &server->overview;
-    if (!overview->open || !strcmp(overview->filter, text))
+    if (!overview->open || overview->assist || !strcmp(overview->filter, text))
         return;
     snprintf(overview->filter, sizeof(overview->filter), "%s", text);
     overview->selected = -1; // the first match
@@ -700,7 +798,7 @@ void overview_key(struct sh_server *server, uint32_t modifiers, xkb_keysym_t sym
         return;
     case XKB_KEY_Left:
     case XKB_KEY_Right:
-        if (control) {
+        if (control && !overview->assist) {
             overview_view(server, overview->viewed + (sym == XKB_KEY_Left ? -1 : 1));
             return;
         }
@@ -756,8 +854,8 @@ void overview_key(struct sh_server *server, uint32_t modifiers, xkb_keysym_t sym
         return;
     }
     }
-    if (modifiers & (WLR_MODIFIER_CTRL | WLR_MODIFIER_ALT | WLR_MODIFIER_LOGO))
-        return;
+    if (modifiers & (WLR_MODIFIER_CTRL | WLR_MODIFIER_ALT | WLR_MODIFIER_LOGO) || overview->assist)
+        return; // Snap Assist has no search
     char utf8[8];
     int bytes = xkb_keysym_to_utf8(sym, utf8, sizeof(utf8));
     if (bytes <= 1 || (unsigned char)utf8[0] < 0x20 || utf8[0] == 0x7f)
@@ -844,7 +942,12 @@ bool overview_motion(struct sh_server *server) {
     if (!overview->open)
         return false;
     double x = server->cursor->x, y = server->cursor->y;
-    if (overview->press >= 0 && !overview->dragging &&
+    // Snap Assist has the pointer over its slot alone, and nowhere to drag a thumbnail to.
+    struct wlr_box area = {overview->area.x, overview->area.y, overview->area.width,
+                           overview->area.height};
+    if (overview->assist && overview->press < 0 && !wlr_box_contains_point(&area, x, y))
+        return false;
+    if (overview->press >= 0 && !overview->dragging && !overview->assist &&
         fabs(x - overview->press_x) + fabs(y - overview->press_y) > 8 &&
         overview->press < overview->count) {
         overview->dragging = true;
@@ -893,7 +996,7 @@ void overview_hot_corner(struct sh_server *server) {
 /* The wheel pages through the workspaces. */
 bool overview_axis(struct sh_server *server, const struct wlr_pointer_axis_event *event) {
     struct sh_overview *overview = &server->overview;
-    if (!overview->open)
+    if (!overview->open || overview->assist)
         return false;
     if (event->orientation != WL_POINTER_AXIS_VERTICAL_SCROLL)
         return true;
