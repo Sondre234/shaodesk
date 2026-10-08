@@ -34,7 +34,8 @@ int main(int argc, char **argv) {
                 "example volume, microphone and brightness keys missing");
         // They work on the lock screen, and the steps repeat while held; the mutes do not.
         require(louder->locked && louder->repeats && microphone->locked && !microphone->repeats &&
-                    dimmer->locked && dimmer->repeats && !config.binding(SH_LOGO, XKB_KEY_q)->locked,
+                    dimmer->locked && dimmer->repeats &&
+                    !config.binding(SH_LOGO, XKB_KEY_q)->locked,
                 "example volume, microphone and brightness keys not locked or repeating");
         require(config.binding(SH_ALT, XKB_KEY_Tab)->action == SH_SWITCHER_NEXT &&
                     config.binding(SH_ALT | SH_SHIFT, XKB_KEY_Tab)->action == SH_SWITCHER_PREV,
@@ -124,12 +125,12 @@ int main(int argc, char **argv) {
                 "{key='XF86MonBrightnessUp',action='brightness_up',amount=100},"
                 "{key='XF86AudioMute',action='volume_mute'},"
                 "{key='XF86AudioMicMute',action='mic_mute'}}}");
-            require(steps.bindings.size() == 5 && steps.bindings[0].action == SH_VOLUME_UP &&
-                        steps.bindings[0].amount == shaodesk::default_step_percent &&
-                        steps.bindings[1].action == SH_VOLUME_DOWN && steps.bindings[1].amount == 2 &&
-                        steps.bindings[2].action == SH_BRIGHTNESS_UP &&
-                        steps.bindings[2].amount == 100 && steps.bindings[3].action == SH_VOLUME_MUTE &&
-                        steps.bindings[4].action == SH_MIC_MUTE,
+            const auto &s = steps.bindings;
+            require(s.size() == 5 && s[0].action == SH_VOLUME_UP &&
+                        s[0].amount == shaodesk::default_step_percent &&
+                        s[1].action == SH_VOLUME_DOWN && s[1].amount == 2 &&
+                        s[2].action == SH_BRIGHTNESS_UP && s[2].amount == 100 &&
+                        s[3].action == SH_VOLUME_MUTE && s[4].action == SH_MIC_MUTE,
                     "volume and brightness bindings not parsed");
             require(shaodesk::parse_action("brightness_down") == SH_BRIGHTNESS_DOWN &&
                         shaodesk::default_amount(SH_RESIZE_UP) == shaodesk::default_resize_amount &&
@@ -191,7 +192,8 @@ int main(int argc, char **argv) {
             require(left && left->action == SH_RESIZE_LEFT && left->repeats &&
                         modes.mode_binding(2, 0, XKB_KEY_Escape)->mode == 0 &&
                         !modes.mode_binding(2, SH_LOGO, XKB_KEY_r) &&
-                        !modes.mode_binding(2, 0, XKB_KEY_x) && modes.modes[1].bindings.size() == 3 &&
+                        !modes.mode_binding(2, 0, XKB_KEY_x) &&
+                        modes.modes[1].bindings.size() == 3 &&
                         modes.mode_binding(1, 0, XKB_KEY_r)->mode == 2 &&
                         !modes.binding(0, XKB_KEY_Left),
                     "a mode's bindings not kept apart");

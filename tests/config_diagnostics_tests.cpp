@@ -110,7 +110,8 @@ void locations() {
     at("return {\n  outputs = {\n    monitors = {\n      [\"DP-1\"] = { scal = 2 },\n"
        "    },\n  },\n}",
        "4: unknown setting");
-    at("return {\n  modes = {\n    resize = {\n      { key = 'Escape', action = 'mode', mode = 'default' },\n"
+    at("return {\n  modes = {\n    resize = {\n"
+       "      { key = 'Escape', action = 'mode', mode = 'default' },\n"
        "      { key = 'q', action = 'mode', mode = 'resise' },\n    },\n  },\n}",
        "5: unknown mode");
     at("return {\n  modes = {\n    launch = {\n      { key = 'x', action = 'close' },\n    },\n"

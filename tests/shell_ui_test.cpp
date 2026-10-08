@@ -5215,7 +5215,8 @@ ListModel {
             view.inputRegion() != QRegion(dockRect.toAlignedRect()))
             return fail("the menu bar and the dock are not laid out as the macOS style has them");
         subscriber->write("mode resize\n");
-        if (!QTest::qWaitFor([&] { return inBar("bindingMode") && inBar("bindingMode")->isVisible(); }))
+        if (!QTest::qWaitFor(
+                [&] { return inBar("bindingMode") && inBar("bindingMode")->isVisible(); }))
             return fail("the menu bar does not show the binding mode in use");
         subscriber->write("mode default\n");
         if (!QTest::qWaitFor([&] { return !inBar("bindingMode")->isVisible(); }))

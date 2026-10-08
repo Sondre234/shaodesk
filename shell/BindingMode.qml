@@ -14,7 +14,10 @@ FlatButton {
     Layout.preferredHeight: Theme.barButtonHeight
     onClicked: { panel.closeMenus(); shell.send("mode default") }
     Accessible.name: "Binding mode: " + mode
-    BarTip { panel: chip.panel; owner: chip; text: "Binding mode: " + chip.mode + "\nClick: leave it" }
+    BarTip {
+        panel: chip.panel; owner: chip
+        text: "Binding mode: " + chip.mode + "\nClick: leave it"
+    }
     contentItem: Item {
         Rectangle {
             id: pill
@@ -29,7 +32,8 @@ FlatButton {
                 anchors.centerIn: parent
                 text: chip.mode
                 color: Theme.textOnAccent
-                font.pixelSize: Theme.fontSizeSmall; font.weight: Font.DemiBold; font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSmall; font.weight: Font.DemiBold
+                font.family: Theme.fontFamily
             }
         }
     }
