@@ -1266,6 +1266,45 @@ shows, such as `us` or `no`, and its name), and a line per keyboard (`keyboard`,
 types in, how many its keymap has, 1 for a virtual one, the modifiers it holds and has locked as
 bits: Shift 1, Caps Lock 2, Ctrl 4, Alt 8, Num Lock 16, Super 64, and its name), tab-separated.
 
+### Input methods
+
+An input method (fcitx5) types Chinese, Japanese, Korean and compose-heavy layouts into Wayland
+applications, as on sway, Hyprland and KDE: applications ask for text through
+text-input-unstable-v3, the input method connects through input-method-unstable-v2, and the
+compositor relays between them. Start it with the session, from `startup = { { "fcitx5", "-d" } }`
+or its XDG autostart entry in a standalone session; one input method is connected at a time, and
+another is told it is unavailable.
+
+The text input of the window with the keyboard turns the input method on and off as the
+application's text field gains and loses focus, and tells it the text around the cursor, what
+kind of text it is (a password, a number, an e-mail address) and where the text cursor is. What
+the input method composes is shown in the field as it is typed (the preedit), and the text it
+commits goes in. While it grabs the keyboard, which fcitx5 does while it is on, every key no
+binding takes goes to it rather than to the application, and it types what it does not use on a
+virtual keyboard of its own, which reaches the application as wtype's keys do; the bindings keep
+their keys. Its candidate window sits under the text cursor, moved in from the sides of the
+monitor and above the cursor where there is no room below, over the windows and panels and
+under the shell's overlays, but over an overlay's own search field, such as the start menu's. As
+the keyboard moves to another window the input method follows it, and as an application or the
+input method goes away the other side forgets it. The session locked, the input method is off and
+the lock screen gets the keys as typed.
+
+GTK 3 and 4 and Qt 6 applications use text-input-v3 by themselves, with `GTK_IM_MODULE` and
+`QT_IM_MODULE` unset (set to `fcitx` they talk to fcitx5 over D-Bus instead, which works too but
+places the candidate window less well). Chromium and Electron applications need
+`--enable-wayland-ime --wayland-text-input-version=3`; older versions speak only
+text-input-unstable-v1, which shaodesk does not offer. X11 applications use XIM through Xwayland
+with `XMODIFIERS=@im=fcitx`. ibus's own Wayland frontend is made for the older
+input-method-unstable-v1 of KDE and Weston, which shaodesk does not offer either, so ibus reaches
+applications through its GTK and Qt modules (`GTK_IM_MODULE=ibus`), as on sway.
+
+`shaodesk msg get input_method` prints `input_method` with 1 or 0 for whether one is connected,
+whether it is on and whether it grabs the keyboard; a line per text input, `text_input`, whether
+it is enabled, whether the input method serves it, and the surface it is on as `get seat` names
+it (`-` for none); and a line per candidate window, `popup`, whether it shows, its place and its
+size; tab-separated. `input_method_smoke` tests it with `text_input_probe` and
+`input_method_probe`.
+
 ### Mouse button bindings
 
 Bindings can use a mouse button (`left`, `right`, `middle`, `side`, `extra`, `forward`,

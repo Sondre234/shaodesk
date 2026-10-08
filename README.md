@@ -127,6 +127,8 @@ shaodesk runs without any of these, and uses them when they are installed:
 - `xdg-desktop-portal-wlr`, `xdg-desktop-portal-gtk` and PipeWire for screen sharing and file
   choosers ([Portals](docs/features.md#portals))
 - `Xwayland` for X11 applications
+- fcitx5 for [input methods](docs/features.md#input-methods): Chinese, Japanese and Korean in
+  Wayland applications
 - a locker such as swaylock or gtklock for [locking](docs/features.md#screen-locking-and-idle),
   by hand or [when idle](docs/features.md#power-saving-when-idle)
 - an icon theme (Adwaita, Breeze, Papirus, ...) for application icons, and `dconf` for the

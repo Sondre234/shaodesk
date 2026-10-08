@@ -251,6 +251,11 @@ shadows.
   every application and a window rule's `shortcuts_inhibit = false` one; `shaodesk msg get
   shortcuts` tells who holds the keys. The example `display_off` binding moves to Super + Alt +
   Escape.
+- Input methods: fcitx5 types Chinese, Japanese, Korean and compose-heavy layouts into GTK and Qt
+  applications on Wayland, as shaodesk now offers text-input-v3 and input-method-v2 and relays
+  between them: the preedit and committed text, the input method's keyboard grab (bindings keep
+  their keys) and its candidate window beside the text cursor, kept on the monitor. `shaodesk msg
+  get input_method` tells what it does.
 - `windows.controls = "traffic_lights"` draws the controls of the windows shaodesk decorates as
   red, yellow and green circles at their top-left, as macOS does: grey while the window has no
   focus, their symbols shown while the pointer is on one, darker while pressed.

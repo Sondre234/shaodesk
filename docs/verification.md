@@ -883,3 +883,29 @@ QEMU's GTK and SDL windows, Remmina, FreeRDP, Moonlight, games), none of which i
 X11 programs that grab the keyboard (VirtualBox, Xephyr, an X11 VNC viewer) and the X11 menus that
 grab it briefly while open; the notification's look on the desktop; and a lock screen that asks for
 the shortcuts itself (its `locked` bindings still run, by the code, not by a test).
+
+## Input methods
+
+Added 2026-10-08. `input_method_smoke` connects `input_method_probe`, an input method speaking
+input-method-unstable-v2 as fcitx5 does, to windows of `text_input_probe`, which take text through
+text-input-unstable-v3 as GTK and Qt do: a text input waits until an input method connects, then
+enters the window with the keyboard and activates it with its surrounding text, change cause and
+content type; committed text (Chinese among it), a preedit, the text replacing it and a deletion
+reach the window, and the window's new text reaches the input method; its keyboard grab gets the
+keys no binding takes, with the keymap and modifiers, while a binding still runs and the window
+hears none, and a key it passes on through its virtual keyboard reaches the window and not the
+grab again; its popup sits under the text cursor, moves in from the output's right edge and goes
+above the cursor at its bottom edge, the input method hearing where the cursor is from it, and
+grim shows it over the window and under a panel on the overlay layer, but over a search field on
+the overlay layer, as the shell's start menu is, whose text input it serves; focus moving to
+another window and back moves the input method with it, and a window that entered enabled is
+served again as it commits; the window closing deactivates it; the session locked, it is off, its
+grab hears no key and its popup is hidden, and unlocked it serves the window again; the input
+method going away makes the text input leave, a second one connecting serves it, and a third is
+told it is unavailable.
+
+Not checked, none of them being installed here: fcitx5 itself (its Wayland frontend, its
+candidate window, the keys it passes on, Pinyin, Mozc, Hangul), ibus (whose own Wayland frontend
+is believed to speak input-method-unstable-v1 only), and real GTK 3 and 4, Qt 6, Chromium and
+Electron applications typing through them, the shell's own search fields among them; and how the
+candidate window looks at fractional scales and on a second monitor.
