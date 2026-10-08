@@ -8,6 +8,8 @@
 #include "window_images.hpp"
 #include <QQmlContext>
 #include <QQmlEngine>
+#include <QClipboard>
+#include <QRegularExpression>
 #include <QDir>
 #include <QGuiApplication>
 #include <QScreen>
@@ -61,6 +63,7 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
     configureSearch();
     connect(&clipboard_, &ClipboardHistory::failed, this, &ShellController::report);
     configureClipboard();
+    connect(&emoji_, &EmojiPicker::typeRequested, this, &ShellController::typeText);
     refreshApps();
     subscribe();
     notifications_.configure(config_.notifications);
@@ -496,6 +499,20 @@ void ShellController::configureSearch() {
     files_.configure(settings);
     startMenu_.setWebSearch(webSearch());
 }
+void ShellController::typeText(const QString &text) {
+    // Without the compositor, or with nothing for it to type into, what was picked is copied, to
+    // paste.
+    auto copy = [this, text](const QString &why) {
+        QGuiApplication::clipboard()->setText(text);
+        report("Copied " + text + " to paste it, as " + why);
+    };
+    if (qEnvironmentVariable("SHAODESK_SOCKET").isEmpty())
+        return copy("there is no compositor to type it");
+    ask(("type " + text + "\n").toUtf8(), [copy](const QByteArray &reply) {
+        if (!reply.startsWith("ok"))
+            copy(QString::fromUtf8(reply).trimmed().remove(QRegularExpression("^error: ")));
+    });
+}
 void ShellController::configureClipboard() {
     const auto &clipboard = config_.shell.clipboard;
     ClipboardHistory::Settings settings;
@@ -796,6 +813,9 @@ void ShellController::subscribe() {
                 continue;
             } else if (line.startsWith("clipboard ")) {
                 clipboard_.toggle(line.sliced(10));
+                continue;
+            } else if (line.startsWith("emoji ")) {
+                emoji_.toggle(line.sliced(6));
                 continue;
             } else if (line.startsWith("locked ")) {
                 // locked on|off: nothing copied while the session is locked is kept.

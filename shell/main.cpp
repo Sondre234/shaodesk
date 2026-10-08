@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
                       "app-menu, window-menu or window-submenu too; or an overlay over the bar: "
                       "osd-volume, osd-text, osd-microphone, cards, power-dialog, auth-dialog, "
                       "palette, palette-empty, palette-calculator, switcher, overview, "
-                      "snap-assist, display-mode, palette-files or clipboard",
+                      "snap-assist, display-mode, palette-files, clipboard or emoji",
                       "name"});
     parser.addOption(
         {"quit-after",
@@ -258,6 +258,14 @@ int main(int argc, char **argv) {
                     throw std::runtime_error("could not load shell QML");
                 }
                 pickers.push_back(std::move(clipboard));
+                auto emoji = std::make_unique<PickerView>(controller, screen, "emoji",
+                                                          "EmojiPicker.qml", controller.emoji());
+                if (emoji->status() == QQuickView::Error) {
+                    for (const auto &error : emoji->errors())
+                        std::cerr << error.toString().toStdString() << '\n';
+                    throw std::runtime_error("could not load shell QML");
+                }
+                pickers.push_back(std::move(emoji));
                 auto powerView = std::make_unique<PowerView>(controller, screen);
                 if (powerView->status() == QQuickView::Error) {
                     for (const auto &error : powerView->errors())

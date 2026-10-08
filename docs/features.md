@@ -1065,6 +1065,35 @@ Ctrl + Y), and typing what was copied into the window would lose pictures and fo
 paste stays the user's. `tests/clipboard_smoke.py` and `tests/clipboard_shell_smoke.py` test it
 with a program copying and pasting through data-control.
 
+## Emoji picker
+
+`emoji_picker` (Super + semicolon, or `shaodesk msg emoji_picker`) opens the shell's emoji picker,
+as Windows' Win + . and Win + ; do, on the monitor under the pointer: a card near the top of the
+screen, as the command palette's, in either style. Along its top are a search field, a tab for the
+emoji picked lately (once there are any; it opens on them) and one for each of Unicode's groups
+(Smileys & Emotion, People & Body, ..., Flags), and the skin tone; under them a grid of emoji and
+the name of the one chosen. Typing searches by name and by CLDR's English keywords, every word
+starting a word of either (`thumbs`, `lol`, `pizz`, `flag norway`), names first; an emoji pasted
+finds itself. The arrows move through the grid (Left and Right while the search is empty, or at
+its ends), Tab and Shift + Tab too, Page Down and Page Up change tabs, Ctrl + T or the hand at the
+end of the tabs changes the skin tone (none, then light to dark) of the emoji that take one, Enter
+or a click picks the emoji, and Escape clears the search, then closes.
+
+The emoji picked is typed into the window that had the keyboard, as Windows does: the picker
+closes, and once it has given the keyboard back the compositor types it (`shaodesk msg type`, see
+[Control socket](#control-socket)) on a keymap of its own, so that every emoji, a flag or a family
+of several characters joined too, arrives whole whatever the keyboard layout, in any program that
+takes typed text. When nothing has the keyboard to type it into, it is copied to the clipboard
+instead and the panel says so. The skin tone and the last 32 emoji picked are kept in
+`$XDG_STATE_HOME/shaodesk/emoji`.
+
+The emoji come from a table compiled into the shell, `vendor/emoji/emoji.tsv`: the 1906 emoji of
+Unicode's Emoji 16.0 (their names, groups and skin-tone forms, from `emoji-test.txt`) with CLDR 46's
+English keywords, under the Unicode License v3; `vendor/emoji/README.md` says how
+`tools/emoji_table.py` makes it again. They are drawn in the system's colour emoji font (Noto Color
+Emoji, say); without one some show as boxes. `tests/emoji_test.cpp` tests the table and the search,
+and `tests/emoji_shell_smoke.py` the picker typing into a window.
+
 ## Terminal
 
 The `terminal` action (`shaodesk msg terminal`) opens a terminal: the program and arguments of
@@ -2237,7 +2266,11 @@ A control socket runs any Lua action from scripts or other tools:
 `shaodesk msg workspace 2`, `shaodesk msg toggle_tiling`, `shaodesk msg spawn foot`,
 `shaodesk msg screenshot window`, `shaodesk msg resize_left 80`. Prefixing
 `output NAME` makes workspace and tiling actions switch that monitor instead of the focused
-one: `shaodesk msg output HDMI-A-1 workspace_next`. The query
+one: `shaodesk msg output HDMI-A-1 workspace_next`. `shaodesk msg type TEXT` types TEXT into
+what has the keyboard, as wtype does: each character on a key of a keymap made for it (200 to a
+keymap; a longer text takes several), the window's own keymap back after, so that accents, emoji
+and their sequences come out as they are whatever the keyboard layout; the request is a line of at
+most 512 bytes, and it says when nothing has the keyboard. The query
 `shaodesk msg get workspace` prints the focused monitor's workspace, `shaodesk msg get workspaces`
 prints one tab-separated line per monitor (name, current workspace, focused, the
 workspaces holding windows, such as `1,3`, or `-`, and tiling, `on` or `off`),

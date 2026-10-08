@@ -279,6 +279,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/tiling.c
         src/compositor/touch.c
         src/compositor/toplevel.c
+        src/compositor/type.c
         src/compositor/volume.c
         src/compositor/window_control.c
         src/compositor/window_icon.c
@@ -449,7 +450,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_BINARY_DIR}/tearing-control-v1-protocol.c
             ${WLR_CLIENT_PROTOCOL_SOURCES})
         target_include_directories(wayland_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
-        target_link_libraries(wayland_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
+        target_link_libraries(wayland_probe PRIVATE PkgConfig::WAYLAND_CLIENT PkgConfig::XKB)
         target_compile_options(wayland_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
         # A window printing the input it gets, for the tests of gestures.
         set(GESTURES_XML ${PROTOCOL_DIR}/unstable/pointer-gestures/pointer-gestures-unstable-v1.xml)
@@ -910,6 +911,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/media_keys_smoke.py
             $<TARGET_FILE:shaodesk> ${EXAMPLE_CONFIG})
         set_tests_properties(media_keys_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME type_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/type_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(type_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME keyboard_layout_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/keyboard_layout_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:pointer_probe>)

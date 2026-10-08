@@ -68,10 +68,10 @@ set(SHAODESK_AUTH_SOURCES authentication.cpp authentication.hpp)
 # controller; their D-Bus backends only in the shell.
 set(SHAODESK_SERVICE_SOURCES media.cpp media.hpp power_mode.cpp power_mode.hpp wifi.cpp wifi.hpp
     row_model.hpp bluetooth.cpp bluetooth.hpp)
-# The clipboard history, its pictures, and the overlay its popup shows in, in everything that
-# builds the controller.
-set(SHAODESK_PICKER_SOURCES clipboard.cpp clipboard.hpp clipboard_images.hpp picker_view.cpp
-    picker_view.hpp ${PROJECT_BINARY_DIR}/ext-data-control-v1-protocol.c
+# The clipboard history, its pictures, the emoji picker, and the overlay their popups show in, in
+# everything that builds the controller.
+set(SHAODESK_PICKER_SOURCES clipboard.cpp clipboard.hpp clipboard_images.hpp emoji.cpp emoji.hpp
+    picker_view.cpp picker_view.hpp ${PROJECT_BINARY_DIR}/ext-data-control-v1-protocol.c
     ${PROJECT_BINARY_DIR}/ext-data-control-v1-client-protocol.h)
 set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_images.cpp
     notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp tray.cpp tray.hpp
@@ -139,7 +139,11 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     WifiPopup.qml
     BluetoothList.qml
     DisplayMode.qml
-    ClipboardPicker.qml)
+    ClipboardPicker.qml
+    EmojiPicker.qml)
+# The emoji picker's table (vendor/emoji), compiled in as :/shaodesk/emoji.tsv.
+qt_add_resources(shaodesk_shell_qml "emoji_table" PREFIX "/shaodesk"
+    BASE ${PROJECT_SOURCE_DIR}/vendor/emoji FILES ${PROJECT_SOURCE_DIR}/vendor/emoji/emoji.tsv)
 # The protocols task_model.cpp and window_pictures.cpp speak, generated in the top-level build
 # directory.
 set(SHAODESK_TASK_PROTOCOL_SOURCES
@@ -298,6 +302,15 @@ if(BUILD_TESTING)
     target_compile_options(web_search_test PRIVATE -Wall -Wextra -Wpedantic)
     target_link_libraries(web_search_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME web_search COMMAND web_search_test)
+    # The emoji picker's table and model.
+    add_executable(emoji_test ${PROJECT_SOURCE_DIR}/tests/emoji_test.cpp emoji.cpp emoji.hpp)
+    set_target_properties(emoji_test PROPERTIES AUTOMOC ON)
+    target_include_directories(emoji_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(emoji_test PRIVATE QT_NO_KEYWORDS
+        SHAODESK_EMOJI_TABLE="${PROJECT_SOURCE_DIR}/vendor/emoji/emoji.tsv")
+    target_compile_options(emoji_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(emoji_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME emoji COMMAND emoji_test)
     # The start menu's model: its pins, the launch history and its search.
     add_executable(start_menu_test ${PROJECT_SOURCE_DIR}/tests/start_menu_test.cpp
         ${SHAODESK_START_SOURCES} fuzzy.cpp fuzzy.hpp)
@@ -633,6 +646,10 @@ if(BUILD_TESTING)
             ${PROJECT_SOURCE_DIR}/tests/clipboard_shell_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:clipboard_probe>)
         set_tests_properties(clipboard_shell_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME emoji_shell_smoke COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/emoji_shell_smoke.py $<TARGET_FILE:shaodesk>
+            $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe>)
+        set_tests_properties(emoji_shell_smoke PROPERTIES TIMEOUT 60)
         # A few of the gallery's popups and overlays through the GPU (Mesa's software OpenGL, in a
         # private compositor), where effects are drawn. Not under the sanitizers: now and then
         # Qt's Wayland platform leaks a surface of a preview that quits soon after showing.

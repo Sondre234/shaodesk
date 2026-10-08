@@ -78,6 +78,7 @@ all. In short:
 | `foreign_toplevel.c` | Window lists for taskbars and single-window capture. |
 | `window_control.c` | The shell's window menu, window pictures and windows' own icons: shaodesk-window-control-v1, which names a window by its taskbar handle. |
 | `scaled_capture.c` | The capture source for a window's picture: the window scaled down to fit a size on the renderer, smoothly. |
+| `type.c` | Typing text into what has the keyboard (`shaodesk msg type`), on a keyboard and keymap of its own. |
 | `window_icon.c` | The icons windows supply themselves (xdg-toplevel-icon-v1; X11 windows' from `xwayland.c`), kept for the window control to send the shell. |
 | `volume.c` | The volume, microphone and brightness actions, which the shell carries out. |
 | `binding_mode.c` | Binding modes: which set of key bindings is in use. |
@@ -477,7 +478,7 @@ what was there.
 | `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |
 | `DisplayMode.qml` | The display mode popup (Windows' Win+P, `shell.displayModes`), an overlay surface of its own in the middle of the output: the four choices, the one the compositor's stepping shows selected; a click takes one. |
 | `AuthDialog.qml` | The polkit authentication dialog (`shell.authentication`), an overlay surface of its own: the request, the user to answer as, the password. |
-| `ClipboardPicker.qml` | The clipboard history's popup, in an overlay surface of its own (`PickerView`, `picker_view.cpp`). |
+| `ClipboardPicker.qml`, `EmojiPicker.qml` | The clipboard history's popup and the emoji picker, each in an overlay surface of its own (`PickerView`, `picker_view.cpp`). |
 | `SwitcherCards.qml` | The switcher's windows as cards with their pictures, in rows, with `shell.thumbnails` outside the macOS style. |
 
 The authentication dialog's model is `Authentication` (`authentication.cpp`): polkit's requests,
@@ -707,6 +708,19 @@ showing `ClipboardPicker.qml`, which filters the entries; `image://clipboard/ID/
 (`clipboard_images.hpp`) serves their pictures. Its file is touched only once the history is the
 session's (connected) or was given a path, so tests and previews that make a controller never
 read or remove it.
+
+The emoji picker (`EmojiPicker`, `emoji.cpp`) reads `vendor/emoji/emoji.tsv`, which
+`shell/CMakeLists.txt` compiles into `shaodesk_shell_qml` as `:/shaodesk/emoji.tsv`, and gives
+`EmojiPicker.qml` a group's emoji, a search's, and the recent ones, each in the skin tone chosen.
+`emoji OUTPUT` from the `emoji_picker` action toggles it, in a `PickerView` as the clipboard's.
+`pick()` closes it and keeps the emoji as pending; the `PickerView`, once the overlay has given
+the keyboard back (its window deactivated while it goes), calls `keyboardReleased()`, or a timer
+does half a second on, and `typeRequested` has the controller send the compositor `type TEXT`,
+copying the emoji instead when the compositor answers an error. The compositor types in `type.c`:
+a keymap of up to 200 keys made for the text's characters (`xkb_utf32_to_keysym`), on a
+`wlr_keyboard` of its own set as the seat's keyboard for the keys, so that the focused client gets
+that keymap, each key pressed and released, and the seat's own keyboard, keymap and modifiers
+back after.
 
 ### Popups and menus
 

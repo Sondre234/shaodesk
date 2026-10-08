@@ -1439,6 +1439,10 @@ struct wlr_scene_tree *fullscreen_tree(struct sh_toplevel *toplevel);
 pid_t toplevel_pid(struct sh_toplevel *toplevel);
 bool toplevel_is_dialog(struct sh_toplevel *toplevel);
 
+/* type.c */
+/* Types UTF-8 `text` into what has the keyboard; false with what went wrong in `error`. */
+bool type_text(struct sh_server *server, const char *text, char *error, size_t error_size);
+
 /* volume.c */
 void volume_action(struct sh_server *server, enum sh_action action, int percent);
 
