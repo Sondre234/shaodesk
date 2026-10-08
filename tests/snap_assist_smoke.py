@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Snap Assist: after a window snaps into a half or a quarter, from the keyboard or by dragging,
-the free slot beside it lists the monitor's other windows (the overview's thumbnails, in that
-slot alone); Return, a click on a thumbnail or overview_confirm puts one there, which brings
+the free slot beside it lists the monitor's other windows, minimized ones too (the overview's
+thumbnails, in that slot alone); Return, a click on a thumbnail or overview_confirm puts one there, which brings
 Snap Assist back for the next free slot while windows are left to offer; Escape, a click
 elsewhere (which goes on to what is there), another binding or action, and the snapped window
 closing dismiss it. Not with a single window, on a monitor that tiles, or with
@@ -159,6 +159,17 @@ with session() as d:
     d.placed("A", LEFT)
     d.closed()
     assert d.windows()["A"][4], d.windows()
+
+# A minimized window is offered too, and comes back into the slot.
+with session() as d:
+    d.msg("snap_cycle_down")  # C, at its own size, minimized; B has the focus
+    d.desktop.wait_for(lambda: d.windows()["C"][5] and d.windows()["B"][4], "C minimized")
+    d.msg("snap_left")
+    d.placed("B", LEFT)
+    d.offered(RIGHT_HALF, ["C", "A"])
+    d.key(RETURN)
+    d.placed("C", RIGHT_HALF)
+    assert not d.windows()["C"][5] and d.windows()["C"][4], d.windows()
 
 # Quarters fill in turn: beside, then below; with no window left to offer, it stays away.
 with session() as d:
