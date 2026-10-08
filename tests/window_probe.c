@@ -10,7 +10,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <wayland-client.h>
 
@@ -44,9 +46,18 @@
  *                                        first time, and kept once that window has closed),
  *                                        and prints "ok" once the compositor has had each; it
  *                                        exits at the end of its input
+ *   window_probe TITLE icon [watch]      prints the icon the window supplies itself, from the
+ *                                        icon and icon_image events of its first state (version
+ *                                        5), and with watch again after each done that brings
+ *                                        them, until the window closes
  *
  * STATE is the flags joined by commas ("floating,tiling"), or "-" for none; OUTPUT is "-" before
  * the window is on one.
+ *
+ * An icon is printed as "NAME SIZE FIRST SUM": its name or "-" for none, then for its pixels
+ * WIDTHxHEIGHT, the first pixel and the sum of all of them as 0xAARRGGBB words (modulo 2^32),
+ * each "-" without pixels; "none" when the first state brings no icon.
+ * SHAODESK_WINDOW_PROBE_VERSION binds the window control at that version at most.
  *
  * A capture copies a frame into shared memory with ext-image-copy-capture-v1 and prints
  * "WIDTHxHEIGHT TOPLEFT CENTRE": the frame's size and the colours (RRGGBB) of its top-left and
@@ -99,6 +110,12 @@ struct probe {
     char output[64];
     uint32_t workspace, state, pid, id;
     int ids; // how many id events came, which should be one
+    /* The icon the icon events last described: its name ("-" for none), and the size, first
+     * pixel and sum of its pixels (a width of 0 for none); whether an icon event came since the
+     * last done, and with watch_icons whether to print the icon at each done that brings one. */
+    char icon_name[64];
+    uint32_t icon_width, icon_height, icon_first, icon_sum;
+    bool icon_heard, watch_icons;
 };
 
 static void die(const char *message) {
@@ -192,10 +209,59 @@ static void check_id(const struct probe *probe) {
     if (probe->ids > 1)
         die("the id event came more than once");
 }
+/* A new icon: its name, and no pixels until an icon_image event gives them. */
+static void window_icon(void *data, struct shaodesk_window_v1 *window, const char *name) {
+    struct probe *probe = data;
+    if (probe->icon_heard)
+        die("two icon events came before one done");
+    snprintf(probe->icon_name, sizeof(probe->icon_name), "%s", name ? name : "-");
+    probe->icon_width = probe->icon_height = 0;
+    probe->icon_heard = true;
+}
+/* The icon's pixels, read from the file the event passes, which must hold them all and be sealed
+ * against writing. */
+static void window_icon_image(void *data, struct shaodesk_window_v1 *window, int32_t fd,
+                              uint32_t width, uint32_t height) {
+    struct probe *probe = data;
+    if (!probe->icon_heard || probe->icon_width)
+        die("an icon_image event came without an icon event of its own before it");
+    if (!width || !height)
+        die("an icon_image event gave no pixels");
+    size_t size = (size_t)width * height * 4;
+    struct stat file;
+    if (fstat(fd, &file) != 0 || (size_t)file.st_size != size)
+        die("the icon's file does not hold width * height * 4 bytes");
+    if (!(fcntl(fd, F_GET_SEALS) & F_SEAL_WRITE))
+        die("the icon's file is not sealed against writing");
+    const uint32_t *pixels = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (pixels == MAP_FAILED)
+        die("cannot map the icon's file");
+    probe->icon_width = width;
+    probe->icon_height = height;
+    probe->icon_first = pixels[0];
+    probe->icon_sum = 0;
+    for (size_t i = 0; i < (size_t)width * height; ++i)
+        probe->icon_sum += pixels[i];
+    munmap((void *)pixels, size);
+    close(fd);
+}
+static void print_icon(const struct probe *probe) {
+    if (!probe->icon_name[0])
+        puts("none");
+    else if (probe->icon_width)
+        printf("%s %ux%u %08x %08x\n", probe->icon_name, probe->icon_width, probe->icon_height,
+               probe->icon_first, probe->icon_sum);
+    else
+        printf("%s - - -\n", probe->icon_name);
+    fflush(stdout);
+}
 static void window_done(void *data, struct shaodesk_window_v1 *window) {
     struct probe *probe = data;
     if (probe->watch)
         print_state(probe);
+    if (probe->watch_icons && probe->icon_heard)
+        print_icon(probe);
+    probe->icon_heard = false;
 }
 static const struct shaodesk_window_v1_listener window_listener = {
     .output = window_output,
@@ -203,7 +269,9 @@ static const struct shaodesk_window_v1_listener window_listener = {
     .state = window_state,
     .done = window_done,
     .pid = window_pid,
-    .id = window_id};
+    .id = window_id,
+    .icon = window_icon,
+    .icon_image = window_icon_image};
 
 static void listed_closed(void *data, struct ext_foreign_toplevel_handle_v1 *object) {
     struct listed *listed = data;
@@ -374,8 +442,11 @@ static void registry_global(void *data, struct wl_registry *registry, uint32_t n
             wl_registry_bind(registry, name, &zwlr_foreign_toplevel_manager_v1_interface, 3);
         zwlr_foreign_toplevel_manager_v1_add_listener(probe->manager, &manager_listener, probe);
     } else if (!strcmp(interface, shaodesk_window_control_v1_interface.name)) {
+        const char *cap = getenv("SHAODESK_WINDOW_PROBE_VERSION");
+        uint32_t most = cap ? (uint32_t)strtoul(cap, NULL, 10) : 5;
+        most = most < 5 ? most : 5;
         probe->control = wl_registry_bind(registry, name, &shaodesk_window_control_v1_interface,
-                                          version < 4 ? version : 4);
+                                          version < most ? version : most);
     } else if (!strcmp(interface, ext_foreign_toplevel_list_v1_interface.name)) {
         probe->list = wl_registry_bind(registry, name, &ext_foreign_toplevel_list_v1_interface, 1);
         ext_foreign_toplevel_list_v1_add_listener(probe->list, &list_listener, probe);
@@ -504,7 +575,7 @@ int main(int argc, char **argv) {
     if (argc < 2 || argc > 6)
         die("usage: window_probe TITLE [watch | workspace N | output NAME | sticky 0|1 | "
             "floating 0|1 | minimize | pid | id | capture [watch] | capture-listed [watch] | "
-            "capture-scaled WIDTH HEIGHT [watch | twice | closed] | peek]");
+            "capture-scaled WIDTH HEIGHT [watch | twice | closed] | peek | icon [watch]]");
     const char *title = argv[1], *command = argc > 2 ? argv[2] : "", *argument = argc > 3 ? argv[3] : "";
     struct probe probe = {.watch = !strcmp(command, "watch")};
     struct wl_display *display = wl_display_connect(NULL);
@@ -598,6 +669,15 @@ int main(int argc, char **argv) {
         if (shaodesk_window_control_v1_get_version(probe.control) < 4)
             die("the compositor's window control does not peek");
         peek(&probe, display, title, &window);
+    } else if (!strcmp(command, "icon")) {
+        // Below version 5 no icon comes, which the tests check too.
+        print_icon(&probe);
+        if (!strcmp(argument, "watch")) {
+            probe.watch_icons = true;
+            while (found->title)
+                if (wl_display_dispatch(display) < 0)
+                    die("dispatch failed");
+        }
     } else {
         die("unknown command");
     }
