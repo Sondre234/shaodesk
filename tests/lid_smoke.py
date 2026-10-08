@@ -3,8 +3,8 @@
 turns the built-in panel (eDP-1) off, its windows moving to the other monitor as when it is
 unplugged, and opening it brings the panel and its windows back; with no other monitor the panel
 stays on, and a monitor coming or going changes that. A lid already closed as its switch appears
-(as libinput reports it at startup) holds the panel off, and a panel appearing behind a closed lid
-stays off. outputs.lid = "ignore" leaves the panel on, bindings run on switches' changes, and
+(as libinput reports a reliable one at startup) holds the panel off, and a panel appearing behind a
+closed lid stays off. outputs.lid = "ignore" leaves the panel on, bindings run on switches' changes, and
 opening the lid counts as input."""
 from pathlib import Path
 import sys

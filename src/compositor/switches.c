@@ -123,9 +123,9 @@ static void switch_destroy(struct wl_listener *listener, void *data) {
         update_lid(server); // a lid gone is a lid that holds nothing off
 }
 
-/* A switch device appeared. libinput tells its state right after it, as a toggle, when the lid
- * is closed or tablet mode on already: a laptop started closed on a dock comes up with its panel
- * off. */
+/* A switch device appeared. libinput tells its state right after it, as a toggle, when tablet
+ * mode is on already, or the lid closed of a switch it knows to be reliable (logind tells of the
+ * others: lid_from_logind). */
 void server_new_switch(struct sh_server *server, struct wlr_input_device *input) {
     struct sh_switch_device *device = calloc(1, sizeof(*device));
     if (!device)
