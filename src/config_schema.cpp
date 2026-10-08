@@ -452,6 +452,14 @@ const Option options[] = {
     {"bindings[].layout", "string or integer", "\"next\"", "", none, none,
      "With `switch_layout` only: `\"next\"` or `\"prev\"` (wrapping), or a layout's number "
      "from 1, in the order of `keyboard.layout`."},
+    {"bindings[].locked", "boolean", "false", "", none, none,
+     "With `key` only: the binding runs while the session is locked too, as Hyprland's `bindl`; "
+     "every other key goes to the lock screen then. An action with nothing to do while the "
+     "session is locked (focusing, moving windows, the switcher, the overview) does nothing."},
+    {"bindings[].repeats", "boolean", "true for `resize_*`, else false", "", none, none,
+     "With `key` only: while the key is held, the action runs again at `keyboard.repeat_rate` "
+     "after `keyboard.repeat_delay`, as Hyprland's `binde`. (Lua keeps `repeat` for its own "
+     "loops.)"},
 
     {"notifications", "table", "", "", none, none,
      "Notifications: the shell serves `org.freedesktop.Notifications` on the session bus and shows "

@@ -136,6 +136,26 @@ int main(int argc, char **argv) {
             rejects("return {bindings={{key='l',action='volume_mute',amount=5}}}");
             rejects("return {bindings={{key='l',action='mic_mute',amount=5}}}");
         }
+        {
+            // `locked` runs a key binding while the session is locked, `repeats` while its key is
+            // held; keyboard resizing repeats unless told not to.
+            auto flags = shaodesk::parse_config(
+                "return {bindings={"
+                "{key='XF86AudioRaiseVolume',action='volume_up',locked=true,repeats=true},"
+                "{key='XF86AudioMute',action='volume_mute',locked=true},"
+                "{mods={'Super'},key='Left',action='resize_left'},"
+                "{mods={'Super'},key='Right',action='resize_right',repeats=false},"
+                "{key='a',action='close'},{button='side',action='close'}}}");
+            const auto &b = flags.bindings;
+            require(b.size() == 6 && b[0].locked && b[0].repeats && b[1].locked && !b[1].repeats &&
+                        !b[2].locked && b[2].repeats && !b[3].repeats && !b[4].locked &&
+                        !b[4].repeats && !b[5].locked && !b[5].repeats,
+                    "locked and repeats not parsed");
+            rejects("return {bindings={{button='side',action='close',locked=true}}}");
+            rejects("return {bindings={{button='side',action='close',repeats=false}}}");
+            rejects("return {bindings={{key='a',action='close',locked='yes'}}}");
+            rejects("return {bindings={{key='a',action='close',repeats=1}}}");
+        }
         auto *launcher = config.binding(SH_LOGO, XKB_KEY_r);
         require(launcher && launcher->action == SH_LAUNCHER, "launcher binding missing");
         require(shaodesk::parse_action("toggle_floating") == SH_TOGGLE_FLOATING,
