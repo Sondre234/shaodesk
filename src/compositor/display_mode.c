@@ -21,10 +21,12 @@ static int connected_outputs(struct sh_server *server) {
     return wl_list_length(&server->outputs) + wl_list_length(&server->disabled_outputs);
 }
 
-/* The main monitor: a built-in panel (the first by name), else the one outputs.primary names,
- * else the first of outputs.order connected, else the first connector by name. NULL with none. */
+/* The main monitor: a built-in panel (the first by name), else the primary one (outputs.primary,
+ * or the display settings window's), else the first of outputs.order connected, else the first
+ * connector by name. NULL with none. */
 static struct sh_output *main_output(struct sh_server *server) {
     const struct sh_settings *settings = server_settings(server);
+    const char *primary = primary_output_name(server);
     struct wl_list *lists[] = {&server->outputs, &server->disabled_outputs};
     struct sh_output *best = NULL, *output;
     for (size_t i = 0; i < 2; ++i) {
@@ -34,9 +36,9 @@ static struct sh_output *main_output(struct sh_server *server) {
                 best = output;
         }
     }
-    for (size_t i = 0; i < 2 && !best && settings->primary_output[0]; ++i) {
+    for (size_t i = 0; i < 2 && !best && primary[0]; ++i) {
         wl_list_for_each(output, lists[i], link) {
-            if (output_key_matches(settings->primary_output, output->wlr_output)) {
+            if (output_key_matches(primary, output->wlr_output)) {
                 best = output;
                 break;
             }

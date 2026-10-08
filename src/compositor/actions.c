@@ -320,6 +320,9 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
     case SH_POWER_MENU:
         request_shell(server, "power-menu");
         break;
+    case SH_DISPLAY_SETTINGS:
+        request_shell(server, "display-settings");
+        break;
     case SH_DISPLAY_OFF:
     case SH_DISPLAY_ON:
     case SH_DISPLAY_TOGGLE: {

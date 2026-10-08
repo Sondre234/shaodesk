@@ -108,7 +108,8 @@ static void session_capture(struct sh_server *server, struct sh_session *session
     }
 }
 
-static bool make_directories(char *path) {
+/* Creates `path` and the directories above it (for the user alone), as `mkdir -p`. */
+bool make_directories(char *path) {
     for (char *c = path + 1; *c; ++c) {
         if (*c != '/')
             continue;

@@ -54,6 +54,7 @@ void reload_config(struct sh_server *server) {
     wl_list_for_each(overridden, &server->outputs, link) overridden->has_override = false;
     wl_list_for_each(overridden, &server->disabled_outputs, link) overridden->has_override = false;
     ++server->config_generation;
+    display_settings_load(server); // laid over outputs.monitors, so read with them
     configure_animations(server);
     night_light_update(server);
     color_management_update(server);
@@ -334,6 +335,8 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
                  server_new_decoration);
     // Windows' tearing hints, which windows.allow_tearing follows (tearing.c).
     server.tearing_control = wlr_tearing_control_manager_v1_create(server.wl_display, 1);
+    // The monitors' settings the display settings window kept, before any monitor appears.
+    display_settings_load(&server);
     // Applications' colours, once a monitor asks for HDR (hdr.c).
     color_management_update(&server);
     // Windows' own icons, for the taskbar (window_icon.c). Clients are told the sizes taskbars
@@ -566,6 +569,7 @@ finish:
     if (server.urgent_timer)
         wl_event_source_remove(server.urgent_timer);
     display_mode_finish(&server);
+    display_settings_finish(&server);
     if (server.config_watch)
         wl_event_source_remove(server.config_watch);
     if (server.config_timer)

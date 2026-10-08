@@ -14,6 +14,7 @@
 #include "shaodesk/decoration.h"
 #include "shaodesk/shadow.h"
 #include "shaodesk/session.h"
+#include "shaodesk/output_state.h"
 #include "shaodesk/overview.h"
 #include "shaodesk/overview_scene.h"
 #include "shaodesk/tabs.h"
@@ -421,7 +422,7 @@ struct sh_server {
     } output_workspaces[16];
     bool tiling_per_workspace; // the layout.tiling_per_workspace the tiling was last put in line with
     char active_output[64];           // of the last focused window, switched workspace, or click
-    char placed_primary[32];          // the primary output the pointer was last put on, if any
+    char placed_primary[64];          // the primary output the pointer was last put on, if any
     struct wlr_output *target_output; // set while a control request names an output
     struct sh_tiling *tiling;
     bool grab_retile;     // the grabbed window left the tiling to be moved; retile it on drop
@@ -525,6 +526,24 @@ struct sh_server {
         char output[64];
         struct wl_event_source *timer;
     } display_mode;
+    /* The display settings window's monitors (display_settings.c): the settings it kept, read
+     * from the state file and laid over outputs.monitors, or a trial's until it is kept. While a
+     * trial runs, what goes back unless it is kept: the kept settings, each monitor's runtime
+     * settings (sh_output.override) by name; and the timer that takes them back, at
+     * `trial_ends` (now_ms()). */
+    struct {
+        struct sh_output_state saved;
+        bool trial;
+        struct sh_output_state kept;
+        struct {
+            char name[64];
+            bool has_override;
+            struct sh_monitor override;
+        } before[SH_OUTPUT_STATE_MAX];
+        int before_count;
+        struct wl_event_source *timer;
+        int64_t trial_ends;
+    } display_settings;
     /* wlr-output-power-management (output_power.c), and when an action last turned monitors
      * off, which input does not undo for a moment. */
     struct wl_listener output_power_set_mode;
@@ -683,10 +702,15 @@ struct sh_output {
      * but the wlr_output is disabled, so it neither scans out nor draws frames. */
     bool powered_off;
     bool idle_off; /* turned off by the idle display_off step (idle.c), which input undoes */
-    /* Settings a wlr-output-management client (wlr-randr, kanshi) applied at runtime. They
-     * replace the configured monitor until the configuration is reloaded. */
+    bool kept_on;  /* on though its settings say off, as the only output (configure_output) */
+    /* Settings a wlr-output-management client (wlr-randr, kanshi) or display_mode applied at
+     * runtime. They replace the configured monitor until the configuration is reloaded or the
+     * display settings window applies its own. */
     bool has_override;
     struct sh_monitor override;
+    /* Its outputs.monitors entry with what the display settings window kept for it laid over
+     * it, as configured_monitor last made it. */
+    struct sh_monitor configured;
     struct wlr_scene_rect *background, *lock_blank;
     bool lock_presented;
     /* Magnifier: the scene is drawn into `zoom_swapchain` and the output shows a part of the
@@ -995,6 +1019,16 @@ bool display_mode_key(struct sh_server *server, xkb_keysym_t sym);
 void describe_display_mode(struct sh_server *server, int fd);
 void display_mode_finish(struct sh_server *server);
 
+/* display_settings.c */
+void display_settings_load(struct sh_server *server);
+const struct sh_output_saved *saved_output(const struct sh_output *output);
+const char *primary_output_name(struct sh_server *server);
+bool hdr_asked(struct sh_server *server);
+void describe_monitors(struct sh_server *server, int fd);
+void describe_monitors_trial(struct sh_server *server, int fd);
+void control_monitors(struct sh_server *server, int fd, const char *arguments);
+void display_settings_finish(struct sh_server *server);
+
 /* effects.c */
 void update_dim(struct sh_toplevel *toplevel);
 bool tick_effects(struct sh_server *server);
@@ -1102,6 +1136,7 @@ bool output_want_hdr(struct sh_output *output, const struct sh_monitor *monitor,
                      struct wlr_output_state *state);
 void output_drop_hdr(struct sh_output *output, struct wlr_output_state *state);
 bool output_is_hdr(const struct sh_output *output);
+const char *hdr_unavailable(struct sh_output *output);
 
 /* headless_input.c */
 void control_headless_pointer(struct sh_server *server, int fd, const char *arguments);
@@ -1183,11 +1218,13 @@ void output_description(const struct wlr_output *output, char *text, size_t size
 bool output_key_matches(const char *key, const struct wlr_output *output);
 const struct sh_monitor *monitor_settings(const struct sh_settings *settings,
                                           const struct wlr_output *output);
+const struct sh_monitor *configured_monitor(struct sh_output *output);
 const struct sh_monitor *output_monitor(const struct sh_settings *settings,
-                                       const struct sh_output *output);
+                                       struct sh_output *output);
 void arrange_outputs(struct sh_server *server);
 void configure_output(struct sh_server *server, struct sh_output *output);
 void apply_output_settings(struct sh_server *server);
+bool test_monitor(struct sh_output *output, const struct sh_monitor *monitor);
 bool deep_format(uint32_t format);
 void output_config_test(struct wl_listener *listener, void *data);
 void output_config_apply(struct wl_listener *listener, void *data);
@@ -1299,6 +1336,7 @@ void scratchpad_show(struct sh_server *server);
 void empty_scratchpad(struct sh_server *server);
 
 /* session.c */
+bool make_directories(char *path);
 bool session_save(struct sh_server *server, const char *name, int *windows, char *error,
                   size_t error_size);
 bool session_restore(struct sh_server *server, const char *name, bool launch,

@@ -142,6 +142,10 @@ if(BUILD_TESTING)
     target_include_directories(lid_tests PRIVATE include)
     target_compile_options(lid_tests PRIVATE -Wall -Wextra)
     add_test(NAME lid COMMAND lid_tests)
+    add_executable(output_state_tests tests/output_state_tests.c src/output_state.c)
+    target_include_directories(output_state_tests PRIVATE include)
+    target_compile_options(output_state_tests PRIVATE -Wall -Wextra)
+    add_test(NAME output_state COMMAND output_state_tests)
     add_executable(border_tests tests/border_tests.c src/border.c)
     target_include_directories(border_tests PRIVATE include)
     target_compile_options(border_tests PRIVATE -Wall -Wextra)
@@ -240,6 +244,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/control.c
         src/compositor/cursor.c
         src/compositor/display_mode.c
+        src/compositor/display_settings.c
         src/compositor/dynamic_rules.c
         src/compositor/effects.c
         src/compositor/focus.c
@@ -299,6 +304,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
     target_sources(shaodesk PRIVATE src/overview_scene.c)
     target_sources(shaodesk PRIVATE src/power_supply.c)
     target_sources(shaodesk PRIVATE src/lid.c)
+    target_sources(shaodesk PRIVATE src/output_state.c)
     target_sources(shaodesk PRIVATE src/dynamic_rule.c)
     target_sources(shaodesk PRIVATE src/border.c)
     target_include_directories(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
@@ -645,6 +651,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
         add_test(NAME display_mode_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/display_mode_smoke.py $<TARGET_FILE:shaodesk>)
         set_tests_properties(display_mode_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME display_settings_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/display_settings_smoke.py $<TARGET_FILE:shaodesk>
+            $<TARGET_FILE:output_management_probe>)
+        set_tests_properties(display_settings_smoke PROPERTIES TIMEOUT 90)
         add_test(NAME lid_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/lid_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)

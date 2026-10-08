@@ -16,7 +16,7 @@ struct sh_control_client {
     bool shell;      // "subscribe shell": the desktop shell, which carries out what it is asked
     struct wl_list link;
     size_t length;
-    char request[512];
+    char request[4096]; // `monitors apply` names every monitor's settings
 };
 
 static int session_name_compare(const struct dirent **a, const struct dirent **b);
@@ -287,6 +287,10 @@ static void control_handle(struct sh_server *server, int fd, const char *request
         snprintf(line, sizeof(line), "dnd %s\n", verb);
         send_shell_line(server, line);
         control_reply(fd, "ok\n");
+        return;
+    }
+    if (!strncmp(request, "monitors", 8) && (!request[8] || request[8] == ' ')) {
+        control_monitors(server, fd, request + 8);
         return;
     }
     if (!strncmp(request, "osd", 3) && (!request[3] || request[3] == ' ')) {
@@ -597,7 +601,7 @@ static void request_shell_on(struct sh_server *server, const char *what,
 }
 
 /* Asks the shell to open something (`what`: "launcher", "palette", "notifications",
- * "power-menu", "clipboard" or "emoji") on the output under the pointer. */
+ * "power-menu", "clipboard", "emoji" or "display-settings") on the output under the pointer. */
 void request_shell(struct sh_server *server, const char *what) {
     struct wlr_cursor *cursor = server->cursor;
     request_shell_on(server, what,

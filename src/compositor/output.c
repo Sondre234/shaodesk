@@ -126,12 +126,25 @@ const struct sh_monitor *monitor_settings(const struct sh_settings *settings,
     return described;
 }
 
-/* The monitor settings in force for `output`: what an output-management client applied, else
- * what the configuration says. */
+/* The settings configured for `output`: its outputs.monitors entry, or what the display settings
+ * window kept for this monitor (display_settings.c) laid over it, all but `tiling`, which the
+ * window leaves to the configuration. NULL for neither. */
+const struct sh_monitor *configured_monitor(struct sh_output *output) {
+    const struct sh_monitor *monitor =
+        monitor_settings(server_settings(output->server), output->wlr_output);
+    const struct sh_output_saved *saved = saved_output(output);
+    if (!saved)
+        return monitor;
+    output->configured = saved->monitor;
+    output->configured.tiling = monitor ? monitor->tiling : -1;
+    return &output->configured;
+}
+
+/* The monitor settings in force for `output`: what an output-management client or display_mode
+ * applied, else what is configured. */
 const struct sh_monitor *output_monitor(const struct sh_settings *settings,
-                                       const struct sh_output *output) {
-    return output->has_override ? &output->override
-                                : monitor_settings(settings, output->wlr_output);
+                                       struct sh_output *output) {
+    return output->has_override ? &output->override : configured_monitor(output);
 }
 
 /* Tells output-management clients how the outputs are set up now. */
@@ -257,9 +270,10 @@ void arrange_outputs(struct sh_server *server) {
     wl_list_for_each(output, &server->outputs, link)
         layout_output(server, output->wlr_output, output->x - origin_x, output->y - origin_y);
     wl_list_for_each(output, &server->outputs, link) follow_moved_output(server, output);
-    struct wlr_output *primary = find_output(server, settings->primary_output);
+    const char *primary_name = primary_output_name(server);
+    struct wlr_output *primary = find_output(server, primary_name);
     struct wlr_box box;
-    if (primary && strcmp(server->placed_primary, settings->primary_output) != 0) {
+    if (primary && strcmp(server->placed_primary, primary_name) != 0) {
         wlr_output_layout_get_box(server->output_layout, primary, &box);
         wlr_cursor_warp(server->cursor, NULL, box.x + box.width / 2.0, box.y + box.height / 2.0);
     } else if (server->running && pointed &&
@@ -269,7 +283,7 @@ void arrange_outputs(struct sh_server *server) {
                         server->cursor->y + box.y - pointed_before.y);
     }
     snprintf(server->placed_primary, sizeof(server->placed_primary), "%s",
-             primary ? settings->primary_output : "");
+             primary ? primary_name : "");
     update_backgrounds(server);
     arrange_layers(server);
     refit_fullscreen(server);
@@ -339,6 +353,48 @@ static void try_deep_format(struct sh_output *output, struct wlr_output_state *s
                 output->wlr_output->name);
 }
 
+/* Under --headless, whether `state` asks for the size the variable `name` names ("1600x900"),
+ * which a test has outputs refuse: SHAODESK_TEST_REFUSE_MODE in the display settings' test
+ * (test_monitor), SHAODESK_TEST_REFUSE_COMMIT in configure_output's own, as a monitor that passed
+ * the one and fails as its settings are committed. */
+static bool refused_size(struct sh_output *output, const struct wlr_output_state *state,
+                         const char *name) {
+    const char *refused = getenv(name);
+    int width, height;
+    return refused && headless_backend(output->server) &&
+           (state->committed & WLR_OUTPUT_STATE_MODE) &&
+           state->mode_type == WLR_OUTPUT_STATE_MODE_CUSTOM &&
+           sscanf(refused, "%dx%d", &width, &height) == 2 &&
+           state->custom_mode.width == width && state->custom_mode.height == height;
+}
+
+/* Whether `output` takes `monitor`'s mode, scale, transform and adaptive sync (the defaults for
+ * NULL) or being turned off, as configure_output commits them: the backend's test, as
+ * wlr-output-management's test asks it of each head. */
+bool test_monitor(struct sh_output *output, const struct sh_monitor *monitor) {
+    struct wlr_output *wlr_output = output->wlr_output;
+    struct wlr_output_state state;
+    wlr_output_state_init(&state);
+    bool enable = !monitor || monitor->enabled;
+    wlr_output_state_set_enabled(&state, enable);
+    if (enable) {
+        struct wlr_output_mode *mode = pick_mode(wlr_output, monitor);
+        if (mode)
+            wlr_output_state_set_mode(&state, mode);
+        else if (monitor && monitor->width > 0 && wl_list_empty(&wlr_output->modes))
+            wlr_output_state_set_custom_mode(&state, monitor->width, monitor->height,
+                                             monitor->refresh);
+        wlr_output_state_set_scale(&state, monitor && monitor->scale > 0 ? monitor->scale : 1);
+        wlr_output_state_set_transform(&state, monitor ? monitor->transform : 0);
+        if (wlr_output->adaptive_sync_supported)
+            wlr_output_state_set_adaptive_sync_enabled(&state, monitor && monitor->vrr);
+    }
+    bool ok = !refused_size(output, &state, "SHAODESK_TEST_REFUSE_MODE") &&
+              wlr_output_test_state(wlr_output, &state);
+    wlr_output_state_finish(&state);
+    return ok;
+}
+
 static void destroy_output_layers(struct sh_server *server, struct wlr_output *wlr_output) {
     struct sh_layer *layer, *temporary;
     wl_list_for_each_safe(layer, temporary, &server->layers, link) {
@@ -356,13 +412,14 @@ void configure_output(struct sh_server *server, struct sh_output *output) {
     // A laptop's panel with its lid closed stays dark while another monitor shows the desktop.
     bool by_lid = lid_holds_off(server, output);
     bool enable = (monitor == NULL || monitor->enabled) && !by_lid;
+    output->kept_on = false;
     if (!enable) {
         bool others = false;
         struct sh_output *candidate;
         wl_list_for_each(candidate, &server->outputs, link) others |= candidate != output;
         if (!others) {
             wlr_log(WLR_ERROR, "Keeping %s on: it is the only output", wlr_output->name);
-            enable = true;
+            enable = output->kept_on = true;
         }
     }
     // A monitor that is off stays off as it is until it is turned on, which configures it.
@@ -414,7 +471,8 @@ void configure_output(struct sh_server *server, struct sh_output *output) {
         else if (!deep && wlr_output->render_format != DRM_FORMAT_XRGB8888)
             wlr_output_state_set_render_format(&state, DRM_FORMAT_XRGB8888);
     }
-    if (state.committed != 0 && !wlr_output_test_state(wlr_output, &state)) {
+    if (state.committed != 0 && (refused_size(output, &state, "SHAODESK_TEST_REFUSE_COMMIT") ||
+                                 !wlr_output_test_state(wlr_output, &state))) {
         // Fall back to the defaults; a new monitor must still light up.
         wlr_log(WLR_ERROR, "%s rejected its configured settings", wlr_output->name);
         wlr_output_state_finish(&state);
@@ -478,9 +536,9 @@ struct sh_output *sh_output_for(struct sh_server *server, struct wlr_output *wlr
 }
 
 /* Settings a wlr-output-management head asks for, as the monitor entry they amount to. */
-static void head_monitor(struct sh_server *server, const struct sh_output *output,
+static void head_monitor(struct sh_server *server, struct sh_output *output,
                          const struct wlr_output_head_v1_state *head, struct sh_monitor *monitor) {
-    const struct sh_monitor *configured = monitor_settings(server_settings(server), output->wlr_output);
+    const struct sh_monitor *configured = configured_monitor(output);
     memset(monitor, 0, sizeof(*monitor));
     monitor->tiling = configured ? configured->tiling : -1;
     monitor->bit_depth = configured ? configured->bit_depth : 8; // no head state says it
@@ -675,6 +733,12 @@ void server_new_output(struct wl_listener *listener, void *data) {
     wlr_log(WLR_INFO, "Output %s: %s", wlr_output->name, description);
     apply_output_layout(server, wlr_output);
     configure_output(server, output);
+    // One kept on only as the first to appear, such as one turned off at startup, goes off now.
+    struct sh_output *other, *temporary;
+    wl_list_for_each_safe(other, temporary, &server->outputs, link) {
+        if (other != output && other->kept_on)
+            configure_output(server, other);
+    }
     if (wlr_output_is_wl(wlr_output))
         wlr_wl_output_set_title(wlr_output, "shaodesk — nested desktop");
     arrange_outputs(server);

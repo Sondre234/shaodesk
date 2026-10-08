@@ -219,6 +219,8 @@ enum sh_action {
     SH_CLIPBOARD_HISTORY,
     /* Asks the shell for its emoji picker on the output under the pointer, as Windows' Win+. */
     SH_EMOJI_PICKER,
+    /* Asks the shell for its display settings window on the output under the pointer. */
+    SH_DISPLAY_SETTINGS,
 };
 
 /* The display_mode action's choices. */

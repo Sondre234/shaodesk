@@ -111,6 +111,14 @@ static void get_display_mode(struct sh_server *server, int fd, const char *argum
     describe_display_mode(server, fd);
 }
 
+static void get_monitors(struct sh_server *server, int fd, const char *arguments) {
+    describe_monitors(server, fd);
+}
+
+static void get_monitors_trial(struct sh_server *server, int fd, const char *arguments) {
+    describe_monitors_trial(server, fd);
+}
+
 static void get_workspace(struct sh_server *server, int fd, const char *arguments) {
     char reply[32];
     snprintf(reply, sizeof(reply), "ok\n%d\n", focused_workspace(server));
@@ -717,6 +725,8 @@ static const struct {
 } queries[] = {
     {"outputs", get_outputs, false},
     {"display_mode", get_display_mode, false},
+    {"monitors", get_monitors, false},
+    {"monitors_trial", get_monitors_trial, false},
     {"tearing", get_tearing, false},
     {"workspace", get_workspace, false},
     {"workspaces", get_workspaces, false},
