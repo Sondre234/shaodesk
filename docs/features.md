@@ -1314,7 +1314,11 @@ started. Another polkit authentication agent is skipped while the shell's is on
 (`shell.polkit_agent`, see [Administrator passwords](#administrator-passwords)): any program or
 file name with `polkit` or `policykit` in it (polkit-gnome-authentication-agent-1,
 polkit-kde-authentication-agent-1, lxpolkit, lxqt-policykit-agent, mate-polkit, xfce-polkit,
-hyprpolkitagent), and soteria.
+hyprpolkitagent), and soteria. An entry that starts a sound server (any name with `pipewire` or
+`pulseaudio` in it, and wireplumber, so Gentoo's `gentoo-pipewire-launcher restart` too) is
+skipped while one already runs, its socket (`pipewire-0` or `pulse/native`) being in
+`$XDG_RUNTIME_DIR`: started again, it would restart the sound under every program playing, as
+when the script that started the session has started PipeWire itself.
 
 ```lua
 autostart = {

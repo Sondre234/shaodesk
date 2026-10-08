@@ -107,6 +107,14 @@ int main() {
         require(role("a.desktop", {"sh"}, "/usr/bin/hyprpolkitagent") == "polkit",
                 "by TryExec");
         require(role("soteria.desktop", {"soteria"}) == "polkit", "soteria");
+        require(role("pipewire.desktop", {"/usr/bin/gentoo-pipewire-launcher", "restart"}) ==
+                    "sound",
+                "gentoo-pipewire-launcher");
+        require(role("pipewire-pulse.desktop", {"pipewire-pulse"}) == "sound", "pipewire-pulse");
+        require(role("wireplumber.desktop", {"wireplumber"}) == "sound", "wireplumber");
+        require(role("pulseaudio.desktop", {"start-pulseaudio-x11"}) == "sound",
+                "start-pulseaudio-x11");
+        require(role("pavucontrol.desktop", {"pavucontrol"}).empty(), "pavucontrol is none");
         require(role("firefox.desktop", {"firefox"}).empty(), "firefox is none of them");
         require(role("nm-applet.desktop", {"nm-applet"}).empty(), "nm-applet is none of them");
 
@@ -196,6 +204,12 @@ int main() {
               "agent-1\n",
               "the shell is the polkit agent", shell);
         check("[Desktop Entry]\nType=Application\nExec=nm-applet\n", "", shell);
+        // A sound server, only while none runs.
+        start("[Desktop Entry]\nType=Application\nExec=gentoo-pipewire-launcher restart\n");
+        shaodesk::AutostartOptions sound = plain;
+        sound.sound = true;
+        check("[Desktop Entry]\nType=Application\nExec=gentoo-pipewire-launcher restart\n",
+              "a sound server is already running", sound);
 
         // The environment's directories and desktops.
         setenv("HOME", (root / "h").c_str(), 1);
@@ -212,6 +226,17 @@ int main() {
                 "directories by default");
         setenv("XDG_CURRENT_DESKTOP", "shaodesk:wlroots", 1);
         require(shaodesk::current_desktops() == Words{"shaodesk", "wlroots"}, "desktops");
+        auto runtime = root / "run";
+        fs::create_directories(runtime / "pulse");
+        setenv("XDG_RUNTIME_DIR", runtime.c_str(), 1);
+        require(!shaodesk::sound_server_running(), "no sound server");
+        write(runtime / "pipewire-0", "");
+        require(shaodesk::sound_server_running(), "PipeWire's socket");
+        fs::remove(runtime / "pipewire-0");
+        write(runtime / "pulse/native", "");
+        require(shaodesk::sound_server_running(), "PulseAudio's socket");
+        setenv("XDG_RUNTIME_DIR", "relative", 1);
+        require(!shaodesk::sound_server_running(), "a relative XDG_RUNTIME_DIR");
 
         // What startup and autostart started, to know their windows by.
         require(shaodesk::program_names({"/usr/bin/Foot", "--server", "-e", "A=b"}) ==

@@ -230,8 +230,8 @@ shadows.
 - A standalone session starts the XDG autostart entries after `startup`, so applications' "start
   at login" settings work: `~/.config/autostart` over `/etc/xdg/autostart` by file name, skipping
   `Hidden`, `OnlyShowIn`/`NotShownIn` that leave shaodesk out, a missing `TryExec`, entries
-  GNOME's setting turns off, and another notification daemon or tray watcher while the shell's
-  is on. `autostart = { xdg = false }` turns it off, `autostart.exclude` leaves entries out by
+  GNOME's setting turns off, another notification daemon or tray watcher while the shell's
+  is on, and a sound server (PipeWire, PulseAudio) while one already runs. `autostart = { xdg = false }` turns it off, `autostart.exclude` leaves entries out by
   file name, and `shaodesk msg get autostart` lists what was started or skipped, and why.
 - The shell is the session's polkit authentication agent: `pkexec`, GParted, updaters and
   logind's `challenge` ask for a password in a dialog over the focused monitor, in either style,
