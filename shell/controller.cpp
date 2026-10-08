@@ -14,6 +14,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
+#include <QIcon>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QSaveFile>
@@ -212,6 +213,7 @@ void ShellController::refreshApps() {
     g_list_free_full(list, g_object_unref);
     appIndex_ = app_match::Index(entries);
     appFor_.clear();
+    iconFor_.clear();
     sortApps();
     Q_EMIT appsChanged();
 }
@@ -1016,10 +1018,19 @@ QString ShellController::iconFor(const QString &windowAppId) const {
     for (const auto &app : apps_)
         if (!id.isEmpty() && app.id == id)
             return app.icon;
-    // A window names its own app ID: a path there is not an icon to load from disk (only a
-    // desktop entry's Icon= may be a path), and it may be a file the application wrote.
-    return windowAppId.isEmpty() || windowAppId.contains('/') ? QString("application-x-executable")
-                                                              : windowAppId;
+    auto known = iconFor_.constFind(windowAppId);
+    if (known == iconFor_.cend()) {
+        // A name the icon theme has, guessed from the app id; never a path, which only a
+        // desktop entry's Icon= may be.
+        QString icon = "application-x-executable";
+        for (const auto &guess : app_match::iconGuesses(windowAppId))
+            if (QIcon::hasThemeIcon(guess)) {
+                icon = guess;
+                break;
+            }
+        known = iconFor_.insert(windowAppId, icon);
+    }
+    return *known;
 }
 void ShellController::toggleTiling(const QString &output) {
     request(output.isEmpty() ? QByteArray("toggle_tiling\n")
