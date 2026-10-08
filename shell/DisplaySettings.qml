@@ -202,9 +202,18 @@ Item {
             }
         }
     }
-    // A switch, as Notification Center's do-not-disturb.
+    // A switch, as Notification Center's do-not-disturb: `on` is what is in force, and `turned`
+    // says what the user made it; what is in force then stays bound, so that a change the model
+    // does not take shows as not taken.
     component Toggle: Switch {
         id: toggle
+        property bool on: false
+        signal turned(bool on)
+        checked: on
+        onToggled: {
+            toggle.turned(checked)
+            checked = Qt.binding(function() { return toggle.on })
+        }
         implicitHeight: Theme.buttonHeight
         indicator: Rectangle {
             x: toggle.leftPadding; y: parent.height / 2 - height / 2
@@ -453,10 +462,10 @@ Item {
                     Toggle {
                         objectName: "displayEnabled"
                         anchors.verticalCenter: parent.verticalCenter
-                        checked: !!root.current.enabled
+                        on: !!root.current.enabled
                         // The last monitor showing the desktop stays on.
                         enabled: !(root.current.inLayout && root.settings.layoutCount === 1)
-                        onToggled: root.settings.setEnabled(root.current.name, checked)
+                        onTurned: (on) => root.settings.setEnabled(root.current.name, on)
                         Accessible.name: "Use this display"
                     }
                 }
@@ -567,8 +576,8 @@ Item {
                         visible: !!root.current.vrrSupported
                         enabled: form.on
                         anchors.verticalCenter: parent.verticalCenter
-                        checked: !!root.current.vrr
-                        onToggled: root.settings.setVrr(root.current.name, checked)
+                        on: !!root.current.vrr
+                        onTurned: (on) => root.settings.setVrr(root.current.name, on)
                         Accessible.name: "Adaptive sync"
                     }
                     Unavailable {
@@ -586,8 +595,8 @@ Item {
                         enabled: form.on && !root.current.hdr
                         anchors.verticalCenter: parent.verticalCenter
                         // HDR draws in 10 bits where it can.
-                        checked: root.current.bitDepth === 10 || !!root.current.hdr
-                        onToggled: root.settings.setBitDepth(root.current.name, checked ? 10 : 8)
+                        on: root.current.bitDepth === 10 || !!root.current.hdr
+                        onTurned: (on) => root.settings.setBitDepth(root.current.name, on ? 10 : 8)
                         Accessible.name: "10 bits per colour channel"
                     }
                 }
@@ -602,8 +611,8 @@ Item {
                         visible: !!root.current.hdrPossible
                         enabled: form.on && !root.current.mirror
                         anchors.verticalCenter: parent.verticalCenter
-                        checked: !!root.current.hdr
-                        onToggled: root.settings.setHdr(root.current.name, checked)
+                        on: !!root.current.hdr
+                        onTurned: (on) => root.settings.setHdr(root.current.name, on)
                         Accessible.name: "HDR"
                     }
                     Unavailable {
