@@ -58,6 +58,7 @@ all. In short:
 | `toplevel.c` | Windows: xdg-shell toplevels and popups, opening by window rules, maximize, fullscreen, minimize. |
 | `xwayland.c` | X11 windows and the XWM waker. |
 | `frame.c` | Borders, opacity, rounded corners, window controls, shadows, tab strips. |
+| `gradient_border.c` | Borders in gradients: the pieces `src/border.c` paints, a strip along each side the scene stretches and a square at each corner, in place of the border's rects. |
 | `placement.c` | Snapping, maximizing, reflowing, moving and resizing by keyboard. |
 | `tiling.c` | Glue between windows and the layouts in `src/tiling.cpp`. |
 | `workspace.c` | Workspaces per output, sticky windows. |

@@ -139,6 +139,11 @@ if(BUILD_TESTING)
     target_include_directories(lid_tests PRIVATE include)
     target_compile_options(lid_tests PRIVATE -Wall -Wextra)
     add_test(NAME lid COMMAND lid_tests)
+    add_executable(border_tests tests/border_tests.c src/border.c)
+    target_include_directories(border_tests PRIVATE include)
+    target_compile_options(border_tests PRIVATE -Wall -Wextra)
+    target_link_libraries(border_tests PRIVATE m)
+    add_test(NAME border COMMAND border_tests)
     add_executable(dynamic_rule_tests tests/dynamic_rule_tests.c src/dynamic_rule.c)
     target_include_directories(dynamic_rule_tests PRIVATE include)
     target_compile_options(dynamic_rule_tests PRIVATE -Wall -Wextra)
@@ -235,6 +240,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/foreign_toplevel.c
         src/compositor/frame.c
         src/compositor/gestures.c
+        src/compositor/gradient_border.c
         src/compositor/grab.c
         src/compositor/group.c
         src/compositor/headless_input.c
@@ -284,6 +290,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
     target_sources(shaodesk PRIVATE src/power_supply.c)
     target_sources(shaodesk PRIVATE src/lid.c)
     target_sources(shaodesk PRIVATE src/dynamic_rule.c)
+    target_sources(shaodesk PRIVATE src/border.c)
     target_include_directories(shaodesk PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
     target_compile_definitions(shaodesk PRIVATE WLR_USE_UNSTABLE)
     # version.h, for --version: the project version, and `git describe` in a git checkout.
@@ -904,6 +911,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
         # A missing grim is an empty argument, which the tests take as leaving out their
         # pixel checks (GRIM itself would be GRIM-NOTFOUND).
         set(GRIM_ARGUMENT "$<$<BOOL:${GRIM}>:${GRIM}>")
+        add_test(NAME gradient_border_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/gradient_border_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")
+        set_tests_properties(gradient_border_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME dim_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/dim_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")

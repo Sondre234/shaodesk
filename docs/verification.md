@@ -983,3 +983,51 @@ candidate window, the keys it passes on, Pinyin, Mozc, Hangul), ibus (whose own 
 is believed to speak input-method-unstable-v1 only), and real GTK 3 and 4, Qt 6, Chromium and
 Electron applications typing through them, the shell's own search fields among them; and how the
 candidate window looks at fractional scales and on a second monitor.
+
+## Keeping windows above
+
+Added 2026-10-08. `stacking_smoke` follows the stacking order through `get stacking` on a headless
+compositor: a window kept above stays in front as the others are focused and raised, among those
+kept above as focus raises them, through workspace switches, sticky, snapping and a group (whose
+windows share it), under a fullscreen window of its monitor while another monitor has the focus
+and over it once a window of its monitor is raised; a tile kept above stays a tile; the window rule
+keeps one above as it opens, focused or not; and `layout.floating_above_tiles` keeps floating
+windows over tiles, keeping their order as a reload turns it on and off. `window_control_smoke`
+keeps a window above through the window control's version 6, and a client of version 5 hears no
+such state; `shell_tasks` does it through the task model; `shell_ui` checks the entries of the
+taskbar's window menu and the macOS Window menu; `session_smoke` saves and restores it.
+
+Not checked: real applications kept above in daily use (a video's picture-in-picture, a calculator)
+over fullscreen games and videos, X11 windows' own idea of their stacking beside it, and the menu
+entries in the running shell on a real panel.
+
+## Dynamic window rules
+
+Added 2026-10-08. `dynamic_rules_smoke` changes a Wayland window's title and app ID on a headless
+compositor: a dynamic rule floats it and keeps it above while its title matches, and lets go as it
+stops, giving back the tile; a change by hand while held stays; a rule matching as the window
+opens holds it from the start; a sticky rule matches by app ID and title together; a static rule
+does not act on a new title; opacity rules follow the title; and reloads let go of what a rule no
+longer holds. `dynamic_rule` tests the holding and giving back, and `config` the matching and that
+a dynamic rule's other actions act once.
+
+Not checked: X11 windows' titles changing (`WM_NAME` through XWayland, which reaches the same code),
+and real applications whose titles change often (a browser, a terminal) with dynamic rules in use.
+
+## Gradient borders
+
+Added 2026-10-08. `gradient_border_smoke` draws borders in gradients on a headless compositor with
+the pixman renderer and checks them through grim: the focused window's border red at its left,
+blue at its right and between the two at the middle of its top, the other's in its colour, both
+following focus; a rounded window's border clear past its outer arc and coloured on it, over the
+window's square corner; rects of one colour again after a reload; and the pointer reaching the
+window through its border's corners inside its geometry. `border` tests the gradient's
+direction, its colours between the stops, the pieces' places and sizes, and their pixels, rounded
+corners included; `config` the settings and their refusals. A screenshot of rounded gradient
+borders at 45 and 90 degrees was looked at.
+
+Not checked: any of it through the GPU renderer, where the rounded-corners patch clips the
+window's content to the arc the border's corner squares are painted to (pixman leaves the content
+square, so a translucent border shows the content's corner through it); fractional scales, at
+which the corners are painted at the next whole scale and the scene scales them down; NVIDIA; and
+the import of a real Hyprland configuration's gradients.

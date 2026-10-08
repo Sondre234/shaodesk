@@ -470,6 +470,33 @@ int main(int argc, char **argv) {
                     ws.border_active[3] < 0.51F && ws.border_inactive[1] == 1.0F &&
                     ws.border_inactive[3] == 1.0F,
                 "border settings not parsed or not premultiplied");
+        require(ws.border_active_gradient.count == 1 && ws.border_inactive_gradient.count == 1 &&
+                    ws.border_inactive_gradient.stops[0][1] == 1.0F,
+                "a border of one colour is not a gradient of one stop");
+        // Gradients: 2 to 10 colours, premultiplied, at an angle; the first is the colour too.
+        auto gradient = shaodesk::parse_config(
+            "return {windows={border_color={'#33ccffee','#00ff99ee',angle=45},"
+            "border_inactive_color={'#000000','#ffffff','#ff0000'}}}");
+        const auto &gs = gradient.settings;
+        require(gs.border_active_gradient.count == 2 && gs.border_active_gradient.angle == 45 &&
+                    std::abs(gs.border_active_gradient.stops[1][3] - 0xee / 255.0F) < 1e-6F &&
+                    std::abs(gs.border_active_gradient.stops[1][1] - 0xee / 255.0F) < 1e-6F &&
+                    gs.border_active[2] == gs.border_active_gradient.stops[0][2] &&
+                    gs.border_inactive_gradient.count == 3 &&
+                    gs.border_inactive_gradient.angle == 0 &&
+                    gs.border_inactive_gradient.stops[2][0] == 1.0F,
+                "gradient borders not parsed");
+        require(shaodesk::parse_config("return {windows={border_color='#123456'}}")
+                        .settings.border_active_gradient.count == 1,
+                "a colour after a gradient's default is not one colour");
+        rejects("return {windows={border_color={'#33ccff'}}}");
+        rejects("return {windows={border_color={'#000000','#000000','#000000','#000000',"
+                "'#000000','#000000','#000000','#000000','#000000','#000000','#000000'}}}");
+        rejects("return {windows={border_color={'#33ccff','blue'}}}");
+        rejects("return {windows={border_color={'#33ccff','#00ff99',angle='45deg'}}}");
+        rejects("return {windows={border_color={'#33ccff','#00ff99',angle=400}}}");
+        rejects("return {windows={border_color={'#33ccff','#00ff99',spin=4}}}");
+        rejects("return {windows={border_color={'#33ccff',[3]='#00ff99'}}}");
         require(windows.window_opacity("firefox", true) == 0.9F &&
                     windows.window_opacity("firefox", false) == 0.9F &&
                     windows.window_opacity("code-oss", false) == 0.6F &&

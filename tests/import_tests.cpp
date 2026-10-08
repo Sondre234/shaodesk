@@ -39,7 +39,13 @@ void hyprlang(const fs::path &root) {
     // $accent's rgba(ff8800ee) is the first color of the gradient; borders are premultiplied.
     require(near(s.border_active[3], 0xee / 255.0F) && near(s.border_active[0], 0xee / 255.0F),
             "active border color not taken from the gradient's first color");
+    require(s.border_active_gradient.count == 2 && near(s.border_active_gradient.angle, 45) &&
+                near(s.border_active_gradient.stops[1][1], 0xee / 255.0F) &&
+                near(s.border_active_gradient.stops[1][3], 0xee / 255.0F) &&
+                near(s.border_active_gradient.stops[0][0], s.border_active[0]),
+            "the active border's gradient not carried over with its angle");
     require(near(s.border_inactive[3], 0xaa / 255.0F), "0xAARRGGBB border color not read");
+    require(s.border_inactive_gradient.count == 1, "a border of one color became a gradient");
     require(config.shell.accent == "#ff8800", "accent does not follow the active border");
     require(near(config.opacity, 0.95F), "active_opacity not imported");
     require(!s.animations, "animations:enabled not imported");
@@ -114,6 +120,9 @@ void lua(const fs::path &root) {
     require(s.gap_inner == 4, "gaps_in not imported from hl.config");
     require(s.gap_outer == 7, "require()d table not imported, or code after the error ran");
     require(config.shell.accent == "#e8a3c9", "gradient table's first color not used");
+    require(s.border_active_gradient.count == 2 && near(s.border_active_gradient.angle, 35) &&
+                near(s.border_active_gradient.stops[1][0], 0xc4 / 255.0F),
+            "the gradient table not carried over with its angle");
     require(near(s.border_inactive[3], 0xee / 255.0F), "integer ARGB color not read");
     require(near(config.inactive_opacity, 0.9F), "inactive_opacity not imported");
     require(!s.animations, "animations.enabled not imported from hl.config");

@@ -29,7 +29,7 @@ bool wants_decoration(struct sh_toplevel *toplevel) {
 }
 
 /* Pixels per logical pixel of what the compositor draws itself: enough for the densest output. */
-static int pixel_scale(struct sh_server *server) {
+int pixel_scale(struct sh_server *server) {
     float scale = 1;
     struct sh_output *output;
     wl_list_for_each(output, &server->outputs, link) {
@@ -119,7 +119,8 @@ static bool lights_accept_input(struct wlr_scene_buffer *buffer, double *sx, dou
 static void raise_frame_node(struct sh_toplevel *toplevel, struct wlr_scene_node *node) {
     struct wl_list *children = &toplevel->content->children;
     struct wlr_scene_node *top = wl_container_of(children->prev, top, link);
-    if (top == node || (toplevel->deco && top == &toplevel->deco->node))
+    if (top == node || (toplevel->deco && top == &toplevel->deco->node) ||
+        (toplevel->gradient && top == &toplevel->gradient->node))
         return;
     for (int i = 0; i < 4; ++i)
         if (toplevel->border[i] && top == &toplevel->border[i]->node)
@@ -351,7 +352,9 @@ void refresh_tabs(struct sh_toplevel *toplevel) {
 
 static void set_buffer_opacity(struct wlr_scene_buffer *buffer, int sx, int sy, void *data) {
     struct sh_toplevel *toplevel = data;
-    if (buffer != toplevel->deco && buffer != toplevel->dim && buffer != toplevel->tabs)
+    // The border keeps its own colours, as its rects do.
+    if (buffer != toplevel->deco && buffer != toplevel->dim && buffer != toplevel->tabs &&
+        (!toplevel->gradient || buffer->node.parent != toplevel->gradient))
         wlr_scene_buffer_set_opacity(buffer, toplevel->opacity);
 }
 
@@ -409,12 +412,20 @@ void refresh_frame(struct sh_toplevel *toplevel) {
     bool shown = (b > 0 || inset) && mapped && !frameless(toplevel, toplevel_output(toplevel));
     const float *color = urgent ? settings->urgent_color
                                 : active ? settings->border_active : settings->border_inactive;
+    // A border in gradients eases from the inactive one to the active one rather than between
+    // colours; going from one kind to the other, it takes the new one at once.
+    bool gradient = shown && !urgent && gradient_borders(server);
     float target[SH_TWEEN_VALUES] = {opacity}, fading[SH_TWEEN_VALUES];
-    if (shown)
+    if (gradient)
+        target[1] = active;
+    else if (shown)
         memcpy(target + 1, color, 4 * sizeof(float));
     sh_tween_track(server->animator, &toplevel->fade, SH_ANIM_FOCUS,
-                   mapped && toplevel->shown && toplevel_visible(toplevel), target, fading,
-                   fade_update, toplevel);
+                   mapped && toplevel->shown && toplevel_visible(toplevel) &&
+                       toplevel->border_gradient == gradient,
+                   target, fading, fade_update, toplevel);
+    toplevel->border_gradient = gradient;
+    double mix = fading[1];
     // Peeking scales the opacity, fullscreen windows included, but for a window peeked at. One
     // on the screen only for a peek fades in and out whole, its controls, tabs and border too.
     float peeked = peek_scale(toplevel, now_ms());
@@ -467,9 +478,13 @@ void refresh_frame(struct sh_toplevel *toplevel) {
                        (radius > 0 || !draws_own_shadow(toplevel)),
                    shown && !inset ? b : 0, radius);
 
-    // xdg-shell windows keep their scene tree while unmapped; the border must not.
+    // xdg-shell windows keep their scene tree while unmapped; the border must not. One in
+    // gradients is drawn in pieces of its own instead.
+    refresh_gradient_border(toplevel, gradient, b, radius, mix, whole);
+    if (toplevel->gradient)
+        raise_frame_node(toplevel, &toplevel->gradient->node);
     for (int i = 0; i < 4; ++i) {
-        if (!shown) {
+        if (!shown || gradient) {
             if (toplevel->border[i])
                 wlr_scene_node_destroy(&toplevel->border[i]->node);
             toplevel->border[i] = NULL;
@@ -482,7 +497,7 @@ void refresh_frame(struct sh_toplevel *toplevel) {
             return;
         wlr_scene_rect_set_color(toplevel->border[i], color);
     }
-    if (!shown)
+    if (!shown || gradient)
         return;
     // The scene tree's origin is the top-left corner of the window geometry.
     if (inset)

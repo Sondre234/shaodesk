@@ -236,6 +236,8 @@ struct Config {
                          .round_always = false,
                          .border_active = {0.49F, 0.66F, 1.0F, 1.0F},
                          .border_inactive = {0.25F, 0.29F, 0.36F, 1.0F},
+                         .border_active_gradient = {{{0.49F, 0.66F, 1.0F, 1.0F}}, 1, 0},
+                         .border_inactive_gradient = {{{0.25F, 0.29F, 0.36F, 1.0F}}, 1, 0},
                          .pointer_speed = 0,
                          .pointer_speed_set = false,
                          .pointer_accel = -1,

@@ -296,6 +296,16 @@ struct sh_idle_steps {
     int suspend;     /* the machine suspends, locking first */
 };
 
+/* A border's colours: one colour, or a linear gradient through 2 to SH_GRADIENT_STOPS colours
+ * spaced evenly, at `angle` degrees (0 runs from left to right, 90 from top to bottom), measured
+ * on the frame's box as if it were square; premultiplied RGBA. */
+enum { SH_GRADIENT_STOPS = 10 };
+struct sh_gradient {
+    float stops[SH_GRADIENT_STOPS][4];
+    int count; /* 1 for one colour */
+    float angle;
+};
+
 /* Lua outputs.lid: what closing a laptop's lid does. CLAMSHELL turns its built-in panel off
  * while another monitor shows the desktop, as unplugging the panel would, and back on as the lid
  * opens; IGNORE leaves the panel on. */
@@ -353,6 +363,8 @@ struct sh_settings {
      * those that draw a shadow of their own. */
     bool round_always;
     float border_active[4], border_inactive[4]; /* premultiplied RGBA */
+    /* The same, or gradients of which those are the first colours. */
+    struct sh_gradient border_active_gradient, border_inactive_gradient;
     /* Pointer devices (libinput only). A negative value keeps the device's own default. */
     double pointer_speed; /* -1 to 1; used when pointer_speed_set */
     bool pointer_speed_set;

@@ -210,10 +210,13 @@ const Option options[] = {
      "floating ones included; `\"always\"`, every window, but for one on a monitor without "
      "tiling that draws a shadow of its own around it (a client-side frame, as GTK's), which "
      "keeps its own corners. Fullscreen and maximized windows stay square."},
-    {"windows.border_color", "color", "\"#7da8ff\"", "\"#7da8ff\"", none, none,
-     "Focused window border, `#RRGGBB` or `#RRGGBBAA`."},
-    {"windows.border_inactive_color", "color", "\"#404a5c\"", "\"#404a5c\"", none, none,
-     "Other windows' border, `#RRGGBB` or `#RRGGBBAA`."},
+    {"windows.border_color", "color or gradient", "\"#7da8ff\"", "\"#7da8ff\"", none, none,
+     "Focused window border, `#RRGGBB` or `#RRGGBBAA`, or a gradient through 2 to 10 such "
+     "colours spaced evenly, `{ \"#33ccff\", \"#00ff99\", angle = 45 }`: `angle` in degrees "
+     "(-360 to 360, 0 by default) runs from left to right at 0 and from top to bottom at 90, "
+     "measured on the border's box as if it were square."},
+    {"windows.border_inactive_color", "color or gradient", "\"#404a5c\"", "\"#404a5c\"", none,
+     none, "Other windows' border, as `border_color`."},
     {"windows.opacity", "number", "1.0", "1.0", 0.05, 1, "Focused window opacity."},
     {"windows.inactive_opacity", "number", "`opacity`", "1.0", 0.05, 1,
      "Unfocused window opacity."},

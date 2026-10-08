@@ -539,6 +539,28 @@ built with `packaging/patches/wlroots-rounded-corners.patch`; stock wlroots keep
 own around it (a GTK frame), which keeps its own corners; fullscreen and maximized windows stay
 square.
 
+Either border colour may be a gradient, as Hyprland's `col.active_border = rgba(33ccffee)
+rgba(00ff99ee) 45deg` is:
+
+```lua
+windows = {
+    border_width = 3,
+    border_color = { "#33ccffee", "#00ff99ee", angle = 45 },
+    border_inactive_color = { "#595959aa", "#303030aa", angle = 90 },
+},
+```
+
+A gradient runs through 2 to 10 colours spaced evenly, at `angle` degrees: 0 (the default) from
+left to right, 90 from top to bottom, measured on the box of the window and its border as if it
+were square, so that 45 runs from the top-left corner to the bottom-right one whatever the
+window's shape, as in Hyprland. Colours mix as they are, premultiplied by their alpha. While
+either colour is a gradient, every border is drawn in pieces: a strip along each side holding the
+colours along it, which the compositor stretches over the side, as a border hardly changes across
+its width, and a square at each corner painted pixel by pixel, rounded with the window. A border
+eases from the inactive gradient to the active one as its window is focused; an urgent window's
+stays in the urgent colour. `shaodesk msg get frames` ends each line with how the border is
+drawn: `none`, `color` or `gradient`.
+
 `windows.shadow = { enabled = true }` draws a soft shadow under each window that has none of its
 own, following its corners: `color` under the focused window, the lighter `inactive_color`
 under the others, fading out over `blur` pixels and falling `offset` pixels down (or

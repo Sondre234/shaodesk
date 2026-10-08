@@ -131,8 +131,8 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `windows.border_width` | integer | 0 | 0 to 20 | Border in pixels around each window; tiles shrink to keep it in their slot. |
 | `windows.corner_radius` | integer | 10 | 0 to 40 | Radius in pixels of the corners of windows (which ones, `round` says) and of their border; 0 keeps them square. Needs wlroots built with shaodesk's rounded-corners patch. |
 | `windows.round` | enum | "tiling" | - | Which windows get rounded corners: `"tiling"`, those on a monitor with tiling on, floating ones included; `"always"`, every window, but for one on a monitor without tiling that draws a shadow of its own around it (a client-side frame, as GTK's), which keeps its own corners. Fullscreen and maximized windows stay square. |
-| `windows.border_color` | color | "#7da8ff" | - | Focused window border, `#RRGGBB` or `#RRGGBBAA`. |
-| `windows.border_inactive_color` | color | "#404a5c" | - | Other windows' border, `#RRGGBB` or `#RRGGBBAA`. |
+| `windows.border_color` | color or gradient | "#7da8ff" | - | Focused window border, `#RRGGBB` or `#RRGGBBAA`, or a gradient through 2 to 10 such colours spaced evenly, `{ "#33ccff", "#00ff99", angle = 45 }`: `angle` in degrees (-360 to 360, 0 by default) runs from left to right at 0 and from top to bottom at 90, measured on the border's box as if it were square. |
+| `windows.border_inactive_color` | color or gradient | "#404a5c" | - | Other windows' border, as `border_color`. |
 | `windows.opacity` | number | 1.0 | 0.05 to 1 | Focused window opacity. |
 | `windows.inactive_opacity` | number | `opacity` | 0.05 to 1 | Unfocused window opacity. |
 | `windows.dim_inactive` | number | 0 | 0 to 0.9 | How much darker windows without focus are, 0 for not at all: black laid over them, so it works for every application and tints nothing. Fades over `dim_duration`. |
