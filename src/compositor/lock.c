@@ -124,6 +124,7 @@ void server_new_lock(struct wl_listener *listener, void *data) {
     server->lock = lock;
     bool relock = server->locked;
     server->locked = true;
+    set_binding_mode(server, 0); // the volume keys and the like are bound outside any mode
     if (server->grabbed_toplevel)
         reset_cursor_mode(server);
     wlr_seat_keyboard_clear_focus(server->seat);

@@ -49,6 +49,7 @@ static void configure_animations(struct sh_server *server) {
 void reload_config(struct sh_server *server) {
     if (!server->callbacks->reload(server->callbacks->userdata))
         return;
+    set_binding_mode(server, 0);
     struct sh_output *overridden;
     wl_list_for_each(overridden, &server->outputs, link) overridden->has_override = false;
     wl_list_for_each(overridden, &server->disabled_outputs, link) overridden->has_override = false;

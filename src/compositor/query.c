@@ -339,6 +339,13 @@ static void get_night_light(struct sh_server *server, int fd, const char *argume
     control_reply(fd, reply);
 }
 
+/* The binding mode in use, "default" outside any. */
+static void get_mode(struct sh_server *server, int fd, const char *arguments) {
+    char reply[64];
+    snprintf(reply, sizeof(reply), "ok\n%s\n", binding_mode(server));
+    control_reply(fd, reply);
+}
+
 static void get_overview(struct sh_server *server, int fd, const char *arguments) {
     // The state (open, closing or closed) and how far the glide has gone (thousandths),
     // then the overview line and a line per thumbnail and per strip cell, as sent to the
@@ -599,6 +606,7 @@ static const struct {
     {"power", get_power, false},
     {"pictures", get_pictures, false},
     {"seat", get_seat, false},
+    {"mode", get_mode, false},
 };
 
 /* Answers `request` if it is a query; false if it is not one. */
