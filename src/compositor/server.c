@@ -403,6 +403,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
                  seat_keyboard_focus_change);
     tablet_init(&server);
     shortcuts_inhibit_init(&server);
+    input_method_init(&server);
     struct wlr_xdg_activation_v1 *activation = wlr_xdg_activation_v1_create(server.wl_display);
     add_listener(&activation->events.request_activate, &server.request_activate, request_activate);
     server.relative_pointer = wlr_relative_pointer_manager_v1_create(server.wl_display);
@@ -517,6 +518,7 @@ finish:
     touch_finish(&server);
     tablet_finish(&server);
     shortcuts_inhibit_finish(&server);
+    input_method_finish(&server);
 
     wl_list_remove(&server.new_input.link);
     wl_list_remove(&server.new_virtual_keyboard.link);

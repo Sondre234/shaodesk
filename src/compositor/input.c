@@ -22,9 +22,12 @@ static void keyboard_handle_modifiers(struct wl_listener *listener, void *data) 
     if (keyboard->server->syncing_keyboards)
         return; // keymap.c is changing it, not a key, and tells the seat itself
 
-    wlr_seat_set_keyboard(keyboard->server->seat, keyboard->wlr_keyboard);
-
-    wlr_seat_keyboard_notify_modifiers(keyboard->server->seat, &keyboard->wlr_keyboard->modifiers);
+    // The input method's keyboard grab hears them in the application's place (input_method.c).
+    if (!input_method_modifiers(keyboard)) {
+        wlr_seat_set_keyboard(keyboard->server->seat, keyboard->wlr_keyboard);
+        wlr_seat_keyboard_notify_modifiers(keyboard->server->seat,
+                                           &keyboard->wlr_keyboard->modifiers);
+    }
     struct sh_server *server = keyboard->server;
     follow_keyboard_layout(server, keyboard);
     uint32_t held = server->switcher.modifiers;
@@ -85,7 +88,9 @@ static void keyboard_handle_key(struct wl_listener *listener, void *data) {
             set_peek(server, false);
     }
 
-    if (!handled) {
+    // A key no binding takes goes to the input method's keyboard grab (input_method.c), else to
+    // the application.
+    if (!handled && !input_method_key(keyboard, event)) {
         wlr_seat_set_keyboard(seat, keyboard->wlr_keyboard);
         wlr_seat_keyboard_notify_key(seat, event->time_msec, event->keycode, event->state);
     }

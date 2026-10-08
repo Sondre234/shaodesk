@@ -14,9 +14,10 @@
  *   tool wheel DEGREES CLICKS | tool button CODE pressed|released | tool frame
  *   pad enter | pad leave | pad button N pressed|released
  * (pressure, distance and the slider in 65535ths). Usage: input_probe [--no-gestures]
- * [--no-touch] [--no-tablet] [--layer] [--keys] [--inhibit] [--commands] [TITLE]: without the
- * gestures, touch or tablets it never binds them, as most applications; with --layer it is a
- * panel along the bottom of the output, 60 pixels high, rather than a window. --keys prints the
+ * [--no-touch] [--no-tablet] [--layer] [--overlay] [--keys] [--inhibit] [--commands] [TITLE]:
+ * without the gestures, touch or tablets it never binds them, as most applications; with --layer
+ * it is a panel along the bottom of the output, 60 pixels high, rather than a window, and with
+ * --overlay such a panel on the overlay layer, as the shell's overlays are. --keys prints the
  * keyboard's events too:
  *   keyboard enter | keyboard leave | key CODE pressed|released (an evdev code)
  * --inhibit asks for the compositor's shortcuts as it is ready
@@ -444,8 +445,8 @@ static void global(void *data, struct wl_registry *registry, uint32_t name, cons
     } else if (!strcmp(interface, zwlr_layer_shell_v1_interface.name)) {
         probe->layer_shell = wl_registry_bind(registry, name, &zwlr_layer_shell_v1_interface, 1);
     } else if (!strcmp(interface, zwp_keyboard_shortcuts_inhibit_manager_v1_interface.name)) {
-        probe->inhibit_manager =
-            wl_registry_bind(registry, name, &zwp_keyboard_shortcuts_inhibit_manager_v1_interface, 1);
+        probe->inhibit_manager = wl_registry_bind(
+            registry, name, &zwp_keyboard_shortcuts_inhibit_manager_v1_interface, 1);
     } else if (!strcmp(interface, zwp_pointer_gestures_v1_interface.name)) {
         probe->gestures_version = version < 3 ? version : 3;
         probe->gestures = wl_registry_bind(registry, name, &zwp_pointer_gestures_v1_interface,
@@ -529,6 +530,7 @@ int main(int argc, char **argv) {
         .want_gestures = true, .want_touch = true, .want_tablet = true, .width = 400, .height = 300};
     const char *title = "input probe";
     bool layer = false, commands = false;
+    uint32_t level = ZWLR_LAYER_SHELL_V1_LAYER_TOP;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--no-gestures"))
             probe.want_gestures = false;
@@ -538,6 +540,10 @@ int main(int argc, char **argv) {
             probe.want_tablet = false;
         else if (!strcmp(argv[i], "--layer"))
             layer = true;
+        else if (!strcmp(argv[i], "--overlay")) {
+            layer = true;
+            level = ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY;
+        }
         else if (!strcmp(argv[i], "--keys"))
             probe.want_keys = true;
         else if (!strcmp(argv[i], "--inhibit"))
@@ -571,7 +577,7 @@ int main(int argc, char **argv) {
         if (!probe.layer_shell)
             die("zwlr_layer_shell_v1 is not offered");
         probe.layer = zwlr_layer_shell_v1_get_layer_surface(
-            probe.layer_shell, probe.surface, NULL, ZWLR_LAYER_SHELL_V1_LAYER_TOP, title);
+            probe.layer_shell, probe.surface, NULL, level, title);
         zwlr_layer_surface_v1_add_listener(probe.layer, &layer_listener, &probe);
         zwlr_layer_surface_v1_set_size(probe.layer, 0, 60);
         zwlr_layer_surface_v1_set_anchor(probe.layer, ZWLR_LAYER_SURFACE_V1_ANCHOR_BOTTOM |

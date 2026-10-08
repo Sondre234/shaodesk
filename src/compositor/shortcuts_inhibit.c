@@ -115,10 +115,10 @@ static void announce(struct sh_server *server, struct sh_shortcuts_inhibitor *in
         return;
     *told = true;
     const struct sh_callbacks *callbacks = server->callbacks;
-    const char *keys = callbacks->binding_keys
-                           ? callbacks->binding_keys(callbacks->userdata,
-                                                     SH_TOGGLE_SHORTCUTS_INHIBIT)
-                           : NULL;
+    const char *keys =
+        callbacks->binding_keys
+            ? callbacks->binding_keys(callbacks->userdata, SH_TOGGLE_SHORTCUTS_INHIBIT)
+            : NULL;
     char name[160], line[384];
     surface_name(server, inhibitor->surface, name, sizeof(name));
     if (keys && *keys)
@@ -135,8 +135,8 @@ static void announce(struct sh_server *server, struct sh_shortcuts_inhibitor *in
  * in use, as locking does, so that the bindings outside any mode are the ones it holds, and the
  * user hears of it the first time. */
 static void shortcuts_changed(struct sh_server *server) {
-    struct sh_shortcuts_inhibitor *now = shortcuts_inhibited(server) ? focused_inhibitor(server)
-                                                                     : NULL;
+    struct sh_shortcuts_inhibitor *now =
+        shortcuts_inhibited(server) ? focused_inhibitor(server) : NULL;
     if (now == server->shortcuts.effective)
         return;
     server->shortcuts.effective = now;
@@ -146,7 +146,8 @@ static void shortcuts_changed(struct sh_server *server) {
     }
     struct sh_toplevel *toplevel = surface_toplevel(server, now->surface);
     const char *app_id = toplevel ? toplevel_app_id(toplevel) : NULL;
-    wlr_log(WLR_INFO, "Shortcuts go to %s", app_id && *app_id ? app_id : "a surface without a window");
+    wlr_log(WLR_INFO, "Shortcuts go to %s",
+            app_id && *app_id ? app_id : "a surface without a window");
     set_binding_mode(server, 0);
     announce(server, now);
 }
@@ -286,8 +287,7 @@ static const struct zwp_xwayland_keyboard_grab_manager_v1_interface manager_impl
     .grab_keyboard = manager_grab_keyboard,
 };
 
-static void bind_grab_manager(struct wl_client *client, void *data, uint32_t version,
-                              uint32_t id) {
+static void bind_grab_manager(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     struct wl_resource *resource = wl_resource_create(
         client, &zwp_xwayland_keyboard_grab_manager_v1_interface, (int)version, id);
     if (!resource) {
@@ -303,7 +303,8 @@ static bool global_filter(const struct wl_client *client, const struct wl_global
     struct sh_server *server = data;
     if (global != server->shortcuts.grab_manager)
         return true;
-    return server->xwayland && server->xwayland->server &&
+    // Xwayland is destroyed before the clients as the compositor quits.
+    return server->running && server->xwayland && server->xwayland->server &&
            client == server->xwayland->server->client;
 }
 #endif
@@ -349,14 +350,14 @@ void describe_shortcuts_inhibitors(struct sh_server *server, int fd,
 void shortcuts_inhibit_init(struct sh_server *server) {
     wl_list_init(&server->shortcuts.inhibitors);
     server->shortcuts.manager = wlr_keyboard_shortcuts_inhibit_v1_create(server->wl_display);
-    add_listener(&server->shortcuts.manager->events.new_inhibitor,
-                 &server->shortcuts.new_inhibitor, new_inhibitor);
+    add_listener(&server->shortcuts.manager->events.new_inhibitor, &server->shortcuts.new_inhibitor,
+                 new_inhibitor);
     add_listener(&server->seat->keyboard_state.events.focus_change,
                  &server->shortcuts.keyboard_focus_change, keyboard_focus_change);
 #if WLR_HAS_XWAYLAND
-    server->shortcuts.grab_manager = wl_global_create(
-        server->wl_display, &zwp_xwayland_keyboard_grab_manager_v1_interface, 1, server,
-        bind_grab_manager);
+    server->shortcuts.grab_manager =
+        wl_global_create(server->wl_display, &zwp_xwayland_keyboard_grab_manager_v1_interface, 1,
+                         server, bind_grab_manager);
     wl_display_set_global_filter(server->wl_display, global_filter, server);
 #endif
 }

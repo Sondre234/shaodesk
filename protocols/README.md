@@ -28,6 +28,12 @@ The virtual pointer and virtual keyboard protocols are used only by the test cli
 `tests/pointer_probe.c`. `virtual-keyboard-unstable-v1.xml` is the copy in the
 wayland-protocols-misc crate (from the same upstream), vendored on 2026-09-28.
 
+`input-method-unstable-v2.xml`, which input methods such as fcitx5 and ibus speak, is the copy in
+wlroots 0.20.2 (`protocol/`), which implements it, vendored on 2026-10-08 (SHA-256
+`aaf68b2aec481f507a4b915ab7c624bf676495ebb2030eaf207a9c8bcac7630d`). It is used only by the test
+client `tests/input_method_probe.c`; text-input-unstable-v3, the applications' side, comes from
+wayland-protocols.
+
 `shaodesk-window-control-v1.xml` is shaodesk's own: the shell's window menu moves a window it
 knows by its foreign-toplevel handle to another workspace or output, makes it sticky or floats
 it, and hears where it is (see [docs/architecture.md](../docs/architecture.md#naming-a-window-from-the-shell)).

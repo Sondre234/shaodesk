@@ -76,6 +76,7 @@
 #include <wlr/types/wlr_idle_inhibit_v1.h>
 #include <wlr/types/wlr_idle_notify_v1.h>
 #include <wlr/types/wlr_input_device.h>
+#include <wlr/types/wlr_input_method_v2.h>
 #include <wlr/types/wlr_output_management_v1.h>
 #include <wlr/types/wlr_output_power_management_v1.h>
 #include <wlr/types/wlr_keyboard.h>
@@ -102,6 +103,7 @@
 #include <wlr/types/wlr_tablet_pad.h>
 #include <wlr/types/wlr_tablet_tool.h>
 #include <wlr/types/wlr_tablet_v2.h>
+#include <wlr/types/wlr_text_input_v3.h>
 #include <wlr/types/wlr_touch.h>
 #include <wlr/types/wlr_viewporter.h>
 #include <wlr/types/wlr_xcursor_manager.h>
@@ -323,6 +325,23 @@ struct sh_shortcuts {
     struct wl_global *grab_manager; // xwayland-keyboard-grab, for X11 windows' grabs
 };
 
+/* Input methods (input_method.c): text-input-v3 for the applications, input-method-v2 for the
+ * input method, one connected at a time, and the relay between them: the text inputs, the one
+ * the input method is active for, its popups, and the trees they are drawn in, for windows and
+ * for overlays; the listeners on the input method are the connected one's. */
+struct sh_text_input;
+struct sh_input_methods {
+    struct wlr_text_input_manager_v3 *text_input_manager;
+    struct wlr_input_method_manager_v2 *manager;
+    struct wl_list text_inputs; // struct sh_text_input
+    struct wl_list popups;      // struct sh_input_popup
+    struct wlr_input_method_v2 *input_method;
+    struct sh_text_input *active;
+    struct wlr_scene_tree *popup_tree, *overlay_popup_tree;
+    struct wl_listener new_text_input, new_input_method, keyboard_focus_change;
+    struct wl_listener commit, new_popup, grab_keyboard, destroy, grab_destroy;
+};
+
 /* The touchpad swipe under way (gestures.c). */
 enum sh_swipe_mode {
     SH_SWIPE_IDLE,      /* there is none */
@@ -527,6 +546,7 @@ struct sh_server {
     struct wl_listener touch_down, touch_motion, touch_up, touch_cancel, touch_frame;
     struct sh_tablets tablet;
     struct sh_shortcuts shortcuts;
+    struct sh_input_methods input_methods;
 
     struct wlr_seat *seat;
     struct wl_listener new_input;
@@ -846,6 +866,8 @@ struct sh_keyboard {
     enum sh_action repeat_action;
     int repeat_argument;
     bool repeat_locked; // its binding runs while the session is locked too
+    /* Keys that went down to the input method's keyboard grab, which come up there too. */
+    bool to_input_method[KEY_MAX + 1];
 
     struct wl_listener modifiers;
     struct wl_listener key;
@@ -1030,6 +1052,15 @@ void seat_request_start_drag(struct wl_listener *listener, void *data);
 void seat_start_drag(struct wl_listener *listener, void *data);
 void server_new_constraint(struct wl_listener *listener, void *data);
 void seat_keyboard_focus_change(struct wl_listener *listener, void *data);
+
+/* input_method.c */
+bool input_method_key(struct sh_keyboard *keyboard, const struct wlr_keyboard_key_event *event);
+bool input_method_modifiers(struct sh_keyboard *keyboard);
+void describe_input_method(struct sh_server *server, int fd,
+                           void (*surface)(struct sh_server *, int, const char *,
+                                           struct wlr_surface *));
+void input_method_init(struct sh_server *server);
+void input_method_finish(struct sh_server *server);
 
 /* keymap.c */
 bool configure_keyboard(struct sh_server *server, struct wlr_keyboard *keyboard);
