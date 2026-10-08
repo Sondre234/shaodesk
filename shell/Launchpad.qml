@@ -428,6 +428,8 @@ Item {
         }
         // A wheel notch, or a touchpad's swipe of as much, pages once: down or right to the next.
         WheelHandler {
+            // Qt takes the whole pointer for a touchpad once the compositor offers gestures
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
             property real travel: 0
             onWheel: (event) => {
                 var delta = Math.abs(event.angleDelta.x) > Math.abs(event.angleDelta.y) ? event.angleDelta.x

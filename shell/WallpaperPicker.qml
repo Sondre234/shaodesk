@@ -98,6 +98,8 @@ PopupCard {
                 }
             }
             WheelHandler {
+                // Qt takes the whole pointer for a touchpad once the compositor offers gestures
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                 onWheel: (event) => {
                     var delta = event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x
                     folderTabs.contentX = Math.max(0, Math.min(folderTabs.contentWidth - folderTabs.width, folderTabs.contentX - delta))

@@ -1133,6 +1133,15 @@ The first window to open within five seconds of a button binding's `spawn` or `t
 the click, kept inside the area the panels leave free, unless a window rule gives its
 `position` (`tests/spawn_at_pointer_smoke.py`). A tile still goes where the layout puts it.
 
+### Touchpad gestures
+
+Swipes of three or more fingers, pinches and holds on a touchpad (libinput's gestures) go to the
+window under the pointer through pointer-gestures-unstable-v1: Firefox and Chromium zoom a page on
+a pinch, Firefox stops kinetic scrolling when fingers come to rest on the touchpad (a hold), and
+GTK 3 and 4 applications get their swipes and pinches. The pointer stays where it is while the
+fingers move, and the window it is on gets the gesture whether it has focus or not; a window that
+never asked for gestures gets none. Two fingers scroll, as before.
+
 ### Nested sessions
 
 The host compositor can consume shortcuts before the nested compositor receives

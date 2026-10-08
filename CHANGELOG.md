@@ -245,6 +245,12 @@ shadows.
   they were, `"launch"` also starts the programs of the others again without doubling what
   startup and autostart started, and `"off"` keeps nothing.
 
+### Touchpads, touchscreens and tablets
+
+- Touchpad swipes, pinches and holds reach the window under the pointer
+  (pointer-gestures-unstable-v1): browsers zoom on a pinch, and GTK applications get their
+  gestures.
+
 ### Working on the shell
 
 - `shaodesk-shell --preview-popup NAME` shows one of the taskbar's popups or overlays on stand-in

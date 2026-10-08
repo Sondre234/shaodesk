@@ -48,6 +48,8 @@ FlatButton {
     }
     // A notch at a time, in Qt's units (120 a notch), as KDE's tray sends it.
     WheelHandler {
+        // Qt takes the whole pointer for a touchpad once the compositor offers gestures
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         property real travel: 0
         onWheel: (event) => {
             var horizontal = event.angleDelta.y === 0

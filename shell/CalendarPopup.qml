@@ -139,6 +139,8 @@ PopupCard {
         spacing: Theme.spacingM
         // A wheel notch pages once: down or right to what comes next.
         WheelHandler {
+            // Qt takes the whole pointer for a touchpad once the compositor offers gestures
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
             property real travel: 0
             onWheel: (event) => {
                 travel += event.angleDelta.y !== 0 ? event.angleDelta.y : -event.angleDelta.x

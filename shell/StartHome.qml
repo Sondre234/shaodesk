@@ -209,6 +209,8 @@ Item {
         }
         // The wheel turns the pages, a notch (or a touchpad's worth of travel) a page.
         WheelHandler {
+            // Qt takes the whole pointer for a touchpad once the compositor offers gestures
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
             enabled: home.pages > 1
             property real travel: 0
             onWheel: (event) => {

@@ -630,3 +630,20 @@ their own windows, Electron applications, terminals, Steam starting slowly at lo
 windows), power off and restart saving the session as they go (the same code as log out, but
 only reached with logind allowing them), monitors that differ between the sessions, and which
 real programs `"launch"` cannot start again by their command line.
+
+## Touchpad gestures, touchscreens and tablets
+
+Added 2026-10-08. This machine has no touchpad, touchscreen or tablet, so headless devices stand in
+for them: `headless_pointer` (`headless_input.c`) is a pointer that moves and sends swipes,
+pinches and holds as libinput's gesture events. `pointer_gestures_smoke` checks with
+`input_probe`, a window that prints the input it gets, that each kind of gesture reaches the
+window under the pointer with its fingers, deltas, scale, rotation and cancellation, that a
+window which never bound the gestures gets none, and that they go to the window under the
+pointer rather than the focused one.
+
+Once the compositor offered the gestures, `tray_smoke` found the tray deaf to the wheel: Qt (6.11)
+then takes the seat's pointer for a touchpad, and a `WheelHandler` hears only mice by default.
+Every one in the shell now takes both.
+
+Not checked: a real touchpad through libinput, and real applications' use of the gestures
+(pinch-zoom in Firefox and Chromium, a hold stopping kinetic scrolling, GTK's gestures).

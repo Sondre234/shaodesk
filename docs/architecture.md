@@ -42,9 +42,11 @@ all. In short:
 | `actions.c` | `run_action`: one `case` per action, handing it to the module that does it. |
 | `control.c` | The control socket: reading requests, commands that are not actions, subscribers and shell events. |
 | `query.c` | `shaodesk msg get ...`: one function per query, and the table that names them. |
+| `headless_input.c` | Input devices without hardware for tests under `--headless`: pointers that move and make touchpad gestures. |
 | `input.c` | Keyboards, key bindings, pointers' libinput settings, virtual devices, selection and drag-and-drop. |
 | `keymap.c` | The keymap from the keyboard settings, given to every keyboard but virtual ones. |
 | `cursor.c` | What is under the pointer, focus on hover, button bindings, scrolling, the cursor image. |
+| `gestures.c` | Touchpad gestures: swipes, pinches and holds passed on to the surface under the pointer (pointer-gestures-unstable-v1). |
 | `grab.c` | Moving and resizing with the pointer, magnetic edges, dropping. |
 | `focus.c` | Keyboard focus and urgent windows. |
 | `toplevel.c` | Windows: xdg-shell toplevels and popups, opening by window rules, maximize, fullscreen, minimize. |
@@ -530,6 +532,10 @@ draws with it in both styles and the taskbar's keeps its look; branch on `Theme.
 the macOS layout differs (Control Center's modules, Spotlight's groups), and give a popup a file of
 its own only where all of it does (Launchpad).
 
+A `WheelHandler` takes `acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad`: since the
+compositor offers pointer gestures, Qt puts every event of the seat's pointer down to a touchpad,
+a mouse wheel's too, and a handler left at its default of the mouse alone hears none of them.
+
 ### Seeing a change
 
 `shaodesk-shell --config FILE --preview-popup NAME --screenshot OUT.png --quit-after 400`
@@ -620,9 +626,11 @@ them in `shell/controller.cpp`.
   `SHAODESK_BUILD_COMPOSITOR` in `CMakeLists.txt`. A temporary directory's prefix stays at 26
   characters or fewer: the control socket goes in it, a Unix socket's path is limited to about
   107 bytes, and a Gentoo package build runs the tests in a `TMPDIR` of 43 characters or more.
-  Under `--headless`, `shaodesk msg headless_output` and `headless_keyboard` plug in outputs and
-  keyboards (`headless_keyboard key NAME CODE press` types on one; see `keymap_smoke.py`), and
-  `wayland_probe --keymap` prints the keymap an application gets. A `wayland_probe` window with
+  Under `--headless`, `shaodesk msg headless_output`, `headless_keyboard` and `headless_pointer`
+  plug in outputs, keyboards and pointers (`headless_keyboard key NAME CODE press` types on one,
+  see `keymap_smoke.py`; `headless_pointer swipe NAME update DX DY [TIME]` moves a touchpad
+  gesture's fingers, at a given time in milliseconds; see `pointer_gestures_smoke.py`, whose
+  `input_probe` window prints the input it gets, a line per event), and `wayland_probe --keymap` prints the keymap an application gets. A `wayland_probe` window with
   `SHAODESK_PROBE_DRAG=source` drags a line of text on a button press of `pointer_probe`'s, and
   one with `=target` takes it, each printing what it hears; `get seat` says where the drag is
   (see `drag_focus_smoke.py`). `SHAODESK_PROBE_ICON` gives a `wayland_probe` window an icon

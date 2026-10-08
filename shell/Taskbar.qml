@@ -56,6 +56,8 @@ Item {
         // output's workspaces: a wheel notch (or a touchpad's worth of travel) moves one,
         // stopping at either end; down or right goes to the next.
         WheelHandler {
+            // Qt takes the whole pointer for a touchpad once the compositor offers gestures
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
             property real travel: 0
             onWheel: (event) => {
                 travel += event.angleDelta.y !== 0 ? event.angleDelta.y : event.angleDelta.x
