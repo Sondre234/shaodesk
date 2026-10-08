@@ -91,6 +91,7 @@ struct ShellWidgets {
     // either way.
     WidgetPlace notifications = WidgetPlace::Quick;
     bool media = true; // the now-playing card in Quick Settings, only while a media player is there
+    bool power_mode = true; // a power mode tile in Quick Settings, only while power-profiles-daemon runs
 };
 
 // Lua `shell.thumbnails`: pictures of the windows of a taskbar button resting under the pointer.

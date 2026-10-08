@@ -630,6 +630,9 @@ const Option options[] = {
      "The now-playing card at the top of Quick Settings: the cover, title and artist of the "
      "media player playing most lately (MPRIS), with previous, play or pause, next and the "
      "position; shown while a player is there."},
+    {"shell.widgets.power_mode", "boolean", "true", "true", none, none,
+     "The power mode tile in Quick Settings: Power saver, Balanced or Performance, through "
+     "power-profiles-daemon; shown while the daemon runs."},
     {"shell.launchers", "list of tables", "unset", "", none, none,
      "Pinned commands for programs without a desktop file, at most 64."},
     {"shell.launchers[].name", "string", "", "", none, none, "Label, 1 to 128 bytes. Required."},
