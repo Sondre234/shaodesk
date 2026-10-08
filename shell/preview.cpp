@@ -68,6 +68,24 @@ QVariantList overviewWindows(const QRect &area) {
             window(232, 444, 300, 170, "kitty", "Build finished", true),
             window(562, 444, 300, 170, "foot", "htop")};
 }
+// Snap Assist's stand-ins in the right half of `area`, as the compositor would lay out two
+// windows there, one above the other with the overview's gap of 24 pixels between and around
+// them, the first selected.
+QRect assistSlot(const QRect &area) {
+    return QRect(area.x() + area.width() / 2, area.y(), area.width() - area.width() / 2,
+                 area.height());
+}
+QVariantList assistWindows(const QRect &area) {
+    const QRect slot = assistSlot(area);
+    const int h = (slot.height() - 3 * 24) / 2, w = std::min(slot.width() - 48, h * 16 / 10);
+    auto window = [&](int y, const QString &appId, const QString &title) {
+        return QVariantMap{{"x", slot.x() + (slot.width() - w) / 2}, {"y", y}, {"w", w}, {"h", h},
+                           {"appId", appId},     {"title", title}, {"workspace", 1}, {"urgent", false}};
+    };
+    const int top = slot.y() + (slot.height() - 2 * h - 24) / 2;
+    return {window(top, "firefox", "Release notes - Mozilla Firefox"),
+            window(top + h + 24, "foot", "~/dev/shaodesk")};
+}
 QVariantList overviewStrip(const QRect &area) {
     const int windows[] = {4, 2, 0, 0};
     QVariantList cells;
@@ -363,7 +381,7 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
 
 QStringList PreviewData::surfaces() {
     return {"osd-volume", "osd-text", "cards",    "power-dialog",
-            "palette",    "switcher", "overview", "palette-empty"};
+            "palette",    "switcher", "overview", "palette-empty", "snap-assist"};
 }
 
 bool PreviewData::showSurface(QScreen *screen, const QString &name) {
@@ -463,6 +481,18 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
                       {"viewed", 1},
                       {"urgentWorkspaces", QVariantList{1}},
                       {"shown", true}};
+    } else if (name == "snap-assist") {
+        // The overview in the free half beside a window snapped to the left.
+        file = "Overview.qml";
+        const QRect area = usableArea();
+        properties = {{"screenSize", ShellView::previewSize()},
+                      {"windows", assistWindows(area)},
+                      {"strip", QVariantList{}},
+                      {"area", assistSlot(area)},
+                      {"assist", true},
+                      {"selected", 0},
+                      {"viewed", 0},
+                      {"shown", true}};
     } else {
         return false;
     }
@@ -542,6 +572,33 @@ QImage PreviewData::withSurface(QImage desktop) const {
             }
         }
         const auto windows = overviewWindows(usable);
+        for (int i = 0; i < windows.size(); ++i) {
+            const auto window = windows[i].toMap();
+            const QRect rect(window["x"].toInt(), window["y"].toInt(), window["w"].toInt(),
+                             window["h"].toInt());
+            const bool dark = window["appId"] != "firefox";
+            painter.fillRect(rect.adjusted(-6, -6, 6, 6),
+                             QColor::fromRgbF(0.1f, 0.11f, 0.14f, 0.85f));
+            painter.fillRect(rect, dark ? QColor("#1e1f29") : QColor("#eceef3"));
+            painter.fillRect(rect.adjusted(0, 0, 0, 14 - rect.height()),
+                             dark ? QColor("#2b2d3a") : QColor("#cfd3dd"));
+            if (i == 0) {
+                painter.setPen(QPen(QColor::fromRgbF(0.36f, 0.6f, 1.0f), 3));
+                painter.setBrush(Qt::NoBrush);
+                painter.drawRect(rect.adjusted(-6, -6, 6, 6));
+            }
+        }
+        painter.resetTransform();
+    } else if (surfaceName_ == "snap-assist") {
+        // A window snapped to the left half, and what the compositor draws in the right one: its
+        // darkened slot and each window on a card, the selected one framed.
+        painter.scale(scale, scale);
+        const QRect slot = assistSlot(usable);
+        const QRect snapped(usable.x(), usable.y(), slot.x() - usable.x(), usable.height());
+        painter.fillRect(snapped, QColor("#1e1f29"));
+        painter.fillRect(snapped.adjusted(0, 0, 0, 30 - snapped.height()), QColor("#2b2d3a"));
+        painter.fillRect(slot, QColor::fromRgbF(0.04f, 0.05f, 0.08f, 0.86f));
+        const auto windows = assistWindows(usable);
         for (int i = 0; i < windows.size(); ++i) {
             const auto window = windows[i].toMap();
             const QRect rect(window["x"].toInt(), window["y"].toInt(), window["w"].toInt(),
