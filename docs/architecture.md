@@ -55,7 +55,7 @@ all. In short:
 | `workspace.c` | Workspaces per output, sticky windows. |
 | `output.c`, `output_moves.c` | Monitors and their configuration; windows and workspaces moving between outputs. |
 | `layer_shell.c` | Panels and other layer surfaces. |
-| `group.c`, `scratchpad.c`, `swallow.c`, `switcher.c`, `overview.c`, `session.c` | One feature each. |
+| `group.c`, `scratchpad.c`, `swallow.c`, `switcher.c`, `overview.c`, `session.c` | One feature each. `session.c` also saves a login session as `last` as it ends (`session_save_last`, from the power actions and quit) and restores it after `startup` (`session_restore_last`, from `sh_run`), asking `sh_callbacks.started` which missing windows startup and autostart will open. |
 | `effects.c` | Dimming, peeking at the desktop or at one window, night light, magnifier, hot corners. |
 | `lock.c` | Session lock and idle/sleep inhibitors. |
 | `power.c` | The power actions: suspend, hibernate, reboot and power off through logind (`src/login1.c`), locking first, closing windows first, log out. |
@@ -629,7 +629,8 @@ them in `shell/controller.cpp`.
   through xdg-toplevel-icon-v1 and an `x11_probe` window `_NET_WM_ICON`, and their commands
   change it (see `window_icon_smoke.py`). `SHAODESK_LOGIN_SESSION=1` makes a headless
   compositor start as a standalone session does, running XDG autostart from the directories
-  `XDG_CONFIG_HOME` and `XDG_CONFIG_DIRS` name (see `autostart_smoke.py`); without it only
+  `XDG_CONFIG_HOME` and `XDG_CONFIG_DIRS` name (see `autostart_smoke.py`), and saving and
+  restoring the last session in `XDG_STATE_HOME` (see `session_restore_smoke.py`); without it only
   `--session` does, so no test starts the developer's own autostart entries.
 
 ## A fast loop

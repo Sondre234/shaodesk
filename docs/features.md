@@ -1350,6 +1350,40 @@ column and which column, and place in its stack, each tile had; a restore puts t
 finds back into those columns. A window started by `restore ... launch` arrives later and opens
 as usual, right of the focused column.
 
+### The last session
+
+As KDE does, a standalone session saves itself as it ends and the next one starts from it. Before
+a log out, a quit, a power off or a restart asks the windows to close, the session is saved as
+`last` (`~/.local/state/shaodesk/sessions/last`); the next standalone session restores it once
+the `startup` commands and the [autostart](#starting-the-session) entries have been started.
+`session.restore` says how much of it comes back:
+
+- `"windows"` (the default) puts the windows that open again back where they were: their
+  monitor, workspace, place and state, each monitor's workspace and tiling, and the focus. Those
+  of a program `startup` or autostart started are placed as they open, for up to a minute, so an
+  application started at login comes back on its workspace. Nothing is started.
+- `"launch"` does that too, and starts the programs of the other windows again by the command
+  line they ran, placing their windows as they open. A window of a program `startup`, autostart
+  or `--exec` started already is waited for rather than started a second time: it is known by its
+  app ID or its program's name being one of the words of what they started (or an autostart
+  entry's file name or `StartupWMClass`).
+- `"off"` saves and restores nothing.
+
+```lua
+session = { restore = "launch" },
+```
+
+`"windows"` is the default because it never starts anything: restarting programs by the command
+line they ran also restarts what should not run twice or unasked, such as an installer, a
+program run with a file it has since dealt with, one that needs a password at login, or one that
+brought the last session down. KDE restores by default, but asks applications how to restart
+themselves rather than rerunning their command lines.
+
+A nested session neither saves nor restores the last session, as its windows are the host's
+business. A session ended otherwise (`loginctl terminate-session`, a shutdown from a terminal,
+SIGTERM) keeps the last one saved before it: its applications may be ending at the same time.
+`last` is an ordinary saved session, which `session restore last` puts back by hand too.
+
 ## Control socket
 
 A control socket runs any Lua action from scripts or other tools:

@@ -610,3 +610,23 @@ request was dismissed, GParted and an updater, logind's `challenge` for a power 
 user is logged in, polkit-agent-helper-1's PAM conversation (with pam_u2f or fprintd, whose
 messages the dialog shows), several administrators in `wheel` to choose from, the shell staying
 out of the way of a running polkit-gnome, and `shell.polkit_agent` turned off and on by a reload.
+
+## The last session
+
+Added 2026-10-08. `session_restore_smoke` runs headless compositors one after another as login
+sessions (`SHAODESK_LOGIN_SESSION=1`) on temporary XDG directories, with a `startup` program and
+an autostart entry that open windows of their own and windows opened by hand: `quit` saves
+`last`, and `logout` saves it before it asks the windows to close; the next start with
+`session.restore = "windows"` puts the windows startup and autostart open again on their
+workspaces and places, shows the workspace that was shown and starts nothing else; with
+`"launch"` it starts the program of the window opened by hand again and places its window,
+waiting for startup's and autostart's rather than starting them twice; `"off"` and a session
+that is not a login session neither save nor restore. `autostart_tests` checks the names of what
+startup and autostart started and how a saved window is matched to them. The existing
+`session_smoke` and `session_scroll_smoke` still check saving and restoring by hand.
+
+Not checked: a real `--session` log out and log in with real applications (browsers that restore
+their own windows, Electron applications, terminals, Steam starting slowly at login, X11
+windows), power off and restart saving the session as they go (the same code as log out, but
+only reached with logind allowing them), monitors that differ between the sessions, and which
+real programs `"launch"` cannot start again by their command line.

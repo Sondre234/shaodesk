@@ -31,7 +31,7 @@ you save it.
 - **Tiling when you want it**, per monitor: dwindle (as in Hyprland), master, spiral, monocle,
   and a niri/PaperWM-style scrolling layout.
 - **Per-monitor workspaces**, a scratchpad, sticky windows, tab groups, window rules,
-  terminal swallowing, and saved sessions you can restore.
+  terminal swallowing, and saved sessions you can restore, the last one at the next login.
 - **A Qt Quick shell** on every monitor, in [the macOS style](docs/features.md#the-macos-style)
   (a menu bar and a dock, Launchpad, Spotlight, Control Center, Notification Center, in light and
   dark) or as a taskbar with a start menu and [pictures of a button's
