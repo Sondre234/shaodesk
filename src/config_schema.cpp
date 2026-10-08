@@ -198,6 +198,11 @@ const Option options[] = {
      "Variable refresh rate."},
     {"outputs.monitors.<name>.tiling", "boolean", "unset", "", none, none,
      "Automatic tiling on this monitor; unset follows `layout.tiling`."},
+    {"outputs.monitors.<name>.mirror", "string", "unset", "\"eDP-1\"", none, none,
+     "Show another monitor's picture, a connector name or `\"desc:\"` as the keys are: this one "
+     "leaves the layout (no workspaces, windows or panels of its own) and shows that monitor's "
+     "whole picture scaled to fit, with black bars where the shapes differ. While that monitor "
+     "is not in the layout, this one joins it."},
 
     {"windows", "table", "", "", none, none, "Window borders, opacity, and rules."},
     {"windows.border_width", "integer", "0", "0", 0, 20,
@@ -553,7 +558,9 @@ const Option options[] = {
      "description; without one, every monitor."},
     {"bindings[].mode", "enum", "\"region\"", "", none, none,
      "With `screenshot`: `\"region\"`, `\"output\"`, or `\"window\"`. With `mode` (required): "
-     "`\"default\"` or the name of one of `modes`."},
+     "`\"default\"` or the name of one of `modes`. With `display_mode`: `\"extend\"`, "
+     "`\"duplicate\"`, `\"internal\"` or `\"external\"`; without one, the popup that steps "
+     "through them."},
     {"bindings[].amount", "integer", "40; 5 for volume and brightness", "", 1, 4000,
      "With `resize_*`: pixels moved per press. With `volume_up`, `volume_down`, `brightness_up` "
      "and `brightness_down`: percent per press, up to 100."},

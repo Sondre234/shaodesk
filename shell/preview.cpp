@@ -503,7 +503,7 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
 QStringList PreviewData::surfaces() {
     return {"osd-volume", "osd-text", "cards",    "power-dialog",
             "palette",    "switcher", "overview", "palette-empty", "auth-dialog", "snap-assist",
-            "osd-microphone"};
+            "osd-microphone", "display-mode"};
 }
 
 bool PreviewData::showSurface(QScreen *screen, const QString &name) {
@@ -526,6 +526,12 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
             controller_.osd()->show(output, "Microphone muted", -1, "microphone-muted");
         else
             controller_.osd()->show(output, "Do not disturb", -1, "dnd");
+    } else if (name == "display-mode") {
+        // The popup stepped once from extend, the choice in force, to the next in its order.
+        file = "DisplayMode.qml";
+        properties = {{"outputName", output}};
+        controller_.displayModes()->handle("display-mode " + output +
+                                           " external extend internal,duplicate,extend,external");
     } else if (name == "cards") {
         file = "NotificationCards.qml";
         // Over the stand-ins every preview has: one with a picture, buttons and a timer.
@@ -689,6 +695,9 @@ QImage PreviewData::withSurface(QImage desktop) const {
         // PaletteView: centred, below the bars by ShellController::paletteDrop.
         at = QPoint(usable.left() + (usable.width() - size.width()) / 2,
                     usable.top() + controller_.paletteDrop(output.height()));
+    } else if (surfaceName_ == "display-mode") {
+        // DisplayModeView: in the middle of the output.
+        at = output.center() - QPoint(size.width() / 2, size.height() / 2);
     } else if (surfaceName_ == "switcher") {
         // SwitcherView: centred.
         at = usable.center() - QPoint(size.width() / 2, size.height() / 2);

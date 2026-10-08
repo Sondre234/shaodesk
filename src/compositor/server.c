@@ -560,6 +560,7 @@ finish:
         wl_event_source_remove(server.overview.timer);
     if (server.urgent_timer)
         wl_event_source_remove(server.urgent_timer);
+    display_mode_finish(&server);
     if (server.config_watch)
         wl_event_source_remove(server.config_watch);
     if (server.config_timer)

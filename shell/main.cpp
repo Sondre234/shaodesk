@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
                       "the macOS style system-menu, "
                       "app-menu, window-menu or window-submenu too; or an overlay over the bar: "
                       "osd-volume, osd-text, osd-microphone, cards, power-dialog, auth-dialog, "
-                      "palette, palette-empty, switcher, overview or snap-assist",
+                      "palette, palette-empty, switcher, overview, snap-assist or display-mode",
                       "name"});
     parser.addOption(
         {"quit-after",
@@ -154,6 +154,7 @@ int main(int argc, char **argv) {
         std::vector<std::unique_ptr<OverviewView>> overviews;
         std::vector<std::unique_ptr<CardsView>> cardViews;
         std::vector<std::unique_ptr<OsdView>> osdViews;
+        std::vector<std::unique_ptr<DisplayModeView>> displayModeViews;
         std::vector<std::unique_ptr<ConfigErrorView>> errorViews;
         // --quit-after's end, with --screenshot's picture of the first view.
         auto quit = [&] {
@@ -277,6 +278,13 @@ int main(int argc, char **argv) {
                     throw std::runtime_error("could not load shell QML");
                 }
                 osdViews.push_back(std::move(osdView));
+                auto displayModeView = std::make_unique<DisplayModeView>(controller, screen);
+                if (displayModeView->status() == QQuickView::Error) {
+                    for (const auto &error : displayModeView->errors())
+                        std::cerr << error.toString().toStdString() << '\n';
+                    throw std::runtime_error("could not load shell QML");
+                }
+                displayModeViews.push_back(std::move(displayModeView));
                 auto errorView = std::make_unique<ConfigErrorView>(controller, screen);
                 if (errorView->status() == QQuickView::Error) {
                     for (const auto &error : errorView->errors())
@@ -326,6 +334,8 @@ int main(int argc, char **argv) {
             });
             std::erase_if(cardViews, [screen](const auto &view) { return view->outputScreen() == screen; });
             std::erase_if(osdViews, [screen](const auto &view) { return view->outputScreen() == screen; });
+            std::erase_if(displayModeViews,
+                          [screen](const auto &view) { return view->outputScreen() == screen; });
             std::erase_if(errorViews, [screen](const auto &view) { return view->outputScreen() == screen; });
         });
         int pipeFds[2];

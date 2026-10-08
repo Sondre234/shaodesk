@@ -64,6 +64,8 @@ all. In short:
 | `workspace.c` | Workspaces per output, sticky windows. |
 | `output.c`, `output_moves.c` | Monitors and their configuration; windows and workspaces moving between outputs. |
 | `output_power.c` | Monitors turned off and on in the layout: wlr-output-power-management. |
+| `mirror.c` | Mirroring: a monitor out of the layout showing another's frames, scaled to fit, with its hardware cursor. |
+| `display_mode.c` | The display_mode action (Windows' Win+P): extend, duplicate, internal, external, and the popup that steps through them. |
 | `layer_shell.c` | Panels and other layer surfaces. |
 | `group.c`, `scratchpad.c`, `swallow.c`, `switcher.c`, `overview.c`, `session.c` | One feature each. `session.c` also saves a login session as `last` as it ends (`session_save_last`, from the power actions and quit) and restores it after `startup` (`session_restore_last`, from `sh_run`), asking `sh_callbacks.started` which missing windows startup and autostart will open. |
 | `switches.c` | Switch devices: the lid turning a laptop's panel off and on (clamshell), switches' bindings. |
@@ -290,6 +292,43 @@ reports the mode from `wlr_output->enabled` on every commit that changes it, so 
 the actions' changes too. `input_activity` (`input.c`), which every key, button, scroll and motion
 event calls, wakes them through `wake_displays` once every output in the layout is off.
 
+### Mirroring
+
+A monitor whose settings name another as `mirror` (`mirror_source`, `mirror.c`) leaves the layout
+in `configure_output` as with `enabled = false`, its windows moving away as when it is unplugged,
+but its `wlr_output` stays on with its own mode and transform, and its `sh_mirror` (`mirror_start`)
+listens to the source's commits. Each commit with a buffer locks it in place of the last one (with
+its source and destination boxes, for a direct scan-out of a client's buffer, and the source's
+size and transform then) and schedules a frame on the mirror; `output_frame` hands a mirror's
+frames to `mirror_frame`, which draws that buffer as one texture through
+`wlr_output_begin_render_pass`, fitted and centred on black, turned from the source's transform to
+the mirror's, and the source's hardware cursor over it, which no frame of the source holds (a
+software cursor is in the frame already). The commit that moves a hardware cursor (wlroots asks
+the source for a frame as it moves) schedules a mirror frame too, which draws only when the buffer
+or the cursor changed. Another way would have been a second `wlr_scene_output` of the same scene,
+placed over the source's area: it would render the whole scene again for each mirror, could not
+letterbox (a scene output shows a rectangle of the scene, the neighbouring monitors where the
+shapes differ), would leave out what the source draws outside the scene (the magnifier, night
+light's colour transform), and its surfaces would enter the mirror's `wl_output` too and weigh on
+their preferred scale. Copying the source's frames costs one scaled copy per frame and nothing
+while the picture stands still, and shows what the source shows. wlroots' screencopy samples an
+output's committed buffers the same way, relying on implicit sync.
+
+`refresh_mirrors`, which `arrange_outputs` calls last (arranging again when it changed something),
+configures again any output whose mirroring no longer matches its source being in the layout, so a
+mirror joins the layout while its source is unplugged, disabled or behind the lid, and leaves it as
+the source comes back. A mirror follows its source's power (`mirrors_follow_power`, from
+`set_output_power`), `lid_holds_off` counts a mirror as another monitor on, and `lock.c` waits for
+a mirror to show a frame the source committed since the session locked: until then it draws black.
+A mirror has no `wl_output` (the layout destroys an output's global as it leaves), so tests read its
+picture with `headless_output capture NAME PATH` (`mirror_capture`).
+
+`display_mode.c` sets the monitors' runtime settings (`sh_output.override`, as wlr-output-management
+does) for the display_mode action and calls `apply_output_settings`; its popup is `sh_server.display_mode`,
+whose timer takes the choice shown, and the shell draws it from `display-mode` lines
+(`DisplayModes`, `display_modes.cpp`, and `DisplayModeView`). `display_mode_key`, which
+`handle_keybinding` asks before the bindings, takes the arrows, Return and Escape while it is open.
+
 ### Power saving when idle
 
 `idle.c` takes the `idle` steps (`enum sh_idle_step`: dim, display_off, lock, suspend) with one
@@ -403,6 +442,7 @@ what was there.
 | `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |
 | `DrawnWallpaper.qml` | The wallpaper the macOS style draws while none is set, light or dark, from the background colour and the accent. |
 | `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |
+| `DisplayMode.qml` | The display mode popup (Windows' Win+P, `shell.displayModes`), an overlay surface of its own in the middle of the output: the four choices, the one the compositor's stepping shows selected; a click takes one. |
 | `AuthDialog.qml` | The polkit authentication dialog (`shell.authentication`), an overlay surface of its own: the request, the user to answer as, the password. |
 | `SwitcherCards.qml` | The switcher's windows as cards with their pictures, in rows, with `shell.thumbnails` outside the macOS style. |
 
@@ -816,7 +856,8 @@ whether it has, for something the compositor does another way without it, as the
   keymap an application gets. A `wayland_probe` window with
   `SHAODESK_PROBE_DRAG=source` drags a line of text on a button press of `pointer_probe`'s, and
   one with `=target` takes it, each printing what it hears; `get seat` says where the drag is
-  (see `drag_focus_smoke.py`). `SHAODESK_PROBE_ICON` gives a `wayland_probe` window an icon
+  (see `drag_focus_smoke.py`). `headless_output capture NAME PATH` writes a mirroring output's
+picture to a PPM file (see `mirror_smoke.py`). `SHAODESK_PROBE_ICON` gives a `wayland_probe` window an icon
   through xdg-toplevel-icon-v1 and an `x11_probe` window `_NET_WM_ICON`, and their commands
   change it (see `window_icon_smoke.py`). `SHAODESK_LOGIN_SESSION=1` makes a headless
   compositor start as a standalone session does, running XDG autostart from the directories

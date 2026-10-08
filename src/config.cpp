@@ -667,6 +667,17 @@ void read_monitors(lua_State *L, sh_settings &settings) {
         monitor.scale = static_cast<float>(number(L, "scale", 0, 0.25, 10));
         monitor.transform = integer(L, "transform", 0, 0, 7);
         boolean(L, "vrr", "vrr", monitor.vrr);
+        lua_getfield(L, -1, "mirror");
+        if (!lua_isnil(L, -1)) {
+            auto source = string(L, -1, "mirror");
+            if (!valid_output_target(source))
+                fail("mirror must be a monitor's connector name or \"desc:\" and the start of "
+                     "its description");
+            if (source == name)
+                fail(name + " cannot mirror itself");
+            copy_text(source, monitor.mirror, "mirror");
+        }
+        lua_pop(L, 1);
         lua_getfield(L, -1, "position");
         if (!lua_isnil(L, -1)) {
             table(L, -1, "position");
@@ -1474,9 +1485,13 @@ void read_bindings(lua_State *L, Config &config, std::vector<Binding> &into, siz
                     fail("the mode action needs mode = \"default\" or the name of one of modes");
                 if (binding.mode < 0)
                     unknown("mode", name, config.mode_names(), "=" + name);
+            } else if (binding.action == SH_DISPLAY_MODE) {
+                // Without one, the popup that steps through them.
+                if (!lua_isnil(L, -1))
+                    binding.mode = parse_display_mode(string(L, -1, "mode"));
             } else if (!lua_isnil(L, -1)) {
                 if (binding.action != SH_SCREENSHOT)
-                    fail("mode is only valid with screenshot and mode");
+                    fail("mode is only valid with screenshot, mode and display_mode");
                 binding.screenshot = parse_screenshot_mode(string(L, -1, "mode"));
             }
             lua_pop(L, 1);
@@ -2023,6 +2038,7 @@ constexpr std::pair<std::string_view, sh_action> action_table[] = {
         {"display_off", SH_DISPLAY_OFF},
         {"display_on", SH_DISPLAY_ON},
         {"display_toggle", SH_DISPLAY_TOGGLE},
+        {"display_mode", SH_DISPLAY_MODE},
         {"scroll_left", SH_SCROLL_LEFT},
         {"scroll_right", SH_SCROLL_RIGHT},
         {"column_widen", SH_COLUMN_WIDEN},
@@ -2181,6 +2197,19 @@ int parse_layout_choice(const std::string &word) {
                  std::to_string(max_layouts) + ", not '" + word + "'",
              "layout");
     return number;
+}
+
+sh_display_mode parse_display_mode(const std::string &name) {
+    static constexpr std::pair<std::string_view, sh_display_mode> modes[] = {
+        {"extend", SH_DISPLAY_MODE_EXTEND},
+        {"duplicate", SH_DISPLAY_MODE_DUPLICATE},
+        {"internal", SH_DISPLAY_MODE_INTERNAL},
+        {"external", SH_DISPLAY_MODE_EXTERNAL},
+    };
+    for (const auto &[text, mode] : modes)
+        if (name == text)
+            return mode;
+    fail("display mode must be \"extend\", \"duplicate\", \"internal\" or \"external\"");
 }
 
 sh_screenshot_mode parse_screenshot_mode(const std::string &name) {

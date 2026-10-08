@@ -131,6 +131,9 @@ if(BUILD_TESTING)
     add_executable(display_power_config_tests tests/display_power_config_tests.cpp)
     target_link_libraries(display_power_config_tests PRIVATE shaodesk_config)
     add_test(NAME display_power_config COMMAND display_power_config_tests)
+    add_executable(output_config_tests tests/output_config_tests.cpp)
+    target_link_libraries(output_config_tests PRIVATE shaodesk_config)
+    add_test(NAME output_config COMMAND output_config_tests)
     add_executable(power_supply_tests tests/power_supply_tests.c src/power_supply.c)
     target_include_directories(power_supply_tests PRIVATE include)
     target_compile_options(power_supply_tests PRIVATE -Wall -Wextra)
@@ -234,6 +237,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/binding_mode.c
         src/compositor/control.c
         src/compositor/cursor.c
+        src/compositor/display_mode.c
         src/compositor/dynamic_rules.c
         src/compositor/effects.c
         src/compositor/focus.c
@@ -250,6 +254,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/keymap.c
         src/compositor/layer_shell.c
         src/compositor/lock.c
+        src/compositor/mirror.c
         src/compositor/output.c
         src/compositor/output_moves.c
         src/compositor/output_power.c
@@ -597,6 +602,14 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:output_power_probe>
             $<TARGET_FILE:lock_probe> $<TARGET_FILE:pointer_probe>)
         set_tests_properties(output_power_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME mirror_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/mirror_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:lock_probe>
+            $<TARGET_FILE:output_management_probe>)
+        set_tests_properties(mirror_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME display_mode_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/display_mode_smoke.py $<TARGET_FILE:shaodesk>)
+        set_tests_properties(display_mode_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME lid_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/lid_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>)

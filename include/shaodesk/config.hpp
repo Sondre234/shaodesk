@@ -41,7 +41,8 @@ struct Binding {
     // `repeats` runs again while the key is held (Hyprland's binde), by default for resize_*.
     bool locked = false;
     bool repeats = false;
-    int mode = 0; // for mode: 0 for the bindings outside any mode, else modes[mode - 1]
+    int mode = 0; // for mode: 0 for the bindings outside any mode, else modes[mode - 1]; for
+                  // display_mode, an sh_display_mode
     int switch_type = -1; // the enum sh_switch of a switch binding; -1 for a key or button
     bool switch_on = false; // with switch_type: it acts as the switch turns on (a lid closing)
 };
@@ -420,6 +421,8 @@ bool valid_output_target(const std::string &target);
 bool action_takes_display(sh_action action);
 // "region", "output", or "window"; throws for other names.
 sh_screenshot_mode parse_screenshot_mode(const std::string &name);
+// "extend", "duplicate", "internal" or "external"; throws for other names.
+sh_display_mode parse_display_mode(const std::string &name);
 // switch_layout's "next" (0), "prev" (-1), or a layout's number from 1; throws for others.
 int parse_layout_choice(const std::string &word);
 

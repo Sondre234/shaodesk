@@ -83,7 +83,7 @@ void unknown_settings() {
     expect("return {bindings={{key='r',action='mode'}}}",
            "the mode action needs mode = \"default\" or the name of one of modes");
     expect("return {bindings={{key='r',action='close',mode='x'}}}",
-           "mode is only valid with screenshot and mode");
+           "mode is only valid with screenshot, mode and display_mode");
     expect("return {windows={rules={{app_id='x',floatng=true}}}}", "did you mean 'floating'?");
     expect("return {outputs={monitors={X={scal=2}}}}", "did you mean 'scale'?");
     expect("return {shell={launchers={{name='a',command={'x'},icn='b'}}}}",

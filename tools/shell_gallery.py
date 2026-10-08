@@ -39,6 +39,7 @@ POPUPS = ["bar", "launcher", "power", "bar-menu", "bar-submenu", "task-menu", "s
 POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switcher",
            "overview", "palette-empty", "auth-dialog", "snap-assist", "osd-microphone"]
 # The start menu's other views and its menus.
+POPUPS += ["display-mode"]
 POPUPS += ["launcher-all", "launcher-search", "launcher-empty", "launcher-menu"]
 POPUPS += ["quick-settings", "quick-settings-mixer", "bar-all"]
 POPUPS += ["quick-settings-power", "quick-settings-wifi", "wifi"]

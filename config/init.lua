@@ -452,5 +452,10 @@ return {
         { mods = {}, key = "XF86AudioNext", action = "media_next", locked = true },
         { mods = {}, key = "XF86AudioPrev", action = "media_previous", locked = true },
         { mods = {}, key = "XF86AudioStop", action = "media_stop", locked = true },
+        -- A laptop's display key (Fn and the key with a monitor on it), as Windows' Win+P: a popup
+        -- steps through PC screen only, duplicate, extend and second screen only, and takes the
+        -- one shown once the key rests. mode = "duplicate" (or "extend", "internal", "external")
+        -- picks one at once.
+        { mods = {}, key = "XF86Display", action = "display_mode" },
     },
 }

@@ -79,12 +79,16 @@ static void control_describe_output(struct sh_server *server, int fd, struct sh_
         wlr_output_layout_get_box(server->output_layout, o, &box);
     char line[512], description[256];
     output_description(o, description, sizeof(description));
-    // name, enabled, x, y, logical width, height, scale, transform, mode, description, and
-    // power: "on" while it shows a picture, "off" while turned off (output_power.c) or disabled.
-    snprintf(line, sizeof(line), "%s\t%d\t%d\t%d\t%d\t%d\t%g\t%d\t%dx%d@%.3f\t%s\t%s\n", o->name,
-             !output->disabled, box.x, box.y, box.width, box.height, o->scale, o->transform,
-             o->width, o->height, o->refresh / 1000.0, description,
-             !output->disabled && !output->powered_off && o->enabled ? "on" : "off");
+    // name, enabled, x, y, logical width, height, scale, transform, mode, description, power:
+    // "on" while it shows a picture, "off" while turned off (output_power.c) or disabled, and the
+    // output it mirrors (mirror.c), "-" for none.
+    const struct sh_output *source = mirrored_output(output);
+    snprintf(line, sizeof(line), "%s\t%d\t%d\t%d\t%d\t%d\t%g\t%d\t%dx%d@%.3f\t%s\t%s\t%s\n",
+             o->name, !output->disabled, box.x, box.y, box.width, box.height, o->scale,
+             o->transform, o->width, o->height, o->refresh / 1000.0, description,
+             (!output->disabled || output->mirror) && !output->powered_off && o->enabled ? "on"
+                                                                                         : "off",
+             source ? source->wlr_output->name : "-");
     control_reply(fd, line);
 }
 
@@ -95,6 +99,10 @@ static void get_outputs(struct sh_server *server, int fd, const char *arguments)
         control_describe_output(server, fd, output);
     wl_list_for_each_reverse(output, &server->disabled_outputs, link)
         control_describe_output(server, fd, output);
+}
+
+static void get_display_mode(struct sh_server *server, int fd, const char *arguments) {
+    describe_display_mode(server, fd);
 }
 
 static void get_workspace(struct sh_server *server, int fd, const char *arguments) {
@@ -702,6 +710,7 @@ static const struct {
     bool arguments;
 } queries[] = {
     {"outputs", get_outputs, false},
+    {"display_mode", get_display_mode, false},
     {"workspace", get_workspace, false},
     {"workspaces", get_workspaces, false},
     {"layout", get_layout, true},

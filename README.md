@@ -298,6 +298,7 @@ Edit them in [config/init.lua](config/init.lua).
 | Microphone mute key | Mute the default input, or unmute it; on the lock screen too |
 | Brightness up / down keys | The backlight up or down by 5 %; on the lock screen too, and held they repeat |
 | Play/Pause, Next, Previous, Stop keys | [Media controls](docs/features.md#media-controls) of the player playing most lately; on the lock screen too |
+| Display key (Fn + the monitor key) | Step through [PC screen only, duplicate, extend and second screen only](docs/features.md#display-modes-win--p), as Windows' Win + P |
 
 ## Scripting
 

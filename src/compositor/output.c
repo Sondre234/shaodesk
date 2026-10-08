@@ -6,6 +6,10 @@
 static void output_frame(struct wl_listener *listener, void *data) {
     struct sh_output *output = wl_container_of(listener, output, frame);
     struct wlr_scene *scene = output->server->scene;
+    if (output->mirror) { // out of the layout, it has no scene output
+        mirror_frame(output);
+        return;
+    }
 
     struct wlr_scene_output *scene_output = wlr_scene_get_scene_output(scene, output->wlr_output);
     struct sh_stats *stats = &output->server->stats;
@@ -119,8 +123,8 @@ const struct sh_monitor *monitor_settings(const struct sh_settings *settings,
 
 /* The monitor settings in force for `output`: what an output-management client applied, else
  * what the configuration says. */
-static const struct sh_monitor *output_monitor(const struct sh_settings *settings,
-                                               const struct sh_output *output) {
+const struct sh_monitor *output_monitor(const struct sh_settings *settings,
+                                       const struct sh_output *output) {
     return output->has_override ? &output->override
                                 : monitor_settings(settings, output->wlr_output);
 }
@@ -140,11 +144,13 @@ static void publish_output_configuration(struct sh_server *server) {
                 wlr_output_configuration_head_v1_create(config, output->wlr_output);
             if (!head)
                 continue;
-            // A monitor turned off (output_power.c) is still in the layout, as in sway.
-            head->state.enabled =
-                !output->disabled && (output->wlr_output->enabled || output->powered_off);
+            // A monitor turned off (output_power.c) is still in the layout, as in sway, and a
+            // mirror (mirror.c) is on where its source is.
+            struct sh_output *placed = mirrored_output(output) ? mirrored_output(output) : output;
+            head->state.enabled = (!output->disabled || output->mirror) &&
+                                  (output->wlr_output->enabled || output->powered_off);
             struct wlr_box box;
-            wlr_output_layout_get_box(server->output_layout, output->wlr_output, &box);
+            wlr_output_layout_get_box(server->output_layout, placed->wlr_output, &box);
             head->state.x = box.x;
             head->state.y = box.y;
         }
@@ -266,6 +272,9 @@ void arrange_outputs(struct sh_server *server) {
     map_tablets(server);
     publish_output_configuration(server);
     notify_subscribers(server); // the list of outputs and their workspaces
+    // A mirror whose source came or went joins or leaves the layout, laid out again then.
+    if (refresh_mirrors(server))
+        arrange_outputs(server);
 }
 
 /* The mode for `monitor`: its resolution at the refresh closest to the one asked for, or the
@@ -318,6 +327,10 @@ void configure_output(struct sh_server *server, struct sh_output *output) {
     // A monitor that is off stays off as it is until it is turned on, which configures it.
     if (enable && output->powered_off)
         return;
+    // One that mirrors another in the layout leaves the layout, showing that one (mirror.c).
+    struct sh_output *source = enable ? mirror_source(server, output) : NULL;
+    bool in_layout = enable && !source;
+
 
     struct wlr_output_state state;
     wlr_output_state_init(&state);
@@ -369,19 +382,23 @@ void configure_output(struct sh_server *server, struct sh_output *output) {
     wlr_output_state_finish(&state);
 
     // The windows of an output that is turned off go to another, as if it were unplugged.
-    bool turned_off = !enable && !wl_list_empty(&output->link) && !output->disabled;
+    bool turned_off = !in_layout && !wl_list_empty(&output->link) && !output->disabled;
     struct wlr_box gone = {0};
     if (turned_off) {
         gone = output->usable;
         if (wlr_box_empty(&gone))
             wlr_output_layout_get_box(server->output_layout, wlr_output, &gone);
     }
-    if (wl_list_empty(&output->link) || enable == output->disabled) {
+    if (wl_list_empty(&output->link) || in_layout == output->disabled) {
         wl_list_remove(&output->link);
-        wl_list_insert(enable ? &server->outputs : &server->disabled_outputs, &output->link);
-        output->disabled = !enable;
+        wl_list_insert(in_layout ? &server->outputs : &server->disabled_outputs, &output->link);
+        output->disabled = !in_layout;
     }
-    if (enable) {
+    if (source)
+        mirror_start(output, source);
+    else
+        mirror_stop(output);
+    if (in_layout) {
         wlr_scene_node_set_enabled(&output->background->node, true);
         wlr_scene_node_set_enabled(&output->lock_blank->node, true);
     } else {
@@ -390,8 +407,9 @@ void configure_output(struct sh_server *server, struct sh_output *output) {
         wlr_output_layout_remove(server->output_layout, wlr_output);
         wlr_scene_node_set_enabled(&output->background->node, false);
         wlr_scene_node_set_enabled(&output->lock_blank->node, false);
+        // The lid or a mirror: as if unplugged, so that the windows come back.
         if (turned_off && server->running)
-            evacuate_output(server, wlr_output->name, gone, by_lid); // the lid: as if unplugged
+            evacuate_output(server, wlr_output->name, gone, by_lid || source);
     }
 }
 
@@ -432,6 +450,14 @@ static void head_monitor(struct sh_server *server, const struct sh_output *outpu
     monitor->positioned = true;
     monitor->x = head->x;
     monitor->y = head->y;
+    // A mirror left where it was said to be, on its source, goes on mirroring it.
+    const struct sh_output *source = mirrored_output(output);
+    struct wlr_box box;
+    if (source) {
+        wlr_output_layout_get_box(server->output_layout, source->wlr_output, &box);
+        if (head->x == box.x && head->y == box.y)
+            snprintf(monitor->mirror, sizeof(monitor->mirror), "%s", source->wlr_output->name);
+    }
 }
 
 static bool test_head(const struct wlr_output_head_v1_state *head) {
@@ -497,6 +523,14 @@ void output_config_apply(struct wl_listener *listener, void *data) {
         head_monitor(server, output, &head->state, &output->override);
         output->has_override = true;
     }
+    apply_output_settings(server);
+    wlr_output_configuration_v1_send_succeeded(config);
+    wlr_output_configuration_v1_destroy(config);
+}
+
+/* Configures every output again after their settings changed while running (through
+ * wlr-output-management, or display_mode.c), and puts windows, workspaces and focus in order. */
+void apply_output_settings(struct sh_server *server) {
     // Enable outputs before disabling others, so a swap never leaves none on.
     struct sh_output *output, *temporary;
     wl_list_for_each_safe(output, temporary, &server->disabled_outputs, link)
@@ -515,8 +549,6 @@ void output_config_apply(struct wl_listener *listener, void *data) {
     }
     wl_list_for_each(toplevel, &server->toplevels, link) refresh_frame(toplevel);
     wl_list_for_each(output, &server->outputs, link) reflow_output(server, output->wlr_output);
-    wlr_output_configuration_v1_send_succeeded(config);
-    wlr_output_configuration_v1_destroy(config);
 }
 
 static void output_request_state(struct wl_listener *listener, void *data) {
@@ -533,6 +565,7 @@ static void output_destroy(struct wl_listener *listener, void *data) {
     wl_list_remove(&output->request_state.link);
     wl_list_remove(&output->destroy.link);
     wl_list_remove(&output->link);
+    mirror_stop(output);
     output_release_zoom(output);
     destroy_output_layers(output->server, output->wlr_output);
     wlr_scene_node_destroy(&output->background->node);

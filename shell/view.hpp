@@ -273,6 +273,23 @@ class OsdView : public QQuickView {
     void placeLayer();
 };
 
+// The display mode popup on one output (Windows' Win+P), in the middle, while the compositor
+// shows it there and until it has faded. It takes the pointer, not the keyboard: the compositor
+// takes the keys that step it.
+class DisplayModeView : public QQuickView {
+    Q_OBJECT
+  public:
+    DisplayModeView(ShellController &controller, QScreen *screen);
+    QScreen *outputScreen() const { return outputScreen_; }
+
+  private Q_SLOTS:
+    void update();
+
+  private:
+    LayerShellQt::Window *layer_ = nullptr;
+    QScreen *outputScreen_;
+};
+
 // The configuration error banner across the top of one output, shown while the default
 // configuration stands in for one with an error. Clicks pass through it.
 class ConfigErrorView : public QQuickView {

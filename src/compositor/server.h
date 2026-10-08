@@ -281,6 +281,7 @@ struct sh_idle {
 };
 
 struct sh_window_object; // a shaodesk_window_v1 (window_control.c)
+struct sh_mirror;        // what a mirroring output shows (mirror.c)
 
 /* A workspace slide a touchpad swipe drives (workspace.c, for gestures.c): the output, the
  * workspace it showed as the swipe began and the one the fingers head for (out of range past
@@ -509,6 +510,14 @@ struct sh_server {
     struct wlr_idle_notifier_v1 *idle_notifier;
     struct wlr_output_manager_v1 *output_manager;
     struct wl_listener output_apply, output_test;
+    /* The display mode popup (display_mode.c): whether it is open, on which output, the choice
+     * it shows (enum sh_display_mode), and the timer that takes it once the key has rested. */
+    struct {
+        bool open;
+        int shown;
+        char output[64];
+        struct wl_event_source *timer;
+    } display_mode;
     /* wlr-output-power-management (output_power.c), and when an action last turned monitors
      * off, which input does not undo for a moment. */
     struct wl_listener output_power_set_mode;
@@ -665,6 +674,8 @@ struct sh_output {
     struct wlr_buffer *zoom_source;
     bool zoomed; // the last frame was magnified
     bool zoom_failed; // it could not be magnified this time; it shows 1x until the zoom is reset
+    /* Out of the layout, showing another output's picture (mirror.c); NULL otherwise. */
+    struct sh_mirror *mirror;
     struct wl_list link;
     struct sh_server *server;
     struct wlr_output *wlr_output;
@@ -955,6 +966,12 @@ bool open_dynamic_rules(struct sh_toplevel *toplevel, struct sh_window_rule *rul
 void follow_dynamic_rules(struct sh_toplevel *toplevel);
 void describe_dynamic_rules(struct sh_server *server, int fd);
 
+/* display_mode.c */
+bool display_mode_choose(struct sh_server *server, int mode, char *error, size_t error_size);
+bool display_mode_key(struct sh_server *server, xkb_keysym_t sym);
+void describe_display_mode(struct sh_server *server, int fd);
+void display_mode_finish(struct sh_server *server);
+
 /* effects.c */
 void update_dim(struct sh_toplevel *toplevel);
 bool tick_effects(struct sh_server *server);
@@ -1119,14 +1136,27 @@ void session_active(struct wl_listener *listener, void *data);
 #endif
 void server_new_inhibitor(struct wl_listener *listener, void *data);
 
+/* mirror.c */
+struct sh_output *mirror_source(struct sh_server *server, struct sh_output *output);
+void mirror_start(struct sh_output *output, struct sh_output *source);
+void mirror_stop(struct sh_output *output);
+struct sh_output *mirrored_output(const struct sh_output *output);
+bool refresh_mirrors(struct sh_server *server);
+void mirrors_follow_power(struct sh_output *source, bool on);
+void mirror_frame(struct sh_output *output);
+bool mirror_capture(struct sh_output *output, const char *path, char *error, size_t error_size);
+
 /* output.c */
 bool output_named(const struct sh_output *output, const char *name);
 void output_description(const struct wlr_output *output, char *text, size_t size);
 bool output_key_matches(const char *key, const struct wlr_output *output);
 const struct sh_monitor *monitor_settings(const struct sh_settings *settings,
                                           const struct wlr_output *output);
+const struct sh_monitor *output_monitor(const struct sh_settings *settings,
+                                       const struct sh_output *output);
 void arrange_outputs(struct sh_server *server);
 void configure_output(struct sh_server *server, struct sh_output *output);
+void apply_output_settings(struct sh_server *server);
 void output_config_test(struct wl_listener *listener, void *data);
 void output_config_apply(struct wl_listener *listener, void *data);
 void server_new_output(struct wl_listener *listener, void *data);

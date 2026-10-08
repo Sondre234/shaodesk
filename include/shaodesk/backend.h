@@ -210,6 +210,19 @@ enum sh_action {
     /* Keeps the focused window above the others (floating ones and tiles), or lets it go back
      * among them: KDE's Keep Above Others, Hyprland's pin, PowerToys' Always on Top. */
     SH_TOGGLE_ABOVE,
+    /* Windows' Win+P: every monitor extending the desktop, all showing one picture, the built-in
+     * panel alone or the other monitors alone (enum sh_display_mode); without one, a popup that
+     * steps through the four. */
+    SH_DISPLAY_MODE,
+};
+
+/* The display_mode action's choices. */
+enum sh_display_mode {
+    SH_DISPLAY_MODE_STEP,      /* the popup: open it, or step to the next choice */
+    SH_DISPLAY_MODE_EXTEND,    /* every monitor in the layout */
+    SH_DISPLAY_MODE_DUPLICATE, /* the others mirroring the built-in panel (or the primary) */
+    SH_DISPLAY_MODE_INTERNAL,  /* the built-in panel (or the primary) alone */
+    SH_DISPLAY_MODE_EXTERNAL,  /* every monitor but that one */
 };
 
 enum sh_screenshot_mode {
@@ -235,6 +248,9 @@ struct sh_monitor {
     int transform; /* enum wl_output_transform, which Hyprland's numbering matches */
     bool vrr;      /* adaptive sync, where the monitor supports it */
     int tiling;    /* automatic tiling: -1 follows sh_settings.tiling, else 0 or 1 */
+    /* The monitor it shows the picture of, out of the layout itself: a connector name or
+     * "desc:..." as `name` is; "" to join the layout. */
+    char mirror[64];
 };
 
 /* layout.outputs: defaults for the workspaces of the outputs matching `name` (as sh_monitor's

@@ -131,8 +131,8 @@ struct wlr_backend *headless_backend(struct sh_server *server) {
 }
 
 /* "headless_output add [NAME] [WIDTHxHEIGHT]" plugs in a virtual output, and "headless_output
- * remove NAME" unplugs one, so tests can exercise hotplug without a display. Only under
- * --headless. */
+ * remove NAME" unplugs one, so tests can exercise hotplug without a display; "headless_output
+ * capture NAME PATH" writes a mirror's picture to a file. Only under --headless. */
 static void control_headless_output(struct sh_server *server, int fd, const char *args) {
     struct wlr_backend *headless = headless_backend(server);
     if (!headless) {
@@ -185,7 +185,21 @@ static void control_headless_output(struct sh_server *server, int fd, const char
         control_reply(fd, "ok\n");
         return;
     }
-    control_reply(fd, "error: usage: headless_output add [NAME] [WIDTHxHEIGHT] | remove NAME\n");
+    // A mirror's picture, which no screenshot tool can name (mirror.c).
+    int path_at = 0;
+    sscanf(args, "%*15s %*63s %n", &path_at);
+    if (!strcmp(verb, "capture") && fields == 3 && path_at > 0) {
+        struct sh_output *output = sh_output_for_name(server, first);
+        char error[PATH_MAX + 64], reply[PATH_MAX + 80];
+        if (!output)
+            snprintf(error, sizeof(error), "no such output");
+        bool done = output && mirror_capture(output, args + path_at, error, sizeof(error));
+        snprintf(reply, sizeof(reply), done ? "ok\n" : "error: %s\n", error);
+        control_reply(fd, reply);
+        return;
+    }
+    control_reply(fd, "error: usage: headless_output add [NAME] [WIDTHxHEIGHT] | remove NAME | "
+                      "capture NAME PATH\n");
 }
 
 /* "osd TEXT [PERCENT]": shows the shell's on-screen display on the focused output. A last word
@@ -369,6 +383,14 @@ static void control_handle(struct sh_server *server, int fd, const char *request
             return;
         }
         control_reply(fd, "ok\n");
+        return;
+    }
+    if (action == SH_DISPLAY_MODE) {
+        // The caller hears of a choice that cannot be had, such as one monitor alone.
+        bool done = display_mode_choose(server, argument, error, sizeof(error));
+        char reply[300];
+        snprintf(reply, sizeof(reply), done ? "ok\n" : "error: %s\n", error);
+        control_reply(fd, reply);
         return;
     }
     if (display_action(action)) {

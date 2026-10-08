@@ -1322,6 +1322,66 @@ settings replace the `outputs.monitors` entry of the outputs they touch until th
 configuration is reloaded, which brings the configured setup back. The last enabled output
 cannot be turned off.
 
+### Mirroring
+
+A monitor can show another's picture, as Windows' Duplicate and KDE's display mirroring do:
+
+```lua
+outputs = {
+    monitors = {
+        ["HDMI-A-1"] = { mirror = "eDP-1" }, -- the projector shows the laptop's panel
+    },
+},
+```
+
+`mirror` names the monitor to show, by connector name or `"desc:"` description as the keys of
+`outputs.monitors` do. The mirroring monitor leaves the layout: it has no workspaces, windows or
+panels of its own, and applications do not see it as an output. It shows the whole picture of the
+monitor it mirrors, everything on it with the pointer, the magnifier, night light and the lock
+screen, scaled to fit its own mode, with black bars where the shapes differ, and upright whichever
+of the two is rotated. Its own `mode` and `transform` apply; its `scale` does not matter. While
+the monitor it mirrors is not in the layout (unplugged, `enabled = false`, or behind a closed
+lid), it joins the layout as any other monitor does, and leaves it again when that one comes
+back, its windows moving as when a monitor is unplugged. It turns off and on with the monitor it
+mirrors (see [Turning monitors off](#turning-monitors-off)), and `shaodesk msg get outputs` names
+that monitor in its last column. One mirroring a monitor that mirrors another shows that other
+one. wlr-output-management clients list it as enabled, at the place of the monitor it mirrors:
+left there, it goes on mirroring; moved elsewhere, it joins the layout there.
+
+The picture is copied from the frames the mirrored monitor shows, one scaled copy for each, so a
+mirror costs little, and nothing while the picture stands still. Closing a laptop's lid while
+another monitor mirrors its panel turns the panel off as in [clamshell mode](#the-laptop-lid),
+and the other monitor then shows the desktop itself.
+
+### Display modes (Win + P)
+
+The `display_mode` action sets the monitors up as Windows' Win + P does: `extend` puts every
+connected monitor in the layout, `duplicate` has the others mirror the main monitor, `internal`
+keeps the main monitor alone (Windows' "PC screen only") and `external` every monitor but it
+("Second screen only"). The main monitor is a laptop's built-in panel; on a machine without one,
+the primary monitor (`outputs.primary`, else the first connected one in `outputs.order`, else the
+first by connector name). A choice keeps each monitor's mode, scale and position, and lasts until
+the configuration is reloaded, as wlr-output-management changes do. With one monitor connected,
+only `extend` can be had.
+
+XF86Display, the key a laptop sends for Fn and its display key, runs `display_mode` without a
+choice: a popup on the focused monitor shows the four in Windows' order (PC screen only,
+duplicate, extend, second screen only) with the one in force selected, each further press moves
+the selection on, and a second and a half after the last press the selected one is taken. While the popup is open the arrow keys move the selection, Return takes it at once
+and Escape closes the popup without changing anything; a click takes a choice too. Win + P
+itself opens the command palette.
+
+```lua
+bindings = {
+    { mods = {}, key = "XF86Display", action = "display_mode" },
+    { mods = { "Super", "Ctrl" }, key = "p", action = "display_mode", mode = "duplicate" },
+},
+```
+
+`shaodesk msg display_mode duplicate` picks one from a script (and says why it cannot, with one
+monitor), and `shaodesk msg get display_mode` prints the choice in force and, while the popup is
+open, the one it shows and its monitor (`-` for both while it is closed).
+
 ### Turning monitors off
 
 A monitor can also be turned off without leaving the layout: it keeps its place, its windows,
@@ -1997,8 +2057,9 @@ one: `shaodesk msg output HDMI-A-1 workspace_next`. The query
 prints one tab-separated line per monitor (name, current workspace, focused, the
 workspaces holding windows, such as `1,3`, or `-`, and tiling, `on` or `off`),
 `shaodesk msg get tiling` prints `on` or `off` for the focused monitor, `shaodesk msg get outputs` prints one tab-separated line per monitor (name,
-enabled, x, y, logical width and height, scale, transform, mode, "make model serial", and
-whether it shows a picture, `on`, or is [turned off](#turning-monitors-off) or disabled, `off`), and
+enabled, x, y, logical width and height, scale, transform, mode, "make model serial",
+whether it shows a picture, `on`, or is [turned off](#turning-monitors-off) or disabled, `off`,
+and the monitor it [mirrors](#mirroring), or `-`), and
 `shaodesk msg get windows` prints one tab-separated line per window:
 workspace, focused, minimized, tiled, x, y, width, height, app ID, title, monitor,
 visible, scratchpad (a window hidden there is also minimized), sticky, its window group

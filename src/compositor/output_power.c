@@ -30,6 +30,7 @@ bool set_output_power(struct sh_output *output, bool on) {
             return false;
         }
         output->powered_off = true;
+        mirrors_follow_power(output, false);
         wlr_log(WLR_INFO, "Turned %s off", wlr_output->name);
         // Nothing shows on it, so a lock waits for it no longer.
         send_locked_if_presented(server);
@@ -45,6 +46,7 @@ bool set_output_power(struct sh_output *output, bool on) {
         wlr_log(WLR_ERROR, "Cannot turn %s on", wlr_output->name);
         return false;
     }
+    mirrors_follow_power(output, true);
     arrange_outputs(server); // in case a reload changed its mode or scale meanwhile
     wlr_output_schedule_frame(wlr_output);
     wlr_log(WLR_INFO, "Turned %s on", wlr_output->name);

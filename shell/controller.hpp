@@ -5,6 +5,7 @@
 #include "authentication.hpp"
 #include "backlight.hpp"
 #include "bluetooth.hpp"
+#include "display_modes.hpp"
 #include "media.hpp"
 #include "notifications.hpp"
 #include "power_mode.hpp"
@@ -123,6 +124,8 @@ class ShellController : public QObject {
     // The notification daemon (cards, history, do-not-disturb) and the on-screen display.
     Q_PROPERTY(NotificationCenter *notifications READ notifications CONSTANT)
     Q_PROPERTY(Osd *osd READ osd CONSTANT)
+    // The display mode popup (Windows' Win+P), which the compositor opens and steps.
+    Q_PROPERTY(DisplayModes *displayModes READ displayModes CONSTANT)
     // The system tray's items, empty until startTray().
     Q_PROPERTY(TrayModel *tray READ tray CONSTANT)
     // The output the compositor says has the focus, and the one showing the notification cards
@@ -266,6 +269,7 @@ class ShellController : public QObject {
     Bluetooth *bluetooth() { return bluetooth_.get(); }
     NotificationCenter *notifications() { return &notifications_; }
     Osd *osd() { return &osd_; }
+    DisplayModes *displayModes() { return &displayModes_; }
     QString focusedOutput() const { return focusedOutput_; }
     QString cardsOutput() const { return cardsOutput_; }
     // The output that overlays for the focused monitor belong on: the focused one when it
@@ -400,6 +404,7 @@ class ShellController : public QObject {
     SystemStatus status_{"/sys", nullptr, true};
     NotificationCenter notifications_;
     Osd osd_;
+    DisplayModes displayModes_;
     // $SHAODESK_SYSFS names another sysfs tree, polled, for tests.
     Backlight backlight_{qEnvironmentVariable("SHAODESK_SYSFS", "/sys"), !qEnvironmentVariableIsSet("SHAODESK_SYSFS"),
                          qEnvironmentVariableIsSet("SHAODESK_SYSFS") ? 100 : 0};
