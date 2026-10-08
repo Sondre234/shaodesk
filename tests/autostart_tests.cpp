@@ -213,6 +213,34 @@ int main() {
         setenv("XDG_CURRENT_DESKTOP", "shaodesk:wlroots", 1);
         require(shaodesk::current_desktops() == Words{"shaodesk", "wlroots"}, "desktops");
 
+        // What startup and autostart started, to know their windows by.
+        require(shaodesk::program_names({"/usr/bin/Foot", "--server", "-e", "A=b"}) ==
+                    Words{"foot"},
+                "a program's names");
+        require(shaodesk::program_names({"sh", "-c", "sleep 2; exec foot --title=x &"}) ==
+                    (Words{"sh", "sleep", "2", "exec", "foot"}),
+                "a shell's command line's names");
+        require(shaodesk::program_names({"flatpak", "run", "org.Telegram.desktop"}) ==
+                    (Words{"flatpak", "run", "org.telegram.desktop"}),
+                "flatpak's names");
+        std::set<std::string> names{"foot", "org.telegram.desktop", "steam"};
+        require(shaodesk::started_by(names, "foot", ""), "by app ID");
+        require(shaodesk::started_by(names, "org.Telegram.Desktop", "/app/bin/telegram"),
+                "by app ID, in any case");
+        require(shaodesk::started_by(names, "", "/home/u/.steam/bin/STEAM"),
+                "by program, from any directory");
+        require(!shaodesk::started_by(names, "firefox", "/usr/lib/firefox/firefox"), "firefox");
+        require(!shaodesk::started_by(names, "", ""), "nothing");
+        require(shaodesk::read_autostart_entry(root / "one" / "entry.desktop", "entry.desktop",
+                                               plain)
+                        .wm_class.empty(),
+                "no StartupWMClass");
+        write(root / "two" / "w.desktop",
+              "[Desktop Entry]\nType=Application\nExec=w\nStartupWMClass=Whatever\n");
+        require(shaodesk::read_autostart_entry(root / "two" / "w.desktop", "w.desktop", plain)
+                        .wm_class == "Whatever",
+                "StartupWMClass");
+
         // The settings.
         auto defaults = shaodesk::parse_config("return {}");
         require(defaults.autostart.xdg && defaults.autostart.exclude.empty(), "defaults");
@@ -233,6 +261,16 @@ int main() {
                     !shaodesk::parse_config("return {shell={polkit_agent=false}}").shell.polkit_agent,
                 "shell.polkit_agent not parsed");
         rejects("return {shell={polkit_agent='no'}}");
+        require(defaults.settings.session_restore == SH_SESSION_RESTORE_WINDOWS,
+                "session.restore's default");
+        require(shaodesk::parse_config("return {session={restore='off'}}").settings.session_restore ==
+                        SH_SESSION_RESTORE_OFF &&
+                    shaodesk::parse_config("return {session={restore='launch'}}")
+                            .settings.session_restore == SH_SESSION_RESTORE_LAUNCH,
+                "session.restore not parsed");
+        rejects("return {session={restore=true}}");
+        rejects("return {session={restore='all'}}");
+        rejects("return {session={save=true}}");
         std::cout << "autostart passed\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';

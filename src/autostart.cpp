@@ -296,7 +296,7 @@ std::string autostart_role(const std::string &name, const std::vector<std::strin
 
 AutostartEntry read_autostart_entry(const std::filesystem::path &path, const std::string &name,
                                     const AutostartOptions &options) {
-    AutostartEntry entry{name, path, {}, {}, {}, {}};
+    AutostartEntry entry{name, path, {}, {}, {}, {}, {}};
     auto keys = read_desktop_group(path);
     if (!keys) {
         entry.skip = "not a desktop entry: no [Desktop Entry] group, or it cannot be read";
@@ -307,6 +307,7 @@ AutostartEntry read_autostart_entry(const std::filesystem::path &path, const std
         return found == keys->end() ? std::string() : found->second;
     };
     entry.program_name = unescape(get("Name"));
+    entry.wm_class = unescape(get("StartupWMClass"));
     entry.directory = unescape(get("Path"));
     auto try_exec = unescape(get("TryExec"));
     auto exec = get("Exec");
@@ -349,6 +350,33 @@ AutostartEntry read_autostart_entry(const std::filesystem::path &path, const std
     else if (role == "polkit" && options.polkit)
         entry.skip = "the shell is the polkit agent";
     return entry;
+}
+
+std::vector<std::string> program_names(const std::vector<std::string> &command) {
+    std::vector<std::string> names;
+    std::string word;
+    auto flush = [&] {
+        if (!word.empty() && word.front() != '-' && word.find('=') == std::string::npos)
+            names.push_back(program_name(word));
+        word.clear();
+    };
+    for (const auto &argument : command) {
+        for (char c : argument) {
+            if (std::isspace(static_cast<unsigned char>(c)) ||
+                std::string_view(";&|()<>'\"`").find(c) != std::string_view::npos)
+                flush();
+            else
+                word += c;
+        }
+        flush();
+    }
+    return names;
+}
+
+bool started_by(const std::set<std::string> &names, const std::string &app_id,
+                const std::string &program) {
+    return (!app_id.empty() && names.count(lower(app_id))) ||
+           (!program.empty() && names.count(program_name(program)));
 }
 
 std::vector<AutostartEntry> autostart_entries(const std::vector<std::filesystem::path> &directories,

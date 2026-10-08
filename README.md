@@ -31,7 +31,7 @@ you save it.
 - **Tiling when you want it**, per monitor: dwindle (as in Hyprland), master, spiral, monocle,
   and a niri/PaperWM-style scrolling layout.
 - **Per-monitor workspaces**, a scratchpad, sticky windows, tab groups, window rules,
-  terminal swallowing, and saved sessions you can restore.
+  terminal swallowing, and saved sessions you can restore, the last one at the next login.
 - **A Qt Quick shell** on every monitor, in [the macOS style](docs/features.md#the-macos-style)
   (a menu bar and a dock, Launchpad, Spotlight, Control Center, Notification Center, in light and
   dark) or as a taskbar with a start menu and [pictures of a button's
@@ -92,6 +92,7 @@ debug build.
 | `SHAODESK_NOTIFICATIONS` | `ON` | Build the shell's notification daemon (needs Qt DBus) |
 | `SHAODESK_PULSEAUDIO` | `ON` | Build the panel's volume control (needs libpulse, which PipeWire also serves) |
 | `SHAODESK_TRAY` | `ON` | Build the panel's system tray (needs Qt DBus) |
+| `SHAODESK_POLKIT` | `ON` | Build the shell's polkit authentication agent (needs libpolkit-agent-1; left out without it) |
 | `SHAODESK_INSTALL_SESSION` | `OFF` | Install the display-manager session entry |
 | `SHAODESK_XWM_WAKER` | `ON` | Work around lost X11 windows; turn off with wlroots patched by `packaging/patches/wlroots-xwm-drain.patch` |
 

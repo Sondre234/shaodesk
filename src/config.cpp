@@ -1579,6 +1579,20 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
     }
     lua_pop(L, 1);
     current_section.clear();
+    if (section(L, "session")) {
+        lua_getfield(L, -1, "restore");
+        if (!lua_isnil(L, -1)) {
+            auto restore = string(L, -1, "session.restore");
+            if (restore != "off" && restore != "windows" && restore != "launch")
+                fail("session.restore must be \"off\", \"windows\" or \"launch\"", "restore");
+            config.settings.session_restore = restore == "off"       ? SH_SESSION_RESTORE_OFF
+                                              : restore == "windows" ? SH_SESSION_RESTORE_WINDOWS
+                                                                     : SH_SESSION_RESTORE_LAUNCH;
+        }
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+    current_section.clear();
 
     current_section.clear();
     check_keymap(config.settings);

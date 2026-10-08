@@ -463,6 +463,9 @@ AuthView::AuthView(ShellController &controller, QScreen *screen)
     connect(screen, &QScreen::geometryChanged, this,
             [this] { resize(outputScreen_->geometry().size()); });
     connect(controller.authentication(), &Authentication::changed, this, &AuthView::update);
+    // Its output gone, the primary screen's view takes over.
+    connect(qGuiApp, &QGuiApplication::screenRemoved, this, &AuthView::update,
+            Qt::QueuedConnection);
     update();
 }
 void AuthView::update() {

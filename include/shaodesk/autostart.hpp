@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,7 @@ struct AutostartEntry {
     // Exec, split into arguments with its field codes expanded or dropped.
     std::vector<std::string> command;
     std::string directory; // Path=: the working directory to start it in; "" for none
+    std::string wm_class;  // StartupWMClass=: what its windows are called; "" for nothing said
     // Why the entry is not started, as `shaodesk msg get autostart` says; "" when it is.
     std::string skip;
 };
@@ -58,4 +60,14 @@ std::optional<std::vector<std::string>> parse_exec(const std::string &value,
 // file's name.
 std::string autostart_role(const std::string &name, const std::vector<std::string> &command,
                            const std::string &try_exec = {});
+// The names the programs a command starts may go by, in lower case, for knowing their windows
+// later: the last part of the path of each word that is no option (-x) or setting (A=b), a
+// shell's command line split into its words ("sh -c 'sleep 2; foot'" gives sh, sleep, 2 and
+// foot).
+std::vector<std::string> program_names(const std::vector<std::string> &command);
+// Whether a window with `app_id`, whose process ran `program` (its command line's first word),
+// belongs to a program going by one of `names`: either is one of them, without regard to case
+// and the program's directory.
+bool started_by(const std::set<std::string> &names, const std::string &app_id,
+                const std::string &program);
 } // namespace shaodesk

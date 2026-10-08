@@ -239,6 +239,11 @@ shadows.
   stays out of the way of an agent already serving the session, and only a standalone session's
   shell is one. `shell.polkit_agent = false` turns it off; `-DSHAODESK_POLKIT=OFF` builds without
   it, as does a system without libpolkit-agent-1.
+- A standalone session saves itself as `last` as it ends (log out, quit, power off, restart),
+  before its windows are asked to close, and the next one restores it after `startup` and
+  autostart: `session.restore = "windows"` (the default) puts the windows that open again where
+  they were, `"launch"` also starts the programs of the others again without doubling what
+  startup and autostart started, and `"off"` keeps nothing.
 
 ### Working on the shell
 

@@ -254,6 +254,9 @@ return {
     -- A standalone session then starts the XDG autostart entries (~/.config/autostart,
     -- /etc/xdg/autostart), but for those named here:
     -- autostart = { xdg = true, exclude = { "org.kde.discover.notifier.desktop" } },
+    -- What a standalone session restores of the last one: "windows" puts back the windows
+    -- that open again, "launch" also starts the programs of the others, "off" nothing:
+    -- session = { restore = "windows" },
     bindings = {
         -- Mouse buttons bind too: left, right, middle, side, extra (most mice's back and
         -- forward thumb buttons), forward, back. app_id (a regular expression) limits one to
