@@ -37,7 +37,8 @@ POPUPS = ["bar", "launcher", "power", "bar-menu", "bar-submenu", "task-menu", "s
           "calendar-years"]
 # The overlay surfaces, each shown over the bar alone (PreviewData::surfaces in shell/preview.cpp).
 POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switcher",
-           "overview", "palette-empty", "palette-calculator", "palette-files"]
+           "overview", "palette-empty", "palette-calculator", "palette-files",
+           "clipboard"]
 # The start menu's other views and its menus.
 POPUPS += ["launcher-all", "launcher-search", "launcher-empty", "launcher-menu"]
 POPUPS += ["quick-settings", "quick-settings-mixer", "bar-all"]
