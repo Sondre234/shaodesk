@@ -227,6 +227,24 @@ struct sh_effect_settings {
     unsigned zoom_scroll_modifier;
 };
 
+/* Lua `gestures`: touchpad swipes the compositor takes for itself (swipe.h). A swipe of
+ * `fingers` toward `direction` (enum sh_swipe_direction) runs `request`, a control request whose
+ * action is `action`; workspace_next and workspace_prev slide the workspaces with the fingers,
+ * toggle_overview and overview_cancel open and close the overview with them. */
+struct sh_swipe_binding {
+    int fingers;
+    int direction;
+    enum sh_action action;
+    char request[256];
+};
+struct sh_gesture_settings {
+    bool enabled;
+    int distance; /* the fingers' travel, in libinput's units, for a whole step */
+    bool invert;  /* swipes count the other way */
+    struct sh_swipe_binding swipes[16];
+    int swipe_count;
+};
+
 struct sh_settings {
     float background[4];
     uint32_t mouse_modifier;
@@ -361,6 +379,7 @@ struct sh_settings {
     bool close_windows;
     int close_timeout;
     bool close_force;
+    struct sh_gesture_settings gestures;
 };
 
 /* What a mouse button was pressed over. */

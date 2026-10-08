@@ -417,6 +417,34 @@ const Option options[] = {
     {"overview.dim", "number", "0.86", "0.86", 0, 1,
      "How opaque the backdrop behind the thumbnails is, from 0 (clear) to 1."},
 
+    {"gestures", "table", "", "", none, none,
+     "Touchpad swipes the compositor takes for itself. Every other swipe, pinch and hold goes to "
+     "the window under the pointer."},
+    {"gestures.enabled", "boolean", "true", "false", none, none,
+     "The swipes in `swipes` act; `false` hands every gesture to the windows."},
+    {"gestures.distance", "integer", "300", "300", 50, 2000,
+     "How far the fingers travel for a whole workspace, or for the overview to open, in the "
+     "touchpad's units (about a pointer's pixels). Letting go past half of it, or flicking, "
+     "finishes the step."},
+    {"gestures.invert", "boolean", "false", "true", none, none,
+     "Read swipes the other way: fingers moving left count as a swipe right, so the workspaces "
+     "move against them."},
+    {"gestures.swipes", "list of tables",
+     "three fingers: left `workspace_next`, right `workspace_prev`, up `toggle_overview`, down "
+     "`overview_cancel`", "", none, none,
+     "The swipes the compositor takes, at most 16, in place of the defaults: a swipe of "
+     "`fingers` toward `direction` runs `action`. `workspace_next` and `workspace_prev` slide "
+     "the workspaces with the fingers, stopping at the first and the last; `toggle_overview` and "
+     "`overview_cancel` open and close the overview with them; anything else runs as the "
+     "fingers lift past half of `distance`."},
+    {"gestures.swipes[].fingers", "integer", "3", "", 3, 5, "How many fingers swipe."},
+    {"gestures.swipes[].direction", "enum", "", "", none, none,
+     "`\"left\"`, `\"right\"`, `\"up\"` or `\"down\"`, the way the fingers go. No two swipes "
+     "may share fingers and a direction."},
+    {"gestures.swipes[].action", "string", "", "", none, none,
+     "A request, written as for `shaodesk msg` and `hot_corners`: an action name and its "
+     "argument, or `spawn PROGRAM ARGS`; `\"none\"` takes the swipe and does nothing."},
+
     {"bindings", "list of tables", "unset", "", none, none,
      "Shortcuts, at most 512, checked in order. A binding has a `key` or a `button`, an "
      "`action`, and optionally `mods`. Keyboard bindings must not repeat a key and modifier "
