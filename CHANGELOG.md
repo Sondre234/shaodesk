@@ -225,6 +225,12 @@ shadows.
 - `shaodesk msg get seat` says what has the keyboard, what the pointer is on, and what a drag is
   over.
 
+### Touchpads, touchscreens and tablets
+
+- Touchpad swipes, pinches and holds reach the window under the pointer
+  (pointer-gestures-unstable-v1): browsers zoom on a pinch, and GTK applications get their
+  gestures.
+
 ### Working on the shell
 
 - `shaodesk-shell --preview-popup NAME` shows one of the taskbar's popups or overlays on stand-in

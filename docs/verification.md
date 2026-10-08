@@ -570,3 +570,16 @@ back when opened as it fades, and that the switcher fades before its surface goe
 Not checked: any of the motion on a real display at 144 or 200 Hz (how it looks and what it costs
 on the GPU), the safe triangle with a real pointer's speed and jitter, and the overlays' exits
 over real applications.
+
+## Touchpad gestures, touchscreens and tablets
+
+Added 2026-10-08. This machine has no touchpad, touchscreen or tablet, so headless devices stand in
+for them: `headless_pointer` (`headless_input.c`) is a pointer that moves and sends swipes,
+pinches and holds as libinput's gesture events. `pointer_gestures_smoke` checks with
+`input_probe`, a window that prints the input it gets, that each kind of gesture reaches the
+window under the pointer with its fingers, deltas, scale, rotation and cancellation, that a
+window which never bound the gestures gets none, and that they go to the window under the
+pointer rather than the focused one.
+
+Not checked: a real touchpad through libinput, and real applications' use of the gestures
+(pinch-zoom in Firefox and Chromium, a hold stopping kinetic scrolling, GTK's gestures).
