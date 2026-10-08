@@ -162,6 +162,12 @@ shadows.
   Enter copies it to the clipboard. `5 km in mi`, `100 f in c` and `3 GiB in MB` convert between
   units, and `255 in hex` writes a whole number in another base. A leading `=` narrows the
   palette to the calculator.
+- They find files and folders by name too: those used lately (`recently-used.xbel`) and those in
+  the home folder and the XDG user folders, read in the background the first time a search asks
+  and again when they are out of date, leaving out hidden, version-controlled and build trees.
+  Enter opens a file in its default application and Ctrl + Enter (or a button) its folder; a
+  leading `/` searches only files. `shell.search` turns it off or names other folders, and sets
+  how deep and how many names are read.
 
 ### The clock and Quick Settings
 

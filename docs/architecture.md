@@ -271,8 +271,8 @@ what was there.
 The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `task_filter.cpp`
 (the taskbar's slots and groups), `audio.cpp` with `pulse_audio.cpp`, `system_status.cpp`
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
-`power.cpp`, `palette.cpp` (with `fuzzy.cpp`, and `calculator.cpp`, which the start menu's search
-shares). `preview.cpp` has stand-ins for all of them for `--preview-popup`.
+`power.cpp`, `palette.cpp` (with `fuzzy.cpp`, and `calculator.cpp` and `file_index.cpp`, which the
+start menu's search shares). `preview.cpp` has stand-ins for all of them for `--preview-popup`.
 
 A window is known by its app id alone. `app_match.cpp` finds the desktop entry it belongs to: an
 `app_match::Index` of the entries, which `refreshApps` builds, tries each way of matching from the
@@ -411,6 +411,20 @@ runs them with `Palette::run`; and the user's name and picture. It tells the con
 the applications again when GIO's monitor says they changed. Launchpad (`Launchpad.qml`), the
 launcher of the macOS style, which the launcher's loader in `Panel.qml` makes in the start menu's
 place, reads it too: every application by name, and what its search finds of them.
+
+Both searches find files through the controller's `FileIndex` (`file_index.cpp`, `shell.files`),
+which `ShellController::configureFiles` hands `shell.search`. `search()` matches the names read
+last, on the GUI thread, and starts reading them again when they are out of date: never read, the
+settings changed, five minutes old, or ten seconds after a `QFileSystemWatcher` on a root but the
+home folder or on `recently-used.xbel` saw a change. `scan()`, a static function the tests call
+too, runs on a `QThread` of its own at the lowest priority: the recent files, then the roots
+breadth first with `openat`/`readdir`, never following a link below a root nor crossing to another
+device. The result comes back with the thread's `finished`, is dropped if the settings changed
+meanwhile, and `changed` makes the palette search again (keeping the entry the selection is on) and
+the start menu bump `searchRevision`, which `StartSearch.qml`'s results read. A preview gives the
+index stand-ins with `preview()`, after which it reads nothing. `FileIndex::open` opens a file, or
+its folder, with GIO's default handler (`g_app_info_launch_default_for_uri`), and
+`ShellController::openFile` shows a failure across the panel.
 
 ### Popups and menus
 
