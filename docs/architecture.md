@@ -412,7 +412,7 @@ the applications again when GIO's monitor says they changed. Launchpad (`Launchp
 launcher of the macOS style, which the launcher's loader in `Panel.qml` makes in the start menu's
 place, reads it too: every application by name, and what its search finds of them.
 
-Both searches find files through the controller's `FileIndex` (`file_index.cpp`, `shell.files`),
+Both searches find files through the controller's `FileIndex` (`file_index.cpp`, `files()`),
 which `ShellController::configureFiles` hands `shell.search`. `search()` matches the names read
 last, on the GUI thread, and starts reading them again when they are out of date: never read, the
 settings changed, five minutes old, or ten seconds after a `QFileSystemWatcher` on a root but the
