@@ -229,16 +229,17 @@ static void control_osd(struct sh_server *server, int fd, const char *arguments)
 static void control_handle(struct sh_server *server, int fd, const char *request) {
     if (run_query(server, fd, request))
         return;
+    // A test's keyboard types on the lock screen too, as any keyboard does.
+    if (!strncmp(request, "headless_keyboard", 17) && (!request[17] || request[17] == ' ')) {
+        control_headless_keyboard(server, fd, request + (request[17] ? 18 : 17));
+        return;
+    }
     if (server->locked) {
         control_reply(fd, "error: the session is locked\n");
         return;
     }
     if (!strncmp(request, "headless_output", 15) && (!request[15] || request[15] == ' ')) {
         control_headless_output(server, fd, request + (request[15] ? 16 : 15));
-        return;
-    }
-    if (!strncmp(request, "headless_keyboard", 17) && (!request[17] || request[17] == ' ')) {
-        control_headless_keyboard(server, fd, request + (request[17] ? 18 : 17));
         return;
     }
     if (!strncmp(request, "session", 7) && (!request[7] || request[7] == ' ')) {
