@@ -210,6 +210,13 @@ shadows.
   snapped by dragging back where it was before the drag. `windows.snap` turns it off and sets the
   distance, the corners, the preview and its colour; `shaodesk msg get snap` tells the zone and
   the preview.
+- Snapping from the keyboard: `snap_top_left`, `snap_top_right`, `snap_bottom_left` and
+  `snap_bottom_right` put the focused window into a quarter, and Super + Alt + arrows
+  (`snap_cycle_left`, `snap_cycle_right`, `snap_cycle_up`, `snap_cycle_down`) step it as
+  Windows' Win + arrows do: left and right to that half and on to the next monitor, up to
+  maximized, down back to its own size and then minimized, and between halves and quarters.
+  The scroll layout's suggested `scroll_left` and `scroll_right` keys in the example
+  configuration move to Super + Alt + H and L.
 - `windows.controls = "traffic_lights"` draws the controls of the windows shaodesk decorates as
   red, yellow and green circles at their top-left, as macOS does: grey while the window has no
   focus, their symbols shown while the pointer is on one, darker while pressed.

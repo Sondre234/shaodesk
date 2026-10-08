@@ -410,8 +410,8 @@ Limitations: window placement during interactive resize is immediate, without wa
 client's next buffer.
 
 Actions without a section of their own: `quit` ends the session (Super + M), and `snap_left` and
-`snap_right` fill half of the monitor with the focused floating window (no default binding).
-`focus_last` (Super + `) focuses the window focused before this one, on any workspace; repeated,
+`snap_right` fill half of the monitor with the focused window (no default binding; see
+[Snapping](#snapping) for the quarters and Super + Alt + arrows). `focus_last` (Super + `) focuses the window focused before this one, on any workspace; repeated,
 it flips between two windows.
 
 ### Borders, opacity and rounded corners
@@ -528,8 +528,8 @@ quarter, and `maximize` fills it; `restore` gives a snapped or maximized window 
 place back. Snapping a window to the half it is in already moves it to the near half of the next
 monitor that way. These float a tile, as dragging one does.
 
-`snap_cycle_left`, `snap_cycle_right`, `snap_cycle_up` and `snap_cycle_down` step the focused
-window as Windows' Win + arrows do. Left and right put a window at its own size or maximized
+`snap_cycle_left`, `snap_cycle_right`, `snap_cycle_up` and `snap_cycle_down` (Super + Alt +
+arrows) step the focused window as Windows' Win + arrows do. Left and right put a window at its own size or maximized
 into that half; from the other half they give it its own size back, and from that half they move
 it on to the next monitor that way, into the half facing back (where there is none, nothing
 happens). Up maximizes a window at its own size, and down minimizes it; down gives a maximized
@@ -537,6 +537,11 @@ window its own size back. Up and down take a half to its top or bottom quarter a
 back to its half; up from a top quarter maximizes, and down from a bottom quarter minimizes.
 Left and right keep a quarter in its row, moving it on to the next monitor from its own side. A
 fullscreen window leaves fullscreen first, and a tile counts as a window at its own size.
+
+The macOS style's Window menu (Tile Window to Left or Right of Screen) runs `snap_left` and
+`snap_right` for the window it names, as the bindings do, and the command palette offers the
+halves and quarters. `tests/snap_keys_smoke.py` steps a window through the quarters and the
+cycle on two monitors, and the cycle has unit tests in `tests/layout_tests.cpp`.
 
 `windows.snap = { enabled = false }` turns snapping by dragging off, the top edge too;
 `corners = false` leaves the corners to the side edges; `preview = false` snaps without the
