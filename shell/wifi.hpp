@@ -1,10 +1,42 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include <QAbstractListModel>
 #include <QObject>
 #include <QStringList>
-#include <QVariantList>
 #include <memory>
 #include <vector>
+
+// The Wi-Fi networks in range, one row each, updated in place, moved rather than made again, so
+// that a row being typed in (a password) stays as signals change and the list reorders.
+class WifiNetworks : public QAbstractListModel {
+    Q_OBJECT
+    Q_PROPERTY(int count READ count NOTIFY countChanged)
+  public:
+    struct Network {
+        QString ssid;
+        int strength = 0;
+        // "open", "owe" (Enhanced Open), "wpa-psk" (WPA or WPA2 Personal, or WPA3 in transition),
+        // "sae" (WPA3 Personal), "wep" or "enterprise".
+        QString security;
+        bool secured = false, known = false, active = false, connecting = false;
+        bool operator==(const Network &) const = default;
+    };
+    enum Role { SsidRole = Qt::UserRole + 1, StrengthRole, SecurityRole, SecuredRole, KnownRole, ActiveRole, ConnectingRole };
+    using QAbstractListModel::QAbstractListModel;
+    int rowCount(const QModelIndex &parent = {}) const override;
+    QVariant data(const QModelIndex &index, int role) const override;
+    QHash<int, QByteArray> roleNames() const override;
+    int count() const { return int(rows_.size()); }
+    const std::vector<Network> &all() const { return rows_; }
+    // The networks as they are now, in order: rows gone are removed, those still there changed
+    // in place and moved to their new places, new ones inserted.
+    void update(const std::vector<Network> &networks);
+  Q_SIGNALS:
+    void countChanged();
+
+  private:
+    std::vector<Network> rows_;
+};
 
 // Wi-Fi as Quick Settings and the network widget show it, from NetworkManager: the radio, the
 // networks in range (one entry for each name, at its strongest access point), the one connected
@@ -20,10 +52,8 @@ class Wifi : public QObject {
     Q_PROPERTY(bool enabled READ enabled NOTIFY changed)
     Q_PROPERTY(bool hardwareEnabled READ hardwareEnabled NOTIFY changed)
     // The networks in range, the one connected first, then the one being connected to, then by
-    // signal, as {ssid, strength (0-100), security, secured, known, active, connecting}; empty
-    // while the radio is off. `security` is "open", "owe" (Enhanced Open), "wpa-psk" (WPA or WPA2
-    // Personal, or WPA3 in transition), "sae" (WPA3 Personal), "wep" or "enterprise".
-    Q_PROPERTY(QVariantList networks READ networks NOTIFY changed)
+    // signal (0-100); empty while the radio is off.
+    Q_PROPERTY(WifiNetworks *networks READ networks CONSTANT)
     // The Wi-Fi network connected to and its signal; "" and 0 for none.
     Q_PROPERTY(QString ssid READ ssid NOTIFY changed)
     Q_PROPERTY(int strength READ strength NOTIFY changed)
@@ -53,12 +83,13 @@ class Wifi : public QObject {
     // An access point's security from NetworkManager's flags for it: Flags (802.11 privacy),
     // WpaFlags and RsnFlags (key management).
     static QString security(uint flags, uint wpaFlags, uint rsnFlags);
-    explicit Wifi(QObject *parent = nullptr) : QObject(parent) {}
+    explicit Wifi(QObject *parent = nullptr) : QObject(parent), networks_(this) {}
     bool available() const { return state_.available; }
     bool hasWifi() const { return state_.hasWifi; }
     bool enabled() const { return state_.enabled; }
     bool hardwareEnabled() const { return state_.hardwareEnabled; }
-    QVariantList networks() const;
+    WifiNetworks *networks() { return &networks_; }
+    const WifiNetworks *networks() const { return &networks_; }
     QString ssid() const { return state_.ssid; }
     int strength() const { return state_.strength; }
     QString connecting() const;
@@ -99,8 +130,11 @@ class Wifi : public QObject {
     State state_;
     // The network asked for, until NetworkManager connects to it or fails.
     QString requested_;
+    WifiNetworks networks_;
     // The strongest access point of each name.
     const AccessPoint *strongest(const QString &ssid) const;
+    // Lists the networks again, from the state and the network asked for.
+    void list();
 };
 
 // The NetworkManager backend on the system bus, or one that never finds NetworkManager when

@@ -24,6 +24,76 @@ bool withKey(const QString &security) { return security == "wpa-psk" || security
 bool withoutKey(const QString &security) { return security == "open" || security == "owe"; }
 } // namespace
 
+int WifiNetworks::rowCount(const QModelIndex &parent) const {
+    return parent.isValid() ? 0 : count();
+}
+QVariant WifiNetworks::data(const QModelIndex &index, int role) const {
+    if (!index.isValid() || index.row() >= count())
+        return {};
+    const auto &network = rows_[size_t(index.row())];
+    switch (role) {
+    case Qt::DisplayRole:
+    case SsidRole:
+        return network.ssid;
+    case StrengthRole:
+        return network.strength;
+    case SecurityRole:
+        return network.security;
+    case SecuredRole:
+        return network.secured;
+    case KnownRole:
+        return network.known;
+    case ActiveRole:
+        return network.active;
+    case ConnectingRole:
+        return network.connecting;
+    }
+    return {};
+}
+QHash<int, QByteArray> WifiNetworks::roleNames() const {
+    return {{SsidRole, "ssid"},   {StrengthRole, "strength"}, {SecurityRole, "security"},
+            {SecuredRole, "secured"}, {KnownRole, "known"}, {ActiveRole, "active"},
+            {ConnectingRole, "connecting"}};
+}
+void WifiNetworks::update(const std::vector<Network> &networks) {
+    const int before = count();
+    auto listed = [&networks](const QString &ssid) {
+        return std::any_of(networks.begin(), networks.end(), [&ssid](const Network &n) { return n.ssid == ssid; });
+    };
+    for (int i = count() - 1; i >= 0; --i)
+        if (!listed(rows_[size_t(i)].ssid)) {
+            beginRemoveRows({}, i, i);
+            rows_.erase(rows_.begin() + i);
+            endRemoveRows();
+        }
+    // Each place in turn: the network already there, moved up from further down, or new.
+    for (int i = 0; i < int(networks.size()); ++i) {
+        const auto &next = networks[size_t(i)];
+        if (i >= count() || rows_[size_t(i)].ssid != next.ssid) {
+            auto it = std::find_if(rows_.begin() + i, rows_.end(),
+                                   [&next](const Network &row) { return row.ssid == next.ssid; });
+            if (it == rows_.end()) {
+                beginInsertRows({}, i, i);
+                rows_.insert(rows_.begin() + i, next);
+                endInsertRows();
+                continue;
+            }
+            const int from = int(it - rows_.begin());
+            beginMoveRows({}, from, from, {}, i);
+            const Network moved = *it;
+            rows_.erase(it);
+            rows_.insert(rows_.begin() + i, moved);
+            endMoveRows();
+        }
+        if (!(rows_[size_t(i)] == next)) {
+            rows_[size_t(i)] = next;
+            Q_EMIT dataChanged(index(i), index(i));
+        }
+    }
+    if (count() != before)
+        Q_EMIT countChanged();
+}
+
 QString Wifi::security(uint flags, uint wpaFlags, uint rsnFlags) {
     const uint keys = wpaFlags | rsnFlags;
     if (keys & (key8021x | keySuiteB))
@@ -49,9 +119,11 @@ const Wifi::AccessPoint *Wifi::strongest(const QString &ssid) const {
 QString Wifi::connecting() const {
     return !state_.activating.isEmpty() ? state_.activating : requested_;
 }
-QVariantList Wifi::networks() const {
-    if (!state_.available || !state_.enabled)
-        return {};
+void Wifi::list() {
+    if (!state_.available || !state_.enabled) {
+        networks_.update({});
+        return;
+    }
     std::vector<AccessPoint> shown;
     for (const auto &point : state_.accessPoints) {
         // A hidden network has no name to show.
@@ -79,31 +151,30 @@ QVariantList Wifi::networks() const {
             return a.strength > b.strength;
         return a.ssid.localeAwareCompare(b.ssid) < 0;
     });
-    QVariantList list;
+    std::vector<WifiNetworks::Network> rows;
     for (const auto &point : shown)
-        list.push_back(QVariantMap{{"ssid", point.ssid},
-                                   {"strength", point.strength},
-                                   {"security", point.security},
-                                   {"secured", !withoutKey(point.security)},
-                                   {"known", state_.known.contains(point.ssid)},
-                                   {"active", point.ssid == state_.ssid},
-                                   {"connecting", point.ssid == linking && point.ssid != state_.ssid}});
-    return list;
+        rows.push_back({point.ssid, point.strength, point.security, !withoutKey(point.security),
+                        state_.known.contains(point.ssid), point.ssid == state_.ssid,
+                        point.ssid == linking && point.ssid != state_.ssid});
+    networks_.update(rows);
 }
 void Wifi::update(State state) {
     if (!state.available)
         state = State{};
     // Connected to the network asked for, or connecting to it by NetworkManager's account.
+    const QString requested = requested_;
     if (!requested_.isEmpty() && (state.ssid == requested_ || state.activating == requested_))
         requested_.clear();
-    if (sameState(state, state_))
+    if (sameState(state, state_) && requested == requested_)
         return;
     state_ = std::move(state);
+    list();
     Q_EMIT changed();
 }
 void Wifi::connectionFailed(const QString &ssid, const QString &message, bool password) {
     if (requested_ == ssid) {
         requested_.clear();
+        list();
         Q_EMIT changed();
     }
     Q_EMIT failed(message);
@@ -125,6 +196,7 @@ void Wifi::setEnabled(bool enabled) {
         return;
     // Shown at once; NetworkManager confirms it.
     state_.enabled = enabled;
+    list();
     Q_EMIT changed();
     sendEnabled(enabled);
 }
@@ -137,6 +209,7 @@ void Wifi::connectTo(const QString &ssid, const QString &password) {
         (needsPassword(ssid) && password.isEmpty()))
         return;
     requested_ = ssid;
+    list();
     Q_EMIT changed();
     const auto *point = strongest(ssid);
     sendConnect(ssid, point ? point->security : QStringLiteral("open"), password);

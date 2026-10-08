@@ -260,15 +260,16 @@ class NetworkManagerDbusTest : public QObject {
     fakedbus::Bus bus_;
 
     static QVariantMap network(const Wifi &wifi, const QString &ssid) {
-        for (const auto &entry : wifi.networks())
-            if (entry.toMap().value("ssid") == ssid)
-                return entry.toMap();
+        for (const auto &entry : wifi.networks()->all())
+            if (entry.ssid == ssid)
+                return {{"strength", entry.strength}, {"security", entry.security}, {"secured", entry.secured},
+                        {"known", entry.known}, {"active", entry.active}, {"connecting", entry.connecting}};
         return {};
     }
     static QStringList names(const Wifi &wifi) {
         QStringList list;
-        for (const auto &entry : wifi.networks())
-            list << entry.toMap().value("ssid").toString();
+        for (const auto &entry : wifi.networks()->all())
+            list << entry.ssid;
         return list;
     }
 
@@ -299,7 +300,7 @@ class NetworkManagerDbusTest : public QObject {
         QVERIFY(wifi.needsPassword("Office"));
         manager.stop();
         QTRY_VERIFY(!wifi.available());
-        QVERIFY(wifi.networks().isEmpty());
+        QVERIFY(wifi.networks()->count() == 0);
         QCOMPARE(wifi.primaryType(), QString());
     }
     // Signals, access points coming and going, and the way out changing.

@@ -32,14 +32,22 @@ Wifi::State inRange() {
 }
 QStringList names(const Wifi &wifi) {
     QStringList list;
-    for (const auto &network : wifi.networks())
-        list << network.toMap().value("ssid").toString();
+    for (const auto &network : wifi.networks()->all())
+        list << network.ssid;
     return list;
 }
+// A row of the list, by its roles' names.
 QVariantMap network(const Wifi &wifi, const QString &ssid) {
-    for (const auto &network : wifi.networks())
-        if (network.toMap().value("ssid") == ssid)
-            return network.toMap();
+    const auto *model = wifi.networks();
+    for (int row = 0; row < model->count(); ++row) {
+        const auto index = model->index(row);
+        if (model->data(index, WifiNetworks::SsidRole) != ssid)
+            continue;
+        QVariantMap roles;
+        for (auto [role, name] : model->roleNames().asKeyValueRange())
+            roles[QString::fromUtf8(name)] = model->data(index, role);
+        return roles;
+    }
     return {};
 }
 } // namespace
@@ -62,7 +70,7 @@ class WifiTest : public QObject {
     void absent() {
         FakeWifi wifi;
         QVERIFY(!wifi.available() && !wifi.hasWifi());
-        QVERIFY(wifi.networks().isEmpty());
+        QVERIFY(wifi.networks()->count() == 0);
         wifi.setEnabled(true);
         wifi.scan();
         wifi.connectTo("Home", "secret");
@@ -72,7 +80,7 @@ class WifiTest : public QObject {
         auto gone = inRange();
         gone.available = false;
         wifi.update(gone);
-        QVERIFY(!wifi.hasWifi() && wifi.networks().isEmpty());
+        QVERIFY(!wifi.hasWifi() && wifi.networks()->count() == 0);
     }
     // One entry for each name at its strongest, hidden networks left out, by signal.
     void list() {
@@ -107,7 +115,34 @@ class WifiTest : public QObject {
         // Nothing while the radio is off.
         connected.enabled = false;
         wifi.update(connected);
-        QVERIFY(wifi.networks().isEmpty());
+        QVERIFY(wifi.networks()->count() == 0);
+    }
+    // Rows change in place and move as the order changes, rather than being made again, so that a
+    // row being typed in stays.
+    void inPlace() {
+        FakeWifi wifi;
+        wifi.update(inRange());
+        auto *model = wifi.networks();
+        QSignalSpy inserted(model, &QAbstractItemModel::rowsInserted);
+        QSignalSpy removed(model, &QAbstractItemModel::rowsRemoved);
+        QSignalSpy moved(model, &QAbstractItemModel::rowsMoved);
+        QSignalSpy changed(model, &QAbstractItemModel::dataChanged);
+        auto stronger = inRange();
+        stronger.accessPoints.push_back({"Cafe", 95, "open"});
+        wifi.update(stronger);
+        QCOMPARE(names(wifi), (QStringList{"Cafe", "Home", "Corp", "Office", "Lobby", "Old"}));
+        QCOMPARE(inserted.count() + removed.count(), 0);
+        QCOMPARE(moved.count(), 1);
+        QCOMPARE(changed.count(), 1);
+        QCOMPARE(network(wifi, "Cafe").value("strength").toInt(), 95);
+        auto other = stronger;
+        std::erase_if(other.accessPoints, [](const Wifi::AccessPoint &point) { return point.ssid == "Old"; });
+        other.accessPoints.push_back({"Park", 10, "open"});
+        wifi.update(other);
+        QCOMPARE(names(wifi), (QStringList{"Cafe", "Home", "Corp", "Office", "Lobby", "Park"}));
+        QCOMPARE(removed.count(), 1);
+        QCOMPARE(inserted.count(), 1);
+        QCOMPARE(model->count(), 6);
     }
     // A password only for a network secured with a key that NetworkManager does not know.
     void passwords() {
