@@ -52,7 +52,9 @@ with harness.Compositor(compositor, CONFIG.format(depth="bit_depth = 10"),
     path = desktop.root / "mirror.ppm"
 
     def mirrored():
-        msg("headless_output", "capture", "HEADLESS-3", str(path))
+        # Nothing to read until the mirror has drawn its first frame.
+        if desktop.run("headless_output", "capture", "HEADLESS-3", str(path)).returncode != 0:
+            return False
         return harness.Shot(path.read_bytes()).at(640, 360) == (0x33, 0x66, 0x99)
     wait_for(mirrored, "the mirror shows the background")
 
