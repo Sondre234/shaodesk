@@ -2,6 +2,7 @@
 #pragma once
 #include <QList>
 #include <QString>
+#include <QStringList>
 
 // Which desktop entry a window belongs to, by the app id it gives. Most windows give their
 // desktop file's name, but many spell it otherwise: X11 clients give their WM_CLASS, which the
@@ -25,7 +26,8 @@ class Index {
     Index() = default;
     explicit Index(const QList<Entry> &entries);
     // The id of the entry a window with this app id belongs to, or an empty string. The ways
-    // to match are tried from the most exact down, each against every entry before the next.
+    // to match are tried from the most exact down, each against every entry before the next,
+    // then again for each of the app id's aliases().
     QString find(const QString &appId) const;
 
   private:
@@ -35,6 +37,7 @@ class Index {
         // StartupWMClass, the program and Name.
         QString baseKey, lastKey, lastTwoKey, wmClassKey, programKey, nameKey;
     };
+    QString findOne(const QString &appId) const;
     QList<Keys> entries_;
 };
 
@@ -49,5 +52,10 @@ QString key(const QString &name);
 // The program an Exec line runs: its file name, past env and its variables, wrappers such as
 // gamemoderun or prime-run, sh -c, and flatpak run (its --command, else the application id).
 QString program(const QString &exec);
+// Other names of the applications whose app ids name nothing like their desktop entries or
+// icons (steamwebhelper is Steam's, soffice LibreOffice's), lowered; empty for the rest.
+QStringList aliases(const QString &appId);
+// Icon names to try, best first, for a window with this app id that no entry matches.
+QStringList iconGuesses(const QString &appId);
 
 } // namespace app_match

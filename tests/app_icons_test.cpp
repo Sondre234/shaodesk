@@ -175,6 +175,31 @@ class AppIconsTest : public QObject {
         QCOMPARE(index.find(""), QString());
         QCOMPARE(app_match::Index().find("firefox"), QString());
     }
+    void findsAliases() {
+        const app_match::Index index({
+            {"steam.desktop", "Steam", "/usr/bin/steam %U", "Steam"},
+            {"libreoffice-startcenter.desktop", "", "libreoffice %U", "LibreOffice"},
+            {"org.gnome.Terminal.desktop", "", "gnome-terminal --window", "Terminal"},
+        });
+        QCOMPARE(index.find("steamwebhelper"), QString("steam.desktop"));
+        QCOMPARE(index.find("soffice"), QString("libreoffice-startcenter.desktop"));
+        QCOMPARE(index.find("gnome-terminal-server"), QString("org.gnome.Terminal.desktop"));
+        QCOMPARE(app_match::aliases("VirtualBox Manager"), QStringList{"virtualbox"});
+        QCOMPARE(app_match::aliases("firefox"), QStringList());
+    }
+    void guessesIconNames() {
+        using app_match::iconGuesses;
+        QCOMPARE(iconGuesses("steam_app_570"),
+                 (QStringList{"steam_icon_570", "steam_app_570", "steam_app"}));
+        QCOMPARE(iconGuesses("Gimp-2.10"), (QStringList{"Gimp-2.10", "gimp-2.10", "gimp"}));
+        QCOMPARE(iconGuesses("org.example.Viewer"),
+                 (QStringList{"org.example.Viewer", "org.example.viewer", "Viewer", "viewer"}));
+        QCOMPARE(iconGuesses(".foo-wrapped"), (QStringList{".foo-wrapped", "foo"}));
+        QCOMPARE(iconGuesses("soffice"),
+                 (QStringList{"soffice", "libreoffice-startcenter", "libreoffice"}));
+        QCOMPARE(iconGuesses("/tmp/evil"), QStringList());
+        QCOMPARE(iconGuesses(""), QStringList());
+    }
 };
 
 QTEST_GUILESS_MAIN(AppIconsTest)

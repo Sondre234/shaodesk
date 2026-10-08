@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "app_match.hpp"
 #include <QFileInfo>
+#include <QHash>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QStringList>
@@ -12,8 +13,9 @@ namespace app_match {
 QString trimmed(const QString &name) {
     static const QStringList extensions{".desktop", ".exe", ".appimage", ".sh", ".py"};
     static const QStringList suffixes{
-        "-wrapped", "-bin", "-desktop",     "-stable", "-beta",   "-nightly", "-git",   "-browser",
-        "-wayland", "-x11", "-url-handler", "-x86_64", "_x86_64", ".x86_64",  "-amd64", "-linux"};
+        "-wrapped", "-bin",     "-desktop", "-stable",      "-beta",     "-nightly", "-git",
+        "-browser", "-wayland", "-x11",     "-url-handler", "-unstable", "-canary",  "-insiders",
+        "-x86_64",  "_x86_64",  ".x86_64",  "-amd64",       "-linux"};
     static const QRegularExpression version(R"([-_ ]v?\d+(\.\d+)*$)");
     auto text = name.trimmed().toLower();
     while (text.startsWith('.'))
@@ -100,6 +102,15 @@ Index::Index(const QList<Entry> &entries) {
 }
 
 QString Index::find(const QString &appId) const {
+    if (auto id = findOne(appId); !id.isEmpty())
+        return id;
+    for (const auto &alias : aliases(appId))
+        if (auto id = findOne(alias); !id.isEmpty())
+            return id;
+    return {};
+}
+
+QString Index::findOne(const QString &appId) const {
     if (appId.isEmpty())
         return {};
     static const QRegularExpression steamApp(R"(^steam_app_(\d+)$)",
@@ -138,6 +149,46 @@ QString Index::find(const QString &appId) const {
             if (match(entry))
                 return entry.id;
     return {};
+}
+
+QStringList aliases(const QString &appId) {
+    static const QHash<QString, QStringList> known{
+        {"steamwebhelper", {"steam"}},
+        {"soffice", {"libreoffice-startcenter", "libreoffice"}},
+        {"libreoffice", {"libreoffice-startcenter"}},
+        {"gnome-terminal-server", {"org.gnome.Terminal", "gnome-terminal"}},
+        {"virtualbox manager", {"virtualbox"}},
+        {"virtualbox machine", {"virtualbox"}},
+        {"virtualboxvm", {"virtualbox"}},
+        {"jetbrains-studio", {"android-studio"}},
+    };
+    return known.value(appId.toLower());
+}
+
+QStringList iconGuesses(const QString &appId) {
+    QStringList guesses;
+    // A path is no icon name, and may be a file the application wrote.
+    if (appId.isEmpty() || appId.contains('/'))
+        return guesses;
+    auto add = [&guesses](const QString &name) {
+        if (!name.isEmpty() && !guesses.contains(name))
+            guesses << name;
+    };
+    // Steam installs a game's icon under this name as it makes its shortcut.
+    static const QRegularExpression steamApp(R"(^steam_app_(\d+)$)",
+                                             QRegularExpression::CaseInsensitiveOption);
+    if (const auto game = steamApp.match(appId).captured(1); !game.isEmpty())
+        add("steam_icon_" + game);
+    add(appId);
+    add(appId.toLower());
+    if (const auto parts = appId.split('.'); parts.size() >= 3) {
+        add(parts.last());
+        add(parts.last().toLower());
+    }
+    add(trimmed(appId));
+    for (const auto &alias : aliases(appId))
+        add(alias);
+    return guesses;
 }
 
 } // namespace app_match
