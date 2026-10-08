@@ -376,7 +376,7 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
 QStringList PreviewData::surfaces() {
     return {"osd-volume", "osd-text", "cards",    "power-dialog",
             "palette",    "switcher", "overview", "palette-empty",
-            "palette-calculator", "palette-files", "clipboard"};
+            "palette-calculator", "palette-files", "clipboard", "emoji"};
 }
 
 namespace {
@@ -471,6 +471,12 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
              {{"text/plain", "Robin Lee\n4 Market Street\nOldtown"}}},
             {1});
         controller_.clipboard()->toggle(output);
+    } else if (name == "emoji") {
+        file = "EmojiPicker.qml";
+        properties = {{"screenSize", ShellView::previewSize()}, {"shown", true}};
+        // Some picked lately, which open the picker on their tab.
+        controller_.emoji()->preview({"👍", "🎉", "😂", "❤️", "🙏", "🚀", "☕"}, 0);
+        controller_.emoji()->toggle(output);
     } else if (paletteQueries().contains(name)) {
         file = "Palette.qml";
         properties = {{"screenSize", ShellView::previewSize()}, {"shown", true}};
@@ -558,7 +564,8 @@ QImage PreviewData::withSurface(QImage desktop) const {
         // bottom.
         at = QPoint((output.width() - size.width()) / 2,
                     controller_.osd()->top() ? 48 : output.height() - controller_.osdBottom() - size.height());
-    } else if (surfaceName_.startsWith("palette") || surfaceName_ == "clipboard") {
+    } else if (surfaceName_.startsWith("palette") || surfaceName_ == "clipboard" ||
+               surfaceName_ == "emoji") {
         // PaletteView: centred, below the bars by ShellController::paletteDrop.
         at = QPoint(usable.left() + (usable.width() - size.width()) / 2,
                     usable.top() + controller_.paletteDrop(output.height()));
