@@ -72,8 +72,10 @@ set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_ima
 # What the compositor passes on from the volume, microphone and brightness keys, which feeds the
 # on-screen display too.
 list(APPEND SHAODESK_NOTIFY_SOURCES volume_keys.cpp volume_keys.hpp)
-# The display mode popup's model, which the controller holds too.
-list(APPEND SHAODESK_NOTIFY_SOURCES display_modes.cpp display_modes.hpp)
+# The display mode popup's model, which the controller holds too, and the display settings
+# window's.
+list(APPEND SHAODESK_NOTIFY_SOURCES display_modes.cpp display_modes.hpp display_settings.cpp
+    display_settings.hpp display_layout.cpp display_layout.hpp)
 # The QML is compiled ahead of time into the binary (qmlcachegen), so starting the shell parses
 # and compiles none of it. It lives at qrc:/shell/ShaodeskShell/*.qml.
 qt_add_library(shaodesk_shell_qml STATIC)

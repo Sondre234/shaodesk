@@ -728,6 +728,9 @@ void ShellController::subscribe() {
                 continue;
             } else if (displayModes_.handle(line)) {
                 continue;
+            } else if (displaySettings_.handle(line)) {
+                // "display-settings OUTPUT", and a trial's lines.
+                continue;
             } else if (line.startsWith("notifications ")) {
                 Q_EMIT notificationsRequested(line.sliced(14));
                 continue;
