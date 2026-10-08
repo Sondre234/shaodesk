@@ -298,8 +298,9 @@ class ShellController : public QObject {
     Q_INVOKABLE bool isPinned(const QString &id) const;
     // The pinned application whose taskbar slot a window with this app id takes over, or empty.
     Q_INVOKABLE QString pinnedAppFor(const QString &windowAppId) const;
-    // The icon of a window's application, else an icon the theme has by a name guessed from its
-    // app id, else application-x-executable.
+    // The icon of a window's application, else of a desktop entry the menus leave out that it
+    // matches, else an icon the theme has by a name guessed from its app id, else
+    // application-x-executable.
     Q_INVOKABLE QString iconFor(const QString &windowAppId) const;
     Q_INVOKABLE void reload();
     Q_INVOKABLE void clearError();
@@ -389,6 +390,9 @@ class ShellController : public QObject {
     // iconFor found for each app id since they last changed.
     app_match::Index appIndex_;
     mutable QHash<QString, QString> appFor_, iconFor_;
+    // The entries the menus leave out, for their windows' icons, and those icons by entry id.
+    app_match::Index hiddenIndex_;
+    QHash<QString, QString> hiddenIcons_;
     // Desktop ids pinned from the shell, in the order they were pinned.
     QStringList userPins_;
     QString error_;

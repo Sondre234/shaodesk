@@ -100,6 +100,14 @@ int main(int argc, char **argv) {
         otherFile.write("[Desktop Entry]\nType=Application\nName=Other app\nExec=true\n") < 0)
         return fail("could not write the other application");
     otherFile.close();
+    // One the menus leave out, whose icon its windows still get.
+    QFile hiddenFile(screens.filePath("data/applications/shaodesk-test-hidden.desktop"));
+    if (!hiddenFile.open(QIODevice::WriteOnly) ||
+        hiddenFile.write("[Desktop Entry]\nType=Application\nName=Hidden app\nExec=true\n"
+                         "NoDisplay=true\nIcon=shaodesk-hidden-icon\n"
+                         "StartupWMClass=HiddenThing\n") < 0)
+        return fail("could not write the hidden application");
+    hiddenFile.close();
     qputenv("XDG_DATA_HOME", screens.filePath("data").toLocal8Bit());
     qputenv("XDG_DATA_DIRS", screens.filePath("none").toLocal8Bit());
     qputenv("XDG_STATE_HOME", screens.filePath("state").toLocal8Bit());
@@ -283,6 +291,11 @@ int main(int argc, char **argv) {
             controller.iconFor("org.example.App") != "application-x-executable" ||
             controller.iconFor("Fake") != "application-x-executable") {
             std::cerr << "a window's icon is not guessed from its app ID\n";
+            return 1;
+        }
+        if (controller.iconFor("HiddenThing") != "shaodesk-hidden-icon" ||
+            !controller.appFor("HiddenThing").isEmpty()) {
+            std::cerr << "a window of an application the menus leave out has not its icon\n";
             return 1;
         }
     }

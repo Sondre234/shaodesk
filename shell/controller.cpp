@@ -173,11 +173,12 @@ void ShellController::refreshApps() {
     for (const auto &launcher : config_.shell.launchers)
         apps_.push_back({QString("pinned:%1").arg(index++), QString::fromStdString(launcher.name),
                          QString::fromStdString(launcher.icon), launcher.command, nullptr, true, {}});
-    QList<app_match::Entry> entries;
+    QList<app_match::Entry> entries, hidden;
+    hiddenIcons_.clear();
     GList *list = g_app_info_get_all();
     for (GList *item = list; item; item = item->next) {
         auto *info = G_APP_INFO(item->data);
-        if (!g_app_info_should_show(info) || !g_app_info_get_id(info))
+        if (!g_app_info_get_id(info))
             continue;
         QString icon = "application-x-executable";
         GIcon *gicon = g_app_info_get_icon(info);
@@ -196,6 +197,17 @@ void ShellController::refreshApps() {
         const char *wmClass = G_IS_DESKTOP_APP_INFO(info)
                                   ? g_desktop_app_info_get_startup_wm_class(G_DESKTOP_APP_INFO(info))
                                   : nullptr;
+        // An entry the menus leave out (NoDisplay, or not for this desktop) still gives the
+        // windows of its program an icon: a password prompt's, a portal's file dialog's.
+        if (!g_app_info_should_show(info)) {
+            if (gicon) {
+                hidden.push_back({id, QString::fromUtf8(wmClass ? wmClass : ""),
+                                  QString::fromUtf8(g_app_info_get_commandline(info)),
+                                  QString::fromUtf8(g_app_info_get_display_name(info))});
+                hiddenIcons_.insert(id, icon);
+            }
+            continue;
+        }
         apps_.push_back({id, QString::fromUtf8(g_app_info_get_display_name(info)), icon, {},
                          G_APP_INFO(g_object_ref(info)), userPins_.contains(id),
                          QString::fromUtf8(wmClass ? wmClass : "")});
@@ -212,6 +224,7 @@ void ShellController::refreshApps() {
     }
     g_list_free_full(list, g_object_unref);
     appIndex_ = app_match::Index(entries);
+    hiddenIndex_ = app_match::Index(hidden);
     appFor_.clear();
     iconFor_.clear();
     sortApps();
@@ -1020,15 +1033,13 @@ QString ShellController::iconFor(const QString &windowAppId) const {
             return app.icon;
     auto known = iconFor_.constFind(windowAppId);
     if (known == iconFor_.cend()) {
-        // A name the icon theme has, guessed from the app id; never a path, which only a
-        // desktop entry's Icon= may be.
-        QString icon = "application-x-executable";
+        // The icon of an entry the menus leave out, else a name the icon theme has, guessed
+        // from the app id; never a path, which only a desktop entry's Icon= may be.
+        QString icon = hiddenIcons_.value(hiddenIndex_.find(windowAppId));
         for (const auto &guess : app_match::iconGuesses(windowAppId))
-            if (QIcon::hasThemeIcon(guess)) {
+            if (icon.isEmpty() && QIcon::hasThemeIcon(guess))
                 icon = guess;
-                break;
-            }
-        known = iconFor_.insert(windowAppId, icon);
+        known = iconFor_.insert(windowAppId, icon.isEmpty() ? "application-x-executable" : icon);
     }
     return *known;
 }
