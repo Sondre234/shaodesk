@@ -21,7 +21,7 @@ covers branches, building, testing and committing; [features.md](features.md) de
 | Where | Language | What |
 | --- | --- | --- |
 | `src/compositor/` | C | The compositor proper, on wlroots. Shares one private header, `server.h`. |
-| `src/*.c`, `include/shaodesk/*.h` | C | Pieces the compositor uses that stand on their own: animations, window controls, shadows and tab strips (pixels), effect arithmetic, touchpad swipes' arithmetic, overview thumbnails, session files, the logind client, what dynamic window rules hold and give back. Several are unit tested. |
+| `src/*.c`, `include/shaodesk/*.h` | C | Pieces the compositor uses that stand on their own: animations, window controls, shadows and tab strips (pixels), effect arithmetic, touchpad swipes' arithmetic, overview thumbnails, session files, the monitors' settings kept from the display settings window, the logind client, what dynamic window rules hold and give back. Several are unit tested. |
 | `src/config.cpp`, `src/config_schema.cpp` | C++ | The Lua configuration: parsing, validation, the action table and the settings schema. |
 | `src/tiling.cpp`, `src/layout.cpp`, `src/window_placement.cpp`, `src/overview_layout.cpp` | C++ | Pure geometry (tiling layouts, snapping, placement, the overview grid), with a C interface in `backend.h` and unit tests. |
 | `src/import/` | C++ | `shaodesk import` from Hyprland and Waybar. |
@@ -68,7 +68,7 @@ all. In short:
 | `hdr.c` | HDR (`outputs.monitors`' `hdr`): monitors driven in BT.2020 with PQ where they, the renderer and the test allow, and color-management-v1 for applications' colours. |
 | `tearing.c` | Tearing (tearing-control-v1, `windows.allow_tearing`): which fullscreen window may have its frames shown at once, and the asynchronous page flips. |
 | `display_mode.c` | The display_mode action (Windows' Win+P): extend, duplicate, internal, external, and the popup that steps through them. |
-| `display_settings.c` | The display settings window's monitors: the settings it kept (`src/output_state.c`), laid over `outputs.monitors`, and the primary monitor. |
+| `display_settings.c` | The display settings window's monitors: the settings it kept (`src/output_state.c`), laid over `outputs.monitors`, the primary monitor, `get monitors`, and `monitors apply` trying every monitor's settings at once, kept or taken back. |
 | `layer_shell.c` | Panels and other layer surfaces. |
 | `group.c`, `scratchpad.c`, `swallow.c`, `switcher.c`, `overview.c`, `session.c` | One feature each. `session.c` also saves a login session as `last` as it ends (`session_save_last`, from the power actions and quit) and restores it after `startup` (`session_restore_last`, from `sh_run`), asking `sh_callbacks.started` which missing windows startup and autostart will open. |
 | `switches.c` | Switch devices: the lid turning a laptop's panel off and on (clamshell), switches' bindings. |
@@ -331,6 +331,39 @@ does) for the display_mode action and calls `apply_output_settings`; its popup i
 whose timer takes the choice shown, and the shell draws it from `display-mode` lines
 (`DisplayModes`, `display_modes.cpp`, and `DisplayModeView`). `display_mode_key`, which
 `handle_keybinding` asks before the bindings, takes the arrows, Return and Escape while it is open.
+
+### Display settings
+
+The monitors' settings in force (`output_monitor`, `output.c`) are a monitor's runtime settings
+(`sh_output.override`, from wlr-output-management or `display_mode`) while it has them, else
+`configured_monitor`: its `outputs.monitors` entry, or the display settings window's line for it
+laid over that entry whole but for `tiling`, copied into `sh_output.configured`.
+`sh_server.display_settings.saved` holds those lines (`struct sh_output_state`,
+`src/output_state.c`, tested by `output_state_tests`), read from the state file by
+`display_settings_load` at startup, before the backend starts, and as the configuration reloads;
+`saved_output` finds a monitor's by its connector name and description (`output_description`).
+`primary_output_name` gives the primary monitor, a line's or `outputs.primary`, to
+`arrange_outputs` and `display_mode.c`, and `hdr_asked` counts the lines' `hdr` towards offering
+colour management.
+
+`monitors apply` (`control_monitors`) starts from every connected monitor's settings as the window
+shows them (`shown_settings`: those in force, with a live monitor's mode, scale, transform and
+adaptive sync as they are, and its place before the shift to 0, 0, `sh_output.x` and `y`), lays
+the request's KEY=VALUE words over them with the state file's own parser
+(`sh_output_state_set`), and checks what no monitor's test can (`check_apply`). `test_monitor`
+(`output.c`) tests each monitor's state as `configure_output` would commit it, as
+wlr-output-management's test does for each head; a refusal changes nothing. Then `apply_saved`
+notes, as a trial starts, the kept lines and each monitor's runtime settings by name, puts the new
+lines in `saved`, drops the runtime settings and calls `apply_output_settings`; `placed_primary`
+is set first, so the pointer does not jump to a new primary monitor. `took_settings` checks that
+every monitor took its mode, scale and transform (`configure_output` falls back to the defaults
+where its own test fails, and ignores a failed commit), and `revert_trial` puts back what was
+noted, at once where one did not, after `TRIAL_MS` on the timer, or on `monitors revert`.
+`monitors keep` writes `saved` to the state file through a temporary file, or removes it when
+`monitors reset` emptied it. A reload during a trial reads the file again, which is the trial's
+end. One more rule makes a line's `enabled = off` hold at startup: the first monitor to appear is
+kept on whatever its settings say (`sh_output.kept_on`), and `server_new_output` configures it
+again once another one is there.
 
 ### Tearing
 
@@ -896,6 +929,10 @@ those headless outputs refuse a 10-bit render format, as a monitor without one d
 `bit_depth_smoke.py`), and `SHAODESK_TEST_REFUSE_TEARING` refuses their asynchronous page flips
 (see `tearing_smoke.py`, whose windows ask for them with `SHAODESK_PROBE_TEARING=async`);
 `SHAODESK_TEST_HDR` makes outputs claim HDR in their EDID (see `hdr_smoke.py`).
+`SHAODESK_TEST_TRIAL_MS` shortens a display settings trial, and `SHAODESK_TEST_REFUSE_MODE=WxH`
+and `SHAODESK_TEST_REFUSE_COMMIT=WxH` make headless outputs refuse that size in the display
+settings' test, or in `configure_output`'s as if the commit failed (see
+`display_settings_smoke.py`).
 `SHAODESK_PROBE_ICON` gives a `wayland_probe` window an icon
   through xdg-toplevel-icon-v1 and an `x11_probe` window `_NET_WM_ICON`, and their commands
   change it (see `window_icon_smoke.py`). `SHAODESK_LOGIN_SESSION=1` makes a headless
