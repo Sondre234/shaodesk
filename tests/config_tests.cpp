@@ -73,6 +73,7 @@ int main(int argc, char **argv) {
                                       {XKB_KEY_XF86AudioStop, SH_MEDIA_STOP}}) {
             auto *media = config.binding(0, keysym);
             require(media && media->action == action, "a media key is not bound");
+            require(media->locked && !media->repeats, "a media key does not work on the lock screen");
         }
         auto *taskbar_keys = config.binding(SH_LOGO, XKB_KEY_b);
         require(taskbar_keys && taskbar_keys->action == SH_TASKBAR_FOCUS,

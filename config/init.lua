@@ -441,11 +441,11 @@ return {
         { mods = {}, key = "XF86MonBrightnessUp", action = "brightness_up", locked = true, repeats = true },
         { mods = {}, key = "XF86MonBrightnessDown", action = "brightness_down", locked = true, repeats = true },
         -- The media keys go to the player playing most lately (MPRIS), the one Quick Settings
-        -- shows.
-        { mods = {}, key = "XF86AudioPlay", action = "media_play_pause" },
-        { mods = {}, key = "XF86AudioPause", action = "media_play_pause" },
-        { mods = {}, key = "XF86AudioNext", action = "media_next" },
-        { mods = {}, key = "XF86AudioPrev", action = "media_previous" },
-        { mods = {}, key = "XF86AudioStop", action = "media_stop" },
+        -- shows; on the lock screen too.
+        { mods = {}, key = "XF86AudioPlay", action = "media_play_pause", locked = true },
+        { mods = {}, key = "XF86AudioPause", action = "media_play_pause", locked = true },
+        { mods = {}, key = "XF86AudioNext", action = "media_next", locked = true },
+        { mods = {}, key = "XF86AudioPrev", action = "media_previous", locked = true },
+        { mods = {}, key = "XF86AudioStop", action = "media_stop", locked = true },
     },
 }
