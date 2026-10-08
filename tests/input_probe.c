@@ -445,8 +445,8 @@ static void global(void *data, struct wl_registry *registry, uint32_t name, cons
     } else if (!strcmp(interface, zwlr_layer_shell_v1_interface.name)) {
         probe->layer_shell = wl_registry_bind(registry, name, &zwlr_layer_shell_v1_interface, 1);
     } else if (!strcmp(interface, zwp_keyboard_shortcuts_inhibit_manager_v1_interface.name)) {
-        probe->inhibit_manager =
-            wl_registry_bind(registry, name, &zwp_keyboard_shortcuts_inhibit_manager_v1_interface, 1);
+        probe->inhibit_manager = wl_registry_bind(
+            registry, name, &zwp_keyboard_shortcuts_inhibit_manager_v1_interface, 1);
     } else if (!strcmp(interface, zwp_pointer_gestures_v1_interface.name)) {
         probe->gestures_version = version < 3 ? version : 3;
         probe->gestures = wl_registry_bind(registry, name, &zwp_pointer_gestures_v1_interface,

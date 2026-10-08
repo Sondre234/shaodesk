@@ -97,8 +97,8 @@ static const struct zwp_input_method_v2_listener input_method_listener = {
 
 /* The grab's keymap goes to the virtual keyboard too, as fcitx5 does, so that the keys it passes
  * on mean the same. */
-static void grab_keymap(void *data, struct zwp_input_method_keyboard_grab_v2 *grab,
-                        uint32_t format, int32_t fd, uint32_t size) {
+static void grab_keymap(void *data, struct zwp_input_method_keyboard_grab_v2 *grab, uint32_t format,
+                        int32_t fd, uint32_t size) {
     struct probe *probe = data;
     say("keymap");
     if (probe->keyboard) {
@@ -131,8 +131,8 @@ static void popup_rectangle(void *data, struct zwp_input_popup_surface_v2 *popup
                             int32_t y, int32_t width, int32_t height) {
     say("rectangle %d %d %d %d", x, y, width, height);
 }
-static const struct zwp_input_popup_surface_v2_listener popup_listener = {
-    .text_input_rectangle = popup_rectangle};
+static const struct zwp_input_popup_surface_v2_listener popup_listener = {.text_input_rectangle =
+                                                                              popup_rectangle};
 
 static void global(void *data, struct wl_registry *registry, uint32_t name, const char *interface,
                    uint32_t version) {
@@ -207,8 +207,8 @@ static void run_command(struct probe *probe, char *command) {
                                     WL_KEYBOARD_KEY_STATE_RELEASED);
     } else if (sscanf(command, "popup %d %d", &first, &second) == 2 && !probe->popup) {
         probe->popup_surface = wl_compositor_create_surface(probe->compositor);
-        probe->popup = zwp_input_method_v2_get_input_popup_surface(probe->input_method,
-                                                                   probe->popup_surface);
+        probe->popup =
+            zwp_input_method_v2_get_input_popup_surface(probe->input_method, probe->popup_surface);
         zwp_input_popup_surface_v2_add_listener(probe->popup, &popup_listener, probe);
         wl_surface_attach(probe->popup_surface, make_buffer(probe, first, second), 0, 0);
         wl_surface_damage_buffer(probe->popup_surface, 0, 0, first, second);

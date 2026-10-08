@@ -173,7 +173,8 @@ static void global(void *data, struct wl_registry *registry, uint32_t name, cons
         probe->shell = wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
         xdg_wm_base_add_listener(probe->shell, &shell_listener, probe);
     } else if (!strcmp(interface, wl_seat_interface.name) && !probe->seat) {
-        probe->seat = wl_registry_bind(registry, name, &wl_seat_interface, version < 5 ? version : 5);
+        probe->seat =
+            wl_registry_bind(registry, name, &wl_seat_interface, version < 5 ? version : 5);
         wl_seat_add_listener(probe->seat, &seat_listener, probe);
     } else if (!strcmp(interface, zwlr_layer_shell_v1_interface.name)) {
         probe->layer_shell = wl_registry_bind(registry, name, &zwlr_layer_shell_v1_interface, 1);

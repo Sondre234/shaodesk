@@ -118,8 +118,8 @@ static void place_popup(struct sh_input_popup *popup) {
         wlr_output_layout_output_at(server->output_layout, cursor.x, cursor.y);
     if (!output) {
         double closest_x, closest_y;
-        wlr_output_layout_closest_point(server->output_layout, NULL, cursor.x, cursor.y,
-                                        &closest_x, &closest_y);
+        wlr_output_layout_closest_point(server->output_layout, NULL, cursor.x, cursor.y, &closest_x,
+                                        &closest_y);
         output = wlr_output_layout_output_at(server->output_layout, closest_x, closest_y);
     }
     if (output) {
@@ -136,9 +136,10 @@ static void place_popup(struct sh_input_popup *popup) {
     }
     struct wlr_layer_surface_v1 *layer =
         wlr_layer_surface_v1_try_from_wlr_surface(wlr_surface_get_root_surface(focus));
-    struct wlr_scene_tree *parent = layer && layer->current.layer == ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY
-                                        ? methods->overlay_popup_tree
-                                        : methods->popup_tree;
+    struct wlr_scene_tree *parent =
+        layer && layer->current.layer == ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY
+            ? methods->overlay_popup_tree
+            : methods->popup_tree;
     if (popup->tree->node.parent != parent)
         wlr_scene_node_reparent(&popup->tree->node, parent);
     wlr_scene_node_set_position(&popup->tree->node, x, y);
@@ -205,7 +206,8 @@ static void pending_destroy(struct wl_listener *listener, void *data) {
  * connects. No text input enters the lock screen. */
 static void follow_focus(struct sh_server *server) {
     struct sh_input_methods *methods = &server->input_methods;
-    struct wlr_surface *focus = server->locked ? NULL : server->seat->keyboard_state.focused_surface;
+    struct wlr_surface *focus =
+        server->locked ? NULL : server->seat->keyboard_state.focused_surface;
     struct sh_text_input *text_input;
     wl_list_for_each(text_input, &methods->text_inputs, link) {
         struct wlr_surface *entered = text_input->input->focused_surface;
@@ -457,7 +459,8 @@ static struct wlr_input_method_keyboard_grab_v2 *grab_for(struct sh_keyboard *ke
         return NULL;
     struct wlr_virtual_keyboard_v1 *virtual =
         wlr_input_device_get_virtual_keyboard(&keyboard->wlr_keyboard->base);
-    if (virtual && wl_resource_get_client(virtual->resource) == wl_resource_get_client(grab->resource))
+    if (virtual &&
+        wl_resource_get_client(virtual->resource) == wl_resource_get_client(grab->resource))
         return NULL;
     return grab;
 }
@@ -476,7 +479,8 @@ bool input_method_key(struct sh_keyboard *keyboard, const struct wlr_keyboard_ke
     if (!grab)
         return false;
     wlr_input_method_keyboard_grab_v2_set_keyboard(grab, keyboard->wlr_keyboard);
-    wlr_input_method_keyboard_grab_v2_send_key(grab, event->time_msec, event->keycode, event->state);
+    wlr_input_method_keyboard_grab_v2_send_key(grab, event->time_msec, event->keycode,
+                                               event->state);
     return true;
 }
 
@@ -537,8 +541,8 @@ void input_method_init(struct sh_server *server) {
                  new_text_input);
     add_listener(&methods->manager->events.new_input_method, &methods->new_input_method,
                  new_input_method);
-    add_listener(&server->seat->keyboard_state.events.focus_change,
-                 &methods->keyboard_focus_change, keyboard_focus_change);
+    add_listener(&server->seat->keyboard_state.events.focus_change, &methods->keyboard_focus_change,
+                 keyboard_focus_change);
 }
 
 void input_method_finish(struct sh_server *server) {
