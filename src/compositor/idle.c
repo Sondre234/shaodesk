@@ -179,7 +179,7 @@ bool idle_activity(struct sh_server *server) {
             woke |= off && set_output_power(output, true);
         }
         if (woke)
-            wlr_log(WLR_INFO, "Input turned the monitors on");
+            wlr_log(WLR_INFO, "Turned on the monitors the idle steps turned off");
         // The steps taken are due again, before the one the timer waits for.
         idle_update(server);
     } else if (!idle->armed) {
