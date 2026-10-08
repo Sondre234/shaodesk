@@ -609,6 +609,9 @@ int main(int argc, char **argv) {
         require(shaodesk::parse_config("return {shell={}}").shell.widgets.power_mode &&
                     !shaodesk::parse_config("return {shell={widgets={power_mode=false}}}").shell.widgets.power_mode,
                 "the power mode tile is not on by default, or not switched off");
+        require(shaodesk::parse_config("return {shell={}}").shell.widgets.bluetooth &&
+                    !shaodesk::parse_config("return {shell={widgets={bluetooth=false}}}").shell.widgets.bluetooth,
+                "the Bluetooth tile is not on by default, or not switched off");
         // By default the status widgets, the profiles and do-not-disturb are in Quick Settings
         // and tiling and the wallpapers on the bar; `true` puts each there.
         const auto placed_by_default = shaodesk::parse_config("return {shell={}}").shell.widgets;
@@ -639,7 +642,7 @@ int main(int argc, char **argv) {
         rejects("return {shell={widgets={volume=1}}}");
         rejects("return {shell={widgets={clock='bar'}}}");
         rejects("return {shell={widgets={keyboard_layout='quick'}}}");
-        rejects("return {shell={widgets={bluetooth=false}}}");
+        rejects("return {shell={widgets={airplane_mode=false}}}");
         rejects("return {shell={widgets=true}}");
         rejects("return {shell={accent='#12345'}}");
         rejects("return {appearance={background='#11223344'}}");

@@ -350,6 +350,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.widgets.notifications` | boolean or string | true | - | Do-not-disturb and the unread notifications: `"bar"` (a bell that opens them, with their count; a right-click toggles do-not-disturb) or `"quick"` (a do-not-disturb tile). The clock does both either way. By default in Quick Settings. |
 | `shell.widgets.media` | boolean | true | - | The now-playing card at the top of Quick Settings: the cover, title and artist of the media player playing most lately (MPRIS), with previous, play or pause, next and the position; shown while a player is there. |
 | `shell.widgets.power_mode` | boolean | true | - | The power mode tile in Quick Settings: Power saver, Balanced or Performance, through power-profiles-daemon; shown while the daemon runs. |
+| `shell.widgets.bluetooth` | boolean | true | - | The Bluetooth tile in Quick Settings, through BlueZ: it turns the adapter on and off, and lists the paired devices to connect and those in range to pair with; shown while BlueZ has an adapter. |
 | `shell.launchers` | list of tables | unset | - | Pinned commands for programs without a desktop file, at most 64. |
 | `shell.launchers[].name` | string | - | - | Label, 1 to 128 bytes. Required. |
 | `shell.launchers[].icon` | string | "application-x-executable" | - | Icon theme name. |

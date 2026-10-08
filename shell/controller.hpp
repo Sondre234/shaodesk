@@ -3,6 +3,7 @@
 #include "app_match.hpp"
 #include "audio.hpp"
 #include "backlight.hpp"
+#include "bluetooth.hpp"
 #include "media.hpp"
 #include "notifications.hpp"
 #include "power_mode.hpp"
@@ -79,7 +80,7 @@ class ShellController : public QObject {
     // features.sticky: whether a window can be shown on every workspace of its monitor.
     Q_PROPERTY(bool stickyWindows READ stickyWindows NOTIFY configChanged)
     // Which panel widgets Lua enables, and where: {workspaces, clock, calendar, keyboard_layout,
-    // power, tray, media, power_mode} as booleans, and {battery, network, volume, tiling,
+    // power, tray, media, power_mode, bluetooth} as booleans, and {battery, network, volume, tiling,
     // profiles, wallpapers, notifications}, which can move, as "bar", "quick" (Quick Settings) or
     // "" (hidden).
     Q_PROPERTY(QVariantMap widgets READ widgets NOTIFY configChanged)
@@ -113,6 +114,8 @@ class ShellController : public QObject {
     // Wi-Fi and the connection out (NetworkManager), which Quick Settings and the network widget
     // show and control.
     Q_PROPERTY(Wifi *wifi READ wifi CONSTANT)
+    // Bluetooth (BlueZ), which Quick Settings switches, connects and pairs.
+    Q_PROPERTY(Bluetooth *bluetooth READ bluetooth CONSTANT)
     // The notification daemon (cards, history, do-not-disturb) and the on-screen display.
     Q_PROPERTY(NotificationCenter *notifications READ notifications CONSTANT)
     Q_PROPERTY(Osd *osd READ osd CONSTANT)
@@ -245,6 +248,7 @@ class ShellController : public QObject {
     Media *media() { return media_.get(); }
     PowerMode *powerMode() { return powerMode_.get(); }
     Wifi *wifi() { return wifi_.get(); }
+    Bluetooth *bluetooth() { return bluetooth_.get(); }
     NotificationCenter *notifications() { return &notifications_; }
     Osd *osd() { return &osd_; }
     QString focusedOutput() const { return focusedOutput_; }
@@ -380,6 +384,7 @@ class ShellController : public QObject {
     std::unique_ptr<Media> media_ = makeMedia();
     std::unique_ptr<PowerMode> powerMode_ = makePowerMode();
     std::unique_ptr<Wifi> wifi_ = makeWifi();
+    std::unique_ptr<Bluetooth> bluetooth_ = makeBluetooth();
     QString focusedOutput_, cardsOutput_;
     QVariantMap keyboardLayout_;
     bool nightLight_ = false;

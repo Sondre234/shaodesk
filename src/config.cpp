@@ -358,7 +358,8 @@ void read_shell(lua_State *L, ShellConfig &shell) {
                                    {"power", &shell.widgets.power},
                                    {"tray", &shell.widgets.tray},
                                    {"media", &shell.widgets.media},
-                                   {"power_mode", &shell.widgets.power_mode}})
+                                   {"power_mode", &shell.widgets.power_mode},
+                                   {"bluetooth", &shell.widgets.bluetooth}})
             boolean(L, key, (std::string("shell.widgets.") + key).c_str(), *target);
         // Those that can move, and where `true` puts them.
         struct Movable {
