@@ -1156,6 +1156,37 @@ settings replace the `outputs.monitors` entry of the outputs they touch until th
 configuration is reloaded, which brings the configured setup back. The last enabled output
 cannot be turned off.
 
+### Turning monitors off
+
+A monitor can also be turned off without leaving the layout: it keeps its place, its windows,
+workspaces and panels, and only stops showing a picture, as in a monitor's power saving, where
+`enabled = false` takes it out of the layout and sends its windows to another. The
+`display_off`, `display_on` and `display_toggle` actions turn every monitor off or on, or the
+one they name (`shaodesk msg display_off HDMI-A-1`, or `output = "HDMI-A-1"` in a binding, a
+connector name or `"desc:"` description as in `outputs.monitors`); toggling turns them all off
+while any is on. Clients of wlr-output-power-management, such as `wlopm`, do the same, and so do
+idle daemons through them (swayidle with `wlopm --off \*` and `wlopm --on \*`).
+
+```lua
+bindings = {
+    { mods = { "Super", "Shift" }, key = "Escape", action = "display_off" },
+    { mods = { "Super", "Ctrl" }, key = "F12", action = "display_toggle", output = "HDMI-A-1" },
+},
+```
+
+Once every monitor is off, whoever turned them off, a key press, a click, a scroll or the
+pointer moving turns them all on again, as on KDE and Windows; the key that does it does nothing
+else, since nobody saw what it would do. For a second after an action turned them off input
+leaves them off, so that the keys that did it, coming up, or a mouse nudged on the way do not
+bring them straight back. A monitor turned off while another stays on stays off until it is
+turned on.
+
+A monitor that is off draws no frames, so the windows on it alone are not asked to draw
+either, and `shaodesk msg get outputs` ends its line with `off`. wlr-output-management clients
+still list it as enabled, as sway does, and a reload or `wlr-randr` leaves it off: turned on
+again, it takes whatever settings they gave it meanwhile. A screen lock does not wait for a
+monitor that is off; the lock covers it from its first frame once it is on.
+
 ## Input
 
 The `keyboard` table sets the XKB `layout`, `variant`, `model`, `options` and `rules`, and the
@@ -1687,7 +1718,8 @@ one: `shaodesk msg output HDMI-A-1 workspace_next`. The query
 prints one tab-separated line per monitor (name, current workspace, focused, the
 workspaces holding windows, such as `1,3`, or `-`, and tiling, `on` or `off`),
 `shaodesk msg get tiling` prints `on` or `off` for the focused monitor, `shaodesk msg get outputs` prints one tab-separated line per monitor (name,
-enabled, x, y, logical width and height, scale, transform, mode, and "make model serial"), and
+enabled, x, y, logical width and height, scale, transform, mode, "make model serial", and
+whether it shows a picture, `on`, or is [turned off](#turning-monitors-off) or disabled, `off`), and
 `shaodesk msg get windows` prints one tab-separated line per window:
 workspace, focused, minimized, tiled, x, y, width, height, app ID, title, monitor,
 visible, scratchpad (a window hidden there is also minimized), sticky, and its window group
@@ -1748,7 +1780,8 @@ installed. The desktop is covered
 before the locker draws, only the locker receives input, and if it crashes the
 session stays locked until a new locker takes over. Idle notification and idle
 inhibition (`ext-idle-notify-v1`, `idle-inhibit-unstable-v1`) let swayidle lock
-or blank after inactivity while video players keep the session awake. Key bindings marked
+or blank after inactivity while video players keep the session awake; it blanks the monitors
+with `wlopm` (see [Turning monitors off](#turning-monitors-off)). Key bindings marked
 `locked = true`, the volume, microphone and brightness keys among them, still run while the
 session is locked ([Bindings on the lock screen, and held
 keys](#bindings-on-the-lock-screen-and-held-keys)). While a standalone

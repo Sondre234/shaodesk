@@ -515,7 +515,9 @@ const Option options[] = {
     {"bindings[].output", "string", "\"next\" for `swap_workspaces`", "", none, none,
      "With `move_workspace_to_output` (required) and `swap_workspaces`: the other monitor, "
      "`\"left\"` or `\"right\"` of the focused one, `\"next\"` or `\"prev\"` in order with wrap, or "
-     "a connector name or `\"desc:\"` description as in `outputs.monitors`."},
+     "a connector name or `\"desc:\"` description as in `outputs.monitors`. With `display_off`, "
+     "`display_on` and `display_toggle`: the monitor, a connector name or `\"desc:\"` "
+     "description; without one, every monitor."},
     {"bindings[].mode", "enum", "\"region\"", "", none, none,
      "With `screenshot`: `\"region\"`, `\"output\"`, or `\"window\"`. With `mode` (required): "
      "`\"default\"` or the name of one of `modes`."},

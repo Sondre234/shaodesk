@@ -367,6 +367,16 @@ static void control_handle(struct sh_server *server, int fd, const char *request
         control_reply(fd, "ok\n");
         return;
     }
+    if (display_action(action)) {
+        // The caller hears of a monitor that is not there.
+        server->target_output = target;
+        bool done = display_power(server, action, error, sizeof(error));
+        server->target_output = NULL;
+        char reply[300];
+        snprintf(reply, sizeof(reply), done ? "ok\n" : "error: %s\n", error);
+        control_reply(fd, reply);
+        return;
+    }
     server->target_output = target;
     run_action(server, action, argument);
     server->target_output = NULL;

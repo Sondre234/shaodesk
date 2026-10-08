@@ -59,6 +59,7 @@ all. In short:
 | `tiling.c` | Glue between windows and the layouts in `src/tiling.cpp`. |
 | `workspace.c` | Workspaces per output, sticky windows. |
 | `output.c`, `output_moves.c` | Monitors and their configuration; windows and workspaces moving between outputs. |
+| `output_power.c` | Monitors turned off and on in the layout: wlr-output-power-management. |
 | `layer_shell.c` | Panels and other layer surfaces. |
 | `group.c`, `scratchpad.c`, `swallow.c`, `switcher.c`, `overview.c`, `session.c` | One feature each. `session.c` also saves a login session as `last` as it ends (`session_save_last`, from the power actions and quit) and restores it after `startup` (`session_restore_last`, from `sh_run`), asking `sh_callbacks.started` which missing windows startup and autostart will open. |
 | `effects.c` | Dimming, peeking at the desktop or at one window, night light, magnifier, hot corners. |
@@ -259,6 +260,20 @@ it lists other windows, has no strip, draws its backdrop over the slot alone, le
 outside the slot to the rest of the compositor, closes at once, and puts the window picked into
 the slot. It announces itself as `overview-assist` rather than `overview`; the shell's
 `OverviewView` draws both, and takes no input for either.
+
+### Monitors turned off
+
+An output in `outputs` (the layout) may be `powered_off` (`output_power.c`): its `wlr_output` is
+committed disabled, which stops its frame events and scan-out, while it stays in the output
+layout, so its `wl_output` global, its place, workspaces, windows and layer surfaces stay as they
+are. `set_output_power` is the one way in and out; turning on clears the flag and calls
+`configure_output`, which until then leaves a powered-off output alone (a reload or a
+wlr-output-management change waits for it), and taking an output out of the layout clears it.
+`publish_output_configuration` reports such an output as enabled, as sway does, and
+`send_locked_if_presented` waits for no frame from it. wlroots' `wlr_output_power_manager_v1`
+reports the mode from `wlr_output->enabled` on every commit that changes it, so clients hear of
+the actions' changes too. `input_activity` (`input.c`), which every key, button, scroll and motion
+event calls, wakes them through `wake_displays` once every output in the layout is off.
 
 ## The shell (`shell/`)
 

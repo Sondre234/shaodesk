@@ -79,10 +79,12 @@ static void control_describe_output(struct sh_server *server, int fd, struct sh_
         wlr_output_layout_get_box(server->output_layout, o, &box);
     char line[512], description[256];
     output_description(o, description, sizeof(description));
-    // name, enabled, x, y, logical width, height, scale, transform, mode, description.
-    snprintf(line, sizeof(line), "%s\t%d\t%d\t%d\t%d\t%d\t%g\t%d\t%dx%d@%.3f\t%s\n", o->name,
+    // name, enabled, x, y, logical width, height, scale, transform, mode, description, and
+    // power: "on" while it shows a picture, "off" while turned off (output_power.c) or disabled.
+    snprintf(line, sizeof(line), "%s\t%d\t%d\t%d\t%d\t%d\t%g\t%d\t%dx%d@%.3f\t%s\t%s\n", o->name,
              !output->disabled, box.x, box.y, box.width, box.height, o->scale, o->transform,
-             o->width, o->height, o->refresh / 1000.0, description);
+             o->width, o->height, o->refresh / 1000.0, description,
+             !output->disabled && !output->powered_off && o->enabled ? "on" : "off");
     control_reply(fd, line);
 }
 

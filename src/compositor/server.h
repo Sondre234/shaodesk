@@ -77,6 +77,7 @@
 #include <wlr/types/wlr_idle_notify_v1.h>
 #include <wlr/types/wlr_input_device.h>
 #include <wlr/types/wlr_output_management_v1.h>
+#include <wlr/types/wlr_output_power_management_v1.h>
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/types/wlr_layer_shell_v1.h>
 #include <wlr/types/wlr_linux_dmabuf_v1.h>
@@ -456,6 +457,10 @@ struct sh_server {
     struct wlr_idle_notifier_v1 *idle_notifier;
     struct wlr_output_manager_v1 *output_manager;
     struct wl_listener output_apply, output_test;
+    /* wlr-output-power-management (output_power.c), and when an action last turned monitors
+     * off, which input does not undo for a moment. */
+    struct wl_listener output_power_set_mode;
+    int64_t displays_off_at;
     struct wl_listener new_inhibitor;
     int inhibitors;
     struct wl_display *wl_display;
@@ -583,6 +588,9 @@ struct sh_output {
     int x, y;                /* arrangement before the shift to the layout origin */
     struct wlr_box previous; /* where arrange_outputs found it; empty when newly added */
     bool disabled;           /* listed in disabled_outputs */
+    /* Turned off in the layout (output_power.c): it keeps its windows, workspaces and panels,
+     * but the wlr_output is disabled, so it neither scans out nor draws frames. */
+    bool powered_off;
     /* Settings a wlr-output-management client (wlr-randr, kanshi) applied at runtime. They
      * replace the configured monitor until the configuration is reloaded. */
     bool has_override;
@@ -948,6 +956,7 @@ void control_headless_tablet(struct sh_server *server, int fd, const char *argum
 void destroy_headless_inputs(struct sh_server *server);
 
 /* input.c */
+bool input_activity(struct sh_server *server, bool wakes);
 void control_headless_keyboard(struct sh_server *server, int fd, const char *arguments);
 void destroy_headless_keyboards(struct sh_server *server);
 void configure_pointer(struct sh_server *server, struct wlr_input_device *device);
@@ -994,6 +1003,7 @@ void output_config_test(struct wl_listener *listener, void *data);
 void output_config_apply(struct wl_listener *listener, void *data);
 void server_new_output(struct wl_listener *listener, void *data);
 struct wlr_output *find_output(struct sh_server *server, const char *name);
+struct sh_output *sh_output_for(struct sh_server *server, struct wlr_output *wlr_output);
 struct wlr_output *first_output(struct sh_server *server);
 struct sh_rect usable_area(struct sh_server *server, struct wlr_output *output);
 
@@ -1005,6 +1015,14 @@ void return_home_windows(struct sh_server *server);
 void move_toplevel_to_output(struct sh_toplevel *toplevel, struct wlr_output *to);
 void move_workspace_to_output(struct sh_server *server, const char *target);
 void swap_output_workspaces(struct sh_server *server, const char *target);
+
+/* output_power.c */
+bool set_output_power(struct sh_output *output, bool on);
+void output_power_set_mode(struct wl_listener *listener, void *data);
+bool display_action(enum sh_action action);
+bool display_power(struct sh_server *server, enum sh_action action, char *error,
+                   size_t error_size);
+bool wake_displays(struct sh_server *server);
 
 /* overview.c */
 size_t overview_describe(struct sh_server *server, char *text, size_t size);

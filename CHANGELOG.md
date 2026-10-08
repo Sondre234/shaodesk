@@ -310,6 +310,15 @@ shadows.
   strips go to the window with the keyboard. `tablet.output` maps a tablet to one monitor, and
   `shaodesk msg get tablet` lists tablets, pads and tools.
 
+### Monitors off, idle and the lid
+
+- A monitor can be turned off and on again while it stays in the layout with its windows,
+  workspaces and panels, where `enabled = false` takes it out: through
+  wlr-output-power-management, so `wlopm` works and swayidle can blank the monitors with it, and
+  with the `display_off`, `display_on` and `display_toggle` actions, for every monitor or the one
+  named. Once every monitor is off, a key press or the pointer turns them on again. `shaodesk msg
+  get outputs` ends each line with the monitor's power, `on` or `off`.
+
 ### Working on the shell
 
 - `shaodesk-shell --preview-popup NAME` shows one of the taskbar's popups or overlays on stand-in

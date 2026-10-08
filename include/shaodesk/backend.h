@@ -192,6 +192,12 @@ enum sh_action {
     /* Binding modes: argument 0 brings back the bindings outside any mode, N those of the
      * configuration's Nth mode (see sh_callbacks.set_mode). */
     SH_MODE,
+    /* Monitors off and on without leaving the layout: every one, or the one the action's target
+     * names (sh_callbacks.action_target: a connector, or "desc:" and the start of a description).
+     * Toggling turns them all off while any of them is on. */
+    SH_DISPLAY_OFF,
+    SH_DISPLAY_ON,
+    SH_DISPLAY_TOGGLE,
 };
 
 enum sh_screenshot_mode {

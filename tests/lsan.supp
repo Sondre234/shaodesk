@@ -2,6 +2,7 @@
 # and Qt state; only leaks the compositor or the shell make are worth failing a run over.
 leak:tests/wayland_probe.c
 leak:tests/output_management_probe.c
+leak:tests/output_power_probe.c
 leak:tests/lock_probe.c
 leak:tests/pointer_probe.c
 leak:tests/x11_probe.c

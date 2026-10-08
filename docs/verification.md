@@ -749,7 +749,6 @@ Not checked: Snap Assist on a real display (how the backdrop and the thumbnails 
 windows and at 144 or 200 Hz), with real applications' windows and their live contents, with a
 real keyboard and mouse, and across monitors of different scales.
 
-
 ## Volume, microphone and brightness keys
 
 Added 2026-10-08. `volume_keys_smoke` types the six keys on a headless keyboard and sends the
@@ -798,3 +797,19 @@ through grim.
 Not checked: a mode in daily use with a real keyboard, over real applications that take the keys
 a mode leaves them.
 
+## Monitors turned off in the layout
+
+Added 2026-10-08. `output_power_smoke` turns monitors off and on on a headless compositor through
+wlr-output-power-management, with a probe that speaks it as wlopm does, and through the
+`display_off`, `display_on` and `display_toggle` actions from the control socket and a binding:
+a monitor that is off keeps its place, windows, workspace and panel, draws no frames however the
+scene changes, is reported `off` by `get outputs` and to a client watching it, stays off over a
+reload, and a lock taken while every monitor is off holds at once; once every one is off, a key
+press (which does nothing else) or the pointer turns them on, a key coming up does not, and for a
+second after the action input leaves them off; a monitor unplugged while off sends its windows to
+another, and they return with it, on. `display_power_config` checks the bindings.
+
+Not checked: any of it on real monitors, that is, what a DRM output does when it is disabled and
+enabled again (the monitor's standby and how long it takes to come back, on NVIDIA and AMD, at
+mixed refresh rates and scales), the real `wlopm` and swayidle with it (neither is installed
+here), and night light and the magnifier on a monitor turned on again.

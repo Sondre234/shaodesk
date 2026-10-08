@@ -302,6 +302,14 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
     case SH_POWER_MENU:
         request_shell(server, "power-menu");
         break;
+    case SH_DISPLAY_OFF:
+    case SH_DISPLAY_ON:
+    case SH_DISPLAY_TOGGLE: {
+        char error[128];
+        if (!display_power(server, action, error, sizeof(error)))
+            wlr_log(WLR_ERROR, "%s", error);
+        break;
+    }
     case SH_TOGGLE_STICKY:
         if (current && server_settings(server)->sticky)
             set_sticky(current, !current->sticky, true);
