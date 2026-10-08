@@ -503,7 +503,7 @@ bool PreviewData::open(QQuickItem *panel, const QString &name) {
 QStringList PreviewData::surfaces() {
     return {"osd-volume", "osd-text", "cards",    "power-dialog",
             "palette",    "switcher", "overview", "palette-empty", "auth-dialog", "snap-assist",
-            "osd-microphone", "display-mode"};
+            "osd-microphone", "display-mode", "display-settings", "display-settings-trial"};
 }
 
 bool PreviewData::showSurface(QScreen *screen, const QString &name) {
@@ -532,6 +532,32 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
         properties = {{"outputName", output}};
         controller_.displayModes()->handle("display-mode " + output +
                                            " external extend internal,duplicate,extend,external");
+    } else if (name == "display-settings" || name == "display-settings-trial") {
+        // A monitor with HDR to be had on the left, the laptop's panel at a scale of 1.5 right of
+        // it, and a projector mirroring the panel; the first chosen, its scale changed but not
+        // applied yet, or on trial.
+        file = "DisplaySettings.qml";
+        properties = {{"screenSize", ShellView::previewSize()}, {"shown", true}};
+        auto *settings = controller_.displaySettings();
+        settings->setAsk([](const QByteArray &line, std::function<void(const QByteArray &)> done) {
+            if (line != "get monitors\n") {
+                done(line.startsWith("monitors apply") ? "ok\n15000\n" : "ok\n");
+                return;
+            }
+            done("ok\n"
+                 "DP-3\tDell Inc. DELL U2720Q 4KX\t0\tconfig\t1\ton\t-\t0\t0\t2560x1440@143.912\t1\t0\toff\t8\t8\t"
+                 "off\tsdr\t-\t1\t2560x1440@143.912*,2560x1440@59.951,1920x1080@143.912,1920x1080@60.000,"
+                 "1280x720@60.000\n"
+                 "eDP-1\tBOE 0x0BCA \t1\tdefault\t1\ton\t-\t2560\t240\t2880x1800@120.000\t1.5\t0\t-\t8\t8\toff\t"
+                 "sdr\tthe monitor does not offer BT.2020 with PQ\t0\t2880x1800@120.000*,2880x1800@60.000\n"
+                 "HDMI-A-1\tEpson EB-W06 \t0\twindow\t1\ton\teDP-1\t2560\t240\t1280x800@60.000\t1\t0\t-\t8\t8\t"
+                 "off\tsdr\tthe monitor does not offer BT.2020 with PQ\t0\t1280x800@60.000*,1024x768@60.000\n");
+        });
+        settings->show(output);
+        settings->select("DP-3");
+        settings->setScale("DP-3", 1.25);
+        if (name == "display-settings-trial")
+            settings->apply();
     } else if (name == "cards") {
         file = "NotificationCards.qml";
         // Over the stand-ins every preview has: one with a picture, buttons and a timer.
@@ -665,7 +691,7 @@ bool PreviewData::showSurface(QScreen *screen, const QString &name) {
     if (file == "Palette.qml")
         QMetaObject::invokeMethod(surface_->rootObject(), "reset");
     surface_->show();
-    if (name == "power-dialog" || name == "auth-dialog")
+    if (name == "power-dialog" || name == "auth-dialog" || name.startsWith("display-settings"))
         QMetaObject::invokeMethod(surface_->rootObject(), "reset");
     return true;
 }
@@ -695,8 +721,8 @@ QImage PreviewData::withSurface(QImage desktop) const {
         // PaletteView: centred, below the bars by ShellController::paletteDrop.
         at = QPoint(usable.left() + (usable.width() - size.width()) / 2,
                     usable.top() + controller_.paletteDrop(output.height()));
-    } else if (surfaceName_ == "display-mode") {
-        // DisplayModeView: in the middle of the output.
+    } else if (surfaceName_ == "display-mode" || surfaceName_.startsWith("display-settings")) {
+        // DisplayModeView and DisplaySettingsView: in the middle of the output.
         at = output.center() - QPoint(size.width() / 2, size.height() / 2);
     } else if (surfaceName_ == "switcher") {
         // SwitcherView: centred.

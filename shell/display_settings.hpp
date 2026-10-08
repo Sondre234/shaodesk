@@ -53,6 +53,8 @@ class DisplaySettings : public QObject {
     // Sends the compositor a request and hands its whole reply on, as ShellController::ask.
     using Ask = std::function<void(const QByteArray &, std::function<void(const QByteArray &)>)>;
     explicit DisplaySettings(Ask ask, QObject *parent = nullptr);
+    // Asks another stand-in for the compositor, as a preview, which has none, does.
+    void setAsk(Ask ask) { ask_ = std::move(ask); }
 
     bool open() const { return open_; }
     QString output() const { return output_; }
