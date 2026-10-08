@@ -159,6 +159,15 @@ std::vector<std::string> current_desktops() {
     return names;
 }
 
+bool sound_server_running() {
+    const char *runtime = std::getenv("XDG_RUNTIME_DIR");
+    if (!runtime || *runtime != '/')
+        return false;
+    std::error_code error;
+    return std::filesystem::exists(std::filesystem::path(runtime) / "pipewire-0", error) ||
+           std::filesystem::exists(std::filesystem::path(runtime) / "pulse/native", error);
+}
+
 std::optional<std::vector<std::string>> parse_exec(const std::string &value,
                                                    const std::string &name,
                                                    const std::string &icon,
@@ -291,6 +300,12 @@ std::string autostart_role(const std::string &name, const std::vector<std::strin
             return n == "soteria" || contains(n, {"polkit", "policykit"});
         }))
         return "polkit";
+    // pipewire, pipewire-pulse, wireplumber, gentoo-pipewire-launcher, pulseaudio and
+    // start-pulseaudio-x11: another start of these restarts the sound under running programs.
+    if (any([&](const std::string &n) {
+            return n == "wireplumber" || contains(n, {"pipewire", "pulseaudio"});
+        }))
+        return "sound";
     return {};
 }
 
@@ -349,6 +364,8 @@ AutostartEntry read_autostart_entry(const std::filesystem::path &path, const std
         entry.skip = "the shell serves the tray";
     else if (role == "polkit" && options.polkit)
         entry.skip = "the shell is the polkit agent";
+    else if (role == "sound" && options.sound)
+        entry.skip = "a sound server is already running";
     return entry;
 }
 

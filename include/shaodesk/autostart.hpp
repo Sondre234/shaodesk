@@ -33,6 +33,8 @@ struct AutostartOptions {
     bool notifications = false; // the notification daemon
     bool tray = false;          // the tray's StatusNotifierWatcher
     bool polkit = false;        // the polkit authentication agent
+    // A sound server already runs (see sound_server_running); an entry starting one is skipped.
+    bool sound = false;
 };
 
 // $XDG_CONFIG_HOME/autostart (else ~/.config/autostart), then the autostart directory of each of
@@ -40,6 +42,9 @@ struct AutostartOptions {
 std::vector<std::filesystem::path> autostart_directories();
 // $XDG_CURRENT_DESKTOP's names.
 std::vector<std::string> current_desktops();
+// Whether PipeWire's or PulseAudio's socket is in $XDG_RUNTIME_DIR: a sound server runs already,
+// as when the script that started the session started one.
+bool sound_server_running();
 // Every *.desktop file in `directories` by file name, the first directory's that has it, sorted by
 // name, each with `skip` saying why it is not started.
 std::vector<AutostartEntry> autostart_entries(const std::vector<std::filesystem::path> &directories,
@@ -56,7 +61,7 @@ std::optional<std::vector<std::string>> parse_exec(const std::string &value,
                                                    const std::string &icon = {},
                                                    const std::string &path = {});
 // What the entry is that the shell provides itself: "notifications", "tray", "polkit", or "" for
-// none. Told by the program it runs (after an `env` and its assignments), its TryExec, or its
+// none; or "sound" for a sound server (PipeWire, PulseAudio, or a script that starts them). Told by the program it runs (after an `env` and its assignments), its TryExec, or its
 // file's name.
 std::string autostart_role(const std::string &name, const std::vector<std::string> &command,
                            const std::string &try_exec = {});

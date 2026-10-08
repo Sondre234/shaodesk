@@ -699,6 +699,7 @@ struct Runtime {
 #if SHAODESK_SHELL_POLKIT
         options.polkit = shell && config.shell.polkit_agent;
 #endif
+        options.sound = shaodesk::sound_server_running();
         auto field = [](std::string text) {
             for (auto &c : text)
                 c = c == '\t' || c == '\n' || c == '\r' ? ' ' : c;
