@@ -19,6 +19,7 @@
 #include "shaodesk/tabs.h"
 #include "shaodesk/sleep.h"
 #include "shaodesk/login1.h"
+#include "shaodesk/swipe.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -261,6 +262,29 @@ struct sh_workspace_swipe {
     int copy_count;
 };
 
+/* The touchpad swipe under way (gestures.c). */
+enum sh_swipe_mode {
+    SH_SWIPE_IDLE,      /* there is none */
+    SH_SWIPE_WAITING,   /* it has no direction yet: held back from the windows until it has */
+    SH_SWIPE_PASSED,    /* the window under the pointer's */
+    SH_SWIPE_WORKSPACE, /* the workspaces follow the fingers */
+    SH_SWIPE_OVERVIEW,  /* the overview opens or closes with them */
+    SH_SWIPE_ACTION,    /* a request runs as the fingers lift past half way */
+};
+struct sh_gesture {
+    enum sh_swipe_mode mode;
+    struct sh_swipe swipe;
+    /* When the swipe began, and how far it went as libinput tells it, while it waited: what the
+     * window under the pointer is told at once if the swipe turns out to be its. */
+    uint32_t began;
+    double dx, dy;
+    /* The swipe bound to the direction taken, and the one bound to the opposite, if any. */
+    struct sh_swipe_binding bound, opposite;
+    bool has_opposite;
+    struct sh_workspace_swipe workspace;
+    bool opening; /* the overview swipe opens it, rather than closing it */
+};
+
 struct sh_server {
     const struct sh_callbacks *callbacks;
     bool running;
@@ -413,6 +437,7 @@ struct sh_server {
     struct wl_listener swipe_begin, swipe_update, swipe_end;
     struct wl_listener pinch_begin, pinch_update, pinch_end;
     struct wl_listener hold_begin, hold_end;
+    struct sh_gesture gesture;
 
     struct wlr_seat *seat;
     struct wl_listener new_input;
@@ -823,6 +848,7 @@ void forget_decoration(struct sh_toplevel *toplevel);
 void server_new_decoration(struct wl_listener *listener, void *data);
 
 /* gestures.c */
+void describe_gesture(struct sh_server *server, int fd);
 void gestures_init(struct sh_server *server);
 void gestures_finish(struct sh_server *server);
 

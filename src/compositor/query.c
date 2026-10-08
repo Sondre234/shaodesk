@@ -553,6 +553,12 @@ static void describe_surface(struct sh_server *server, int fd, const char *what,
     control_reply(fd, line);
 }
 
+static void get_gesture(struct sh_server *server, int fd, const char *arguments) {
+    // The touchpad swipe under way, and the workspaces following it (see describe_gesture).
+    control_reply(fd, "ok\n");
+    describe_gesture(server, fd);
+}
+
 static void get_seat(struct sh_server *server, int fd, const char *arguments) {
     // What has the keyboard, what the pointer is on, and, while a drag is under way, what it is
     // over (each as describe_surface has it). During a drag the pointer is on nothing: its events
@@ -599,6 +605,7 @@ static const struct {
     {"power", get_power, false},
     {"pictures", get_pictures, false},
     {"seat", get_seat, false},
+    {"gesture", get_gesture, false},
 };
 
 /* Answers `request` if it is a query; false if it is not one. */
