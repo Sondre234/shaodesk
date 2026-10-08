@@ -268,6 +268,7 @@ what was there.
 | `Desktop.qml` | The wallpaper and the desktop's launchers, on the background layer. |
 | `DrawnWallpaper.qml` | The wallpaper the macOS style draws while none is set, light or dark, from the background colour and the accent. |
 | `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |
+| `AuthDialog.qml` | The polkit authentication dialog (`shell.authentication`), an overlay surface of its own: the request, the user to answer as, the password. |
 | `SwitcherCards.qml` | The switcher's windows as cards with their pictures, in rows, with `shell.thumbnails` outside the macOS style. |
 
 The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `task_filter.cpp`

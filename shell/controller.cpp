@@ -30,6 +30,9 @@
 #if SHAODESK_TRAY
 #include "tray_host.hpp"
 #endif
+#if SHAODESK_POLKIT
+#include "polkit_agent.hpp"
+#endif
 
 ShellController::ShellController(std::filesystem::path path, QObject *parent)
     : QObject(parent), path_(std::move(path)), tasks_(this) {
@@ -68,10 +71,12 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
             osd_.show(overlayOutput(), "Brightness", percent, "brightness");
     });
     connect(&backlight_, &Backlight::failed, this, &ShellController::report);
+    authentication_.setOutputSource([this] { return overlayOutput(); });
 }
 ShellController::~ShellController() {
     delete engine_; // Before the objects its context refers to go away.
     delete trayHost_; // Before the model it fills.
+    delete polkitAgent_; // Likewise.
     clearApps();
 }
 QQmlEngine *ShellController::engine() {
@@ -577,6 +582,7 @@ void ShellController::reload() {
         power_.setCountdown(config_.power.countdown);
         updateNotificationService();
         updateTrayHost();
+        updatePolkitAgent();
         refreshApps();
         Q_EMIT configChanged();
         Q_EMIT wallpaperChanged();
@@ -989,6 +995,40 @@ void ShellController::updateTrayHost() {
         } else {
             std::cerr << "shaodesk tray: " << host->error().toStdString() << '\n';
             delete host;
+        }
+    }
+#endif
+}
+bool ShellController::startPolkit() {
+    servePolkit_ = true;
+    updatePolkitAgent();
+    return polkitAgent_ != nullptr;
+}
+void ShellController::updatePolkitAgent() {
+    if (!servePolkit_)
+        return;
+#if SHAODESK_POLKIT
+    if (!config_.shell.polkit_agent) {
+        if (polkitAgent_)
+            std::cerr << "shaodesk polkit: off, no longer the authentication agent\n";
+        delete polkitAgent_;
+        polkitAgent_ = nullptr;
+        polkitProblem_.clear();
+    } else if (!polkitAgent_) {
+        auto *agent = new PolkitAgent(authentication_, this);
+        if (agent->start()) {
+            polkitAgent_ = agent;
+            polkitProblem_.clear();
+            std::cerr << "shaodesk polkit: the session's authentication agent\n";
+        } else {
+            // Quietly off: said once, tried again at the next reload.
+            const QString problem = agent->taken()
+                                        ? "another authentication agent serves this session"
+                                        : agent->error();
+            if (problem != polkitProblem_)
+                std::cerr << "shaodesk polkit: " << problem.toStdString() << '\n';
+            polkitProblem_ = problem;
+            delete agent;
         }
     }
 #endif

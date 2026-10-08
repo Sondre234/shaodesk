@@ -73,8 +73,8 @@ int main(int argc, char **argv) {
                       "profiles, wallpapers, notifications, "
                       "quick-settings or quick-settings-mixer; in the macOS style system-menu, "
                       "app-menu, window-menu or window-submenu too; or an overlay over the bar: "
-                      "osd-volume, osd-text, cards, power-dialog, palette, palette-empty, switcher "
-                      "or overview",
+                      "osd-volume, osd-text, cards, power-dialog, auth-dialog, palette, "
+                      "palette-empty, switcher or overview",
                       "name"});
     parser.addOption(
         {"quit-after",
@@ -144,6 +144,7 @@ int main(int argc, char **argv) {
         std::vector<std::unique_ptr<SwitcherView>> switchers;
         std::vector<std::unique_ptr<PaletteView>> palettes;
         std::vector<std::unique_ptr<PowerView>> powerViews;
+        std::vector<std::unique_ptr<AuthView>> authViews;
         std::vector<std::unique_ptr<OverviewView>> overviews;
         std::vector<std::unique_ptr<CardsView>> cardViews;
         std::vector<std::unique_ptr<OsdView>> osdViews;
@@ -242,6 +243,13 @@ int main(int argc, char **argv) {
                     throw std::runtime_error("could not load shell QML");
                 }
                 powerViews.push_back(std::move(powerView));
+                auto authView = std::make_unique<AuthView>(controller, screen);
+                if (authView->status() == QQuickView::Error) {
+                    for (const auto &error : authView->errors())
+                        std::cerr << error.toString().toStdString() << '\n';
+                    throw std::runtime_error("could not load shell QML");
+                }
+                authViews.push_back(std::move(authView));
                 auto overview = std::make_unique<OverviewView>(controller, screen);
                 if (overview->status() == QQuickView::Error) {
                     for (const auto &error : overview->errors())
@@ -284,6 +292,7 @@ int main(int argc, char **argv) {
         if (!preview || qEnvironmentVariableIsSet("SHAODESK_PREVIEW_DBUS")) {
             controller.startNotifications();
             controller.startTray();
+            controller.startPolkit();
         }
         QObject::connect(&app, &QGuiApplication::screenAdded, &app, [&](QScreen *screen) {
             if (preview)
@@ -304,6 +313,7 @@ int main(int argc, char **argv) {
                 return palette->outputScreen() == screen;
             });
             std::erase_if(powerViews, [screen](const auto &view) { return view->outputScreen() == screen; });
+            std::erase_if(authViews, [screen](const auto &view) { return view->outputScreen() == screen; });
             std::erase_if(overviews, [screen](const auto &overview) {
                 return overview->outputScreen() == screen;
             });

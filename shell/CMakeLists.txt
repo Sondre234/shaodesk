@@ -90,6 +90,7 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     FocusRing.qml
 
     PowerDialog.qml
+    AuthDialog.qml
     ClockFlyout.qml
     BatteryIcon.qml
     QuickSettingsButton.qml
@@ -348,6 +349,21 @@ if(BUILD_TESTING)
     target_link_libraries(osd_test PRIVATE shaodesk_shell_qml)
     add_test(NAME shell_osd COMMAND osd_test)
     set_tests_properties(shell_osd PROPERTIES TIMEOUT 30
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;DBUS_SESSION_BUS_ADDRESS=disabled:")
+    # The authentication dialog in its view, with stand-ins for polkit's helper.
+    add_executable(auth_dialog_test ${PROJECT_SOURCE_DIR}/tests/auth_dialog_test.cpp
+        ${SHAODESK_NOTIFY_SOURCES} controller.cpp controller.hpp palette.cpp palette.hpp fuzzy.cpp fuzzy.hpp view.cpp view.hpp task_model.cpp task_model.hpp window_pictures.cpp window_pictures.hpp
+        task_filter.cpp task_filter.hpp icons.cpp icons.hpp app_match.cpp app_match.hpp wallpapers.cpp wallpapers.hpp window_images.cpp window_images.hpp audio.cpp audio.hpp system_status.cpp system_status.hpp power.cpp power.hpp
+        ${SHAODESK_TASK_PROTOCOL_SOURCES})
+    set_target_properties(auth_dialog_test PROPERTIES AUTOMOC ON)
+    target_sources(auth_dialog_test PRIVATE ${SHAODESK_START_SOURCES} ${SHAODESK_AUTH_SOURCES})
+    target_include_directories(auth_dialog_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
+    target_compile_definitions(auth_dialog_test PRIVATE QT_NO_KEYWORDS SHAODESK_LAYER_SHELL=0)
+    target_compile_options(auth_dialog_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(auth_dialog_test PRIVATE shaodesk_config Qt6::Test Qt6::Network Qt6::Quick Qt6::Qml
+        PkgConfig::GIO PkgConfig::SHELL_WAYLAND shaodesk_shell_qml)
+    add_test(NAME shell_auth_dialog COMMAND auth_dialog_test)
+    set_tests_properties(shell_auth_dialog PROPERTIES TIMEOUT 60
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;DBUS_SESSION_BUS_ADDRESS=disabled:")
     add_executable(system_status_test ${PROJECT_SOURCE_DIR}/tests/system_status_test.cpp
         system_status.cpp system_status.hpp)
