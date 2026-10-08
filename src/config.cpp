@@ -285,6 +285,41 @@ Command command(lua_State *L) {
         fail("command executable is empty");
     return result;
 }
+// The dimming a `display_off` of so many milliseconds brings when `dim` is unset: 30 seconds
+// before, halfway under a minute, none without it.
+int idle_dim_before(int display_off) {
+    return display_off > 0 ? display_off - std::min(30000, display_off / 2) : 0;
+}
+// One table of `idle` steps, in seconds (0 for never), into milliseconds; steps it leaves out
+// stay as they are.
+void read_idle_steps(lua_State *L, sh_idle_steps &steps) {
+    constexpr int day = 24 * 60 * 60;
+    lua_getfield(L, -1, "dim");
+    bool dim_set = !lua_isnil(L, -1);
+    lua_pop(L, 1);
+    lua_getfield(L, -1, "display_off");
+    bool off_set = !lua_isnil(L, -1);
+    lua_pop(L, 1);
+    steps.display_off = 1000 * integer(L, "display_off", steps.display_off / 1000, 0, day);
+    steps.lock = 1000 * integer(L, "lock", steps.lock / 1000, 0, day);
+    steps.suspend = 1000 * integer(L, "suspend", steps.suspend / 1000, 0, day);
+    if (dim_set)
+        steps.dim = 1000 * integer(L, "dim", 0, 0, day);
+    else if (off_set)
+        steps.dim = idle_dim_before(steps.display_off);
+}
+// `idle`, and `idle.battery`, which starts from it.
+void read_idle(lua_State *L, sh_settings &settings) {
+    if (section(L, "idle")) {
+        read_idle_steps(L, settings.idle);
+        settings.idle_battery = settings.idle;
+        if (section(L, "battery", "idle.battery"))
+            read_idle_steps(L, settings.idle_battery);
+        lua_pop(L, 1);
+    }
+    lua_pop(L, 1);
+    current_section.clear();
+}
 void read_shell(lua_State *L, ShellConfig &shell) {
     if (!section(L, "shell")) {
         lua_pop(L, 1);
@@ -1409,6 +1444,7 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
     }
     lua_pop(L, 1);
     current_section.clear();
+    read_idle(L, config.settings);
     lua_getfield(L, -1, "bindings");
     current_section = "bindings";
     if (!lua_isnil(L, -1)) {

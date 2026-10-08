@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Configuration of monitors turned off in the layout: the display actions.
+// Configuration of monitors turned off in the layout: the display actions, and the idle steps.
 #include "shaodesk/config.hpp"
 #include <iostream>
 #include <stdexcept>
@@ -7,6 +7,10 @@
 static void require(bool condition, const char *message) {
     if (!condition)
         throw std::runtime_error(message);
+}
+static bool steps_are(const sh_idle_steps &steps, int dim, int display_off, int lock, int suspend) {
+    return steps.dim == dim && steps.display_off == display_off && steps.lock == lock &&
+           steps.suspend == suspend;
 }
 static void rejects(const std::string &source) {
     try {
@@ -36,6 +40,40 @@ int main() {
         rejects("return {bindings={{key='l',action='display_off',output='desc:'}}}");
         rejects("return {bindings={{key='l',action='display_on',output=1}}}");
         rejects("return {bindings={{key='l',action='lock',output='HDMI-A-1'}}}");
+        // The idle steps, in seconds, kept in milliseconds. Unset, the screens dim 30 seconds
+        // before the monitors go off after ten minutes, and nothing locks or suspends.
+        auto defaults = shaodesk::parse_config("return {}").settings;
+        require(steps_are(defaults.idle, 570000, 600000, 0, 0) &&
+                    steps_are(defaults.idle_battery, 570000, 600000, 0, 0),
+                "idle defaults");
+        auto idle = [](const char *table) {
+            return shaodesk::parse_config(std::string("return {idle=") + table + "}").settings;
+        };
+        require(steps_are(idle("{display_off=300}").idle, 270000, 300000, 0, 0),
+                "dimming follows display_off");
+        require(steps_are(idle("{display_off=40}").idle, 20000, 40000, 0, 0),
+                "dimming halfway under a minute");
+        require(steps_are(idle("{display_off=0}").idle, 0, 0, 0, 0) &&
+                    steps_are(idle("{display_off=0}").idle_battery, 0, 0, 0, 0),
+                "display_off = 0 turns dimming off too");
+        require(steps_are(idle("{dim=0}").idle, 0, 600000, 0, 0), "dim = 0");
+        require(steps_are(idle("{dim=700,display_off=600}").idle, 700000, 600000, 0, 0),
+                "dim after display_off is kept as given");
+        auto both = idle("{dim=100,display_off=300,lock=600,suspend=1800,"
+                         "battery={display_off=120,suspend=600}}");
+        require(steps_are(both.idle, 100000, 300000, 600000, 1800000) &&
+                    steps_are(both.idle_battery, 90000, 120000, 600000, 600000),
+                "battery steps not parsed");
+        require(steps_are(idle("{lock=60,battery={dim=10}}").idle_battery, 10000, 600000, 60000, 0),
+                "battery dim not parsed");
+        rejects("return {idle=true}");
+        rejects("return {idle={dim=-1}}");
+        rejects("return {idle={display_off=1.5}}");
+        rejects("return {idle={lock='5'}}");
+        rejects("return {idle={suspend=86401}}");
+        rejects("return {idle={sleep=60}}");
+        rejects("return {idle={battery=300}}");
+        rejects("return {idle={battery={hibernate=60}}}");
         std::cout << "display power configuration passed\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';

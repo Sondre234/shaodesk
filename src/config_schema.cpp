@@ -515,6 +515,36 @@ const Option options[] = {
      "Go ahead with the power off, reboot or log out even when windows are still open after "
      "`close_timeout`; their applications are then ended without saving."},
 
+    {"idle", "table", "", "", none, none,
+     "Power saving after a while without input, as KDE and Windows have, with no idle daemon: "
+     "the screens dim, the monitors turn off, the screen locks and the machine suspends, each "
+     "a number of seconds after the last key press, click, scroll or pointer motion; 0 never "
+     "takes that step. An idle inhibitor (a video playing, a game) holds every step off. "
+     "`ext-idle-notify-v1` works as before, so an idle daemon such as swayidle runs beside "
+     "these; `display_off = 0` leaves the monitors to it."},
+    {"idle.dim", "integer", "`display_off` − 30", "570", 0, 86400,
+     "Seconds before the screens darken by half, fading in; any input brings them back. "
+     "Unset, 30 seconds before `display_off` (halfway, under a minute), or never without it."},
+    {"idle.display_off", "integer", "600", "600", 0, 86400,
+     "Seconds before every monitor turns off, as `display_off` does: they keep their windows "
+     "and panels, and a key or the pointer turns them on again."},
+    {"idle.lock", "integer", "0", "300", 0, 86400,
+     "Seconds before the screen locks with `power.lock_command`."},
+    {"idle.suspend", "integer", "0", "1800", 0, 86400,
+     "Seconds before the machine suspends, as `suspend` does: through logind, locking first "
+     "with `power.lock_before_sleep`."},
+    {"idle.battery", "table", "unset", "", none, none,
+     "The same steps while the machine runs on battery: a battery discharging and no mains or "
+     "USB supply online in `/sys/class/power_supply`. Each one left out is the one above, but "
+     "for `dim`, which follows this table's `display_off` when that is set."},
+    {"idle.battery.dim", "integer", "`idle.dim`", "", 0, 86400, "Seconds before the screens dim."},
+    {"idle.battery.display_off", "integer", "`idle.display_off`", "300", 0, 86400,
+     "Seconds before the monitors turn off."},
+    {"idle.battery.lock", "integer", "`idle.lock`", "", 0, 86400,
+     "Seconds before the screen locks."},
+    {"idle.battery.suspend", "integer", "`idle.suspend`", "900", 0, 86400,
+     "Seconds before the machine suspends."},
+
     {"startup", "list of commands", "unset", "", none, none,
      "Commands started once when the compositor starts (not on reload), at most 32; each is "
      "an argument list, e.g. `{ { \"kitty\" } }`."},
