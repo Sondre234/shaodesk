@@ -214,6 +214,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/tiling.c
         src/compositor/toplevel.c
         src/compositor/window_control.c
+        src/compositor/window_icon.c
         src/compositor/workspace.c
         src/compositor/xwayland.c
     )
@@ -252,14 +253,16 @@ if(SHAODESK_BUILD_COMPOSITOR)
         message(STATUS "No sd-bus (libsystemd, libelogind, basu); other desktops may suspend "
             "the machine while shaodesk is on screen")
     endif()
-    # X11 support follows the wlroots build; the XWM waker needs xcb directly.
+    # X11 support follows the wlroots build; the XWM waker needs xcb directly, and reading an
+    # X11 window's icon xcb-ewmh.
     find_file(SHAODESK_WLR_CONFIG_H wlr/config.h PATHS ${WLROOTS_INCLUDE_DIRS} NO_DEFAULT_PATH)
     file(READ ${SHAODESK_WLR_CONFIG_H} SHAODESK_WLR_CONFIG)
     if(SHAODESK_WLR_CONFIG MATCHES "WLR_HAS_XWAYLAND 1")
         # Unpatched wlroots strands X events; see packaging/patches/wlroots-xwm-drain.patch.
         option(SHAODESK_XWM_WAKER "Nudge wlroots' X11 window manager (off only for patched wlroots)" ON)
         pkg_check_modules(XCB REQUIRED IMPORTED_TARGET xcb)
-        target_link_libraries(shaodesk PRIVATE PkgConfig::XCB)
+        pkg_check_modules(XCB_EWMH REQUIRED IMPORTED_TARGET xcb-ewmh)
+        target_link_libraries(shaodesk PRIVATE PkgConfig::XCB PkgConfig::XCB_EWMH)
         if(SHAODESK_XWM_WAKER)
             pkg_check_modules(XCB_XFIXES REQUIRED IMPORTED_TARGET xcb-xfixes)
             target_link_libraries(shaodesk PRIVATE PkgConfig::XCB_XFIXES)
@@ -332,6 +335,15 @@ if(SHAODESK_BUILD_COMPOSITOR)
             COMMAND ${WAYLAND_SCANNER} private-code ${ACTIVATION_XML}
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-activation-v1-protocol.c
             DEPENDS ${ACTIVATION_XML})
+        set(TOPLEVEL_ICON_XML ${PROTOCOL_DIR}/staging/xdg-toplevel-icon/xdg-toplevel-icon-v1.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header ${TOPLEVEL_ICON_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-client-protocol.h
+            DEPENDS ${TOPLEVEL_ICON_XML})
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code ${TOPLEVEL_ICON_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-protocol.c
+            DEPENDS ${TOPLEVEL_ICON_XML})
         set(DECORATION_XML ${PROTOCOL_DIR}/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml)
         add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/xdg-decoration-unstable-v1-client-protocol.h
             COMMAND ${WAYLAND_SCANNER} client-header ${DECORATION_XML}
@@ -348,6 +360,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-activation-v1-protocol.c
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-decoration-unstable-v1-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-decoration-unstable-v1-protocol.c
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-toplevel-icon-v1-protocol.c
             ${WLR_CLIENT_PROTOCOL_SOURCES})
         target_include_directories(wayland_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
         target_link_libraries(wayland_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
@@ -385,8 +399,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
         target_link_libraries(output_management_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
         target_compile_options(output_management_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
         # A taskbar's window menu through shaodesk-window-control-v1, for window_control_smoke,
-        # its capture of a window, for window_capture_smoke, and its peek at one, for
-        # window_peek_smoke.
+        # its capture of a window, for window_capture_smoke, its peek at one, for
+        # window_peek_smoke, and windows' own icons, for window_icon_smoke.
         add_executable(window_probe tests/window_probe.c
             ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c
@@ -808,5 +822,11 @@ if(SHAODESK_BUILD_COMPOSITOR)
         else()
             message(STATUS "XWayland test skipped: needs an Xwayland binary and wlroots X support")
         endif()
+        # Windows' own icons; an X11 window's only where the X11 probe is built.
+        add_test(NAME window_icon_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_icon_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>
+            $<$<TARGET_EXISTS:x11_probe>:$<TARGET_FILE:x11_probe>>)
+        set_tests_properties(window_icon_smoke PROPERTIES TIMEOUT 60)
     endif()
 endif()

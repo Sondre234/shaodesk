@@ -374,7 +374,8 @@ void TaskModel::watch(Task *task) {
         return;
     task->window = shaodesk_window_control_v1_get_window(control_, task->handle);
     static const shaodesk_window_v1_listener listener{windowOutput, windowWorkspace, windowState,
-                                                      windowDone,   windowPid,       windowId};
+                                                      windowDone,   windowPid,       windowId,
+                                                      nullptr,      nullptr};
     shaodesk_window_v1_add_listener(task->window, &listener, task);
 }
 void TaskModel::globalRemoved(void *, wl_registry *, uint32_t) {}

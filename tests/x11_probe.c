@@ -12,7 +12,7 @@
 struct probe {
     xcb_connection_t *connection;
     xcb_window_t root, window;
-    xcb_atom_t protocols, delete_window, state, fullscreen, attention, hints;
+    xcb_atom_t protocols, delete_window, state, fullscreen, attention, hints, icon;
     int width, height;
     bool mapped, closed;
 };
@@ -81,6 +81,36 @@ static void handle(struct probe *probe, xcb_generic_event_t *event) {
         }                                                                                          \
     } while (0)
 
+/* Sets _NET_WM_ICON from SPEC's words, each "SIZE:AARRGGBB" or "WIDTHxHEIGHT:AARRGGBB": an
+ * image of that size in that colour, its alpha beside a colour not premultiplied by it, as X11
+ * gives them. */
+static void set_icon(struct probe *probe, const char *spec) {
+    char words[256];
+    snprintf(words, sizeof(words), "%s", spec);
+    uint32_t *data = NULL;
+    size_t length = 0;
+    for (char *word = strtok(words, " "); word; word = strtok(NULL, " ")) {
+        unsigned width, height, colour;
+        if (sscanf(word, "%ux%u:%x", &width, &height, &colour) != 3) {
+            if (sscanf(word, "%u:%x", &width, &colour) != 2)
+                die("an icon takes words \"SIZE:AARRGGBB\" or \"WIDTHxHEIGHT:AARRGGBB\"");
+            height = width;
+        }
+        if (!width || !height || width > 512 || height > 512)
+            die("an icon's image is 1 to 512 pixels wide and tall");
+        data = realloc(data, (length + 2 + (size_t)width * height) * sizeof(*data));
+        if (!data)
+            die("out of memory");
+        data[length++] = width;
+        data[length++] = height;
+        for (size_t i = 0; i < (size_t)width * height; ++i)
+            data[length++] = colour;
+    }
+    xcb_change_property(probe->connection, XCB_PROP_MODE_REPLACE, probe->window, probe->icon,
+                        XCB_ATOM_CARDINAL, 32, (uint32_t)length, data);
+    free(data);
+}
+
 static void request_fullscreen(struct probe *probe, bool enable) {
     xcb_client_message_event_t message = {
         .response_type = XCB_CLIENT_MESSAGE,
@@ -108,6 +138,7 @@ int main(int argc, char **argv) {
     probe.fullscreen = atom(probe.connection, "_NET_WM_STATE_FULLSCREEN");
     probe.attention = atom(probe.connection, "_NET_WM_STATE_DEMANDS_ATTENTION");
     probe.hints = atom(probe.connection, "WM_HINTS");
+    probe.icon = atom(probe.connection, "_NET_WM_ICON");
 
     probe.window = xcb_generate_id(probe.connection);
     uint32_t values[] = {screen->white_pixel, XCB_EVENT_MASK_STRUCTURE_NOTIFY};
@@ -134,6 +165,9 @@ int main(int argc, char **argv) {
         xcb_change_property(probe.connection, XCB_PROP_MODE_REPLACE, probe.window, probe.hints,
                             probe.hints, 32, 9, hints);
     }
+    // SHAODESK_PROBE_ICON=SPEC gives the window an icon before it maps (see set_icon).
+    if (getenv("SHAODESK_PROBE_ICON"))
+        set_icon(&probe, getenv("SHAODESK_PROBE_ICON"));
     xcb_map_window(probe.connection, probe.window);
     xcb_flush(probe.connection);
     WAIT_FOR(&probe, probe.mapped, "window mapping");
@@ -169,7 +203,8 @@ int main(int argc, char **argv) {
     if (!strcmp(command, "commands")) {
         // Lines on standard input ask for attention the two ways X11 clients do: "demand" and
         // "undemand" add and remove _NET_WM_STATE_DEMANDS_ATTENTION, "hint" and "unhint" set
-        // and clear the urgency flag of WM_HINTS. Closing the window ends it.
+        // and clear the urgency flag of WM_HINTS. "icon SPEC" sets _NET_WM_ICON (see set_icon)
+        // and "unicon" deletes it. Closing the window ends it.
         puts("waiting for commands");
         fflush(stdout);
         char pending[128];
@@ -215,6 +250,10 @@ int main(int argc, char **argv) {
                     uint32_t hints[9] = {pending[0] == 'h' ? 256 : 0};
                     xcb_change_property(probe.connection, XCB_PROP_MODE_REPLACE, probe.window,
                                         probe.hints, probe.hints, 32, 9, hints);
+                } else if (!strncmp(pending, "icon ", 5)) {
+                    set_icon(&probe, pending + 5);
+                } else if (!strcmp(pending, "unicon")) {
+                    xcb_delete_property(probe.connection, probe.window, probe.icon);
                 } else
                     die("unknown command");
                 xcb_flush(probe.connection);

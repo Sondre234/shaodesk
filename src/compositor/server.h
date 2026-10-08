@@ -106,6 +106,7 @@
 #include <wlr/types/wlr_xdg_foreign_v2.h>
 #include <wlr/types/wlr_xdg_output_v1.h>
 #include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/types/wlr_xdg_toplevel_icon_v1.h>
 #include <wlr/util/log.h>
 #include <wlr/util/region.h>
 #include <wlr/xcursor.h>
@@ -357,6 +358,7 @@ struct sh_server {
     struct wl_list window_objects;
     struct wl_event_source *window_objects_idle;
     struct wl_listener new_capture_request;
+    struct wl_listener set_xdg_icon; // a Wayland window giving its icon (window_icon.c)
 
     /* Session lock: `locked` outlives a crashed locker so the screen stays covered. */
     bool locked;
@@ -501,6 +503,15 @@ struct sh_output {
     struct wl_listener destroy;
 };
 
+/* An icon a window supplies itself (window_icon.c): the icon theme name it gave, and the pixels
+ * of one of its sizes as wl_shm's ARGB8888 (premultiplied 0xAARRGGBB words, rows without
+ * padding). Either may be missing; neither is an icon the window does not have. */
+struct sh_icon {
+    char *name;
+    uint32_t *pixels;
+    int width, height;
+};
+
 struct sh_opacity_rule {
     unsigned generation; // server->config_generation it was computed under; 0 for never
     bool active;
@@ -529,6 +540,10 @@ struct sh_toplevel {
     struct wlr_ext_foreign_toplevel_handle_v1 *listed;
     struct wlr_scene *capture_scene;
     struct wlr_ext_image_capture_source_v1 *capture_source;
+    /* The icon the window supplies itself, and how many times it has changed, which the window
+     * control's objects hold against what they last sent. */
+    struct sh_icon icon;
+    unsigned icon_serial;
     struct wl_listener title_changed, app_id_changed;
     struct wl_listener foreign_activate, foreign_close, foreign_maximize, foreign_minimize;
     struct wl_listener foreign_fullscreen;
@@ -576,7 +591,7 @@ struct sh_toplevel {
     struct wlr_xwayland_surface *xsurface; // NULL for xdg-shell windows
     bool unmanaged, associated;            // unmanaged: override-redirect menus and tooltips
     struct wl_listener x_associate, x_dissociate, x_configure, x_activate, x_geometry;
-    struct wl_listener x_decorations, x_attention, x_hints;
+    struct wl_listener x_decorations, x_attention, x_hints, x_icon;
     bool x_hint_urgent; // the client's WM_HINTS ask for attention
 #endif
     /* scene_tree sits at the window's place; content holds everything drawn for it, so an
@@ -1033,6 +1048,12 @@ bool toplevel_is_dialog(struct sh_toplevel *toplevel);
 void window_objects_changed(struct sh_server *server);
 void window_objects_forget(struct sh_toplevel *toplevel);
 void window_control_init(struct sh_server *server);
+
+/* window_icon.c */
+int icon_size_rank(uint32_t width, uint32_t height);
+void set_toplevel_icon(struct sh_toplevel *toplevel, struct sh_icon icon);
+void free_icon(struct sh_icon *icon);
+void server_set_xdg_icon(struct wl_listener *listener, void *data);
 
 /* workspace.c */
 int output_slot(struct sh_server *server, const char *name);

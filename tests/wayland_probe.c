@@ -5,6 +5,7 @@
 #include "xdg-activation-v1-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
+#include "xdg-toplevel-icon-v1-client-protocol.h"
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -71,6 +72,7 @@ struct probe {
     struct wl_data_device_manager *data_manager;
     struct wl_data_device *data_device;
     struct wl_data_offer *offer; // the drag's offer while it is over the window
+    struct xdg_toplevel_icon_manager_v1 *icons; // for SHAODESK_PROBE_ICON and "icon" commands
 };
 static void die(const char *message) {
     fprintf(stderr, "wayland probe: %s\n", message);
@@ -186,6 +188,9 @@ static void global(void *data, struct wl_registry *registry, uint32_t name, cons
     } else if (!strcmp(interface, "wl_data_device_manager") && version >= 3) {
         probe->data_manager =
             wl_registry_bind(registry, name, &wl_data_device_manager_interface, 3);
+    } else if (!strcmp(interface, "xdg_toplevel_icon_manager_v1")) {
+        probe->icons =
+            wl_registry_bind(registry, name, &xdg_toplevel_icon_manager_v1_interface, 1);
     }
 }
 /* A line on standard output, at once: the test reads it while the probe runs. */
@@ -313,7 +318,66 @@ static void request_activation(struct probe *probe) {
     xdg_activation_token_v1_set_surface(token, probe->surface);
     xdg_activation_token_v1_commit(token);
 }
-/* One line of standard input: "activate", "title TEXT", or "app_id TEXT". */
+/* A buffer for an icon: `size` pixels square, each `colour` (0xAARRGGBB, premultiplied as wl_shm's
+ * argb8888 is, or xrgb8888 when `opaque`, whose alpha means nothing). Each row is followed by two
+ * pixels of padding, 0xdeadbeef, which are not the icon's. */
+static struct wl_buffer *icon_buffer(struct probe *probe, int size, uint32_t colour, bool opaque) {
+    struct buffer *buffer = calloc(1, sizeof(*buffer));
+    if (!buffer)
+        die("out of memory");
+    int stride = (size + 2) * 4;
+    buffer->size = (size_t)stride * size;
+    int fd = memfd_create("shaodesk-test-icon", MFD_CLOEXEC);
+    if (fd < 0 || ftruncate(fd, buffer->size) != 0)
+        die("cannot allocate shm buffer");
+    buffer->pixels = mmap(NULL, buffer->size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (buffer->pixels == MAP_FAILED)
+        die("cannot map shm buffer");
+    uint32_t *pixels = buffer->pixels;
+    for (int y = 0; y < size; ++y)
+        for (int x = 0; x < size + 2; ++x)
+            pixels[y * (size + 2) + x] = x < size ? colour : 0xdeadbeef;
+    struct wl_shm_pool *pool = wl_shm_create_pool(probe->shm, fd, (int)buffer->size);
+    buffer->object = wl_shm_pool_create_buffer(
+        pool, 0, size, size, stride, opaque ? WL_SHM_FORMAT_XRGB8888 : WL_SHM_FORMAT_ARGB8888);
+    wl_shm_pool_destroy(pool);
+    close(fd);
+    buffer->next = probe->buffers; // kept until the probe exits, as the icon may still use it
+    probe->buffers = buffer;
+    return buffer->object;
+}
+/* Gives the window an icon through xdg-toplevel-icon-v1, as SPEC says: "none" sets none, else its
+ * words each add to one icon: "name:NAME" its name, "SIZE:AARRGGBB" a buffer SIZE pixels square
+ * in that colour, "SIZE:AARRGGBB:x" one in xrgb8888, and "empty" nothing, for an icon with
+ * neither. The icon applies at the window's next commit. */
+static void set_icon(struct probe *probe, const char *spec) {
+    if (!probe->icons)
+        die("xdg_toplevel_icon_manager_v1 is not advertised");
+    if (!strcmp(spec, "none")) {
+        xdg_toplevel_icon_manager_v1_set_icon(probe->icons, probe->toplevel, NULL);
+        return;
+    }
+    struct xdg_toplevel_icon_v1 *icon = xdg_toplevel_icon_manager_v1_create_icon(probe->icons);
+    char words[512];
+    snprintf(words, sizeof(words), "%s", spec);
+    for (char *word = strtok(words, " "); word; word = strtok(NULL, " ")) {
+        int size;
+        unsigned colour;
+        char format = '\0';
+        if (!strncmp(word, "name:", 5))
+            xdg_toplevel_icon_v1_set_name(icon, word + 5);
+        else if (sscanf(word, "%d:%x:%c", &size, &colour, &format) >= 2 && size >= 1 &&
+                 size <= 1024)
+            xdg_toplevel_icon_v1_add_buffer(icon, icon_buffer(probe, size, colour, format == 'x'),
+                                            1);
+        else if (strcmp(word, "empty"))
+            die("an icon takes \"none\", or \"name:NAME\", \"SIZE:AARRGGBB[:x]\" and \"empty\"");
+    }
+    xdg_toplevel_icon_manager_v1_set_icon(probe->icons, probe->toplevel, icon);
+    xdg_toplevel_icon_v1_destroy(icon);
+}
+/* One line of standard input: "activate", "title TEXT", "app_id TEXT", or "icon SPEC" (see
+ * set_icon). */
 static void run_command(struct probe *probe, char *line) {
     line[strcspn(line, "\n")] = '\0';
     if (!strcmp(line, "activate"))
@@ -322,7 +386,10 @@ static void run_command(struct probe *probe, char *line) {
         xdg_toplevel_set_title(probe->toplevel, line + 6);
     else if (!strncmp(line, "app_id ", 7))
         xdg_toplevel_set_app_id(probe->toplevel, line + 7);
-    else
+    else if (!strncmp(line, "icon ", 5)) {
+        set_icon(probe, line + 5);
+        wl_surface_commit(probe->surface);
+    } else
         die("unknown command");
 }
 /* Dispatches Wayland events and standard input together until the window is closed. */
@@ -749,6 +816,9 @@ int main(int argc, char **argv) {
     const char *title = getenv("SHAODESK_PROBE_TITLE"), *app_id = getenv("SHAODESK_PROBE_APP_ID");
     xdg_toplevel_set_title(probe.toplevel, title && *title ? title : "shaodesk protocol probe");
     xdg_toplevel_set_app_id(probe.toplevel, app_id && *app_id ? app_id : "shaodesk-probe");
+    // SHAODESK_PROBE_ICON=SPEC gives the window an icon before it maps (see set_icon).
+    if (getenv("SHAODESK_PROBE_ICON"))
+        set_icon(&probe, getenv("SHAODESK_PROBE_ICON"));
     wl_surface_commit(probe.surface);
     if (probe.commands)
         run_commands(display, &probe);
@@ -776,6 +846,8 @@ int main(int argc, char **argv) {
         die("taskbar window handle survived unmapping");
     if (probe.activation)
         xdg_activation_v1_destroy(probe.activation);
+    if (probe.icons)
+        xdg_toplevel_icon_manager_v1_destroy(probe.icons);
     if (probe.panel) {
         zwlr_layer_surface_v1_destroy(probe.panel);
         wl_surface_destroy(probe.panel_surface);

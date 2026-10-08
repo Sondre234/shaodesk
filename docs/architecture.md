@@ -58,8 +58,9 @@ all. In short:
 | `lock.c` | Session lock and idle/sleep inhibitors. |
 | `power.c` | The power actions: suspend, hibernate, reboot and power off through logind (`src/login1.c`), locking first, closing windows first, log out. |
 | `foreign_toplevel.c` | Window lists for taskbars and single-window capture. |
-| `window_control.c` | The shell's window menu and window pictures: shaodesk-window-control-v1, which names a window by its taskbar handle. |
+| `window_control.c` | The shell's window menu, window pictures and windows' own icons: shaodesk-window-control-v1, which names a window by its taskbar handle. |
 | `scaled_capture.c` | The capture source for a window's picture: the window scaled down to fit a size on the renderer, smoothly. |
+| `window_icon.c` | The icons windows supply themselves (xdg-toplevel-icon-v1; X11 windows' from `xwayland.c`), kept for the window control to send the shell. |
 
 A function used by one file is `static`; one used by several is declared in `server.h` under
 the file that defines it. The build warns (`-Wmissing-prototypes`) about one that is neither.
@@ -90,8 +91,8 @@ and do nothing while the session is locked. A change reaches the objects through
 `window_objects_changed`, which `notify_subscribers` and the tiling call: it sends what changed
 from an idle callback, once the change is over. Like the foreign-toplevel manager, the global is
 offered to every client; it lets a client do nothing to a window a taskbar cannot already do.
-`tests/window_probe.c` is a client of it for `window_control_smoke`, `window_capture_smoke` and
-`window_peek_smoke`, and `TaskModel` the shell's.
+`tests/window_probe.c` is a client of it for `window_control_smoke`, `window_capture_smoke`,
+`window_peek_smoke` and `window_icon_smoke`, and `TaskModel` the shell's.
 
 A window's capture source is the one screen sharing gets for its ext-foreign-toplevel-list
 handle, from `toplevel_capture_source` (`foreign_toplevel.c`): made from a private scene that
@@ -165,6 +166,29 @@ Version 4 also sends the window's `id` once, with its first state: `sh_toplevel.
 it when published again, as a swallowed terminal is. The control socket names windows by it
 where the shell has to find them among its handles: the switcher's `switcher-window` lines end
 with it.
+
+Since version 5 a `shaodesk_window_v1` also sends the icon the window supplies itself, for the
+shell to show a window whose application it cannot find by its app id among the desktop entries
+and icon themes, as for a game run through Wine or Proton, a Java program or an AppImage. A
+Wayland window gives it through xdg-toplevel-icon-v1, whose global `sh_run` makes with the sizes
+it prefers (16 to 256 pixels): `server_set_xdg_icon` (`window_icon.c`) keeps the icon's name and
+a copy of the pixels of one of its buffers, argb8888 as it is or xrgb8888 made opaque (a buffer in
+another format is passed over), so that no wlroots buffer is held past the request. wlroots hands
+the icon over as the client asks, not at its next commit, which a taskbar's icon needs no lining
+up with. An X11 window gives `_NET_WM_ICON`, which wlroots does not read but signals as
+`set_icon`, also as the window is associated: `xwayland_set_icon` fetches it with
+`wlr_xwayland_surface_fetch_icon` (xcb-ewmh), a round trip on the XWM's connection, and
+premultiplies the colours, which X11 gives straight; it has no name. Of the sizes a window gives,
+`icon_size_rank` prefers the largest that fits within 256 by 256 pixels, else the smallest larger
+one, measured by the longer side. `set_toplevel_icon` keeps it on the window as an `sh_icon` (a
+name, and premultiplied ARGB8888 pixels in rows without padding), counting changes in
+`icon_serial` and passing over an icon the same as the one there, as an X11 window's is when it
+is read again. `send_window` sends `icon` (the name, or null) and `icon_image` to each object whose
+`icon_serial` is behind the window's, with its first state only when the window has an icon.
+`icon_image` passes a memfd of width × height × 4 bytes for each client, sealed against writing;
+libwayland sends a copy of it, so the compositor closes its own at once. `shaodesk msg get
+window_icons` lists each window's number, app id and icon's name and size, and
+`tests/window_icon_smoke.py` tests them.
 
 ## The shell (`shell/`)
 
@@ -586,7 +610,9 @@ them in `shell/controller.cpp`.
   `wayland_probe --keymap` prints the keymap an application gets. A `wayland_probe` window with
   `SHAODESK_PROBE_DRAG=source` drags a line of text on a button press of `pointer_probe`'s, and
   one with `=target` takes it, each printing what it hears; `get seat` says where the drag is
-  (see `drag_focus_smoke.py`).
+  (see `drag_focus_smoke.py`). `SHAODESK_PROBE_ICON` gives a `wayland_probe` window an icon
+  through xdg-toplevel-icon-v1 and an `x11_probe` window `_NET_WM_ICON`, and their commands
+  change it (see `window_icon_smoke.py`).
 
 ## A fast loop
 
