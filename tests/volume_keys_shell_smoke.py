@@ -82,10 +82,10 @@ with harness.Compositor(compositor, CONFIG, start=False) as desktop:
             break
         except harness.Timeout:
             pass
-    start = level()
     desktop.wait_for(lambda: "shaodesk osd shown on HEADLESS-1" in log() and
                      log().count("osd hidden") == log().count("osd shown"),
                      "the display shown, and gone again")
+    start = level()  # by now a second step the loop asked for, had the shell been slow, has landed
     count = len(called())
 
     # The keys reach the shell, which sets the backlight and, without its sound server, runs
