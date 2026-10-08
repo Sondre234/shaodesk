@@ -181,6 +181,14 @@ if(BUILD_TESTING)
     target_compile_options(start_menu_test PRIVATE -Wall -Wextra -Wpedantic)
     target_link_libraries(start_menu_test PRIVATE Qt6::Core Qt6::Test PkgConfig::GIO)
     add_test(NAME start_menu COMMAND start_menu_test)
+    # Applications' icons: the desktop's icon theme.
+    add_executable(app_icons_test ${PROJECT_SOURCE_DIR}/tests/app_icons_test.cpp icons.cpp icons.hpp)
+    set_target_properties(app_icons_test PROPERTIES AUTOMOC ON)
+    target_include_directories(app_icons_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(app_icons_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(app_icons_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(app_icons_test PRIVATE Qt6::Core Qt6::Gui Qt6::Quick Qt6::Test PkgConfig::GIO)
+    add_test(NAME app_icons COMMAND app_icons_test)
     add_executable(task_model_test ${PROJECT_SOURCE_DIR}/tests/task_model_test.cpp
         task_model.cpp task_model.hpp window_pictures.cpp window_pictures.hpp window_images.cpp
         window_images.hpp ${SHAODESK_TASK_PROTOCOL_SOURCES})
