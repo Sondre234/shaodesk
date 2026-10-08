@@ -203,6 +203,14 @@ libwayland sends a copy of it, so the compositor closes its own at once. `shaode
 window_icons` lists each window's number, app id and icon's name and size, and
 `tests/window_icon_smoke.py` tests them.
 
+Since version 6 the `state` also has `above` while the window is kept above the others, sent only
+to objects of version 6 as an older client knows no such bit, and `set_above` / `unset_above` call
+`set_above` (`stacking.c`), as `toggle_above` does for the focused window, for the window menu's
+Keep Above Others. A window kept above is drawn in `above_windows`, a tree between the other
+windows (`windows`, and `floating_windows` with `layout.floating_above_tiles`) and the
+fullscreen ones; `window_layer` names the tree a window belongs in, and everything that puts a
+window back among the others (focus, leaving fullscreen, the overview, the peek) puts it there.
+
 ### Touchpad swipes
 
 `gestures.c` hears the cursor's swipes. One of as many fingers as a swipe of `gestures` has waits

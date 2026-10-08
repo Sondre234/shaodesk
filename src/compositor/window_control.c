@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* The taskbar's window menu and pictures: shaodesk-window-control-v1 names a window by its
  * wlr-foreign-toplevel handle, tells the shell which output and workspace each is on, how it is
- * placed, its number and its own icon, moves one to another workspace or output, makes it sticky
- * or floats it, gives its capture source for a picture of it, and peeks at it. */
+ * placed, its number and its own icon, moves one to another workspace or output, makes it sticky,
+ * floats it or keeps it above, gives its capture source for a picture of it, and peeks at it. */
 #include "server.h"
 #include <sys/mman.h>
 
@@ -35,12 +35,16 @@ static struct sh_toplevel *handle_toplevel(struct sh_server *server, struct wl_r
     return NULL;
 }
 
-static uint32_t window_state(struct sh_toplevel *toplevel) {
+/* The state bits the object's version knows: from version 6, whether it is kept above. */
+static uint32_t window_state(struct sh_toplevel *toplevel, struct wl_resource *resource) {
     struct wlr_output *output = find_output(toplevel->server, toplevel->output);
+    bool above = toplevel->above &&
+                 wl_resource_get_version(resource) >= SHAODESK_WINDOW_V1_STATE_ABOVE_SINCE_VERSION;
     return (toplevel->sticky ? SHAODESK_WINDOW_V1_STATE_STICKY : 0) |
            (toplevel->floating || toplevel->sticky ? SHAODESK_WINDOW_V1_STATE_FLOATING : 0) |
            (toplevel->tiled ? SHAODESK_WINDOW_V1_STATE_TILED : 0) |
-           (tiles_for(toplevel, output) ? SHAODESK_WINDOW_V1_STATE_TILING : 0);
+           (tiles_for(toplevel, output) ? SHAODESK_WINDOW_V1_STATE_TILING : 0) |
+           (above ? SHAODESK_WINDOW_V1_STATE_ABOVE : 0);
 }
 
 /* A file holding the icon's pixels for icon_image, sealed so that no client changes what
@@ -100,7 +104,7 @@ static void send_window(struct sh_window_object *object) {
         shaodesk_window_v1_send_workspace(object->resource, workspace);
         changed = true;
     }
-    uint32_t state = window_state(toplevel);
+    uint32_t state = window_state(toplevel, object->resource);
     if (!object->sent || object->state != state) {
         object->state = state;
         shaodesk_window_v1_send_state(object->resource, state);
@@ -227,6 +231,18 @@ static void window_unset_floating(struct wl_client *client, struct wl_resource *
         set_floating(toplevel, false, false);
 }
 
+static void window_set_above(struct wl_client *client, struct wl_resource *resource) {
+    struct sh_toplevel *toplevel = requested(resource);
+    if (toplevel)
+        set_above(toplevel, true);
+}
+
+static void window_unset_above(struct wl_client *client, struct wl_resource *resource) {
+    struct sh_toplevel *toplevel = requested(resource);
+    if (toplevel)
+        set_above(toplevel, false);
+}
+
 /* The capture source ext-foreign-toplevel-list's handle for the window gives, the same object;
  * an inert one when the window is gone or the session is locked, never none, which the client's
  * next request would find missing. */
@@ -282,6 +298,8 @@ static const struct shaodesk_window_v1_interface window_implementation = {
     .get_scaled_capture_source = window_get_scaled_capture_source,
     .set_peek = window_set_peek,
     .unset_peek = window_unset_peek,
+    .set_above = window_set_above,
+    .unset_above = window_unset_above,
 };
 
 /* Destroyed by its client, or as the client disconnects: a peek it asked for ends. */
@@ -343,7 +361,7 @@ static void control_bind(struct wl_client *client, void *data, uint32_t version,
 void window_control_init(struct sh_server *server) {
     wl_list_init(&server->window_objects);
     server->window_control = wl_global_create(server->wl_display,
-                                              &shaodesk_window_control_v1_interface, 5, server,
+                                              &shaodesk_window_control_v1_interface, 6, server,
                                               control_bind);
     if (!server->window_control)
         wlr_log(WLR_ERROR, "Cannot offer shaodesk-window-control-v1");

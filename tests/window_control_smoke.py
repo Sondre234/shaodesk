@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """shaodesk-window-control-v1, as the taskbar's window menu uses it: a window named by its
 taskbar handle hears its output, workspace, placement, process and number, and moves to another
-workspace or output, becomes sticky or floats, without taking the focus from the window that has
-it. A window's number is its own: it stays as the window moves and changes, and no window that
+workspace or output, becomes sticky, floats or is kept above, without taking the focus from the
+window that has it. A window's number is its own: it stays as the window moves and changes, and no window that
 comes later gets one already given."""
 from pathlib import Path
 import queue
@@ -119,6 +119,23 @@ with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) a
     control("A", "output", "HEADLESS-2")
     assert windows()["A"] == (1, False, False, "HEADLESS-2", True, False), windows()
     assert windows()["B"][1]
+    assert heard() == "HEADLESS-2 1 -"
+
+    # Kept above and let go again (version 6), the focus staying with B; a client of version 5
+    # hears no such state.
+    def above(title):
+        return {r[9]: r[15] == "1" for r in desktop.rows("windows")}[title]
+
+    control("A", "above", "1")
+    assert above("A") and windows()["B"][1], windows()
+    assert heard() == "HEADLESS-2 1 above"
+    assert desktop.rows("stacking")[0][1:4:2] == ["A", "above"], desktop.rows("stacking")
+    older = subprocess.run([window_probe, "A"], env={**desktop.env,
+                                                     "SHAODESK_WINDOW_PROBE_VERSION": "5"},
+                           check=True, capture_output=True, text=True, timeout=30)
+    assert older.stdout.strip() == "HEADLESS-2 1 -", older.stdout
+    control("A", "above", "0")
+    assert not above("A")
     assert heard() == "HEADLESS-2 1 -"
 
     # Turning the feature off leaves set_sticky without effect.
