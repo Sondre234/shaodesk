@@ -8,7 +8,9 @@
 #include <wlr/interfaces/wlr_switch.h>
 
 /* Whether the lid holds `output` off: a built-in panel, the lid closed, and a monitor that is not
- * built in in the layout (outputs.lid). configure_output asks this of every output. */
+ * built in in the layout or mirroring (outputs.lid). configure_output asks this of every output.
+ * A monitor mirroring the panel joins the layout once the panel is off, as Windows' duplicate
+ * display becomes the external one alone. */
 bool lid_holds_off(struct sh_server *server, struct sh_output *output) {
     if (!sh_output_built_in(output->wlr_output->name))
         return false;
@@ -16,6 +18,8 @@ bool lid_holds_off(struct sh_server *server, struct sh_output *output) {
     struct sh_output *other;
     wl_list_for_each(other, &server->outputs, link)
         external |= other != output && !sh_output_built_in(other->wlr_output->name);
+    wl_list_for_each(other, &server->disabled_outputs, link)
+        external |= other->mirror && !sh_output_built_in(other->wlr_output->name);
     return sh_lid_turns_off(server_settings(server)->lid, server->lid_closed, true, external);
 }
 

@@ -276,6 +276,7 @@ struct sh_idle {
 };
 
 struct sh_window_object; // a shaodesk_window_v1 (window_control.c)
+struct sh_mirror;        // what a mirroring output shows (mirror.c)
 
 /* A workspace slide a touchpad swipe drives (workspace.c, for gestures.c): the output, the
  * workspace it showed as the swipe began and the one the fingers head for (out of range past
@@ -626,6 +627,8 @@ struct sh_output {
     struct wlr_buffer *zoom_source;
     bool zoomed; // the last frame was magnified
     bool zoom_failed; // it could not be magnified this time; it shows 1x until the zoom is reset
+    /* Out of the layout, showing another output's picture (mirror.c); NULL otherwise. */
+    struct sh_mirror *mirror;
     struct wl_list link;
     struct sh_server *server;
     struct wlr_output *wlr_output;
@@ -1035,12 +1038,24 @@ void session_active(struct wl_listener *listener, void *data);
 #endif
 void server_new_inhibitor(struct wl_listener *listener, void *data);
 
+/* mirror.c */
+struct sh_output *mirror_source(struct sh_server *server, struct sh_output *output);
+void mirror_start(struct sh_output *output, struct sh_output *source);
+void mirror_stop(struct sh_output *output);
+struct sh_output *mirrored_output(const struct sh_output *output);
+bool refresh_mirrors(struct sh_server *server);
+void mirrors_follow_power(struct sh_output *source, bool on);
+void mirror_frame(struct sh_output *output);
+bool mirror_capture(struct sh_output *output, const char *path, char *error, size_t error_size);
+
 /* output.c */
 bool output_named(const struct sh_output *output, const char *name);
 void output_description(const struct wlr_output *output, char *text, size_t size);
 bool output_key_matches(const char *key, const struct wlr_output *output);
 const struct sh_monitor *monitor_settings(const struct sh_settings *settings,
                                           const struct wlr_output *output);
+const struct sh_monitor *output_monitor(const struct sh_settings *settings,
+                                       const struct sh_output *output);
 void arrange_outputs(struct sh_server *server);
 void configure_output(struct sh_server *server, struct sh_output *output);
 void output_config_test(struct wl_listener *listener, void *data);

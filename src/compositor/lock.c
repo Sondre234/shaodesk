@@ -16,6 +16,11 @@ void send_locked_if_presented(struct sh_server *server) {
         if (!output->lock_presented && !output->powered_off)
             return;
     }
+    // A mirror shows the lock a frame after its source (mirror.c).
+    wl_list_for_each(output, &server->disabled_outputs, link) {
+        if (output->mirror && !output->lock_presented && !output->powered_off)
+            return;
+    }
     lock->locked_sent = true;
     wlr_session_lock_v1_send_locked(lock->lock);
     power_locked(server);

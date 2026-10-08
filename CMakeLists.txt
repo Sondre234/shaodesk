@@ -230,6 +230,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/keymap.c
         src/compositor/layer_shell.c
         src/compositor/lock.c
+        src/compositor/mirror.c
         src/compositor/output.c
         src/compositor/output_moves.c
         src/compositor/output_power.c
