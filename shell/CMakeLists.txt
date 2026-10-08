@@ -47,7 +47,7 @@ set(SHAODESK_START_SOURCES start_menu.cpp start_menu.hpp launch_history.cpp laun
 # The models of the services Quick Settings controls over D-Bus, in everything that builds the
 # controller; their D-Bus backends only in the shell.
 set(SHAODESK_SERVICE_SOURCES media.cpp media.hpp power_mode.cpp power_mode.hpp wifi.cpp wifi.hpp
-    row_model.hpp)
+    row_model.hpp bluetooth.cpp bluetooth.hpp)
 set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_images.cpp
     notification_images.hpp osd.cpp osd.hpp backlight.cpp backlight.hpp tray.cpp tray.hpp
     tray_images.cpp tray_images.hpp)
@@ -358,6 +358,14 @@ if(BUILD_TESTING)
     target_compile_options(wifi_test PRIVATE -Wall -Wextra -Wpedantic)
     target_link_libraries(wifi_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME shell_wifi COMMAND wifi_test)
+    # Bluetooth's model: its lists of devices, what the controls ask for, and the answers to BlueZ.
+    add_executable(bluetooth_test ${PROJECT_SOURCE_DIR}/tests/bluetooth_test.cpp bluetooth.cpp bluetooth.hpp)
+    set_target_properties(bluetooth_test PROPERTIES AUTOMOC ON)
+    target_include_directories(bluetooth_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(bluetooth_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(bluetooth_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(bluetooth_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME shell_bluetooth COMMAND bluetooth_test)
     if(SHAODESK_MEDIA_DBUS)
         # The MPRIS backend against stand-in players on a bus of its own, the environment's made
         # unusable.
