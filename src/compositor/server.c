@@ -361,6 +361,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
 
     wl_list_init(&server.keyboards);
     wl_list_init(&server.headless_keyboards);
+    wl_list_init(&server.headless_pointers);
     wl_list_init(&server.pointers);
     add_listener(&server.backend->events.new_input, &server.new_input, server_new_input);
     struct wlr_virtual_keyboard_manager_v1 *virtual_keyboards =
@@ -477,6 +478,7 @@ finish:
     wl_event_source_remove(sighup);
     wl_event_source_remove(sigchld);
     destroy_headless_keyboards(&server);
+    destroy_headless_inputs(&server);
     wl_display_destroy_clients(server.wl_display);
 
     wl_list_remove(&server.new_xdg_toplevel.link);

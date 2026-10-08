@@ -429,6 +429,7 @@ struct sh_server {
     xkb_layout_index_t keyboard_layout;
     bool syncing_keyboards;
     struct wl_list headless_keyboards; // added by tests with "headless_keyboard add"
+    struct wl_list headless_pointers;  // and "headless_pointer add" (headless_input.c)
     struct wl_list pointers; /* struct sh_pointer */
     enum sh_cursor_mode cursor_mode;
     struct sh_toplevel *grabbed_toplevel;
@@ -836,6 +837,10 @@ void group_cycle(struct sh_server *server, struct sh_toplevel *current, int step
 void ungroup(struct sh_server *server, struct sh_toplevel *current);
 void group_merge(struct sh_server *server, enum sh_action action);
 void dissolve_groups(struct sh_server *server);
+
+/* headless_input.c */
+void control_headless_pointer(struct sh_server *server, int fd, const char *arguments);
+void destroy_headless_inputs(struct sh_server *server);
 
 /* input.c */
 void control_headless_keyboard(struct sh_server *server, int fd, const char *arguments);

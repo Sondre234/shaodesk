@@ -197,6 +197,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/gestures.c
         src/compositor/grab.c
         src/compositor/group.c
+        src/compositor/headless_input.c
         src/compositor/input.c
         src/compositor/keymap.c
         src/compositor/layer_shell.c
