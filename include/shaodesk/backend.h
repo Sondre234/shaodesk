@@ -385,6 +385,7 @@ struct sh_settings {
     bool close_force;
     /* idle: the steps on mains, and while the machine runs on battery. */
     struct sh_idle_steps idle, idle_battery;
+    int lid; /* enum sh_lid_mode, outputs.lid */
 };
 
 /* What a mouse button was pressed over. */
@@ -454,6 +455,9 @@ struct sh_callbacks {
     /* Starts the program of the SH_SPAWN that key, button, command or hot_corner returned
      * last, or for SH_TERMINAL the terminal. False, with the reason, when it cannot. */
     bool (*launch)(void *, enum sh_action action, char *error, size_t error_size);
+    /* The action bound to a switch turning on (a lid closing, tablet mode starting) or off, as
+     * `key` returns one; SH_NONE when none is. */
+    enum sh_action (*switch_toggled)(void *, enum sh_switch type, bool on, int *argument);
 };
 
 enum sh_backend_mode { SH_BACKEND_NESTED, SH_BACKEND_HEADLESS, SH_BACKEND_SESSION };

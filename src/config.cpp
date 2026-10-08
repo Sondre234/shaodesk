@@ -320,6 +320,29 @@ void read_idle(lua_State *L, sh_settings &settings) {
     lua_pop(L, 1);
     current_section.clear();
 }
+// A switch binding, { switch = "lid", state = "close", action = ... }: no key, button or mods.
+void read_switch_binding(lua_State *L, Binding &binding) {
+    for (const char *other : {"key", "button", "mods", "app_id", "desktop"}) {
+        lua_getfield(L, -1, other);
+        if (!lua_isnil(L, -1))
+            fail(std::string(other) + " is not valid with a switch", other);
+        lua_pop(L, 1);
+    }
+    auto name = field(L, "switch"), state = field(L, "state");
+    if (name == "lid") {
+        if (state != "close" && state != "open")
+            fail("the lid's state is \"close\" or \"open\", not '" + state + "'", "state");
+        binding.switch_type = SH_SWITCH_LID;
+        binding.switch_on = state == "close";
+    } else if (name == "tablet") {
+        if (state != "on" && state != "off")
+            fail("tablet mode's state is \"on\" or \"off\", not '" + state + "'", "state");
+        binding.switch_type = SH_SWITCH_TABLET;
+        binding.switch_on = state == "on";
+    } else {
+        unknown("switch", name, {"lid", "tablet"}, "switch");
+    }
+}
 void read_shell(lua_State *L, ShellConfig &shell) {
     if (!section(L, "shell")) {
         lua_pop(L, 1);
@@ -1301,6 +1324,14 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
     current_section.clear();
     if (section(L, "outputs")) {
         boolean(L, "return_windows", "outputs.return_windows", config.settings.return_windows);
+        lua_getfield(L, -1, "lid");
+        if (!lua_isnil(L, -1)) {
+            auto mode = string(L, -1, "outputs.lid");
+            if (mode != "clamshell" && mode != "ignore")
+                fail("outputs.lid must be \"clamshell\" or \"ignore\"", "lid");
+            config.settings.lid = mode == "ignore" ? SH_LID_IGNORE : SH_LID_CLAMSHELL;
+        }
+        lua_pop(L, 1);
         read_monitors(L, config.settings);
         lua_getfield(L, -1, "order");
         if (!lua_isnil(L, -1)) {
@@ -1457,7 +1488,12 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
             lua_getfield(L, -1, "button");
             bool is_button = !lua_isnil(L, -1);
             lua_pop(L, 1);
-            if (is_button) {
+            lua_getfield(L, -1, "switch");
+            bool is_switch = !lua_isnil(L, -1);
+            lua_pop(L, 1);
+            if (is_switch) {
+                read_switch_binding(L, binding);
+            } else if (is_button) {
                 lua_getfield(L, -1, "key");
                 if (!lua_isnil(L, -1))
                     fail("a binding takes a key or a button, not both");
@@ -1486,6 +1522,12 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
                     xkb_keysym_to_lower(xkb_keysym_from_name(key.c_str(), XKB_KEYSYM_NO_FLAGS));
                 if (binding.keysym == XKB_KEY_NoSymbol)
                     fail("unknown key '" + key + "'");
+            }
+            if (!is_switch) {
+                lua_getfield(L, -1, "state");
+                if (!lua_isnil(L, -1))
+                    fail("state is only valid with a switch");
+                lua_pop(L, 1);
             }
             auto action = field(L, "action");
             binding.action = action == "none" ? SH_NONE : parse_action(action);
@@ -1576,10 +1618,13 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
             // Bindings past `own` come from the defaults a configuration extends; its own
             // bindings, "none" included, take their keys first.
             // Button bindings may share a button: the first whose target matches wins.
-            if (binding.button || !config.binding(binding.modifiers, binding.keysym))
+            bool taken = is_switch ? config.switch_binding(static_cast<sh_switch>(binding.switch_type),
+                                                           binding.switch_on) != nullptr
+                                   : !binding.button && config.binding(binding.modifiers, binding.keysym);
+            if (!taken)
                 config.bindings.push_back(std::move(binding));
             else if (i <= own)
-                fail("duplicate keyboard binding");
+                fail(is_switch ? "duplicate switch binding" : "duplicate keyboard binding");
             lua_pop(L, 1);
         }
     }
@@ -1886,7 +1931,15 @@ const Binding *Config::binding(uint32_t modifiers, uint32_t keysym) const {
     modifiers &= relevant; // CapsLock and NumLock do not disable shortcuts.
     keysym = xkb_keysym_to_lower(keysym);
     for (const auto &binding : bindings)
-        if (!binding.button && binding.modifiers == modifiers && binding.keysym == keysym)
+        if (!binding.button && binding.switch_type < 0 && binding.modifiers == modifiers &&
+            binding.keysym == keysym)
+            return &binding;
+    return nullptr;
+}
+
+const Binding *Config::switch_binding(sh_switch type, bool on) const {
+    for (const auto &binding : bindings)
+        if (binding.switch_type == static_cast<int>(type) && binding.switch_on == on)
             return &binding;
     return nullptr;
 }
