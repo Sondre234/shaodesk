@@ -387,7 +387,18 @@ if(SHAODESK_BUILD_COMPOSITOR)
             COMMAND ${WAYLAND_SCANNER} private-code ${GESTURES_XML}
             ${CMAKE_CURRENT_BINARY_DIR}/pointer-gestures-unstable-v1-protocol.c
             DEPENDS ${GESTURES_XML})
+        set(TABLET_XML ${PROTOCOL_DIR}/stable/tablet/tablet-v2.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/tablet-v2-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header ${TABLET_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/tablet-v2-client-protocol.h
+            DEPENDS ${TABLET_XML})
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/tablet-v2-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code ${TABLET_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/tablet-v2-protocol.c
+            DEPENDS ${TABLET_XML})
         add_executable(input_probe tests/input_probe.c
+            ${CMAKE_CURRENT_BINARY_DIR}/tablet-v2-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/tablet-v2-protocol.c
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.c
             ${CMAKE_CURRENT_BINARY_DIR}/wlr-layer-shell-unstable-v1-client-protocol.h
@@ -636,6 +647,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/touchscreen_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:input_probe> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(touchscreen_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME tablet_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/tablet_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:input_probe>)
+        set_tests_properties(tablet_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME spawn_at_pointer_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/spawn_at_pointer_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:pointer_probe>)
