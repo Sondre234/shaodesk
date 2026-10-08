@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later AND MIT */
 /* Sessions: `session save NAME` writes what every output and window is doing to a file (see
  * shaodesk/session.h); `session restore NAME [launch]` puts matching windows back, and with
- * `launch` starts the applications that are missing, placing their windows as they open. */
+ * `launch` starts the applications that are missing, placing their windows as they open. A login
+ * session saves itself as `last` as it ends and restores that as the next starts
+ * (session.restore). */
 #include "server.h"
 
 static void session_read_command(struct sh_toplevel *toplevel, struct sh_session_window *window) {
@@ -250,9 +252,17 @@ static void session_restore_columns(struct sh_server *server, const struct sh_se
     }
 }
 
-bool session_restore(struct sh_server *server, const char *name, bool launch,
-                     int *restored, int *launched, int *missing, char *error,
-                     size_t error_size) {
+/* How long the windows of a restore that are still to open have to open: those launched by hand,
+ * and those a login session's startup, autostart or restore starts, which may take a while
+ * longer as everything starts at once. */
+#define PENDING_MS 30000
+#define LOGIN_PENDING_MS 60000
+
+/* session_restore; as a login session starts (`login`), a missing window that startup or autostart
+ * started a program for waits for it (`waiting`) rather than being launched again. */
+static bool restore_session(struct sh_server *server, const char *name, bool launch, bool login,
+                            int *restored, int *launched, int *waiting, int *missing,
+                            char *error, size_t error_size) {
     char path[PATH_MAX];
     if (!sh_session_path(name, path, sizeof(path))) {
         snprintf(error, error_size, "a session name is letters, digits, '.', '_' and '-'");
@@ -312,7 +322,7 @@ bool session_restore(struct sh_server *server, const char *name, bool launch,
     int assignment[SH_SESSION_MAX_WINDOWS];
     sh_session_match(session->windows, session->window_count, live_app_ids, live_titles,
                      live_count, assignment);
-    *restored = *launched = *missing = 0;
+    *restored = *launched = *waiting = *missing = 0;
     struct sh_toplevel *focus = NULL;
     for (int i = 0; i < session->window_count; ++i) {
         const struct sh_session_window *saved = &session->windows[i];
@@ -323,17 +333,20 @@ bool session_restore(struct sh_server *server, const char *name, bool launch,
             ++*restored;
             continue;
         }
-        char **argv = launch ? sh_session_argv(saved->command) : NULL;
+        char **argv = sh_session_argv(saved->command);
+        const struct sh_callbacks *callbacks = server->callbacks;
+        bool started = login && callbacks->started &&
+                       callbacks->started(callbacks->userdata, saved->app_id, argv ? argv[0] : "");
         size_t slot = 0, slots = sizeof(server->session_pending) / sizeof(*server->session_pending);
         int64_t now = now_ms();
         while (slot < slots && server->session_pending[slot].used &&
                server->session_pending[slot].deadline >= now)
             ++slot;
-        if (argv && slot < slots && session_spawn(argv)) {
+        if (slot < slots && (started || (launch && argv && session_spawn(argv)))) {
             server->session_pending[slot].window = *saved;
-            server->session_pending[slot].deadline = now + 30000;
+            server->session_pending[slot].deadline = now + (login ? LOGIN_PENDING_MS : PENDING_MS);
             server->session_pending[slot].used = true;
-            ++*launched;
+            ++*(started ? waiting : launched);
         } else {
             ++*missing;
         }
@@ -350,6 +363,52 @@ bool session_restore(struct sh_server *server, const char *name, bool launch,
     notify_subscribers(server);
     free(session);
     return true;
+}
+
+bool session_restore(struct sh_server *server, const char *name, bool launch,
+                     int *restored, int *launched, int *missing, char *error,
+                     size_t error_size) {
+    int waiting;
+    return restore_session(server, name, launch, false, restored, launched, &waiting, missing,
+                           error, error_size);
+}
+
+/* The session a login session ends with and the next one starts from. */
+static const char last_session[] = "last";
+
+/* Whether this session keeps the last one: a login session, with session.restore on. */
+static bool keeps_last(struct sh_server *server) {
+    return server->login_session &&
+           server_settings(server)->session_restore != SH_SESSION_RESTORE_OFF;
+}
+
+void session_save_last(struct sh_server *server) {
+    if (!keeps_last(server))
+        return;
+    int windows = 0;
+    char error[320];
+    if (session_save(server, last_session, &windows, error, sizeof(error)))
+        wlr_log(WLR_INFO, "Saved the session as %s: %d windows", last_session, windows);
+    else
+        wlr_log(WLR_ERROR, "Cannot save the session as %s: %s", last_session, error);
+}
+
+void session_restore_last(struct sh_server *server) {
+    char path[PATH_MAX];
+    if (!keeps_last(server) || !sh_session_path(last_session, path, sizeof(path)) ||
+        access(path, F_OK) != 0)
+        return;
+    bool launch = server_settings(server)->session_restore == SH_SESSION_RESTORE_LAUNCH;
+    int restored, launched, waiting, missing;
+    char error[320];
+    if (restore_session(server, last_session, launch, true, &restored, &launched, &waiting,
+                        &missing, error, sizeof(error)))
+        wlr_log(WLR_INFO,
+                "Restored the last session: %d windows placed, %d waited for from startup and "
+                "autostart, %d launched, %d not found",
+                restored, waiting, launched, missing);
+    else
+        wlr_log(WLR_ERROR, "Cannot restore the last session: %s", error);
 }
 
 /* A window a session restore launched takes over the saved window's place as its rule: the

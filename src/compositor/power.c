@@ -475,6 +475,9 @@ bool power_start(struct sh_server *server, enum sh_action action, char *error,
         wl_event_source_timer_update(power->timer, LOCK_TIMEOUT_MS);
         return true;
     }
+    // The session as it is, before its windows go, for the next login to start from.
+    if (action == SH_POWER_OFF || action == SH_REBOOT || action == SH_LOGOUT)
+        session_save_last(server);
     const struct sh_settings *settings = server_settings(server);
     if ((action == SH_POWER_OFF || action == SH_REBOOT || action == SH_LOGOUT) &&
         settings->close_windows && !wl_list_empty(&server->toplevels)) {

@@ -54,6 +54,7 @@ void run_action(struct sh_server *server, enum sh_action action, int argument) {
         break;
     }
     case SH_QUIT:
+        session_save_last(server);
         wl_display_terminate(server->wl_display);
         break;
     case SH_RELOAD:

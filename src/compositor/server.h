@@ -329,6 +329,9 @@ struct sh_server {
         int64_t deadline;
         bool used;
     } session_pending[32];
+    /* A login session (standalone, or a test's with SHAODESK_LOGIN_SESSION): it saves itself as
+     * it ends and restores that as it starts (session.restore). */
+    bool login_session;
 
     /* Urgent windows (see windows.activation): the last order number given, and the timer that
      * redraws their pulsing borders while they pulse. */
@@ -968,6 +971,10 @@ bool session_save(struct sh_server *server, const char *name, int *windows, char
 bool session_restore(struct sh_server *server, const char *name, bool launch,
                      int *restored, int *launched, int *missing, char *error,
                      size_t error_size);
+/* As a login session ends and starts, with session.restore on: the session saved as `last`, and
+ * put back once startup and autostart have started what they start. */
+void session_save_last(struct sh_server *server);
+void session_restore_last(struct sh_server *server);
 bool session_claim(struct sh_server *server, struct sh_toplevel *toplevel,
                    struct sh_window_rule *rule, bool ruled);
 

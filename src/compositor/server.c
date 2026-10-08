@@ -450,7 +450,10 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     server.power.system_bus = mode != SH_BACKEND_HEADLESS;
     power_init(&server);
     server.running = true;
+    server.login_session = mode == SH_BACKEND_SESSION ||
+                           (getenv("SHAODESK_LOGIN_SESSION") && *getenv("SHAODESK_LOGIN_SESSION"));
     callbacks->startup(callbacks->userdata);
+    session_restore_last(&server);
 
     wlr_log(WLR_INFO, "Running Wayland compositor on WAYLAND_DISPLAY=%s", socket);
     wl_display_run(server.wl_display);
