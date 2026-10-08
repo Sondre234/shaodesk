@@ -330,10 +330,19 @@ void server_new_tablet(struct sh_server *server, struct wlr_input_device *device
     wlr_log(WLR_INFO, "Drawing tablet %s", device->name ? device->name : "");
 }
 
+/* Whether the surface with the keyboard takes the pad: wlroots would otherwise go on sending
+ * its buttons to the last one that did. */
+static bool pad_focused(struct sh_tablet_pad *pad) {
+    struct wlr_surface *surface = pad->server->seat->keyboard_state.focused_surface;
+    return pad->tablet && surface && wlr_surface_accepts_tablet_v2(surface, pad->tablet->tablet_v2);
+}
+
 static void pad_button(struct wl_listener *listener, void *data) {
     struct sh_tablet_pad *pad = wl_container_of(listener, pad, button);
     struct wlr_tablet_pad_button_event *event = data;
     wlr_idle_notifier_v1_notify_activity(pad->server->idle_notifier, pad->server->seat);
+    if (!pad_focused(pad))
+        return;
     wlr_tablet_v2_tablet_pad_notify_button(pad->pad_v2, event->button, event->time_msec,
                                            (enum zwp_tablet_pad_v2_button_state)event->state);
 }
@@ -342,6 +351,8 @@ static void pad_ring(struct wl_listener *listener, void *data) {
     struct sh_tablet_pad *pad = wl_container_of(listener, pad, ring);
     struct wlr_tablet_pad_ring_event *event = data;
     wlr_idle_notifier_v1_notify_activity(pad->server->idle_notifier, pad->server->seat);
+    if (!pad_focused(pad))
+        return;
     wlr_tablet_v2_tablet_pad_notify_ring(pad->pad_v2, event->ring, event->position,
                                          event->source == WLR_TABLET_PAD_RING_SOURCE_FINGER,
                                          event->time_msec);
@@ -351,6 +362,8 @@ static void pad_strip(struct wl_listener *listener, void *data) {
     struct sh_tablet_pad *pad = wl_container_of(listener, pad, strip);
     struct wlr_tablet_pad_strip_event *event = data;
     wlr_idle_notifier_v1_notify_activity(pad->server->idle_notifier, pad->server->seat);
+    if (!pad_focused(pad))
+        return;
     wlr_tablet_v2_tablet_pad_notify_strip(pad->pad_v2, event->strip, event->position,
                                           event->source == WLR_TABLET_PAD_STRIP_SOURCE_FINGER,
                                           event->time_msec);
