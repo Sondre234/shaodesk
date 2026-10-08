@@ -342,6 +342,15 @@ struct sh_settings {
     bool magnet_guides;
     uint32_t magnet_bypass;
     float magnet_guide_color[4]; /* premultiplied RGBA */
+    /* windows.snap: a floating window dropped with the pointer within `snap_distance` pixels of
+     * a side of its output fills that half, of two sides that quarter (with `snap_corners`), of
+     * the top it is maximized (see sh_snap_zone); while it would, a preview in `snap_color` shows
+     * where (with `snap_preview`). */
+    bool snap;
+    int snap_distance;
+    bool snap_corners;
+    bool snap_preview;
+    float snap_color[4]; /* premultiplied RGBA */
     /* windows.placement: enum sh_place_mode, where new floating windows open. */
     int placement;
     /* windows.drag_strip: how many pixels along the top of a window without a title bar move

@@ -229,6 +229,24 @@ const Option options[] = {
     {"windows.magnet.bypass", "enum", "\"Shift\"", "\"Shift\"", none, none,
      "Holding this modifier while dragging turns the magnetism off: `Shift`, `Ctrl`, `Alt`, "
      "`Super`, or `none`."},
+    {"windows.snap", "table", "", "", none, none,
+     "Snapping by dragging: a floating window dropped with the pointer at the left or right "
+     "edge of its monitor fills that half, in a corner that quarter, and at the top edge it is "
+     "maximized; a translucent preview shows where while the pointer is there. Edges shared "
+     "with another monitor do not snap. On a monitor that tiles, a window lifted out of the "
+     "tiling splits the tile it is dropped on instead, but for the top edge."},
+    {"windows.snap.enabled", "boolean", "true", "true", none, none,
+     "`false` turns snapping by dragging off, at the top edge too; the snap actions still "
+     "work."},
+    {"windows.snap.distance", "integer", "8", "8", 1, 100,
+     "How near, in pixels, the pointer has to come to an edge, or be on a panel along it."},
+    {"windows.snap.corners", "boolean", "true", "true", none, none,
+     "Corners snap into quarters; with `false` a corner belongs to the side edge."},
+    {"windows.snap.preview", "boolean", "true", "true", none, none,
+     "Show where the window will go while dropping it would snap it."},
+    {"windows.snap.color", "color", "`border_color`, a quarter opaque", "\"#7da8ff40\"", none,
+     none,
+     "The preview's fill, `#RRGGBBAA`; its outline is the same colour, more opaque."},
     {"windows.placement", "enum", "\"cascade\"", "\"smart\"", none, none,
      "Where a new floating window opens (tiles go where the layout puts them, and rules with a "
      "`position` win): `\"cascade\"` steps each one 32 pixels down and right, `\"center\"` "
