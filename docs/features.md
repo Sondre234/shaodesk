@@ -490,8 +490,33 @@ windows = {
 
 Every matching rule applies, in order; where two set the same action, the later one wins. A
 tiled window keeps `size` and `position` as the place it floats to when toggled. Rules see the
-app ID and title the window has when it opens; later title changes do not apply them again.
+app ID and title the window has when it opens; later title changes do not apply them again,
+but for opacity, which follows the title and app ID as they change, and dynamic rules.
 `features = { window_rules = false }` turns the actions off and leaves opacity rules working.
+
+A rule with `dynamic = true` follows the window, as Hyprland's dynamic rules do: while the
+window's title and app ID match it, as they change, it holds the window to its `floating`,
+`sticky` and `above`, and once they no longer match the window gets back what it had without the
+rule. A browser's video call floats over the other windows while its title says "Meeting", and
+tiles again as the call ends:
+
+```lua
+windows = {
+    rules = {
+        { app_id = "^firefox$", title = "Meeting", dynamic = true, floating = true, above = true },
+    },
+},
+```
+
+The rule holds the window from the moment it matches, as the window opens too. Changed by hand
+meanwhile (toggled with Super + V, Super + Shift + P or Super + Ctrl + T), the window keeps the
+change, also as the rule stops matching; matching anew, the rule holds it again. Its other
+actions (`workspace`, `output`, `size`, `position`, `fullscreen`, `maximize`, `focus`) still act
+once, as the window opens, if it matches then. A window in a group stays as its group has it,
+and one in the scratchpad or hidden by a window it started stays as it is. A reload applies the
+rules as they are now, letting go of what a rule no longer holds; so does `features = {
+window_rules = false }`. `shaodesk msg get dynamic_rules` says, per window, what the dynamic rules
+decide and what they hold it to.
 
 ### Window placement
 
@@ -1786,7 +1811,11 @@ visible, scratchpad (a window hidden there is also minimized), sticky, its windo
 get stacking` lists the windows front to back as they are drawn, hidden ones where they would
 be: app ID, title, monitor, and the layer it is in (`fullscreen_cover` for fullscreen over the
 panels, `peek` for the window the taskbar peeks at, `fullscreen`, `above`, `floating` for floating
-windows kept over tiles, `normal`). `shaodesk msg get pid_at X Y` prints the process ID of the window
+windows kept over tiles, `normal`). `shaodesk msg get dynamic_rules` prints a line per window in
+the order of `get windows`: app ID, title, what the [dynamic rules](#window-rules) decide of
+floating, sticky and kept above (`on`, `off`, or `-` while none decides it), and which of them
+they hold the window to (`floating,sticky,above`, or `-`), one changed by hand being no longer
+held. `shaodesk msg get pid_at X Y` prints the process ID of the window
 drawn at that layout point, or nothing over bare desktop. `shaodesk msg get layers` prints one line per panel or other layer-shell surface:
 namespace, output, layer (0 background to 3 overlay), whether it is shown, and whether it holds
 the keyboard.
