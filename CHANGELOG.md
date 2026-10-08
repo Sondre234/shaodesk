@@ -217,6 +217,13 @@ shadows.
   maximized, down back to its own size and then minimized, and between halves and quarters.
   The scroll layout's suggested `scroll_left` and `scroll_right` keys in the example
   configuration move to Super + Alt + H and L.
+- Snap Assist: after a window snaps into a half or a quarter, by dragging or from the keyboard,
+  the free part of the monitor beside it shows the monitor's other windows as live thumbnails
+  with their titles, as Windows does; Return or a click puts one there, and Snap Assist comes
+  back for the next free part, so four windows fill the quarters in turn. Escape, a click
+  elsewhere or any other binding dismisses it, and `windows.snap.assist = false` turns it off.
+  It is the overview in that part alone, so the overview's overlay in the shell now takes no
+  input at all.
 - `windows.controls = "traffic_lights"` draws the controls of the windows shaodesk decorates as
   red, yellow and green circles at their top-left, as macOS does: grey while the window has no
   focus, their symbols shown while the pointer is on one, darker while pressed.

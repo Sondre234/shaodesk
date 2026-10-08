@@ -551,6 +551,35 @@ slot a drop gives, and where the preview is drawn and how far it has faded in.
 monitors, a panel, a tiling monitor, the settings, and the preview's easing, corners and pixels;
 the zones have unit tests in `tests/layout_tests.cpp`.
 
+### Snap Assist
+
+After a window snaps into a half or a quarter of its monitor, dragged to an edge, with a snap
+action or Super + Alt + arrows, or from the macOS style's Window menu, the free part beside it
+shows the monitor's other windows as live thumbnails, as Windows' Snap Assist does: for a half,
+the other half; for a quarter, the quarter beside it in its row, else the one above or below it,
+else the one across; parts that other snapped windows hold are not free. It lists the windows on
+the monitor's workspace, the most recently used first, minimized ones included, but not those
+snapped into a half or a quarter already, nor fullscreen ones.
+
+Return, or a click on a thumbnail, puts that window there (back from minimized) and gives it the
+focus. Snapped there, it brings Snap Assist back for the next free part while there are windows
+left to offer, so that three more windows fill the quarters around a first one in turn. The
+arrows, Tab, Home and End move the selection, and Delete or a middle click closes a window.
+Escape, a click anywhere else (which goes on to what is there), any other binding, and any action
+from the control socket dismiss it and leave the part empty; so does the snapped window closing.
+
+It is the [overview](#overview) in that part alone: the compositor draws the thumbnails over the
+part darkened and rounded as a window there would be, and the shell draws the titles and a hint,
+without the search. The rest of the screen keeps working, the pointer reaching the windows beside
+it through the shell's overlay, but the keyboard is Snap Assist's until it goes. It does not open
+on a monitor that tiles, whose tiling places windows itself, nor with no other window to offer.
+`windows.snap = { assist = false }` turns it off. `shaodesk msg get overview` describes it,
+beginning with an `overview-assist` line (the slot, in the monitor's coordinates), and
+`overview_confirm`, `overview_cancel` and `overview select N` drive it as they drive the overview.
+`tests/snap_assist_smoke.py` tests it headless with a keyboard and a pointer, and
+`tests/snap_assist_shell_smoke.py` with the shell; `snap-assist` previews the shell's part
+(`--preview-popup`).
+
 ### Magnetic edges
 
 A floating window that is dragged (Alt + left drag, or a client-decorated window's own title

@@ -191,6 +191,25 @@ libwayland sends a copy of it, so the compositor closes its own at once. `shaode
 window_icons` lists each window's number, app id and icon's name and size, and
 `tests/window_icon_smoke.py` tests them.
 
+### Snapping
+
+Where a window dragged to an edge snaps (`sh_snap_zone`), a step of the Win+arrow cycle
+(`sh_snap_cycle`), the quarters an arrangement covers and the slot Snap Assist offers
+(`sh_snap_quarters`, `sh_snap_assist_slot`) are pure functions in `src/layout.cpp`, beside the
+halves' and quarters' geometry (`sh_placement`), with unit tests in `tests/layout_tests.cpp`.
+`snap.c` follows a move with the pointer (`snap_follow`, from `process_cursor_move`): the zone,
+the slot (`placed_slot`, `placement.c`) and the preview, a tree of two rectangles that sits in
+`windows` just under the dragged window while it shows and among the guides while it does not,
+easing through an `sh_tween` of five values (place, size, opacity). `finish_grab` asks
+`snap_drop` first; a drop that would take the window into a tiling (`drop_tiles`, `grab.c`)
+snaps nowhere but at the top. `place_by_hand_on` puts a window into a slot of a given output,
+and `snap_assist_offer` follows every snap into a half or a quarter. Snap Assist is the overview
+in a mode of its own (`overview_assist`, `overview.c`, with `assist` set): its area is the slot,
+it lists other windows, has no strip, draws its backdrop over the slot alone, leaves the pointer
+outside the slot to the rest of the compositor, closes at once, and puts the window picked into
+the slot. It announces itself as `overview-assist` rather than `overview`; the shell's
+`OverviewView` draws both, and takes no input for either.
+
 ## The shell (`shell/`)
 
 `ShellController` (`controller.cpp`) loads the configuration, keeps the compositor's state from
