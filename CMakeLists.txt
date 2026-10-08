@@ -399,8 +399,8 @@ if(SHAODESK_BUILD_COMPOSITOR)
         target_link_libraries(output_management_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
         target_compile_options(output_management_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
         # A taskbar's window menu through shaodesk-window-control-v1, for window_control_smoke,
-        # its capture of a window, for window_capture_smoke, and its peek at one, for
-        # window_peek_smoke.
+        # its capture of a window, for window_capture_smoke, its peek at one, for
+        # window_peek_smoke, and windows' own icons, for window_icon_smoke.
         add_executable(window_probe tests/window_probe.c
             ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/shaodesk-window-control-v1-protocol.c
