@@ -10,3 +10,6 @@ leak:tests/task_model_test.cpp
 # fontconfig's pattern cache, filled through Qt's font fallback and never freed; neither the
 # compositor nor the shell calls fontconfig itself.
 leak:libfontconfig.so
+# wlroots 0.20's tablet-v2 pad: wlr_tablet_pad_create allocates pad->groups and the pad's destroy
+# handler never frees it, a few bytes for every pad unplugged.
+leak:wlr_tablet_pad_create
