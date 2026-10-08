@@ -397,6 +397,9 @@ struct sh_settings {
      * in and out over dim_duration milliseconds. */
     float dim_inactive;
     int dim_duration;
+    /* windows.allow_tearing: a fullscreen window that asks for it (tearing-control-v1, or a
+     * rule's allow_tearing) is shown at once, tearing, while it is alone on its monitor. */
+    bool allow_tearing;
     /* windows.activation: what a client asking for attention (xdg-activation, an X11 urgency
      * hint) gets. */
     int activation; /* enum sh_activation */
@@ -499,6 +502,7 @@ struct sh_window_rule {
     bool fullscreen, maximize;
     bool no_focus;
     bool sticky; /* only with features.sticky */
+    bool allow_tearing; /* shown at once while fullscreen, with windows.allow_tearing */
 };
 
 /* What a key binding asks for besides its action (sh_callbacks.binding_flags). */

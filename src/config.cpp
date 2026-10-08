@@ -767,6 +767,7 @@ WindowRule window_rule(lua_State *L, int workspaces) {
     actions.maximize = optional_boolean(L, "maximize");
     actions.focus = optional_boolean(L, "focus");
     actions.sticky = optional_boolean(L, "sticky");
+    actions.allow_tearing = optional_boolean(L, "allow_tearing");
     lua_getfield(L, -1, "workspace");
     bool has_workspace = !lua_isnil(L, -1);
     lua_pop(L, 1);
@@ -936,6 +937,7 @@ void read_windows(lua_State *L, Config &config) {
         static_cast<float>(number(L, "inactive_opacity", config.opacity, 0.05, 1));
     config.settings.dim_inactive = static_cast<float>(number(L, "dim_inactive", 0, 0, 0.9));
     config.settings.dim_duration = integer(L, "dim_duration", 180, 0, 2000);
+    boolean(L, "allow_tearing", "windows.allow_tearing", config.settings.allow_tearing);
     lua_getfield(L, -1, "activation");
     if (!lua_isnil(L, -1)) {
         auto name = string(L, -1, "windows.activation");
@@ -2177,8 +2179,8 @@ bool WindowRule::matches(const std::string &app_id, const std::string &title) co
 }
 
 bool WindowActions::empty() const {
-    return !floating && !fullscreen && !maximize && !focus && !sticky && !workspace && !output &&
-           !size && position == Position::Unset;
+    return !floating && !fullscreen && !maximize && !focus && !sticky && !allow_tearing &&
+           !workspace && !output && !size && position == Position::Unset;
 }
 
 void WindowActions::merge(const WindowActions &other) {
@@ -2186,7 +2188,8 @@ void WindowActions::merge(const WindowActions &other) {
                                   {&fullscreen, &other.fullscreen},
                                   {&maximize, &other.maximize},
                                   {&focus, &other.focus},
-                                  {&sticky, &other.sticky}})
+                                  {&sticky, &other.sticky},
+                                  {&allow_tearing, &other.allow_tearing}})
         if (*source)
             *target = *source;
     if (other.workspace)
@@ -2219,6 +2222,7 @@ sh_window_rule WindowActions::to_c() const {
     rule.maximize = maximize.value_or(false);
     rule.no_focus = !focus.value_or(true);
     rule.sticky = sticky.value_or(false);
+    rule.allow_tearing = allow_tearing.value_or(false);
     return rule;
 }
 

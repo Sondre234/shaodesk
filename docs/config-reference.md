@@ -136,6 +136,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `windows.opacity` | number | 1.0 | 0.05 to 1 | Focused window opacity. |
 | `windows.inactive_opacity` | number | `opacity` | 0.05 to 1 | Unfocused window opacity. |
 | `windows.dim_inactive` | number | 0 | 0 to 0.9 | How much darker windows without focus are, 0 for not at all: black laid over them, so it works for every application and tints nothing. Fades over `dim_duration`. |
+| `windows.allow_tearing` | boolean | false | - | Let a fullscreen window that asks for it (tearing-control-v1, as games do) or that a rule's `allow_tearing` names show each frame at once, for the least latency, rather than at the monitor's next refresh, while nothing else shows on its monitor. The picture may tear. |
 | `windows.dim_duration` | integer | 180 | 0 to 2000 | Milliseconds the dimming takes to fade in and out; 0, or `animations.enabled = false`, switches it at once. |
 | `windows.activation` | string | "urgent" | - | What an unfocused application asking for attention (xdg-activation, an X11 urgency hint) gets: `"urgent"` marks the window (border, taskbar, workspace indicator) and leaves focus alone, `"focus"` focuses it and switches to its workspace, `"ignore"` drops the request. `focus_urgent` jumps to the oldest urgent window. |
 | `windows.urgent_color` | color | "#ff9e64" | - | Border of an urgent window, `#RRGGBB` or `#RRGGBBAA`; it pulses for a few seconds, also on windows without a `border_width`. |
@@ -180,6 +181,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `windows.rules[].maximize` | boolean | unset | - | Open maximized. |
 | `windows.rules[].focus` | boolean | unset | - | `false` opens the window without focusing it. |
 | `windows.rules[].sticky` | boolean | unset | - | Show on every workspace of its monitor. |
+| `windows.rules[].allow_tearing` | boolean | unset | - | With `windows.allow_tearing`, show the window's frames at once while it is fullscreen and alone on its monitor, whether or not it asks for that (as an X11 game cannot). |
 
 ## `peek`
 

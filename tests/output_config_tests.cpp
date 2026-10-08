@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Configuration of what a monitor shows: mirroring another one, the display_mode action, and the
-// bits per channel it is drawn in.
+// Configuration of what a monitor shows: mirroring another one, the display_mode action, the bits
+// per channel it is drawn in, and tearing.
 #include "shaodesk/config.hpp"
 #include <iostream>
 #include <stdexcept>
@@ -72,6 +72,21 @@ int main() {
         rejects("return {outputs={monitors={X={bit_depth=12}}}}");
         rejects("return {outputs={monitors={X={bit_depth='10'}}}}");
         rejects("return {outputs={monitors={X={bit_depth=10.5}}}}");
+
+        // Tearing is off unless allowed, and a rule may let a window tear that does not ask.
+        require(!shaodesk::parse_config("return {}").settings.allow_tearing,
+                "tearing allowed by default");
+        auto tearing = shaodesk::parse_config(
+            "return {windows={allow_tearing=true,rules={{app_id='^cs2$',allow_tearing=true},"
+            "{app_id='^mpv$',allow_tearing=false},{app_id='^foot$',floating=true}}}}");
+        require(tearing.settings.allow_tearing, "windows.allow_tearing not parsed");
+        require(tearing.window_actions("cs2", "").to_c().allow_tearing &&
+                    !tearing.window_actions("mpv", "").to_c().allow_tearing &&
+                    !tearing.window_actions("mpv", "").empty() &&
+                    !tearing.window_actions("foot", "").to_c().allow_tearing,
+                "allow_tearing rules not parsed");
+        rejects("return {windows={allow_tearing='yes'}}");
+        rejects("return {windows={rules={{app_id='x',allow_tearing=1}}}}");
     } catch (const std::exception &error) {
         std::cerr << "output_config: " << error.what() << '\n';
         return 1;
