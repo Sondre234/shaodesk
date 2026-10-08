@@ -214,7 +214,7 @@ void DisplaySettings::show(const QString &output) {
         setMessage({});
     Q_EMIT openChanged();
     // Opened again while a trial runs, it keeps what is on trial in view.
-    if (!was || !trial_)
+    if (!was || !trial_ || monitors_.isEmpty())
         reload();
 }
 
