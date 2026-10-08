@@ -1,0 +1,98 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Monitors turned off and on in the layout: a wlr-output-power-management client (as wlopm is)
+turns one off and on; it keeps its place, windows, workspace and panel, `get outputs` says it is
+off, it draws no frames while off, and a lock does not wait for it."""
+from pathlib import Path
+import subprocess
+import sys
+
+import harness
+
+compositor, probe, power_probe, lock_probe = (str(Path(p).resolve()) for p in sys.argv[1:5])
+
+CONFIG = """return {
+    xwayland = false,
+    animations = { enabled = false },
+    outputs = { monitors = { ["HEADLESS-1"] = { mode = "1280x720" },
+                             ["HEADLESS-2"] = { mode = "1280x720" } } },
+}"""
+
+with harness.Compositor(compositor, CONFIG, env={"WLR_HEADLESS_OUTPUTS": "2"}) as desktop:
+    msg, wait_for = desktop.msg, desktop.wait_for
+
+    def outputs():
+        """name: (enabled, x, y, width, height, power) per monitor."""
+        return {r[0]: (r[1] == "1", *map(int, r[2:6]), r[10]) for r in desktop.rows("outputs")}
+
+    def windows():
+        """(workspace, output, visible) per window."""
+        return [(int(r[0]), r[10], r[11] == "1") for r in desktop.rows("windows")]
+
+    def frames():
+        return int(desktop.rows("stats")[0][0])
+
+    def power(*words):
+        result = subprocess.run([power_probe, *words], env=desktop.env, capture_output=True,
+                                text=True, timeout=30)
+        assert result.returncode == 0, result.stderr
+        return result.stdout.split()
+
+    desktop.detail = lambda: f"outputs: {outputs()}, windows: {windows()}"
+    before = outputs()
+    assert [state[5] for state in before.values()] == ["on", "on"], before
+    assert sorted(power("list")) == sorted(["HEADLESS-1", "on", "HEADLESS-2", "on"])
+
+    # A window and a panel on HEADLESS-2.
+    msg("output", "HEADLESS-2", "workspace", "2")
+    window = desktop.spawn([probe, "--external-control"])
+    wait_for(lambda: windows() == [(2, "HEADLESS-2", True)], "the window opened on HEADLESS-2")
+    wait_for(lambda: len(desktop.rows("layers")) == 1, "the panel mapped")
+    layers = desktop.rows("layers")
+
+    assert power("set", "HEADLESS-2", "off") == ["off"]
+    state = outputs()
+    assert state["HEADLESS-2"] == (*before["HEADLESS-2"][:5], "off"), state
+    assert state["HEADLESS-1"] == before["HEADLESS-1"], state
+    assert windows() == [(2, "HEADLESS-2", True)], windows()
+    assert desktop.rows("layers") == layers
+    assert {r[0]: r[1] for r in desktop.rows("workspaces")}["HEADLESS-2"] == "2"
+    assert sorted(power("list")) == sorted(["HEADLESS-1", "on", "HEADLESS-2", "off"])
+    # Asked again, it stays off; a reload leaves it off too.
+    assert power("set", "HEADLESS-2", "off") == ["off"]
+    desktop.reload()
+    assert outputs()["HEADLESS-2"][5] == "off", outputs()
+
+    # With every monitor off, nothing is drawn, however the scene changes.
+    assert power("set", "HEADLESS-1", "off") == ["off"]
+    drawn = frames()
+    msg("output", "HEADLESS-2", "workspace", "1")
+    msg("output", "HEADLESS-1", "workspace", "3")
+    desktop.stays(lambda: frames() == drawn, "frames were drawn with every monitor off")
+    assert windows() == [(2, "HEADLESS-2", False)], windows()
+
+    # A lock does not wait for monitors that are off.
+    log = desktop.root / "locker.log"
+    log.touch()
+    locker = desktop.spawn([lock_probe, "hold", str(log)])
+    wait_for(lambda: "locked" in log.read_text(), "the lock held with the monitors off")
+    # Turned on while locked, a monitor shows the lock's cover, then the desktop once unlocked.
+    assert power("set", "HEADLESS-2", "on") == ["on"]
+    wait_for(lambda: frames() > drawn, "HEADLESS-2 drew again")
+    locker.terminate()
+    assert desktop.reap(locker) == 0
+    assert "unlocked" in log.read_text()
+
+    assert power("set", "HEADLESS-1", "on") == ["on"]
+    assert outputs() == {name: (*state[:5], "on") for name, state in before.items()}, outputs()
+    msg("output", "HEADLESS-2", "workspace", "2")
+    assert windows() == [(2, "HEADLESS-2", True)], windows()
+
+    # A monitor out of the layout is off, and no client can turn it on. (The probe's panel goes
+    # with it, and the probe with its panel.)
+    window.terminate()
+    desktop.reap(window)
+    desktop.reload(CONFIG.replace('["HEADLESS-2"] = { mode = "1280x720" }',
+                                  '["HEADLESS-2"] = { enabled = false }'))
+    assert outputs()["HEADLESS-2"][::5] == (False, "off"), outputs()
+    assert power("list") == ["HEADLESS-1", "on"]
+print("Monitors turned off and on through wlr-output-power-management keep their place")

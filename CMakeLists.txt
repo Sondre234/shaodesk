@@ -400,6 +400,13 @@ if(SHAODESK_BUILD_COMPOSITOR)
         target_include_directories(output_management_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
         target_link_libraries(output_management_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
         target_compile_options(output_management_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        # A wlr-output-power-management client, as wlopm is, for output_power_smoke.
+        add_executable(output_power_probe tests/output_power_probe.c
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-output-power-management-unstable-v1-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/wlr-output-power-management-unstable-v1-protocol.c)
+        target_include_directories(output_power_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        target_link_libraries(output_power_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
+        target_compile_options(output_power_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
         # A taskbar's window menu through shaodesk-window-control-v1, for window_control_smoke,
         # its capture of a window, for window_capture_smoke, its peek at one, for
         # window_peek_smoke, and windows' own icons, for window_icon_smoke.
@@ -420,6 +427,11 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_management_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:output_management_probe>)
         set_tests_properties(output_management PROPERTIES TIMEOUT 60)
+        add_test(NAME output_power_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/output_power_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:output_power_probe>
+            $<TARGET_FILE:lock_probe>)
+        set_tests_properties(output_power_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME compositor_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/compositor_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe>
