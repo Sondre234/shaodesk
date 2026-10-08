@@ -275,6 +275,15 @@ struct sh_gesture_settings {
     int swipe_count;
 };
 
+/* Lua `idle`: how long without input, in milliseconds, before each step of power saving; 0 for
+ * never. */
+struct sh_idle_steps {
+    int dim;         /* the screens darken, until the next input */
+    int display_off; /* every monitor turns off, staying in the layout */
+    int lock;        /* the screen locks with power.lock_command */
+    int suspend;     /* the machine suspends, locking first */
+};
+
 struct sh_settings {
     float background[4];
     uint32_t mouse_modifier;
@@ -433,6 +442,8 @@ struct sh_settings {
     /* tablet.output: the output drawing tablets are mapped to, as touch_output names one; ""
      * for the whole layout. */
     char tablet_output[128];
+    /* idle: the steps on mains, and while the machine runs on battery. */
+    struct sh_idle_steps idle, idle_battery;
 };
 
 /* What a login session keeps of the last one: nothing; where its windows were, for those that open

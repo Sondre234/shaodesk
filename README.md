@@ -43,7 +43,10 @@ you save it.
   an Alt + Tab switcher, an Exposé-style overview, a command palette, and a power menu.
 - **Power controls** through logind (systemd-logind or elogind): lock, suspend, hibernate,
   restart, power off and log out, locking before any sleep and closing windows first so that
-  applications can save.
+  applications can save; and [power saving when idle](docs/features.md#power-saving-when-idle)
+  without an idle daemon: the screens dim, the monitors turn off, the screen locks and the
+  machine suspends after their timeouts, shorter on battery if you like, held off while a video
+  plays.
 - **Administrator passwords:** the shell is the session's polkit agent, so `pkexec`, GParted and
   updaters ask for a password in a dialog of their own.
 - **Effects:** interruptible animations with spring curves, dimming of inactive windows, peek,
@@ -123,8 +126,8 @@ shaodesk runs without any of these, and uses them when they are installed:
 - `xdg-desktop-portal-wlr`, `xdg-desktop-portal-gtk` and PipeWire for screen sharing and file
   choosers ([Portals](docs/features.md#portals))
 - `Xwayland` for X11 applications
-- a locker such as swaylock or gtklock, and swayidle, for
-  [locking and idle timeouts](docs/features.md#screen-locking-and-idle)
+- a locker such as swaylock or gtklock for [locking](docs/features.md#screen-locking-and-idle),
+  by hand or [when idle](docs/features.md#power-saving-when-idle)
 - an icon theme (Adwaita, Breeze, Papirus, ...) for application icons, and `dconf` for the
   window buttons of GTK applications
 

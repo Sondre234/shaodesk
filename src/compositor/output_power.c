@@ -36,6 +36,7 @@ bool set_output_power(struct sh_output *output, bool on) {
         return true;
     }
     output->powered_off = false;
+    output->idle_off = false;
     configure_output(server, output);
     if (!wlr_output->enabled) {
         output->powered_off = true;

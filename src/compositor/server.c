@@ -102,6 +102,7 @@ void reload_config(struct sh_server *server) {
     wl_list_for_each(toplevel, &server->toplevels, link) refresh_frame(toplevel);
     wl_list_for_each(output, &server->outputs, link) reflow_output(server, output->wlr_output);
     power_reload(server);
+    idle_reload(server);
 }
 
 static int terminate_signal(int signal_number, void *data) {
@@ -461,6 +462,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     night_light_update(&server);
     server.power.system_bus = mode != SH_BACKEND_HEADLESS;
     power_init(&server);
+    idle_init(&server);
     server.running = true;
     server.login_session = mode == SH_BACKEND_SESSION ||
                            (getenv("SHAODESK_LOGIN_SESSION") && *getenv("SHAODESK_LOGIN_SESSION"));
@@ -483,6 +485,7 @@ int sh_run(const struct sh_callbacks *callbacks, enum sh_backend_mode mode) {
     }
 #endif
     power_finish(&server);
+    idle_finish(&server);
     close_control_socket(&server);
 
 finish:

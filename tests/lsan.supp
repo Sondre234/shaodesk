@@ -5,6 +5,7 @@ leak:tests/output_management_probe.c
 leak:tests/output_power_probe.c
 leak:tests/lock_probe.c
 leak:tests/pointer_probe.c
+leak:tests/idle_probe.c
 leak:tests/x11_probe.c
 leak:tests/shell_ui_test.cpp
 leak:tests/task_model_test.cpp

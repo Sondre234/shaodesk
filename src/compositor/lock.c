@@ -147,6 +147,7 @@ static void inhibitor_destroy(struct wl_listener *listener, void *data) {
     wl_list_remove(&inhibitor->destroy.link);
     free(inhibitor);
     wlr_idle_notifier_v1_set_inhibited(server->idle_notifier, --server->inhibitors > 0);
+    idle_hold_changed(server);
 }
 
 #if WLR_HAS_SESSION
@@ -159,6 +160,7 @@ void session_active(struct wl_listener *listener, void *data) {
         close(server->sleep_inhibitor);
         server->sleep_inhibitor = -1;
     }
+    idle_hold_changed(server); // no idle step while another VT is in front
 }
 #endif
 
@@ -172,4 +174,5 @@ void server_new_inhibitor(struct wl_listener *listener, void *data) {
     inhibitor->server = server;
     add_listener(&wlr_inhibitor->events.destroy, &inhibitor->destroy, inhibitor_destroy);
     wlr_idle_notifier_v1_set_inhibited(server->idle_notifier, ++server->inhibitors > 0);
+    idle_hold_changed(server);
 }

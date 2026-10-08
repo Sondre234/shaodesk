@@ -15,6 +15,8 @@ static void output_frame(struct wl_listener *listener, void *data) {
     overview_touch(output->server, false); // windows that move or fade move their thumbnails
     if (tick_effects(output->server))
         wlr_output_schedule_frame(output->wlr_output);
+    if (tick_idle(output->server)) // the screens dimming
+        wlr_output_schedule_frame(output->wlr_output);
     struct wlr_scene_output_state_options night = {.color_transform = output->server->night_transform};
     double level = zoom_level(output->server, now_ms());
     bool zoomed = false;

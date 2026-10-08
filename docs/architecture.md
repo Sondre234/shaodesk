@@ -64,6 +64,7 @@ all. In short:
 | `group.c`, `scratchpad.c`, `swallow.c`, `switcher.c`, `overview.c`, `session.c` | One feature each. `session.c` also saves a login session as `last` as it ends (`session_save_last`, from the power actions and quit) and restores it after `startup` (`session_restore_last`, from `sh_run`), asking `sh_callbacks.started` which missing windows startup and autostart will open. |
 | `effects.c` | Dimming, peeking at the desktop or at one window, night light, magnifier, hot corners. |
 | `lock.c` | Session lock and idle/sleep inhibitors. |
+| `idle.c` | Power saving after a while without input: dimming, monitors off, locking, suspending. |
 | `power.c` | The power actions: suspend, hibernate, reboot and power off through logind (`src/login1.c`), locking first, closing windows first, log out. |
 | `foreign_toplevel.c` | Window lists for taskbars and single-window capture. |
 | `window_control.c` | The shell's window menu, window pictures and windows' own icons: shaodesk-window-control-v1, which names a window by its taskbar handle. |
@@ -274,6 +275,22 @@ wlr-output-management change waits for it), and taking an output out of the layo
 reports the mode from `wlr_output->enabled` on every commit that changes it, so clients hear of
 the actions' changes too. `input_activity` (`input.c`), which every key, button, scroll and motion
 event calls, wakes them through `wake_displays` once every output in the layout is off.
+
+### Power saving when idle
+
+`idle.c` takes the `idle` steps (`enum sh_idle_step`: dim, display_off, lock, suspend) with one
+timer, `sh_server.idle`. `input_activity` calls `idle_activity` on every input event, which only
+notes the time while no step has been taken; the timer, set for the next step's time on either
+power source's table, finds when it fires whether input came meanwhile and sets itself again.
+Each step taken sets its bit in `done` and is not taken again until input clears them, which
+also fades the dimming out and turns on the outputs the display_off step turned off (`idle_off`
+on `sh_output`, cleared whenever an output is turned on another way). The dimming is a stretched
+`server->black` buffer (`sh_dim_create`) in a tree of its own created last at the scene's root,
+over the lock too, faded by `tick_idle` from `output_frame`. `idle_held` (an idle inhibitor, or
+the session not active) disarms the timer, and `idle_hold_changed` (called from `lock.c` as
+inhibitors come and go and the VT changes) restarts the count once released. `idle_steps` reads
+`src/power_supply.c`'s answer, from `$SHAODESK_SYSFS` in the tests; power.c's waking up after
+sleep calls `idle_activity` as input would.
 
 ## The shell (`shell/`)
 

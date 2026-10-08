@@ -319,7 +319,10 @@ struct Config {
                                                  {3, SH_SWIPE_DOWN, SH_OVERVIEW_CANCEL, "overview_cancel"}},
                                       .swipe_count = 4},
                          .touch_output = "",
-                         .tablet_output = ""};
+                         .tablet_output = "",
+                         .idle = {.dim = 570000, .display_off = 600000, .lock = 0, .suspend = 0},
+                         .idle_battery = {.dim = 570000, .display_off = 600000, .lock = 0,
+                                          .suspend = 0}};
     // layout.workspace_names: the label of workspace N is names[N - 1]; "" or past the end: none.
     std::vector<std::string> workspace_names;
     // hot_corners: what each corner runs, as a control request; "" for nothing.
