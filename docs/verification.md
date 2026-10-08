@@ -570,3 +570,19 @@ back when opened as it fades, and that the switcher fades before its surface goe
 Not checked: any of the motion on a real display at 144 or 200 Hz (how it looks and what it costs
 on the GPU), the safe triangle with a real pointer's speed and jitter, and the overlays' exits
 over real applications.
+
+## XDG autostart
+
+Added 2026-10-08. `autostart_tests` checks the splitting of `Exec` (double and single quotes,
+escapes, every field code), which directory's file counts, each reason an entry is skipped, the
+entries recognised as a notification daemon, a tray watcher or a polkit agent, and the settings.
+`autostart_smoke` runs a headless compositor as a login session (`SHAODESK_LOGIN_SESSION=1`) on
+temporary XDG directories: the entries start after `startup` with their arguments and in their
+`Path`, the user's file hides the system's, the skipped and failed ones are listed with their
+reasons by `get autostart`, a reload starts nothing again, and neither a compositor that is no
+login session nor `autostart.xdg = false` starts any.
+
+Not checked: a real `--session` starting real applications' entries (Steam, Discord, Nextcloud,
+KeePassXC and the like) and the shell skipping a real dunst, mako or snixembed; applications that
+start before the shell's tray or notification daemon is on the bus and so miss it (they start
+right after the shell, which takes the names a moment later).

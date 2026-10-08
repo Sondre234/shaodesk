@@ -9,7 +9,9 @@ covers branches, building, testing and committing; [features.md](features.md) de
   watches it, runs scripts (screenshots, spawned programs) and answers the compositor's
   questions through a table of callbacks (`struct sh_callbacks` in
   `include/shaodesk/backend.h`). Then it hands over to `sh_run`, the C compositor in
-  `src/compositor/`. `shaodesk msg ...` is the same binary acting as a control client.
+  `src/compositor/`, which calls back `startup` once it runs: the shell, the `startup` commands
+  and, in a login session, the XDG autostart entries (`src/autostart.cpp`, tested by
+  `autostart_tests`). `shaodesk msg ...` is the same binary acting as a control client.
 - **`shaodesk-shell`** (`shell/`) is the Qt Quick shell: panels, launcher, notifications, tray, OSD,
   and the text of the switcher and overview. It is an ordinary layer-shell client that
   connects to the control socket with `subscribe` and gets state lines and events.
@@ -612,7 +614,10 @@ them in `shell/controller.cpp`.
   one with `=target` takes it, each printing what it hears; `get seat` says where the drag is
   (see `drag_focus_smoke.py`). `SHAODESK_PROBE_ICON` gives a `wayland_probe` window an icon
   through xdg-toplevel-icon-v1 and an `x11_probe` window `_NET_WM_ICON`, and their commands
-  change it (see `window_icon_smoke.py`).
+  change it (see `window_icon_smoke.py`). `SHAODESK_LOGIN_SESSION=1` makes a headless
+  compositor start as a standalone session does, running XDG autostart from the directories
+  `XDG_CONFIG_HOME` and `XDG_CONFIG_DIRS` name (see `autostart_smoke.py`); without it only
+  `--session` does, so no test starts the developer's own autostart entries.
 
 ## A fast loop
 
