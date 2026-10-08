@@ -72,6 +72,10 @@ struct WindowActions {
     // Fields `other` sets replace these.
     void merge(const WindowActions &other);
     sh_window_rule to_c() const;
+    // The state a dynamic rule holds a window to while it matches (above, floating, sticky), and
+    // the rest, which acts once as the window opens.
+    WindowActions held() const;
+    WindowActions once() const;
 };
 
 // Windows whose app ID and title match `app_id` and `title` (ECMAScript regexes, searched;
@@ -82,6 +86,9 @@ struct WindowRule {
     bool sets_opacity = true; // takes part in window_opacity
     float opacity = 1, inactive_opacity = 1;
     WindowActions actions;
+    // dynamic = true: what it holds of the window's state (WindowActions::held) follows its title
+    // and app ID as they change, and is given back as it stops matching.
+    bool dynamic = false;
     bool matches(const std::string &app_id, const std::string &title) const;
 };
 
@@ -377,8 +384,11 @@ struct Config {
         return window_opacity(app_id, "", active);
     }
     // The actions of every matching rule, later rules winning; none with
-    // features.window_rules = false.
+    // features.window_rules = false. Dynamic rules give only their actions that act once.
     WindowActions window_actions(const std::string &app_id, const std::string &title) const;
+    // What the dynamic rules matching now hold the window to (WindowActions::held), later rules
+    // winning; none with features.window_rules = false.
+    WindowActions dynamic_actions(const std::string &app_id, const std::string &title) const;
 };
 
 // Maps a Lua/control-socket action name; throws for unknown names.

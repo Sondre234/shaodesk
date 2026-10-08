@@ -180,6 +180,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `windows.rules[].focus` | boolean | unset | - | `false` opens the window without focusing it. |
 | `windows.rules[].sticky` | boolean | unset | - | Show on every workspace of its monitor. |
 | `windows.rules[].above` | boolean | unset | - | Keep above the other windows, as `toggle_above` does. |
+| `windows.rules[].dynamic` | boolean | false | - | Hold the window to the rule's `above`, `floating` and `sticky` while its title and app ID match, as they change, and give back what it had once they no longer do; its other actions still act once, as the window opens. |
 
 ## `peek`
 

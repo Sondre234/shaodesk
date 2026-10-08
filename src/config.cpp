@@ -785,6 +785,7 @@ WindowRule window_rule(lua_State *L, int workspaces) {
         actions.position = WindowActions::Position::At;
     }
     lua_pop(L, 1);
+    rule.dynamic = optional_boolean(L, "dynamic").value_or(false);
     // A rule only for actions leaves opacity to the rules and defaults after it.
     rule.sets_opacity = has_opacity || actions.empty();
     return rule;
@@ -2196,6 +2197,20 @@ sh_window_rule WindowActions::to_c() const {
     return rule;
 }
 
+WindowActions WindowActions::held() const {
+    WindowActions result;
+    result.floating = floating;
+    result.sticky = sticky;
+    result.above = above;
+    return result;
+}
+
+WindowActions WindowActions::once() const {
+    WindowActions result = *this;
+    result.floating = result.sticky = result.above = std::nullopt;
+    return result;
+}
+
 float Config::window_opacity(const std::string &app_id, const std::string &title,
                              bool active) const {
     for (const auto &rule : window_rules)
@@ -2210,7 +2225,17 @@ WindowActions Config::window_actions(const std::string &app_id, const std::strin
         return result;
     for (const auto &rule : window_rules)
         if (!rule.actions.empty() && rule.matches(app_id, title))
-            result.merge(rule.actions);
+            result.merge(rule.dynamic ? rule.actions.once() : rule.actions);
+    return result;
+}
+
+WindowActions Config::dynamic_actions(const std::string &app_id, const std::string &title) const {
+    WindowActions result;
+    if (!settings.window_rules)
+        return result;
+    for (const auto &rule : window_rules)
+        if (rule.dynamic && !rule.actions.held().empty() && rule.matches(app_id, title))
+            result.merge(rule.actions.held());
     return result;
 }
 

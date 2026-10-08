@@ -332,6 +332,12 @@ struct Runtime {
         *rule = actions.to_c();
         return true;
     }
+    static void dynamic_rule(void *data, const char *app_id, const char *title,
+                             sh_dynamic_rule *rule) {
+        auto held = static_cast<Runtime *>(data)->config.dynamic_actions(app_id, title);
+        auto value = [](const std::optional<bool> &decided) { return decided ? *decided : -1; };
+        *rule = {value(held.floating), value(held.sticky), value(held.above)};
+    }
     static sh_action key(void *data, uint32_t modifiers, uint32_t keysym, int *argument) {
         auto &self = *static_cast<Runtime *>(data);
         auto *binding = self.config.mode_binding(self.mode, modifiers, keysym);
@@ -1022,7 +1028,8 @@ int main(int argc, char **argv) {
             Runtime::opacity,   Runtime::screenshot, Runtime::window_rule,
             Runtime::hot_corner, Runtime::action_target, Runtime::config_watch,
             Runtime::config_changed, Runtime::lock, Runtime::launch, Runtime::autostart,
-            Runtime::started, Runtime::binding_flags, Runtime::set_mode, Runtime::switch_toggled};
+            Runtime::started, Runtime::binding_flags, Runtime::set_mode, Runtime::switch_toggled,
+            Runtime::dynamic_rule};
         int result = sh_run(&callbacks, mode);
         if (runtime.shell_pid > 0)
             kill(runtime.shell_pid, SIGTERM);
