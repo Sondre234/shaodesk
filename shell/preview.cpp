@@ -26,6 +26,13 @@ class PreviewAudio : public Audio {
     void sendStreamVolume(uint32_t, int) override {}
     void sendStreamMute(uint32_t, bool) override {}
 };
+// Media players that take every request and do nothing with it.
+class PreviewMedia : public Media {
+  protected:
+    void sendCommand(const QString &, const QString &) override {}
+    void sendPosition(const QString &, const QString &, qint64) override {}
+    void queryPosition(const QString &) override {}
+};
 
 // A tray icon: a rounded square in `color` with a letter on it.
 QImage trayIcon(const QColor &color, const QString &letter) {
@@ -201,7 +208,8 @@ Notification notification(const QString &app, const QString &icon, const QString
 } // namespace
 
 PreviewData::PreviewData(ShellController &controller)
-    : QObject(&controller), controller_(controller), audio_(std::make_unique<PreviewAudio>()) {
+    : QObject(&controller), controller_(controller), audio_(std::make_unique<PreviewAudio>()),
+      media_(std::make_unique<PreviewMedia>()) {
     // Firefox plays from a child process of its window's, and the music player from the shell of
     // the first terminal, which has no window of its own (the processes are the stand-in tasks').
     audio_->update({"speakers",
@@ -279,6 +287,45 @@ PreviewData::PreviewData(ShellController &controller)
     controller.power()->setAvailable("lock,suspend,hibernate,reboot,poweroff,logout");
     controller.setNightLight(true, "auto");
 
+    // A music player well into a track, its cover a picture in the preview's own directory, and
+    // a browser paused behind it.
+    QImage cover(128, 128, QImage::Format_RGB32);
+    {
+        QPainter painter(&cover);
+        QLinearGradient gradient(0, 0, 128, 128);
+        gradient.setColorAt(0, QColor("#f2994a"));
+        gradient.setColorAt(1, QColor("#7a3fbf"));
+        painter.fillRect(cover.rect(), gradient);
+        painter.setPen(QPen(QColor(255, 255, 255, 170), 6));
+        painter.drawEllipse(QPoint(64, 64), 34, 34);
+    }
+    const auto coverPath = sysfs_.filePath("cover.png");
+    cover.save(coverPath);
+    Media::Player music;
+    music.name = "org.mpris.MediaPlayer2.music";
+    music.identity = "Music";
+    music.desktopEntry = "org.gnome.Music";
+    music.status = "Playing";
+    music.title = "Harbour Lights";
+    music.artist = "The Late Ferries";
+    music.album = "Night Crossing";
+    music.art = QUrl::fromLocalFile(coverPath).toString();
+    music.trackId = "/track/1";
+    music.length = 214'000'000;
+    music.position = 83'000'000;
+    music.rate = 0; // stays where it is, for the screenshot
+    music.canPlay = music.canPause = music.canGoNext = music.canGoPrevious = music.canSeek = true;
+    Media::Player browser = music;
+    browser.name = "org.mpris.MediaPlayer2.firefox.instance_1_2";
+    browser.identity = "Firefox";
+    browser.desktopEntry = "firefox";
+    browser.status = "Paused";
+    browser.title = "A walk along the coast";
+    browser.artist = "";
+    browser.art = "";
+    media_->setPlayer(browser);
+    media_->setPlayer(music);
+
     // The start menu as on a desktop in use: two pages of pins, applications launched lately and
     // someone logged in; those of tools/shell_gallery.py that are installed show.
     const auto now = QDateTime::currentDateTimeUtc();
@@ -347,6 +394,8 @@ void PreviewData::fill(QQuickItem *panel) {
     panel->setProperty("statusSource", QVariant::fromValue<QObject *>(status_.get()));
     QQmlEngine::setObjectOwnership(backlight_.get(), QQmlEngine::CppOwnership);
     panel->setProperty("backlightSource", QVariant::fromValue<QObject *>(backlight_.get()));
+    QQmlEngine::setObjectOwnership(media_.get(), QQmlEngine::CppOwnership);
+    panel->setProperty("mediaSource", QVariant::fromValue<QObject *>(media_.get()));
     if (tasks_)
         panel->setProperty("taskSource", QVariant::fromValue(tasks_));
 }

@@ -36,6 +36,8 @@ Item {
     property var statusSource: shell.status
     // The screen backlight, swapped the same way.
     property var backlightSource: shell.backlight
+    // The media players, swapped the same way.
+    property var mediaSource: shell.media
     property string audioPopup: ""
     // The middle of the item it opens by, and the item's width.
     property real audioPopupX: 0

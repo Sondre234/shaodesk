@@ -3,10 +3,11 @@ import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
 
-// The Quick Settings flyout, as on Windows 11, at the bar's right end: tiles for what
-// shell.widgets puts in it ("quick") and for night light, the volume with the outputs and the
-// applications' volumes a click away, the screen's brightness where it has a backlight, and the
-// battery along its foot. What sits on the bar instead keeps its own button there.
+// The Quick Settings flyout, as on Windows 11, at the bar's right end: what is playing (a media
+// player's card), tiles for what shell.widgets puts in it ("quick") and for night light, the
+// volume with the outputs and the applications' volumes a click away, the screen's brightness
+// where it has a backlight, and the battery along its foot. What sits on the bar instead keeps
+// its own button there.
 //
 // In the macOS style it is Control Center: the tiles are modules two to a row, and the brightness
 // and the sound are modules of their own under a heading, each a raised card on the flyout.
@@ -21,6 +22,7 @@ PopupCard {
     readonly property var status: panel.statusSource
     readonly property var audio: panel.audioSource
     readonly property var backlight: panel.backlightSource
+    readonly property var media: panel.mediaSource
     readonly property var center: shell.notifications
     // Which list is open under its tile or row: "profiles", "outputs", "mixer", or "" for none.
     property string expanded: ""
@@ -93,6 +95,7 @@ PopupCard {
         interactive: contentHeight > height
         boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+        Module { section: mediaCard }
         Module { section: profileList }
         Module { section: brightness; heading: "Display" }
         Module { section: sound; heading: "Sound" }
@@ -103,6 +106,18 @@ PopupCard {
             x: quick.padding + inset; y: quick.padding
             width: quick.width - 2 * x
             spacing: Theme.macos ? 2 * inset + Theme.spacingM : Theme.spacingL
+            // What is playing, while a player is there.
+            MediaCard {
+                id: mediaCard
+                visible: quick.widgets.media && !!quick.media && quick.media.available
+                Layout.fillWidth: true
+                // Its module's card reaches out by the inset; the tiles under it are cards
+                // themselves.
+                Layout.topMargin: Theme.macos ? content.inset : 0
+                Layout.bottomMargin: Theme.macos ? -content.inset : 0
+                media: quick.media
+                shown: quick.open
+            }
             GridLayout {
                 id: tiles
                 Layout.fillWidth: true
