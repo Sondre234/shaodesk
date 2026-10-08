@@ -229,6 +229,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/foreign_toplevel.c
         src/compositor/frame.c
         src/compositor/gestures.c
+        src/compositor/gradient_border.c
         src/compositor/grab.c
         src/compositor/group.c
         src/compositor/headless_input.c
@@ -840,6 +841,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
         # A missing grim is an empty argument, which the tests take as leaving out their
         # pixel checks (GRIM itself would be GRIM-NOTFOUND).
         set(GRIM_ARGUMENT "$<$<BOOL:${GRIM}>:${GRIM}>")
+        add_test(NAME gradient_border_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/gradient_border_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")
+        set_tests_properties(gradient_border_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME dim_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/dim_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> "${GRIM_ARGUMENT}")

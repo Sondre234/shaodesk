@@ -21,6 +21,7 @@
 #include "shaodesk/login1.h"
 #include "shaodesk/swipe.h"
 #include "shaodesk/dynamic_rule.h"
+#include "shaodesk/border.h"
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -647,6 +648,13 @@ struct sh_icon {
     int width, height;
 };
 
+/* What a window's border in a gradient was painted for (gradient_border.c). */
+struct sh_gradient_drawn {
+    int width, height, border, radius, scale;
+    float mix; // from the inactive gradient (0) to the active one (1)
+    unsigned generation; // server->config_generation
+};
+
 struct sh_opacity_rule {
     unsigned generation; // server->config_generation it was computed under; 0 for never
     bool active;
@@ -743,6 +751,12 @@ struct sh_toplevel {
     bool shown; // has opened (and started its opening animation) since it last mapped
     struct wlr_scene_buffer *deco;    // window controls; NULL when the client decorates itself
     struct wlr_scene_rect *border[4]; // top, bottom, left, right; NULL without a border
+    /* A border in a gradient, in place of `border` (gradient_border.c): its pieces, sides then
+     * corners, in a tree of their own, and what they were painted for; NULL without one. */
+    struct wlr_scene_tree *gradient;
+    struct wlr_scene_buffer *gradient_pieces[SH_BORDER_PIECES];
+    struct sh_gradient_drawn gradient_drawn;
+    bool border_gradient; // the focus fade last eased between gradients, not colours
     int frame_hole; // with rounded corners, the width of the frame border[0] draws; else 0
     int corner_radius; // of the rounded clip on `content`; 0 while the window is square
     /* The shadow: a tree at the bottom of `content` holding the slices of a shared image, NULL
@@ -955,6 +969,7 @@ void publish_toplevel(struct sh_toplevel *toplevel);
 void unpublish_toplevel(struct sh_toplevel *toplevel);
 
 /* frame.c */
+int pixel_scale(struct sh_server *server);
 enum wlr_xdg_toplevel_decoration_v1_mode
 decoration_mode(struct wlr_xdg_toplevel_decoration_v1 *decoration);
 bool wants_decoration(struct sh_toplevel *toplevel);
@@ -979,6 +994,12 @@ void process_cursor_move(struct sh_server *server);
 void process_cursor_resize(struct sh_server *server);
 void begin_interactive(struct sh_toplevel *toplevel, enum sh_cursor_mode mode,
                        uint32_t edges);
+
+/* gradient_border.c */
+bool gradient_borders(struct sh_server *server);
+void remove_gradient_border(struct sh_toplevel *toplevel);
+void refresh_gradient_border(struct sh_toplevel *toplevel, bool on, int border, int radius,
+                             double mix, float opacity);
 
 /* group.c */
 bool groups_enabled(struct sh_server *server);
