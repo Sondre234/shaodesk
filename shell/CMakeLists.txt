@@ -268,6 +268,15 @@ if(BUILD_TESTING)
     target_compile_options(display_layout_test PRIVATE -Wall -Wextra -Wpedantic)
     target_link_libraries(display_layout_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME shell_display_layout COMMAND display_layout_test)
+    # The display settings window's model, against a stand-in for the compositor.
+    add_executable(display_settings_test ${PROJECT_SOURCE_DIR}/tests/display_settings_test.cpp
+        display_settings.cpp display_settings.hpp display_layout.cpp display_layout.hpp)
+    set_target_properties(display_settings_test PROPERTIES AUTOMOC ON)
+    target_include_directories(display_settings_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(display_settings_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(display_settings_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(display_settings_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME shell_display_settings COMMAND display_settings_test)
     # The start menu's model: its pins, the launch history and its search.
     add_executable(start_menu_test ${PROJECT_SOURCE_DIR}/tests/start_menu_test.cpp
         ${SHAODESK_START_SOURCES} fuzzy.cpp fuzzy.hpp)
