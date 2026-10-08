@@ -235,6 +235,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
         src/compositor/headless_input.c
         src/compositor/idle.c
         src/compositor/input.c
+        src/compositor/input_method.c
         src/compositor/keymap.c
         src/compositor/layer_shell.c
         src/compositor/lock.c
@@ -485,6 +486,42 @@ if(SHAODESK_BUILD_COMPOSITOR)
         target_include_directories(pointer_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
         target_link_libraries(pointer_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
         target_compile_options(pointer_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        # Both sides of input methods, for input_method_smoke: an application's text input
+        # (text-input-unstable-v3) and an input method (input-method-unstable-v2).
+        set(TEXT_INPUT_XML ${PROTOCOL_DIR}/unstable/text-input/text-input-unstable-v3.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/text-input-unstable-v3-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header ${TEXT_INPUT_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/text-input-unstable-v3-client-protocol.h
+            DEPENDS ${TEXT_INPUT_XML})
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/text-input-unstable-v3-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code ${TEXT_INPUT_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/text-input-unstable-v3-protocol.c
+            DEPENDS ${TEXT_INPUT_XML})
+        add_executable(text_input_probe tests/text_input_probe.c
+            ${CMAKE_CURRENT_BINARY_DIR}/text-input-unstable-v3-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/text-input-unstable-v3-protocol.c
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/xdg-shell-protocol.c)
+        target_include_directories(text_input_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        target_link_libraries(text_input_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
+        target_compile_options(text_input_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
+        set(INPUT_METHOD_XML ${CMAKE_CURRENT_SOURCE_DIR}/protocols/input-method-unstable-v2.xml)
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/input-method-unstable-v2-client-protocol.h
+            COMMAND ${WAYLAND_SCANNER} client-header ${INPUT_METHOD_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/input-method-unstable-v2-client-protocol.h
+            DEPENDS ${INPUT_METHOD_XML})
+        add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/input-method-unstable-v2-protocol.c
+            COMMAND ${WAYLAND_SCANNER} private-code ${INPUT_METHOD_XML}
+            ${CMAKE_CURRENT_BINARY_DIR}/input-method-unstable-v2-protocol.c
+            DEPENDS ${INPUT_METHOD_XML})
+        add_executable(input_method_probe tests/input_method_probe.c
+            ${CMAKE_CURRENT_BINARY_DIR}/input-method-unstable-v2-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/input-method-unstable-v2-protocol.c
+            ${CMAKE_CURRENT_BINARY_DIR}/virtual-keyboard-client-protocol.h
+            ${CMAKE_CURRENT_BINARY_DIR}/virtual-keyboard-protocol.c)
+        target_include_directories(input_method_probe PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+        target_link_libraries(input_method_probe PRIVATE PkgConfig::WAYLAND_CLIENT)
+        target_compile_options(input_method_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
         add_executable(output_management_probe tests/output_management_probe.c
             ${CMAKE_CURRENT_BINARY_DIR}/wlr-output-management-unstable-v1-client-protocol.h
             ${CMAKE_CURRENT_BINARY_DIR}/wlr-output-management-unstable-v1-protocol.c)
@@ -947,6 +984,11 @@ if(SHAODESK_BUILD_COMPOSITOR)
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/shortcuts_inhibit_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:input_probe>)
         set_tests_properties(shortcuts_inhibit_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME input_method_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/input_method_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:text_input_probe>
+            $<TARGET_FILE:input_method_probe> $<TARGET_FILE:lock_probe>)
+        set_tests_properties(input_method_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME window_capture_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_capture_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>
