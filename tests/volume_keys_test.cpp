@@ -183,7 +183,8 @@ class VolumeKeysTest : public QObject {
         config.brightness = false;
         osd.configure(config);
         VolumeKeys keys(audio, backlight, osd, here);
-        for (const char *line : {"volume up 5", "volume mute", "microphone mute", "brightness up 5"})
+        for (const char *line :
+             {"volume up 5", "volume mute", "microphone mute", "brightness up 5"})
             QVERIFY(keys.handle(line));
         QCOMPARE(audio.volume(), 55);
         QVERIFY(audio.muted() && audio.inputMuted());

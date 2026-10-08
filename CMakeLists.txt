@@ -199,6 +199,7 @@ if(SHAODESK_BUILD_COMPOSITOR)
     set(SHAODESK_COMPOSITOR_SOURCES
         src/compositor/server.c
         src/compositor/actions.c
+        src/compositor/binding_mode.c
         src/compositor/control.c
         src/compositor/cursor.c
         src/compositor/effects.c
@@ -848,6 +849,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:lock_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(session_lock PROPERTIES TIMEOUT 60)
+        add_test(NAME binding_modes_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/binding_modes_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:lock_probe>)
+        set_tests_properties(binding_modes_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME locked_bindings_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/locked_bindings_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:lock_probe>)

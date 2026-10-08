@@ -53,8 +53,7 @@ static void run_fallback(enum sh_action action, int percent) {
     }
     case SH_BRIGHTNESS_UP:
     case SH_BRIGHTNESS_DOWN: {
-        const char *brightness[] = {"brightnessctl", "--quiet", "--min-value=1", "set", step,
-                                    NULL};
+        const char *brightness[] = {"brightnessctl", "--quiet", "--min-value=1", "set", step, NULL};
         run_program(brightness);
         break;
     }

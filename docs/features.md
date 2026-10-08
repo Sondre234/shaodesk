@@ -1350,6 +1350,42 @@ button bindings take neither.
 
 `locked_bindings_smoke` tests both, holding keys on and off the lock screen.
 
+### Binding modes
+
+Binding modes are sway's modes and Hyprland's submaps: named lists of key bindings in `modes`, one
+of which may be in use at a time. A binding with `action = "mode", mode = "NAME"` puts one in use,
+from a key, a mouse button or `shaodesk msg mode NAME`; its bindings then take the place of
+`bindings`, so that bare keys can do the work, and every other key reaches the focused application
+as usual. `mode = "default"` (`shaodesk msg mode default`) brings the bindings outside any mode
+back. Mouse button bindings and `mouse.modifier` stay as they are. The shipped configuration has a
+resize mode, commented out, entered with Super + Alt + R:
+
+```lua
+modes = {
+    resize = {
+        { key = "Left", action = "resize_left" },
+        { key = "Right", action = "resize_right" },
+        { key = "Up", action = "resize_up" },
+        { key = "Down", action = "resize_down" },
+        { key = "Escape", action = "mode", mode = "default" },
+        { key = "Return", action = "mode", mode = "default" },
+    },
+},
+```
+
+A mode's bindings take keys only, with any action and `locked` or `repeats` as elsewhere (resizing
+repeats while held). A mode's name is up to 32 letters, digits, `-` and `_`, not `default`, and
+there are at most 16 modes. A mode without a binding with `action = "mode"` to leave it is refused,
+since it would keep every other binding away, and so is a `mode` that no mode has, with a
+suggestion for a misspelled one.
+
+While a mode is in use the taskbar, and the macOS style's menu bar, show its name on a pill in the
+accent colour; a click on it leaves the mode. `shaodesk msg get mode` prints the mode in use
+(`default` outside any), and subscribers hear `mode NAME` as it changes. A reload leaves the mode,
+since the modes may have changed, and so does locking the session, so that the keys the lock
+screen leaves to bindings, the volume keys among them, are the ones outside any mode.
+`binding_modes_smoke` tests them, and `shell_ui` the pill.
+
 ### Nested sessions
 
 The host compositor can consume shortcuts before the nested compositor receives
@@ -1698,7 +1734,9 @@ buttons, or gives it back. The shell subscribes with `subscribe shell`, saying i
 the volume, microphone and brightness actions, which send `volume up PERCENT`, `volume down
 PERCENT`, `volume mute`, `microphone mute`, `brightness up PERCENT` or `brightness down PERCENT`
 to every subscriber; while no client subscribed that way, the compositor runs `wpctl` and
-`brightnessctl` for them itself. Children of the session find the socket through `SHAODESK_SOCKET`. Actions are
+`brightnessctl` for them itself. The state also says the [binding mode](#binding-modes) in use
+as `mode NAME` (`default` outside any). Children of the session find the socket through
+`SHAODESK_SOCKET`. Actions are
 refused while the session is locked.
 
 ## Screen locking and idle

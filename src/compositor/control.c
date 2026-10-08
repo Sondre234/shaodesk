@@ -482,6 +482,9 @@ static void describe_state(struct sh_server *server, char *state, size_t size) {
                            server->keyboard_layout + 1, xkb_keymap_num_layouts(server->keymap), code,
                            name);
     }
+    // "mode NAME": the binding mode in use, "default" outside any.
+    if (length < size)
+        length += snprintf(state + length, size - length, "mode %s\n", binding_mode(server));
     // "night-light ACTIVE MODE": whether the screen is warmed now ("on" or "off"), and whether
     // the schedule decides ("auto") or an override holds it "on" or "off".
     if (length < size)

@@ -65,6 +65,21 @@ void unknown_settings() {
     expect("return {bindings={{mods={'Supr'},key='q',action='close'}}}", "did you mean 'Super'?");
     expect("return {bindings={{button='sid',action='close'}}}", "did you mean 'side'?");
     expect("return {bindings={{key='q',action='close',comand={'x'}}}}", "did you mean 'command'?");
+    expect("return {modes={resize={{key='Escape',action='mode',mode='default'}}},"
+           "bindings={{key='r',action='mode',mode='resiz'}}}",
+           "unknown mode 'resiz'; did you mean 'resize'?");
+    expect("return {modes={resize={{key='Escape',action='mode',mode='defualt'}}}}",
+           "did you mean 'default'?");
+    expect("return {modes={resize={{key='Left',action='resize_left'}}}}",
+           "mode 'resize' has no binding with action = \"mode\" to leave it");
+    expect("return {modes={resize={{button='side',action='mode',mode='default'}}}}",
+           "a mode's bindings take a key, not a button");
+    expect("return {modes={default={{key='Escape',action='mode',mode='default'}}}}",
+           "mode name 'default' must be");
+    expect("return {bindings={{key='r',action='mode'}}}",
+           "the mode action needs mode = \"default\" or the name of one of modes");
+    expect("return {bindings={{key='r',action='close',mode='x'}}}",
+           "mode is only valid with screenshot and mode");
     expect("return {windows={rules={{app_id='x',floatng=true}}}}", "did you mean 'floating'?");
     expect("return {outputs={monitors={X={scal=2}}}}", "did you mean 'scale'?");
     expect("return {shell={launchers={{name='a',command={'x'},icn='b'}}}}",
@@ -95,6 +110,13 @@ void locations() {
     at("return {\n  outputs = {\n    monitors = {\n      [\"DP-1\"] = { scal = 2 },\n"
        "    },\n  },\n}",
        "4: unknown setting");
+    at("return {\n  modes = {\n    resize = {\n"
+       "      { key = 'Escape', action = 'mode', mode = 'default' },\n"
+       "      { key = 'q', action = 'mode', mode = 'resise' },\n    },\n  },\n}",
+       "5: unknown mode");
+    at("return {\n  modes = {\n    launch = {\n      { key = 'x', action = 'close' },\n    },\n"
+       "  },\n}",
+       "3: mode 'launch' has no binding");
     // Lua's own errors already carry file:line.
     at("return {\n  x = = 1,\n}", "2:");
     at("local a = nil\nreturn { shell = a.b }", "2:");
@@ -170,13 +192,13 @@ void schema_matches_parser() {
     // Each top-level key the parser knows is in the schema and the other way around.
     for (const char *name : {"version", "extends", "theme", "appearance", "keyboard", "mouse",
                              "touchpad", "layout", "outputs", "windows", "animations", "bindings",
-                             "startup", "shell", "xwayland", "screenshots", "features", "overview", "peek", "night_light", "hot_corners", "zoom", "notifications", "osd", "profile", "profiles", "auto_reload", "power", "terminal", "autostart", "session", "gestures", "touch", "tablet"}) {
+                             "startup", "shell", "xwayland", "screenshots", "features", "overview", "peek", "night_light", "hot_corners", "zoom", "notifications", "osd", "profile", "profiles", "auto_reload", "power", "terminal", "autostart", "session", "gestures", "touch", "tablet", "modes"}) {
         bool found = false;
         for (const auto *child : shaodesk::config_children(""))
             found = found || std::string(child->path) == name;
         require(found, std::string(name) + " missing from the schema");
     }
-    require(shaodesk::config_children("").size() == 34, "the schema has an unknown top-level key");
+    require(shaodesk::config_children("").size() == 35, "the schema has an unknown top-level key");
     // A key that is in the schema is accepted by keys(), however deeply nested.
     require(accepted("return {windows={rules={{app_id='x',sticky=true,focus=false}}}}"),
             "rule keys rejected");

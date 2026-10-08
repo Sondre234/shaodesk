@@ -69,6 +69,7 @@ all. In short:
 | `scaled_capture.c` | The capture source for a window's picture: the window scaled down to fit a size on the renderer, smoothly. |
 | `window_icon.c` | The icons windows supply themselves (xdg-toplevel-icon-v1; X11 windows' from `xwayland.c`), kept for the window control to send the shell. |
 | `volume.c` | The volume, microphone and brightness actions, which the shell carries out. |
+| `binding_mode.c` | Binding modes: which set of key bindings is in use. |
 
 A function used by one file is `static`; one used by several is declared in `server.h` under
 the file that defines it. The build warns (`-Wmissing-prototypes`) about one that is neither.
@@ -314,6 +315,7 @@ what was there.
 | `Taskbar.qml` | The taskbar: the bar along the panel's edge with the start button, the pinned applications, the windows, the widgets and the clock, and its smaller buttons. |
 | `TopMenuBar.qml`, `Dock.qml`, `DockIcon.qml` | The bars of the macOS style (`shell.style`): the menu bar along the top in a `MenuBarWindow` of its own, with the system, application and Window menus, the widgets, search, Quick Settings and the clock; and the dock in the panel's surface, an icon for each application, pinned or running, with the applications button and the Trash. |
 | `BarKeyboard.qml` | The keyboard on the bar (`taskbar_focus`): held in the popover, it walks the taskbar's buttons or the dock's icons and the windows they show. |
+| `BindingMode.qml` | The name of the binding mode in use, on the bar while it is not the default one. |
 | `PinnedSlots.qml`, `TaskList.qml`, `TaskButton.qml`, `TrayButton.qml`, `WorkspaceIndicator.qml`, `VolumeButton.qml`, `ClockButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `QuickSettingsButton.qml`, `WallpapersButton.qml`, `ProfilesButton.qml`, `TilingButton.qml`, `BarAppIcon.qml`, `Badge.qml`, `BarTip.qml` | Parts of the bar: widgets, an application's icon on it, a count on a pill, and the tooltip for things on it. |
 | `ClockFlyout.qml`, `QuickSettings.qml`, `AudioMixer.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml`, `WindowThumbnails.qml`, `MenuBarMenu.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
 | `CalendarPopup.qml`, `NotificationHistory.qml` | The clock flyout's cards: the month calendar, and the notifications grouped by application. |
@@ -353,6 +355,7 @@ reaches the machine's polkit. `tests/fake_polkitd.c` stands in for polkitd on a 
 The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `task_filter.cpp`
 (the taskbar's slots and groups), `audio.cpp` with `pulse_audio.cpp`, `system_status.cpp`
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
+`volume_keys.cpp` (what the compositor passes on from the volume, microphone and brightness keys),
 `power.cpp`, `palette.cpp`. `preview.cpp` has stand-ins for all of them for
 `--preview-popup`.
 
@@ -673,7 +676,9 @@ client header and code for the shell and the test probes), its global made with
 `send_event` (`control.c`) sends a line to every subscriber; `send_shell_line` and
 `request_shell` are the shell-specific forms, and `report_failure` logs a failure the user no
 longer waits on and shows it across the panel (`power-error`, `spawn-error`). The shell reads
-them in `shell/controller.cpp`.
+them in `shell/controller.cpp`. It subscribes with `subscribe shell`, and `shell_listening` says
+whether it has, for something the compositor does another way without it, as the volume keys run
+`wpctl` (`volume.c`).
 
 ### A new test
 

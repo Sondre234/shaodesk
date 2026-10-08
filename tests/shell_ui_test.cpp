@@ -212,6 +212,11 @@ int main(int argc, char **argv) {
                 client->write("ok\n");
                 client->disconnectFromServer();
                 subscriber->write(nightLight ? "night-light on on\n" : "night-light off off\n");
+            } else if (request.startsWith("mode ")) {
+                requests.push_back(QString::fromUtf8(request).trimmed());
+                client->write("ok\n");
+                client->disconnectFromServer();
+                subscriber->write(request);
             } else if (request == "switch_layout next\n") {
                 ++layoutSwitches;
                 client->write("ok\n");
@@ -714,6 +719,22 @@ int main(int argc, char **argv) {
             std::cerr << "the keyboard layout indicator did not come back\n";
             return 1;
         }
+    }
+    // The binding mode in use, on a pill while it is not the default one; a click leaves it.
+    {
+        auto *chip = find(view.rootObject(), "bindingMode");
+        if (!chip || chip->isVisible() || !controller.bindingMode().isEmpty())
+            return fail("the binding mode shows before the compositor names one");
+        subscriber->write("mode resize\n");
+        if (!QTest::qWaitFor([&] { return chip->isVisible(); }) ||
+            controller.bindingMode() != "resize" ||
+            find(view.rootObject(), "bindingModeText")->property("text").toString() != "resize")
+            return fail("the binding mode in use does not show");
+        click(chip);
+        if (!QTest::qWaitFor([&] { return !chip->isVisible(); }) ||
+            !requests.contains("mode default") || !controller.bindingMode().isEmpty())
+            return fail("clicking the binding mode did not leave it");
+        requests.removeAll("mode default");
     }
     // The compositor says whether night light is on and who decides.
     if (controller.nightLight() || !controller.nightLightMode().isEmpty())
@@ -5193,6 +5214,13 @@ ListModel {
             std::abs(dockRect.center().x() - view.width() / 2.0) > 1 ||
             view.inputRegion() != QRegion(dockRect.toAlignedRect()))
             return fail("the menu bar and the dock are not laid out as the macOS style has them");
+        subscriber->write("mode resize\n");
+        if (!QTest::qWaitFor(
+                [&] { return inBar("bindingMode") && inBar("bindingMode")->isVisible(); }))
+            return fail("the menu bar does not show the binding mode in use");
+        subscriber->write("mode default\n");
+        if (!QTest::qWaitFor([&] { return !inBar("bindingMode")->isVisible(); }))
+            return fail("the menu bar shows the binding mode after it was left");
 
         // Windows of three: two of the fake application's and one of the application with actions.
         for (const auto &app : controller.pinned())

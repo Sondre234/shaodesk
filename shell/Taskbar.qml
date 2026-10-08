@@ -94,6 +94,7 @@ Item {
             Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: Theme.barButtonHeight / 2 + Theme.spacingS; color: Theme.divider }
             TaskList { id: taskList; panel: taskbar.panel }
             WorkspaceIndicator { id: workspaceIndicator; panel: taskbar.panel }
+            BindingMode { panel: taskbar.panel }
             WallpapersButton { id: wallpapersButton; panel: taskbar.panel }
             ProfilesButton { id: profilesButton; panel: taskbar.panel }
             TilingButton { panel: taskbar.panel }

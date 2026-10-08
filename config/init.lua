@@ -276,6 +276,22 @@ return {
     -- What a standalone session restores of the last one: "windows" puts back the windows
     -- that open again, "launch" also starts the programs of the others, "off" nothing:
     -- session = { restore = "windows" },
+    -- Binding modes, as sway's modes and Hyprland's submaps: while one is in use its bindings take
+    -- the place of those below, so bare keys can do the work, and the bar shows its name. A
+    -- binding with action = "mode" enters one, and mode = "default" leaves it; each mode needs
+    -- such a way out. For a resize mode on Super+Alt+R, add to the bindings below
+    --     { mods = { mod, "Alt" }, key = "r", action = "mode", mode = "resize" },
+    -- and:
+    -- modes = {
+    --     resize = {
+    --         { key = "Left", action = "resize_left" },
+    --         { key = "Right", action = "resize_right" },
+    --         { key = "Up", action = "resize_up" },
+    --         { key = "Down", action = "resize_down" },
+    --         { key = "Escape", action = "mode", mode = "default" },
+    --         { key = "Return", action = "mode", mode = "default" },
+    --     },
+    -- },
     bindings = {
         -- Mouse buttons bind too: left, right, middle, side, extra (most mice's back and
         -- forward thumb buttons), forward, back. app_id (a regular expression) limits one to

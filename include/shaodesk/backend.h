@@ -189,6 +189,9 @@ enum sh_action {
     SH_MIC_MUTE,
     SH_BRIGHTNESS_UP,
     SH_BRIGHTNESS_DOWN,
+    /* Binding modes: argument 0 brings back the bindings outside any mode, N those of the
+     * configuration's Nth mode (see sh_callbacks.set_mode). */
+    SH_MODE,
 };
 
 enum sh_screenshot_mode {
@@ -517,6 +520,10 @@ struct sh_callbacks {
     bool (*started)(void *, const char *app_id, const char *program);
     /* The sh_binding_flag bits of the binding that `key` returned last. */
     unsigned (*binding_flags)(void *);
+    /* Makes the bindings of mode `mode` (0: those outside any mode, N: the configuration's Nth
+     * mode) the ones `key` looks in, until another mode or a reload. Returns the mode's name
+     * ("default" for 0), or NULL, changing nothing, when there is no such mode. */
+    const char *(*set_mode)(void *, int mode);
 };
 
 enum sh_backend_mode { SH_BACKEND_NESTED, SH_BACKEND_HEADLESS, SH_BACKEND_SESSION };

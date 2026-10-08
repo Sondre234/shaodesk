@@ -34,7 +34,8 @@ int main(int argc, char **argv) {
                 "example volume, microphone and brightness keys missing");
         // They work on the lock screen, and the steps repeat while held; the mutes do not.
         require(louder->locked && louder->repeats && microphone->locked && !microphone->repeats &&
-                    dimmer->locked && dimmer->repeats && !config.binding(SH_LOGO, XKB_KEY_q)->locked,
+                    dimmer->locked && dimmer->repeats &&
+                    !config.binding(SH_LOGO, XKB_KEY_q)->locked,
                 "example volume, microphone and brightness keys not locked or repeating");
         require(config.binding(SH_ALT, XKB_KEY_Tab)->action == SH_SWITCHER_NEXT &&
                     config.binding(SH_ALT | SH_SHIFT, XKB_KEY_Tab)->action == SH_SWITCHER_PREV,
@@ -126,12 +127,12 @@ int main(int argc, char **argv) {
                 "{key='XF86MonBrightnessUp',action='brightness_up',amount=100},"
                 "{key='XF86AudioMute',action='volume_mute'},"
                 "{key='XF86AudioMicMute',action='mic_mute'}}}");
-            require(steps.bindings.size() == 5 && steps.bindings[0].action == SH_VOLUME_UP &&
-                        steps.bindings[0].amount == shaodesk::default_step_percent &&
-                        steps.bindings[1].action == SH_VOLUME_DOWN && steps.bindings[1].amount == 2 &&
-                        steps.bindings[2].action == SH_BRIGHTNESS_UP &&
-                        steps.bindings[2].amount == 100 && steps.bindings[3].action == SH_VOLUME_MUTE &&
-                        steps.bindings[4].action == SH_MIC_MUTE,
+            const auto &s = steps.bindings;
+            require(s.size() == 5 && s[0].action == SH_VOLUME_UP &&
+                        s[0].amount == shaodesk::default_step_percent &&
+                        s[1].action == SH_VOLUME_DOWN && s[1].amount == 2 &&
+                        s[2].action == SH_BRIGHTNESS_UP && s[2].amount == 100 &&
+                        s[3].action == SH_VOLUME_MUTE && s[4].action == SH_MIC_MUTE,
                     "volume and brightness bindings not parsed");
             require(shaodesk::parse_action("brightness_down") == SH_BRIGHTNESS_DOWN &&
                         shaodesk::default_amount(SH_RESIZE_UP) == shaodesk::default_resize_amount &&
@@ -161,6 +162,65 @@ int main(int argc, char **argv) {
             rejects("return {bindings={{button='side',action='close',repeats=false}}}");
             rejects("return {bindings={{key='a',action='close',locked='yes'}}}");
             rejects("return {bindings={{key='a',action='close',repeats=1}}}");
+        }
+        {
+            // Binding modes: named lists of key bindings, sorted by name, which a binding with
+            // the mode action puts in use; "default" is the bindings outside any.
+            auto modes = shaodesk::parse_config(
+                "return {modes={resize={{key='Left',action='resize_left'},"
+                "{key='Escape',action='mode',mode='default'},"
+                "{key='Return',action='mode',mode='default'},{key='x',action='none'}},"
+                "launch={{key='t',action='terminal'},{key='Escape',action='mode',mode='default'},"
+                "{key='r',action='mode',mode='resize'}}},"
+                "bindings={{mods={'Super'},key='r',action='mode',mode='resize'},"
+                "{mods={'Super'},key='o',action='mode',mode='launch'},"
+                "{button='side',action='mode',mode='resize'},"
+                "{key='Print',action='screenshot',mode='window'}}}");
+            require(modes.modes.size() == 2 && modes.modes[0].name == "launch" &&
+                        modes.modes[1].name == "resize" && modes.mode_number("default") == 0 &&
+                        modes.mode_number("launch") == 1 && modes.mode_number("resize") == 2 &&
+                        modes.mode_number("other") == -1 && modes.mode_number("") == -1,
+                    "modes not read in name order");
+            require(modes.mode_names() ==
+                        std::vector<std::string>{"default", "launch", "resize"},
+                    "mode names not listed");
+            auto *enter = modes.binding(SH_LOGO, XKB_KEY_r);
+            require(enter && enter->action == SH_MODE && enter->mode == 2 &&
+                        modes.bindings[2].action == SH_MODE && modes.bindings[2].mode == 2 &&
+                        modes.bindings[3].screenshot == SH_SCREENSHOT_WINDOW,
+                    "the mode action not read");
+            // A mode's keys are its own: the others are not bound in it, and "none" drops one.
+            auto *left = modes.mode_binding(2, 0, XKB_KEY_Left);
+            require(left && left->action == SH_RESIZE_LEFT && left->repeats &&
+                        modes.mode_binding(2, 0, XKB_KEY_Escape)->mode == 0 &&
+                        !modes.mode_binding(2, SH_LOGO, XKB_KEY_r) &&
+                        !modes.mode_binding(2, 0, XKB_KEY_x) &&
+                        modes.modes[1].bindings.size() == 3 &&
+                        modes.mode_binding(1, 0, XKB_KEY_r)->mode == 2 &&
+                        !modes.binding(0, XKB_KEY_Left),
+                    "a mode's bindings not kept apart");
+            // Mode 0, or a number no mode has, is the bindings outside any.
+            require(modes.mode_binding(0, SH_LOGO, XKB_KEY_r) == enter &&
+                        modes.mode_binding(7, SH_LOGO, XKB_KEY_r) == enter,
+                    "the bindings outside any mode not found");
+            const std::string leave = "{key='Escape',action='mode',mode='default'}";
+            rejects("return {bindings={{key='r',action='mode'}}}");
+            rejects("return {bindings={{key='r',action='mode',mode='resize'}}}");
+            rejects("return {bindings={{key='r',action='mode',mode=3}}}");
+            rejects("return {bindings={{key='r',action='close',mode='default'}}}");
+            rejects("return {modes={resize={{key='Left',action='resize_left'}}}}");
+            rejects("return {modes={resize={}}}");
+            rejects("return {modes={resize=true}}");
+            rejects("return {modes={" + leave + "}}");
+            rejects("return {modes={default={" + leave + "}}}");
+            rejects("return {modes={['two words']={" + leave + "}}}");
+            rejects("return {modes={resize={" + leave + ",{button='side',action='close'}}}}");
+            rejects("return {modes={resize={" + leave + "," + leave + "}}}");
+            rejects("return {modes={resize={" + leave + ",{key='q',action='mode',mode='other'}}}}");
+            std::string many = "return {modes={";
+            for (int i = 0; i < 17; ++i)
+                many += "m" + std::to_string(i) + "={" + leave + "},";
+            rejects(many + "}}");
         }
         auto *launcher = config.binding(SH_LOGO, XKB_KEY_r);
         require(launcher && launcher->action == SH_LAUNCHER, "launcher binding missing");

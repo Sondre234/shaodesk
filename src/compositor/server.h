@@ -448,6 +448,8 @@ struct sh_server {
 
     /* Session lock: `locked` outlives a crashed locker so the screen stays covered. */
     bool locked;
+    /* The binding mode in use, by name: "default" outside any (binding_mode.c). */
+    char binding_mode[40];
     struct sh_lock *lock;
     struct wlr_scene_tree *lock_tree, *lock_blanks;
     struct wl_listener new_lock;
@@ -824,6 +826,10 @@ void request_palette(struct sh_server *server);
 void request_taskbar(struct sh_server *server);
 void open_control_socket(struct sh_server *server, const char *wayland_socket);
 void close_control_socket(struct sh_server *server);
+
+/* binding_mode.c */
+const char *binding_mode(struct sh_server *server);
+void set_binding_mode(struct sh_server *server, int mode);
 
 /* cursor.c */
 uint32_t corner_edges(struct sh_toplevel *toplevel, uint32_t edges);

@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The examples in the documentation work as written: each binding config/init.lua offers in a
-comment, added to the default bindings, is accepted (no duplicate key, no unknown action), and so
-is every Lua block of the README and docs/features.md, on top of the default configuration."""
+comment, added to the default bindings with its example binding mode uncommented, is accepted (no
+duplicate key, no unknown action or mode), and so is every Lua block of the README and
+docs/features.md, on top of the default configuration."""
 import os
 from pathlib import Path
 import re
@@ -13,9 +14,27 @@ shaodesk = str(Path(sys.argv[1]).resolve())
 example = Path(sys.argv[2]).resolve()
 lines = example.read_text().splitlines()
 
+# The example binding mode, commented out as a whole (`-- modes = {` to its `-- },`): its lines
+# are no bindings of their own, and every snippet is checked with it in place.
+first = next(n for n, line in enumerate(lines) if re.match(r"\s*--\s*modes = \{", line))
+
+
+def inside(line):
+    """The text of a commented line, without the comment marker and the space after it."""
+    return re.sub(r"^\s*-- ?", "", line)
+
+
+depth = len(inside(lines[first])) - len(inside(lines[first]).lstrip())
+last = next(n for n in range(first + 1, len(lines))
+            if inside(lines[n]).startswith(" " * depth + "}"))
+modes = ["    " + inside(line) for line in lines[first:last + 1]]
+
 snippets = []
 i = 0
 while i < len(lines):
+    if first <= i <= last:
+        i += 1
+        continue
     match = re.match(r"\s*--\s*(\{ (?:mods|button|key)\b.*)$", lines[i])
     if not match:
         i += 1
@@ -34,7 +53,8 @@ failures = []
 with tempfile.TemporaryDirectory(prefix="shaodesk-snippets-") as directory:
     for snippet in snippets:
         path = Path(directory) / "init.lua"
-        path.write_text("\n".join(lines[:start + 1] + ["        " + snippet] + lines[start + 1:]))
+        path.write_text("\n".join(lines[:start] + modes + lines[start:start + 1] +
+                                  ["        " + snippet] + lines[start + 1:]))
         result = subprocess.run([shaodesk, "--check-config", "--config", str(path)],
                                 capture_output=True, text=True, timeout=30)
         if result.returncode != 0:
