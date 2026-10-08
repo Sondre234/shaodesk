@@ -288,6 +288,7 @@ Edit them in [config/init.lua](config/init.lua).
 | Volume up / down / mute keys | [Volume](docs/features.md#volume-and-brightness-keys) of the default output up or down by 5 %, or mute it; on the lock screen too, and held they repeat |
 | Microphone mute key | Mute the default input, or unmute it; on the lock screen too |
 | Brightness up / down keys | The backlight up or down by 5 %; on the lock screen too, and held they repeat |
+| Display key (Fn + the monitor key) | Step through [PC screen only, duplicate, extend and second screen only](docs/features.md#display-modes-win--p), as Windows' Win + P |
 
 ## Scripting
 
