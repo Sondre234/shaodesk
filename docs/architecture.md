@@ -511,6 +511,7 @@ what was there.
 | `DrawnWallpaper.qml` | The wallpaper the macOS style draws while none is set, light or dark, from the background colour and the accent. |
 | `Switcher.qml`, `Overview.qml`, `Palette.qml`, `PowerDialog.qml`, `NotificationCards.qml`, `Osd.qml`, `ConfigError.qml` | One overlay surface each. |
 | `DisplayMode.qml` | The display mode popup (Windows' Win+P, `shell.displayModes`), an overlay surface of its own in the middle of the output: the four choices, the one the compositor's stepping shows selected; a click takes one. |
+| `DisplaySettings.qml` | The display settings window (`shell.displaySettings`), an overlay surface of its own in the middle of the output: the monitors' arrangement to drag, the selected monitor's settings, Apply, and the question while they are on trial. |
 | `AuthDialog.qml` | The polkit authentication dialog (`shell.authentication`), an overlay surface of its own: the request, the user to answer as, the password. |
 | `ClipboardPicker.qml`, `EmojiPicker.qml` | The clipboard history's popup and the emoji picker, each in an overlay surface of its own (`PickerView`, `picker_view.cpp`). |
 | `SwitcherCards.qml` | The switcher's windows as cards with their pictures, in rows, with `shell.thumbnails` outside the macOS style. |
@@ -526,6 +527,23 @@ GObject's and runs on the thread-default GLib main context, which Qt's event loo
 (`QEventDispatcherGlib`); the agent checks that before it registers. The compositor marks the
 shell of a login session with `SHAODESK_POLKIT_AGENT=1`, and only that one registers, so no test
 reaches the machine's polkit. `tests/fake_polkitd.c` stands in for polkitd on a private bus.
+
+The display settings window's model is `DisplaySettings` (`display_settings.cpp`, the
+controller's `displaySettings`). It reads `get monitors` through `ShellController::ask` as the
+window opens and after every trial, keeps each monitor's settings as the window changes them
+(with `loaded_`, what is in force, for `changed`), and sends them all as one `monitors apply`;
+the compositor tests them, puts them on trial and tells every subscriber of the trial's start and
+end (`monitors-trial`, `monitors-kept`, `monitors-reverted`), which `handle` follows, so the
+countdown the window shows is the compositor's and a trial a script started shows too. The
+arrangement's arithmetic is pure, in `display_layout.cpp` (tested by `display_layout_test`):
+`snap` puts a dragged monitor beside the others, overlapping none, edges lining up within a
+threshold of eight of the drawing's pixels; `settle` puts them back side by side after one
+changed size, each on the side of the others it was on; `normalise` starts them at 0, 0.
+`display_settings_test` drives the model against a stand-in for the compositor, and `setAsk` lets
+the preview answer for one. `DisplaySettingsView` (`view.cpp`) is an `OverlayView` on every output,
+holding the keyboard, shown on the output the window was opened on, or on the primary screen while
+that output is gone (`screenAdded` and `screenRemoved`), as a trial may turn it off.
+`tests/display_settings_shell_smoke.py` follows it with a real compositor.
 
 The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `task_filter.cpp`
 (the taskbar's slots and groups), `audio.cpp` with `pulse_audio.cpp`, `system_status.cpp`
@@ -871,7 +889,8 @@ notifications, over the configured wallpaper (`--preview-popup` lists the names)
 style the dock and the menu bar, over the style's drawn wallpaper while none is set, with the
 menu bar's menus as `system-menu`, `app-menu`, `window-menu` and `window-submenu`. The overlay
 surfaces have names there too (`osd-volume`, `osd-text`, `osd-microphone`, `cards`,
-`power-dialog`, `palette`, `palette-empty`, `switcher`, `overview`, `snap-assist`): `PreviewData` in `preview.cpp` shows one in a window of its own over the
+`power-dialog`, `palette`, `palette-empty`, `switcher`, `overview`, `snap-assist`, `display-mode`,
+`display-settings`, `display-settings-trial`): `PreviewData` in `preview.cpp` shows one in a window of its own over the
 bar alone, with stand-ins for what the compositor would tell it, and the screenshot draws it where
 its layer surface would be (the overview over stand-ins for the compositor's thumbnails).
 `--preview --preview-desktop` draws the desktop instead (the gallery's `desktop`, without the

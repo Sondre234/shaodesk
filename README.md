@@ -41,6 +41,11 @@ you save it.
   can sit on the bar instead), keyboard layout, a clock with the notifications and a calendar,
   a system tray, a notification daemon with history and do-not-disturb, an on-screen display,
   an Alt + Tab switcher, an Exposé-style overview, a command palette, and a power menu.
+- **Monitors** set up in a [display settings window](docs/features.md#display-settings), as on
+  Windows and KDE: drag them into place, choose resolution, refresh rate, scale, rotation,
+  adaptive sync, mirroring, 10-bit colour and HDR, and keep the result only once it is seen to
+  work (it goes back by itself after 15 seconds); or in Lua, with Win + P's display modes for a
+  projector.
 - **Power controls** through logind (systemd-logind or elogind): lock, suspend, hibernate,
   restart, power off and log out, locking before any sleep and closing windows first so that
   applications can save; and [power saving when idle](docs/features.md#power-saving-when-idle)

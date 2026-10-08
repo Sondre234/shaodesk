@@ -4,8 +4,9 @@ import Shaodesk
 import "WindowMenu.js" as WindowMenu
 
 // The menus of the macOS style's menu bar, one at a time below its title (panel.menuBarMenu):
-// - the system menu: the appearance profiles, the wallpaper picker, and the power actions the
-//   compositor allows, those that end the session asking first (PowerDialog.qml);
+// - the system menu: the appearance profiles, the wallpaper picker, the display settings window,
+//   and the power actions the compositor allows, those that end the session asking first
+//   (PowerDialog.qml);
 // - the focused application's: starting it again or one of its desktop actions, hiding it (or
 //   the others) and quitting it, which close its windows; while no window is focused, what the
 //   desktop offers;
@@ -99,6 +100,8 @@ PopupMenu {
         if (shell.wallpaperFolder !== "")
             look.push({ text: "Wallpaper…", objectName: "systemMenuWallpaper",
                         run: function() { panel.toggleAudioPopup("wallpapers", bar.systemButton) } })
+        look.push({ text: "Displays…", objectName: "systemMenuDisplays",
+                    run: function() { panel.closeMenus(); shell.displaySettings.show(panel.outputName) } })
         // As macOS orders them, by what the compositor allows; the popover gives the keyboard back
         // before one runs.
         var titles = { suspend: "Sleep", hibernate: "Hibernate", reboot: "Restart…", poweroff: "Shut Down…",

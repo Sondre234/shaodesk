@@ -84,9 +84,9 @@ int main(void) {
     CHECK(read_text(text, &back) && back.count == 3, "read back: %d", back.count);
     const struct sh_monitor *m = &back.outputs[0].monitor;
     CHECK(!strcmp(m->name, "DP-3") && back.outputs[0].primary && m->enabled && m->width == 2560 &&
-              m->height == 1440 && m->refresh == 143912 && m->scale == 1.25f &&
-              m->transform == 1 && m->positioned && m->x == -2560 && m->y == 120 && m->vrr &&
-              !m->mirror[0] && m->bit_depth == 10 && m->hdr && m->tiling == -1,
+              m->height == 1440 && m->refresh == 143912 && m->scale == 1.25f && m->transform == 1 &&
+              m->positioned && m->x == -2560 && m->y == 120 && m->vrr && !m->mirror[0] &&
+              m->bit_depth == 10 && m->hdr && m->tiling == -1,
           "DP-3 as kept");
     m = &back.outputs[1].monitor;
     CHECK(!strcmp(m->mirror, "DP-3") && m->refresh == 0 && m->scale == 1.0f / 3 * 4 &&
@@ -128,8 +128,8 @@ int main(void) {
                     &mixed),
           "a file with mistakes in it is read");
     CHECK(mixed.count == 2, "two lines read: %d", mixed.count);
-    CHECK(!strcmp(mixed.outputs[0].monitor.name, "DP-1") && mixed.outputs[0].monitor.scale == 1.5f &&
-              mixed.outputs[0].primary,
+    CHECK(!strcmp(mixed.outputs[0].monitor.name, "DP-1") &&
+              mixed.outputs[0].monitor.scale == 1.5f && mixed.outputs[0].primary,
           "the first DP-1 line");
     m = &mixed.outputs[1].monitor;
     CHECK(!strcmp(m->name, "HDMI-A-1") && m->refresh == 59940 && m->x == 10 && m->y == -20 &&
@@ -144,7 +144,8 @@ int main(void) {
     CHECK(sh_output_state_set(&one, "mirror", "-") == SH_OUTPUT_FIELD_SET && !one.monitor.mirror[0],
           "no mirror");
     CHECK(sh_output_state_set(&one, "mirror", "DP-1") == SH_OUTPUT_FIELD_BAD, "itself");
-    CHECK(sh_output_state_set(&one, "enabled", "off") == SH_OUTPUT_FIELD_SET && !one.monitor.enabled,
+    CHECK(sh_output_state_set(&one, "enabled", "off") == SH_OUTPUT_FIELD_SET &&
+              !one.monitor.enabled,
           "off");
     CHECK(sh_output_state_set(&one, "sparkle", "yes") == SH_OUTPUT_FIELD_UNKNOWN, "unknown");
     CHECK(sh_output_state_set(&one, "transform", "9") == SH_OUTPUT_FIELD_BAD, "transform 9");
@@ -158,7 +159,8 @@ int main(void) {
     size_t at = strlen(longer);
     memset(longer + at, 'x', 4000);
     strcpy(longer + at + 4000, "\nDP-2\tdescription=B\n");
-    CHECK(read_text(longer, &mixed) && mixed.count == 1 && !strcmp(mixed.outputs[0].monitor.name, "DP-2"),
+    CHECK(read_text(longer, &mixed) && mixed.count == 1 &&
+              !strcmp(mixed.outputs[0].monitor.name, "DP-2"),
           "the long line passed over: %d", mixed.count);
     free(longer);
     // The empty state writes a file of no monitors.

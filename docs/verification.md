@@ -1109,3 +1109,35 @@ through Proton and Gamescope describing their colours through color-management-v
 scene converts them; direct scan-out of an HDR video; the hardware cursor's colours; night light
 left off it; a mirror of it converting the picture to SDR; screenshots and screen sharing of it;
 and the Vulkan renderer as a daily one (wlroots calls it experimental).
+
+## Display settings
+
+Added 2026-10-08. `display_settings_smoke` runs three headless monitors, one a laptop's panel:
+`get monitors` says what the window shows; `monitors apply` puts every monitor's settings on
+trial, its milliseconds shortened by `SHAODESK_TEST_TRIAL_MS`, taken back by `monitors revert`, by
+running out and by a reload, and kept by `monitors keep` into the state file, read again on a
+reload and at the next start, where a line kept for another monitor on the same connector counts
+for nothing; settings that cannot be had change nothing (an unknown monitor or setting, a mirror of
+a mirror, nothing left showing the desktop, a size the headless test refuses with
+`SHAODESK_TEST_REFUSE_MODE`); one refused after the test (`SHAODESK_TEST_REFUSE_COMMIT`, as
+`configure_output`'s own test failing) goes back at once; a wlr-output-management change gives way
+to the window's and comes back as the trial ends; and `monitors reset`, kept, removes the file.
+`display_settings_shell_smoke` opens the window in the shell with the action, takes a trial back
+with Escape on its question, follows the window to the other monitor as a trial turns its own off
+and back as it returns, and closes it. `shell_ui` drives the window on stand-in monitors (choosing,
+dragging with the snapping outline, the keyboard on a scale, Apply, Keep, Escape, a trial running
+out, a refusal, the last monitor on, HDR where it can be had, Reset to configuration, closing during
+a trial), and opens it from Quick Settings, the system menu and the compositor's line;
+`shell_display_settings` tests the model, `shell_display_layout` the snapping and settling, and
+`output_state` the state file. The gallery pictures the window and its question in both styles.
+
+Not checked, for want of the hardware here: a trial on real monitors through DRM, on the NVIDIA
+RTX 4090 in daily use and on AMD and Intel: that a mode, refresh rate, scale or rotation the test
+passes is taken as the commit is made, that one the kernel refuses at the commit after a passing
+test comes back at once, and how long a modeset blanks the monitors against the 15 seconds;
+several monitors' settings together beyond what each one's test checks (the window tests each
+monitor as wlr-output-management's test does, not all of them in one atomic test, so a bandwidth
+limit across monitors shows only as a monitor not taking its settings); adaptive sync, 10-bit
+colour and HDR from the window on monitors that have them; real EDIDs' descriptions keeping a kept
+line to its monitor across docking and undocking; the window on a monitor at a fractional scale;
+and the window moving to another monitor as a trial turns off the one it is on.

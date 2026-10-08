@@ -215,6 +215,18 @@ class AuthView : public OverlayView {
     void update();
 };
 
+// The display settings window on one output, in its middle, holding the keyboard while it is open
+// there: on the output it was opened on, or on the primary screen once that one is gone, as the
+// monitors change under it.
+class DisplaySettingsView : public OverlayView {
+    Q_OBJECT
+  public:
+    DisplaySettingsView(ShellController &controller, QScreen *screen);
+
+  private:
+    void update();
+};
+
 // The overview's overlay on one output: the text over the compositor's thumbnails (titles,
 // workspace labels, the search box), covering the output while the overview is open there.
 class OverviewView : public OverlayView {

@@ -25,7 +25,8 @@ shell is laid out and drawn as macOS's, in the profile's colours, and the panel 
 the dock.
 
 - **Menu bar**, along the top of every monitor. A spiral at the left opens the system menu:
-  Appearance (the profiles), Wallpaper…, Sleep, Restart…, Shut Down…, Lock Screen and Log Out…;
+  Appearance (the profiles), Wallpaper…, Displays… (the [display
+  settings](#display-settings)), Sleep, Restart…, Shut Down…, Lock Screen and Log Out…;
   the `power_menu` action opens it too. The focused application's name, in bold ("Desktop" when
   no window has focus), opens its menu: its desktop actions, New Window, Hide, Hide Others and
   Quit. The **Window** menu acts on the focused window: Minimize, Zoom, Tile Window to Left or
@@ -230,7 +231,8 @@ profile (listing the profiles under it) and the wallpaper (opening the same pick
 button), and without NetworkManager's Wi-Fi the network's state on a disc rather than a tile, as it
 is only shown (Wi-Fi, wired or down, and the interface, or NetworkManager's name for the
 connection); a brightness slider where the screen has a backlight
-(set through logind's `SetBrightness`, so no privileges are needed); the volume with its mute, the
+(set through logind's `SetBrightness`, so no privileges are needed) and under it the [display
+settings](#display-settings); the volume with its mute, the
 outputs to play through and each application's volume a click away; and the battery's charge
 along the foot.
 
@@ -1600,8 +1602,40 @@ open, the one it shows and its monitor (`-` for both while it is closed).
 
 ### Display settings
 
-The `display_settings` action asks the shell for its display settings window, on the monitor
-under the pointer.
+A window sets the monitors up, as Windows' Display settings and KDE's Display Configuration do.
+It opens from Quick Settings (Display settings…, under the brightness; Display Settings… in Control
+Center's Display module), from the macOS style's system menu (Displays…), from the command
+palette, and with the `display_settings` action, which opens it on the monitor under the pointer:
+
+```lua
+bindings = {
+    { mods = { "Super", "Ctrl" }, key = "d", action = "display_settings" },
+},
+```
+
+At its top the monitors that show a desktop of their own are drawn to scale where they stand,
+each with its connector name, its make and model ("Built-in display" for a laptop's panel), a
+star on the primary one, and the monitors mirroring it; a laptop's panel the closed lid holds off
+is drawn faded. A click chooses one, and a drag moves it: it snaps beside the others, an edge of
+it lining up with theirs (tops, bottoms, centres) as it comes near, never overlapping one or
+leaving a gap, and an outline shows where it will go. The monitors that are off or mirror another
+are listed under the arrangement, to choose too. The chosen monitor's settings follow: whether
+it is on (never the last one showing the desktop), its picture (a desktop of its own, or the same
+as another monitor's: [mirroring](#mirroring)), its resolution and refresh rate from the modes it
+offers (its preferred one marked recommended), its scale (100 % to 300 % in steps, or Custom… for
+any from 25 % to 1000 %), its rotation, adaptive sync where it has any, 10-bit colour, HDR where
+the compositor says it can be had, else why not (its EDID, or the renderer), and Make this the
+main display. Changing a size moves the others to keep them side by side as they were. A line
+under the settings says what they cannot show: that the lid holds a panel off, that a mirror's
+scale does not matter, that a monitor asked for 10 bits or HDR and stayed at 8 or SDR.
+
+Nothing changes until Apply, which puts every monitor's settings on trial at once. Then "Keep
+these display settings?" counts down 15 seconds, and unless Keep changes is clicked they go back
+by themselves; Revert, Escape and closing the window take them back at once. The keyboard starts
+on Revert, as on Windows, so that a stray Enter on a monitor showing nothing keeps nothing. Where
+the window's own monitor goes off, the window moves to another, and comes back with the monitor.
+Undo changes forgets what was not applied, and Reset to configuration, offered once the window's
+settings are kept, puts the configuration's settings on trial as Apply does.
 
 Settings applied there are tried first, as on Windows and KDE: every monitor's settings are
 tested at once, as a wlr-output-management client's are, and nothing changes where a monitor

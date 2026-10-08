@@ -40,7 +40,7 @@ POPUPS += ["osd-volume", "osd-text", "cards", "power-dialog", "palette", "switch
            "overview", "palette-empty", "auth-dialog", "snap-assist", "osd-microphone",
            "palette-calculator", "palette-files", "clipboard", "emoji"]
 # The start menu's other views and its menus.
-POPUPS += ["display-mode"]
+POPUPS += ["display-mode", "display-settings", "display-settings-trial"]
 POPUPS += ["launcher-all", "launcher-search", "launcher-empty", "launcher-menu"]
 POPUPS += ["quick-settings", "quick-settings-mixer", "bar-all"]
 POPUPS += ["quick-settings-power", "quick-settings-wifi", "wifi"]

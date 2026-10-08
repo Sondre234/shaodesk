@@ -18,17 +18,14 @@ bool sh_output_state_path(char *path, size_t size) {
 }
 
 /* Tabs and line breaks would split the line; they are written as spaces. */
-static char plain(char c) {
-    return c == '\t' || c == '\n' || c == '\r' ? ' ' : c;
-}
+static char plain(char c) { return c == '\t' || c == '\n' || c == '\r' ? ' ' : c; }
 
-static const char *on_off(bool value) {
-    return value ? "on" : "off";
-}
+static const char *on_off(bool value) { return value ? "on" : "off"; }
 
 bool sh_output_state_write(const struct sh_output_state *state, FILE *file) {
-    fprintf(file, "%s\n# The monitors' settings kept from the display settings window, laid over "
-                  "outputs.monitors.\n# Reset to configuration in the window removes this file.\n",
+    fprintf(file,
+            "%s\n# The monitors' settings kept from the display settings window, laid over "
+            "outputs.monitors.\n# Reset to configuration in the window removes this file.\n",
             magic);
     for (int i = 0; i < state->count; ++i) {
         const struct sh_output_saved *saved = &state->outputs[i];
@@ -138,7 +135,8 @@ static bool parse_field(struct sh_output_saved *saved, const char *key, const ch
         return true;
     }
     if (!strcmp(key, "bit_depth"))
-        return parse_number(value, 8, 10, &m->bit_depth) && (m->bit_depth == 8 || m->bit_depth == 10);
+        return parse_number(value, 8, 10, &m->bit_depth) &&
+               (m->bit_depth == 8 || m->bit_depth == 10);
     if (!strcmp(key, "hdr"))
         return parse_switch(value, &m->hdr);
     if (!strcmp(key, "primary"))

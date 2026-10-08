@@ -79,8 +79,10 @@ set(SHAODESK_NOTIFY_SOURCES notifications.cpp notifications.hpp notification_ima
 # What the compositor passes on from the volume, microphone and brightness keys, which feeds the
 # on-screen display too.
 list(APPEND SHAODESK_NOTIFY_SOURCES volume_keys.cpp volume_keys.hpp)
-# The display mode popup's model, which the controller holds too.
-list(APPEND SHAODESK_NOTIFY_SOURCES display_modes.cpp display_modes.hpp)
+# The display mode popup's model, which the controller holds too, and the display settings
+# window's.
+list(APPEND SHAODESK_NOTIFY_SOURCES display_modes.cpp display_modes.hpp display_settings.cpp
+    display_settings.hpp display_layout.cpp display_layout.hpp)
 # The QML is compiled ahead of time into the binary (qmlcachegen), so starting the shell parses
 # and compiles none of it. It lives at qrc:/shell/ShaodeskShell/*.qml.
 qt_add_library(shaodesk_shell_qml STATIC)
@@ -140,7 +142,8 @@ qt_add_qml_module(shaodesk_shell_qml URI ShaodeskShell VERSION 1.0 RESOURCE_PREF
     BluetoothList.qml
     DisplayMode.qml
     ClipboardPicker.qml
-    EmojiPicker.qml)
+    EmojiPicker.qml
+    DisplaySettings.qml)
 # The emoji picker's table (vendor/emoji), compiled in as :/shaodesk/emoji.tsv.
 qt_add_resources(shaodesk_shell_qml "emoji_table" PREFIX "/shaodesk"
     BASE ${PROJECT_SOURCE_DIR}/vendor/emoji FILES ${PROJECT_SOURCE_DIR}/vendor/emoji/emoji.tsv)
@@ -311,6 +314,24 @@ if(BUILD_TESTING)
     target_compile_options(emoji_test PRIVATE -Wall -Wextra -Wpedantic)
     target_link_libraries(emoji_test PRIVATE Qt6::Core Qt6::Test)
     add_test(NAME emoji COMMAND emoji_test)
+    # The display settings window's arrangement: snapping, settling, starting at 0, 0.
+    add_executable(display_layout_test ${PROJECT_SOURCE_DIR}/tests/display_layout_test.cpp
+        display_layout.cpp display_layout.hpp)
+    set_target_properties(display_layout_test PROPERTIES AUTOMOC ON)
+    target_include_directories(display_layout_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(display_layout_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(display_layout_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(display_layout_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME shell_display_layout COMMAND display_layout_test)
+    # The display settings window's model, against a stand-in for the compositor.
+    add_executable(display_settings_test ${PROJECT_SOURCE_DIR}/tests/display_settings_test.cpp
+        display_settings.cpp display_settings.hpp display_layout.cpp display_layout.hpp)
+    set_target_properties(display_settings_test PROPERTIES AUTOMOC ON)
+    target_include_directories(display_settings_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_compile_definitions(display_settings_test PRIVATE QT_NO_KEYWORDS)
+    target_compile_options(display_settings_test PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(display_settings_test PRIVATE Qt6::Core Qt6::Test)
+    add_test(NAME shell_display_settings COMMAND display_settings_test)
     # The start menu's model: its pins, the launch history and its search.
     add_executable(start_menu_test ${PROJECT_SOURCE_DIR}/tests/start_menu_test.cpp
         ${SHAODESK_START_SOURCES} fuzzy.cpp fuzzy.hpp)
@@ -708,6 +729,10 @@ if(BUILD_TESTING)
             ${PROJECT_SOURCE_DIR}/tests/display_mode_shell_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:pointer_probe>)
         set_tests_properties(display_mode_shell_smoke PROPERTIES TIMEOUT 90)
+        add_test(NAME display_settings_shell_smoke COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/display_settings_shell_smoke.py $<TARGET_FILE:shaodesk>
+            $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:pointer_probe>)
+        set_tests_properties(display_settings_shell_smoke PROPERTIES TIMEOUT 90)
         if(SHAODESK_DBUS)
             add_test(NAME notifications_smoke COMMAND ${Python3_EXECUTABLE}
                 ${PROJECT_SOURCE_DIR}/tests/notifications_smoke.py $<TARGET_FILE:shaodesk>

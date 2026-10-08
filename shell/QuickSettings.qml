@@ -6,10 +6,10 @@ import QtQuick.Layouts
 // The Quick Settings flyout, as on Windows 11, at the bar's right end: what is playing (a media
 // player's card), tiles for what shell.widgets puts in it ("quick") and for night light, the
 // volume with the outputs and the applications' volumes a click away, the screen's brightness
-// where it has a backlight, and the battery along its foot. What sits on the bar instead keeps
-// its own button there.
+// where it has a backlight with the display settings window under it, and the battery along its
+// foot. What sits on the bar instead keeps its own button there.
 //
-// In the macOS style it is Control Center: the tiles are modules two to a row, and the brightness
+// In the macOS style it is Control Center: the tiles are modules two to a row, and the display
 // and the sound are modules of their own under a heading, each a raised card on the flyout.
 PopupCard {
     id: quick
@@ -115,7 +115,7 @@ PopupCard {
         Module { section: powerModeList }
         Module { section: wifiList }
         Module { section: bluetoothList }
-        Module { section: brightness; heading: "Display" }
+        Module { section: display; heading: "Display" }
         Module { section: sound; heading: "Sound" }
         ColumnLayout {
             id: content
@@ -319,32 +319,66 @@ PopupCard {
                     }
                 }
             }
-            // The screen's brightness, where it has a backlight.
-            RowLayout {
-                id: brightness
-                objectName: "quickBrightness"
-                visible: quick.backlight.present
+            // The screen's brightness, where it has a backlight, and the display settings window.
+            ColumnLayout {
+                id: display
                 Layout.fillWidth: true
                 Layout.topMargin: Theme.macos ? Theme.moduleHeadingHeight : 0
-                spacing: Theme.spacingS
-                Item {
-                    Layout.preferredWidth: Theme.rowHeight - Theme.spacingS; Layout.preferredHeight: Theme.rowHeight - Theme.spacingS
-                    Icon { anchors.centerIn: parent; name: "sun" }
-                }
-                AudioSlider {
-                    objectName: "quickBrightnessSlider"
+                spacing: Theme.spacingXS
+                RowLayout {
+                    id: brightness
+                    objectName: "quickBrightness"
+                    visible: quick.backlight.present
                     Layout.fillWidth: true
-                    value: Math.max(0, quick.backlight.percent)
-                    Accessible.name: "Brightness"
-                    onMoved: quick.backlight.setPercent(Math.round(value))
+                    spacing: Theme.spacingS
+                    Item {
+                        Layout.preferredWidth: Theme.rowHeight - Theme.spacingS; Layout.preferredHeight: Theme.rowHeight - Theme.spacingS
+                        Icon { anchors.centerIn: parent; name: "sun" }
+                    }
+                    AudioSlider {
+                        objectName: "quickBrightnessSlider"
+                        Layout.fillWidth: true
+                        value: Math.max(0, quick.backlight.percent)
+                        Accessible.name: "Brightness"
+                        onMoved: quick.backlight.setPercent(Math.round(value))
+                    }
+                    Text {
+                        visible: !Theme.macos
+                        Layout.preferredWidth: Theme.rowHeight
+                        // Level with the volume's percentage, whose row has a chevron after it.
+                        Layout.rightMargin: Theme.rowHeight + Theme.spacingS
+                        text: quick.backlight.percent + "%"; horizontalAlignment: Text.AlignRight
+                        color: Theme.text; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+                    }
                 }
-                Text {
-                    visible: !Theme.macos
-                    Layout.preferredWidth: Theme.rowHeight
-                    // Level with the volume's percentage, whose row has a chevron after it.
-                    Layout.rightMargin: Theme.rowHeight + Theme.spacingS
-                    text: quick.backlight.percent + "%"; horizontalAlignment: Text.AlignRight
-                    color: Theme.text; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+                // Opens the display settings window on this monitor, closing the flyout.
+                FlatButton {
+                    id: displaySettings
+                    objectName: "quickDisplaySettings"
+                    Layout.fillWidth: true; Layout.preferredHeight: Theme.rowHeight
+                    leftPadding: Theme.spacingS; rightPadding: Theme.spacingS
+                    onClicked: {
+                        quick.panel.closeMenus()
+                        shell.displaySettings.show(quick.panel.outputName)
+                    }
+                    Accessible.name: "Display settings"
+                    contentItem: RowLayout {
+                        spacing: Theme.spacingS
+                        Item {
+                            Layout.preferredWidth: Theme.rowHeight - Theme.spacingS - displaySettings.leftPadding
+                            Layout.preferredHeight: Theme.iconSize
+                            Icon { anchors.centerIn: parent; name: "monitor"; visible: !Theme.macos }
+                        }
+                        Text {
+                            Layout.fillWidth: true
+                            text: Theme.macos ? "Display Settings…" : "Display settings…"; elide: Text.ElideRight
+                            color: Theme.text; font.pixelSize: Theme.fontSizeSmall; font.family: Theme.fontFamily
+                        }
+                        Icon {
+                            visible: !Theme.macos
+                            name: "chevron-right"; size: Theme.iconSizeSmall; color: Theme.textMuted
+                        }
+                    }
                 }
             }
             // The default output's volume, the outputs to play through and each application's

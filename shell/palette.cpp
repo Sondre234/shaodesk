@@ -48,6 +48,7 @@ constexpr Action actions[] = {
     {"peek_toggle", "Peek at the desktop"},
     {"workspace_back", "Back to the previous workspace"},
     {"launcher", "Applications menu"},
+    {"display_settings", "Display settings"},
     {"reload", "Reload configuration"},
 };
 

@@ -198,6 +198,8 @@ return {
         -- Per-monitor mode, scale, position, rotation (0-7), vrr, tiling, or enabled = false,
         -- keyed by connector or by "desc:" and the start of "make model serial", e.g.:
         -- monitors = { ["DP-3"] = { mode = "2560x1440@200", scale = 1.25, tiling = true } },
+        -- What the display settings window (Quick Settings) keeps wins over these, for the
+        -- monitor it was kept for; its Reset to configuration brings these back.
         -- A laptop's lid closed with another monitor on turns its panel off ("ignore": not):
         -- lid = "clamshell",
     },
