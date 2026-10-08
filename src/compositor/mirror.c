@@ -155,6 +155,23 @@ void mirror_stop(struct sh_output *output) {
     wlr_log(WLR_INFO, "%s mirrors nothing", output->wlr_output->name);
 }
 
+/* `source` goes away: the mirrors showing it let go of it at once. Their own listeners on its
+ * destroy signal run after output_destroy, which arranges the outputs, and so asks what each
+ * mirror shows, first. */
+void mirrors_forget_source(struct sh_output *source) {
+    struct sh_server *server = source->server;
+    struct wl_list *lists[] = {&server->outputs, &server->disabled_outputs};
+    for (size_t i = 0; i < 2; ++i) {
+        struct sh_output *output;
+        wl_list_for_each(output, lists[i], link) {
+            if (output->mirror && output->mirror->source == source) {
+                detach_source(output->mirror);
+                wlr_output_schedule_frame(output->wlr_output);
+            }
+        }
+    }
+}
+
 /* The output a mirror shows, NULL for none (its source gone). */
 struct sh_output *mirrored_output(const struct sh_output *output) {
     return output->mirror ? output->mirror->source : NULL;
@@ -175,7 +192,9 @@ bool refresh_mirrors(struct sh_server *server) {
             wl_list_for_each(output, lists[i], link) {
                 if ((output->disabled && !output->mirror) || (output->powered_off && !output->mirror))
                     continue; // turned off: configured again as it comes back
-                if (mirror_source(server, output) != mirrored_output(output)) {
+                // A mirror whose source went (mirrors_forget_source) shows nothing until then.
+                if (mirror_source(server, output) != mirrored_output(output) ||
+                    (output->mirror && !mirrored_output(output))) {
                     output->powered_off = false; // a mirror off with a source gone comes on
                     configure_output(server, output);
                     changed = any = true;

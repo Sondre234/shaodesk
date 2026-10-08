@@ -1170,6 +1170,7 @@ void server_new_inhibitor(struct wl_listener *listener, void *data);
 struct sh_output *mirror_source(struct sh_server *server, struct sh_output *output);
 void mirror_start(struct sh_output *output, struct sh_output *source);
 void mirror_stop(struct sh_output *output);
+void mirrors_forget_source(struct sh_output *source);
 struct sh_output *mirrored_output(const struct sh_output *output);
 bool refresh_mirrors(struct sh_server *server);
 void mirrors_follow_power(struct sh_output *source, bool on);
