@@ -468,6 +468,8 @@ shadows.
 
 ### Fixes
 
+- A keymap file (`keyboard.file`) saved in place while the compositor read it after a reload
+  could end the session with SIGBUS; it is now read into memory before it is compiled.
 - A program capturing one window (ext-foreign-toplevel-image-capture-source-v1, as a portal's
   window sharing does) is no longer disconnected for asking while the session is locked: it gets
   a source whose capture stops at once, as for a window that is gone.
