@@ -1,41 +1,41 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-#include <QAbstractListModel>
+#include "row_model.hpp"
 #include <QObject>
 #include <QStringList>
 #include <memory>
 #include <vector>
 
-// The Wi-Fi networks in range, one row each, updated in place, moved rather than made again, so
-// that a row being typed in (a password) stays as signals change and the list reorders.
-class WifiNetworks : public QAbstractListModel {
+// A Wi-Fi network in range, one row of WifiNetworks.
+struct WifiNetwork {
+    QString ssid;
+    int strength = 0;
+    // "open", "owe" (Enhanced Open), "wpa-psk" (WPA or WPA2 Personal, or WPA3 in transition),
+    // "sae" (WPA3 Personal), "wep" or "enterprise".
+    QString security;
+    bool secured = false, known = false, active = false, connecting = false;
+    QString key() const { return ssid; }
+    bool operator==(const WifiNetwork &) const = default;
+};
+
+// The Wi-Fi networks in range, one row each, kept in place (RowModel), so that a row being typed
+// in (a password) stays as signals change and the list reorders.
+class WifiNetworks : public RowModel<WifiNetwork> {
     Q_OBJECT
     Q_PROPERTY(int count READ count NOTIFY countChanged)
   public:
-    struct Network {
-        QString ssid;
-        int strength = 0;
-        // "open", "owe" (Enhanced Open), "wpa-psk" (WPA or WPA2 Personal, or WPA3 in transition),
-        // "sae" (WPA3 Personal), "wep" or "enterprise".
-        QString security;
-        bool secured = false, known = false, active = false, connecting = false;
-        bool operator==(const Network &) const = default;
-    };
+    using Network = WifiNetwork;
     enum Role { SsidRole = Qt::UserRole + 1, StrengthRole, SecurityRole, SecuredRole, KnownRole, ActiveRole, ConnectingRole };
-    using QAbstractListModel::QAbstractListModel;
-    int rowCount(const QModelIndex &parent = {}) const override;
+    using RowModel::RowModel;
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
-    int count() const { return int(rows_.size()); }
-    const std::vector<Network> &all() const { return rows_; }
-    // The networks as they are now, in order: rows gone are removed, those still there changed
-    // in place and moved to their new places, new ones inserted.
-    void update(const std::vector<Network> &networks);
+    // The networks as they are now, in order.
+    void update(const std::vector<Network> &networks) {
+        if (replace(networks))
+            Q_EMIT countChanged();
+    }
   Q_SIGNALS:
     void countChanged();
-
-  private:
-    std::vector<Network> rows_;
 };
 
 // Wi-Fi as Quick Settings and the network widget show it, from NetworkManager: the radio, the
