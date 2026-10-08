@@ -416,6 +416,14 @@ shadows.
   monitor, falling back to normal page flips where the GPU refuses. Off by default; `shaodesk
   import` carries Hyprland's `allow_tearing` and `immediate` rules over, and `shaodesk msg get
   tearing` tells what each monitor's frames do.
+- Monitors' settings can be tried before they are kept, as on Windows and KDE: `shaodesk msg
+  monitors apply DP-3 scale=1.5 HDMI-A-1 mirror=DP-3` tests every monitor's settings at once,
+  applies them on trial and takes them back after 15 seconds unless `monitors keep` keeps them
+  (at once where a monitor does not take them). Kept settings go to
+  `$XDG_STATE_HOME/shaodesk/outputs`, laid over `outputs.monitors` at login and on each reload
+  for the monitor they were kept for; `monitors reset` goes back to the configuration's. `shaodesk
+  msg get monitors` lists each monitor's settings, where they come from, its modes and why it
+  cannot have HDR.
 
 ### Working on the shell
 
@@ -428,6 +436,8 @@ shadows.
 
 ### Fixes
 
+- A monitor whose settings turn it off (`enabled = false`) goes off once another monitor
+  appears, where it stayed on when it was the first to appear, as at startup.
 - A program capturing one window (ext-foreign-toplevel-image-capture-source-v1, as a portal's
   window sharing does) is no longer disconnected for asking while the session is locked: it gets
   a source whose capture stops at once, as for a window that is gone.
