@@ -18,6 +18,10 @@ struct sh_mirror {
     struct wlr_box dst_box;
     int width, height;
     enum wl_output_transform transform;
+    /* The colours of a source driven in HDR (hdr.c), which an SDR mirror converts: its transfer
+     * function and primaries, 0 for SDR's. */
+    enum wlr_color_transfer_function transfer_function;
+    enum wlr_color_named_primaries primaries;
     bool shows_lock;
     bool fresh; // a frame or a change the mirror has not drawn yet
     /* The source's hardware cursor as last drawn, which no frame of the source holds. */
@@ -90,6 +94,9 @@ static void source_commit(struct wl_listener *listener, void *data) {
         mirror->width = event->output->width;
         mirror->height = event->output->height;
         mirror->transform = event->output->transform;
+        const struct wlr_output_image_description *colours = event->output->image_description;
+        mirror->transfer_function = colours ? colours->transfer_function : 0;
+        mirror->primaries = colours ? colours->primaries : 0;
         // The lock is in the scene from the moment the session locks, so a frame committed
         // since shows it.
         mirror->shows_lock = mirror->output->server->locked;
@@ -280,6 +287,14 @@ void mirror_frame(struct sh_output *output) {
         struct wlr_box placed = wlr_box_empty(&mirror->dst_box)
                                     ? (struct wlr_box){0, 0, mirror->width, mirror->height}
                                     : mirror->dst_box;
+        // An HDR source's picture brought down to SDR as the scene brings an HDR window's, its
+        // reference white to SDR's.
+        struct wlr_color_primaries primaries = {0};
+        if (mirror->primaries)
+            wlr_color_primaries_from_named(&primaries, mirror->primaries);
+        // wlroots' defaults: PQ's reference white is 203 cd/m² of 10000, SDR's 80 of 80.
+        bool pq = mirror->transfer_function == WLR_COLOR_TRANSFER_FUNCTION_ST2084_PQ;
+        float luminance = pq ? (80.0f / 203.0f) * (10000.0f / 80.0f) : 1.0f;
         wlr_render_pass_add_texture(
             pass, &(struct wlr_render_texture_options){
                       .texture = texture,
@@ -289,6 +304,9 @@ void mirror_frame(struct sh_output *output) {
                           wlr_output_transform_invert(mirror->transform), out->transform),
                       .filter_mode = WLR_SCALE_FILTER_BILINEAR,
                       .blend_mode = WLR_RENDER_BLEND_MODE_NONE,
+                      .transfer_function = mirror->transfer_function,
+                      .primaries = mirror->primaries ? &primaries : NULL,
+                      .luminance_multiplier = &luminance,
                   });
         if (cursor) {
             double scale;
