@@ -416,14 +416,19 @@ shadows.
   monitor, falling back to normal page flips where the GPU refuses. Off by default; `shaodesk
   import` carries Hyprland's `allow_tearing` and `immediate` rules over, and `shaodesk msg get
   tearing` tells what each monitor's frames do.
-- Monitors' settings can be tried before they are kept, as on Windows and KDE: `shaodesk msg
-  monitors apply DP-3 scale=1.5 HDMI-A-1 mirror=DP-3` tests every monitor's settings at once,
-  applies them on trial and takes them back after 15 seconds unless `monitors keep` keeps them
-  (at once where a monitor does not take them). Kept settings go to
-  `$XDG_STATE_HOME/shaodesk/outputs`, laid over `outputs.monitors` at login and on each reload
-  for the monitor they were kept for; `monitors reset` goes back to the configuration's. `shaodesk
-  msg get monitors` lists each monitor's settings, where they come from, its modes and why it
-  cannot have HDR.
+- A display settings window, as Windows' and KDE's, opened from Quick Settings (or Control
+  Center), the macOS style's system menu, the command palette or the `display_settings` action:
+  the monitors drawn to scale, dragged into place where they snap beside one another, and the
+  chosen one's resolution, refresh rate, scale, rotation, adaptive sync, mirroring, 10-bit colour,
+  HDR (where it can be had, else why not) and whether it is the main one. Apply tests every
+  monitor's settings at once and puts them on trial: "Keep these display settings?" counts down
+  15 seconds and they go back by themselves unless kept, at once where a monitor does not take
+  them. Kept settings go to `$XDG_STATE_HOME/shaodesk/outputs`, laid over `outputs.monitors` at
+  login and on each reload for the monitor they were kept for; Reset to configuration goes back
+  to the configuration's, and no Lua file is ever edited. Scripts do the same with `shaodesk msg
+  monitors apply DP-3 scale=1.5 HDMI-A-1 mirror=DP-3`, `monitors keep` and `monitors reset`, and
+  `shaodesk msg get monitors` lists each monitor's settings, where they come from, its modes and
+  why it cannot have HDR.
 
 ### Working on the shell
 
