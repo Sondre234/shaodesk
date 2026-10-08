@@ -3844,6 +3844,29 @@ ListModel {
         if (!QTest::qWaitFor([&] { return QGuiApplication::clipboard()->text() == "1024" && !launcherOpen(); }) ||
             !requests.isEmpty())
             return fail("Enter did not copy the value the start menu calculated");
+        // A file found is the best match when nothing matches better, with Open folder beside
+        // Open, which the keyboard reaches.
+        controller.clearError();
+        if (!openStart())
+            return fail("the start menu did not open for a file");
+        type("/quarterly");
+        if (!QTest::qWaitFor([&] {
+                return shown("startBestMatch") && shown("startBestAction:folder") &&
+                       item("startBestMatch")->property("result").toMap()["title"] == "Quarterly report.txt";
+            }) ||
+            item("startBestOpen")->property("text") != "Open")
+            return fail("the start menu's search did not find a file");
+        key(Qt::Key_Right);
+        key(Qt::Key_Right);
+        if (!QTest::qWaitFor([&] { return item("startBestAction:folder")->property("current").toBool(); }))
+            return fail("the keyboard did not reach the file's Open folder");
+        key(Qt::Key_Return);
+        if (!QTest::qWaitFor([&] {
+                return controller.error().startsWith("Could not open the folder of Quarterly report.txt: ") &&
+                       !launcherOpen();
+            }))
+            return fail("Open folder did not open the file's folder from the start menu");
+        controller.clearError();
         // More pins than a page holds go on pages, which the wheel, the dots beside them and the
         // keyboard moving past the last row turn.
         {

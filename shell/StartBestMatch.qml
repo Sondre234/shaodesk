@@ -4,10 +4,9 @@ import QtQuick.Controls.Basic
 
 // The best match of the start menu's search, on a card of its own: its icon large, its name,
 // what it is and what its entry says of it, and buttons for what it can do: an application's
-// Open and its desktop actions, a window's Switch to, an action's Run, a calculation's Copy.
-// `current` says the
-// keyboard is at it, and `button` at which of its buttons (-1 for the card itself, 0 for Open,
-// then the actions), which press() presses.
+// Open and its desktop actions, a window's Switch to, an action's Run, a calculation's Copy, a
+// file's Open and Open folder. `current` says the keyboard is at it, and `button` at which of its
+// buttons (-1 for the card itself, 0 for Open, then the actions), which press() presses.
 AbstractButton {
     id: card
     required property var result
@@ -15,12 +14,15 @@ AbstractButton {
     property bool current: false
     property int button: -1
     readonly property bool app: result.kind === "app"
-    // Read from its desktop entry only while it shows.
-    readonly property var actions: visible && app && !result.configured ? shell.appActions(result.appId) : []
+    // Read from its desktop entry only while it shows; a file's folder is its one action.
+    readonly property var actions: visible && app && !result.configured ? shell.appActions(result.appId)
+        : result.kind === "file" ? [{ action: "folder", name: "Open folder", icon: "folder-open" }] : []
     readonly property int buttons: 1 + actions.length
     function press(index) {
         if (index <= 0)
             launcher.run(result)
+        else if (result.kind === "file")
+            launcher.openFolder(result)
         else if (index <= actions.length)
             launcher.launchAction(result.appId, actions[index - 1].action)
     }
@@ -99,7 +101,7 @@ AbstractButton {
                 primary: true
                 focusPolicy: Qt.NoFocus
                 current: card.current && card.button === 0
-                text: card.app ? "Open" : card.result.kind === "window" ? "Switch to"
+                text: card.app || card.result.kind === "file" ? "Open" : card.result.kind === "window" ? "Switch to"
                     : card.result.kind === "calc" ? "Copy" : "Run"
                 onClicked: card.press(0)
             }
