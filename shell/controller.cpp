@@ -73,6 +73,14 @@ ShellController::ShellController(std::filesystem::path path, QObject *parent)
     });
     connect(&backlight_, &Backlight::failed, this, &ShellController::report);
     authentication_.setOutputSource([this] { return overlayOutput(); });
+    // A monitor plugged in or out shows in the display settings window, unless it holds changes
+    // not applied yet.
+    auto monitorsChanged = [this] {
+        if (displaySettings_.open() && !displaySettings_.trial() && !displaySettings_.changed())
+            displaySettings_.reload();
+    };
+    connect(qGuiApp, &QGuiApplication::screenAdded, this, monitorsChanged);
+    connect(qGuiApp, &QGuiApplication::screenRemoved, this, monitorsChanged);
     connect(powerMode_.get(), &PowerMode::failed, this, &ShellController::report);
     connect(wifi_.get(), &Wifi::failed, this, &ShellController::report);
     connect(bluetooth_.get(), &Bluetooth::failed, this, &ShellController::report);
