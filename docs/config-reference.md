@@ -337,7 +337,7 @@ Ranges are inclusive. Colors are `"#RRGGBB"` (with `#RRGGBBAA` where noted).
 | `shell.widgets` | table | - | - | Panel widgets; each is switched off with `false`. One that can move takes `"bar"` to sit on the bar or `"quick"` to sit in the Quick Settings flyout instead, and `true` puts it in its default place. |
 | `shell.widgets.workspaces` | boolean | true | - | This monitor's workspace numbers. |
 | `shell.widgets.battery` | boolean or string | true | - | Charge and state, only where a battery exists: `"bar"` or `"quick"` (along Quick Settings' foot). By default in Quick Settings. |
-| `shell.widgets.network` | boolean or string | true | - | Connection state, only where a network interface exists: `"bar"` or `"quick"` (a tile, and an icon on the Quick Settings button only while the link is down). By default in Quick Settings. |
+| `shell.widgets.network` | boolean or string | true | - | Connection state, only where a network interface exists: `"bar"` or `"quick"` (a tile, and an icon on the Quick Settings button only while the link is down). Where NetworkManager has Wi-Fi, the tile turns it on and off and lists the networks to connect to, as a click on the bar's icon does. By default in Quick Settings. |
 | `shell.widgets.volume` | boolean or string | true | - | The default output's volume, only with a sound server: `"bar"` or `"quick"` (a slider, with the outputs and the applications' volumes). By default in Quick Settings. |
 | `shell.widgets.clock` | boolean | true | - | The clock. |
 | `shell.widgets.calendar` | boolean | true | - | The month calendar in the clock's flyout. |

@@ -67,7 +67,7 @@ Requirements:
   wayland-protocols, wayland-scanner
 - For the shell: Qt 6.9+ (Core, Gui, Network, Qml, Quick, Quick Controls Basic, Quick Layouts,
   Quick Effects, the Wayland platform plugin, and DBus for notifications, the tray, the media
-  controls and the power mode),
+  controls, the power mode and Wi-Fi),
   LayerShellQt 6.6+, GLib/GIO, wayland-client
 - libinput and xcb (with xcb-xfixes and xcb-ewmh) when wlroots is built with its libinput
   backend or with XWayland; optionally sd-bus (libsystemd, libelogind or basu) for the
@@ -93,6 +93,7 @@ debug build.
 | `SHAODESK_TRAY` | `ON` | Build the panel's system tray (needs Qt DBus) |
 | `SHAODESK_MEDIA` | `ON` | Build the media controls: Quick Settings' card and the media keys, through MPRIS (needs Qt DBus) |
 | `SHAODESK_POWER_PROFILES` | `ON` | Build Quick Settings' power mode tile, through power-profiles-daemon (needs Qt DBus) |
+| `SHAODESK_NETWORKMANAGER` | `ON` | Build Wi-Fi in Quick Settings and the network widget, through NetworkManager (needs Qt DBus) |
 | `SHAODESK_INSTALL_SESSION` | `OFF` | Install the display-manager session entry |
 | `SHAODESK_XWM_WAKER` | `ON` | Work around lost X11 windows; turn off with wlroots patched by `packaging/patches/wlroots-xwm-drain.patch` |
 

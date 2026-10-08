@@ -602,3 +602,25 @@ held-back performance, `shell.widgets.power_mode` and the Quick Settings button 
 Not checked: a real power-profiles-daemon (this desktop runs none) with its polkit rule, its
 drivers' sets of profiles (the placeholder driver's two), and a laptop's lap detection or heat
 holding performance back.
+
+## Wi-Fi
+
+Added 2026-10-08. The Wi-Fi tile, its list and the network widget's popup were looked at in the
+gallery in both themes of both styles and both renderers (`quick-settings-wifi`, `wifi`).
+`wifi_test` checks the security read from NetworkManager's flags (open, Enhanced Open, WEP, WPA and
+WPA2 Personal, WPA3 Personal and in transition, 802.1X and Suite B), one entry per network name at
+its strongest, the order, when a password is asked for, the rows changed and moved in place, and
+what the controls ask of NetworkManager. `network_manager_dbus_test` drives the backend against a
+stand-in NetworkManager on a private bus, with a wired and a Wi-Fi device, six access points (one
+hidden) and three known connections: NetworkManager coming and going, signals changing, access
+points coming and going, the radio switched and a refusal undone, a known network activated on its
+strongest access point, a new one added with a WPA3 key, a refused password asked again with the
+connection added for it deleted, an error from `AddAndActivateConnection` said as given, and
+disconnecting. `shell_ui` clicks through the widget's popup and Quick Settings' tile against a
+stand-in model: typing a password (Connect waiting for eight characters, Enter connecting and the
+card taking the keyboard back), a refused password, an open network, one that needs a sign-in,
+Disconnect, the switch and the tile's chevron.
+
+Not checked: a real NetworkManager (this desktop has none) with a real Wi-Fi card, its polkit
+rules, WPA3 and Enhanced Open access points, scans as NetworkManager rate-limits them, a laptop's
+rfkill switch, and the bars on the bar following a real signal.
