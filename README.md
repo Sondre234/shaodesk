@@ -268,6 +268,9 @@ Edit them in [config/init.lua](config/init.lua).
 | Super + N / Super + Shift + N | [Notification](docs/features.md#notifications-and-on-screen-display) history / do-not-disturb |
 | Super + Shift + R | Reload the configuration |
 | Print / Shift + Print / Super + Print | [Screenshot](docs/features.md#screenshots-and-screen-sharing) of a region / the monitor / the focused window |
+| Volume up / down / mute keys | [Volume](docs/features.md#volume-and-brightness-keys) of the default output up or down by 5 %, or mute it |
+| Microphone mute key | Mute the default input, or unmute it |
+| Brightness up / down keys | The backlight up or down by 5 % |
 
 ## Scripting
 
