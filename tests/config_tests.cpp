@@ -32,6 +32,10 @@ int main(int argc, char **argv) {
                     microphone->action == SH_MIC_MUTE && dimmer &&
                     dimmer->action == SH_BRIGHTNESS_DOWN,
                 "example volume, microphone and brightness keys missing");
+        // They work on the lock screen, and the steps repeat while held; the mutes do not.
+        require(louder->locked && louder->repeats && microphone->locked && !microphone->repeats &&
+                    dimmer->locked && dimmer->repeats && !config.binding(SH_LOGO, XKB_KEY_q)->locked,
+                "example volume, microphone and brightness keys not locked or repeating");
         require(config.binding(SH_ALT, XKB_KEY_Tab)->action == SH_SWITCHER_NEXT &&
                     config.binding(SH_ALT | SH_SHIFT, XKB_KEY_Tab)->action == SH_SWITCHER_PREV,
                 "example window switcher bindings missing");
@@ -137,6 +141,26 @@ int main(int argc, char **argv) {
             rejects("return {bindings={{key='l',action='brightness_down',amount=0}}}");
             rejects("return {bindings={{key='l',action='volume_mute',amount=5}}}");
             rejects("return {bindings={{key='l',action='mic_mute',amount=5}}}");
+        }
+        {
+            // `locked` runs a key binding while the session is locked, `repeats` while its key is
+            // held; keyboard resizing repeats unless told not to.
+            auto flags = shaodesk::parse_config(
+                "return {bindings={"
+                "{key='XF86AudioRaiseVolume',action='volume_up',locked=true,repeats=true},"
+                "{key='XF86AudioMute',action='volume_mute',locked=true},"
+                "{mods={'Super'},key='Left',action='resize_left'},"
+                "{mods={'Super'},key='Right',action='resize_right',repeats=false},"
+                "{key='a',action='close'},{button='side',action='close'}}}");
+            const auto &b = flags.bindings;
+            require(b.size() == 6 && b[0].locked && b[0].repeats && b[1].locked && !b[1].repeats &&
+                        !b[2].locked && b[2].repeats && !b[3].repeats && !b[4].locked &&
+                        !b[4].repeats && !b[5].locked && !b[5].repeats,
+                    "locked and repeats not parsed");
+            rejects("return {bindings={{button='side',action='close',locked=true}}}");
+            rejects("return {bindings={{button='side',action='close',repeats=false}}}");
+            rejects("return {bindings={{key='a',action='close',locked='yes'}}}");
+            rejects("return {bindings={{key='a',action='close',repeats=1}}}");
         }
         auto *launcher = config.binding(SH_LOGO, XKB_KEY_r);
         require(launcher && launcher->action == SH_LAUNCHER, "launcher binding missing");

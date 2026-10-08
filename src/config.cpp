@@ -1541,6 +1541,12 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
                 }
                 lua_pop(L, 1);
                 boolean(L, "desktop", "desktop", binding.desktop);
+                for (const char *only : {"locked", "repeats"}) {
+                    lua_getfield(L, -1, only);
+                    if (!lua_isnil(L, -1))
+                        fail(std::string(only) + " is only valid with a key");
+                    lua_pop(L, 1);
+                }
             } else {
                 for (const char *only : {"app_id", "desktop"}) {
                     lua_getfield(L, -1, only);
@@ -1632,6 +1638,11 @@ Config read(lua_State *L, size_t own, const std::filesystem::path &directory) {
                 fail("amount is only valid with resize, volume and brightness actions");
             binding.amount = integer(L, "amount", default_amount(binding.action), 1,
                                      max_amount(binding.action));
+            // Keyboard resizing repeats unless told not to; other actions only when told.
+            binding.repeats = !binding.button && binding.action >= SH_RESIZE_LEFT &&
+                              binding.action <= SH_RESIZE_DOWN;
+            boolean(L, "locked", "locked", binding.locked);
+            boolean(L, "repeats", "repeats", binding.repeats);
             // Bindings past `own` come from the defaults a configuration extends; its own
             // bindings, "none" included, take their keys first.
             // Button bindings may share a button: the first whose target matches wins.

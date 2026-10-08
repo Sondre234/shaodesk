@@ -780,12 +780,13 @@ struct sh_keyboard {
     struct sh_server *server;
     struct wlr_keyboard *wlr_keyboard;
     bool is_virtual; // wtype and the like, which send their own keymap
-    /* A held key bound to a repeating action (keyboard resizing) runs it again at the
-     * keyboard's repeat rate, as clients repeat keys themselves. */
+    /* A held key whose binding `repeats` (keyboard resizing's, unless told otherwise) runs its
+     * action again at the keyboard's repeat rate, as clients repeat keys themselves. */
     struct wl_event_source *repeat_timer;
     uint32_t repeat_keycode;
     enum sh_action repeat_action;
     int repeat_argument;
+    bool repeat_locked; // its binding runs while the session is locked too
 
     struct wl_listener modifiers;
     struct wl_listener key;

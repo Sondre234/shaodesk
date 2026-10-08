@@ -768,3 +768,16 @@ Not checked: the keys on a real keyboard, a real backlight (this desktop has non
 server's default input (PulseAudio's source and its mute through PipeWire's pulse server), a real
 `wpctl` and `brightnessctl` (their options `-l 1.0` and `--min-value=1` are from their manuals),
 and logind setting a real backlight from the keys.
+
+## Locked and repeating bindings
+
+Added 2026-10-08. `locked_bindings_smoke` holds keys on a headless keyboard, whose test requests
+now reach the lock screen as any keyboard's keys do, with stand-ins for `wpctl` and
+`brightnessctl` writing down each step: a binding with `repeats` runs until its key comes up and
+one without runs once however long it is held; locked by a probe holding an `ext-session-lock-v1`
+lock, a repeating binding that is not `locked` stops, the bindings marked `locked` run and repeat,
+the others do not and `shaodesk msg` is still refused; once unlocked, every binding runs again.
+The `config` test checks that keyboard resizing's bindings repeat unless `repeats = false`.
+
+Not checked: a real keyboard's held keys on a real lock screen (swaylock), and how a locker that
+reads the keys itself takes the ones a `locked` binding keeps from it.

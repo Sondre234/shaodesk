@@ -231,6 +231,10 @@ shadows.
   shows the on-screen display, at the ends of the range too, with a microphone for the
   microphone's mute; without a shell the compositor runs `wpctl` and `brightnessctl`. The shell
   subscribes with `subscribe shell` to say it is there.
+- A key binding with `locked = true` runs while the session is locked too, as Hyprland's `bindl`,
+  and one with `repeats = true` runs again while its key is held, as Hyprland's `binde` (keyboard
+  resizing did alone before, and still does unless `repeats = false`). The shipped volume,
+  microphone and brightness keys work on the lock screen, and the steps repeat while held.
 - `windows.controls = "traffic_lights"` draws the controls of the windows shaodesk decorates as
   red, yellow and green circles at their top-left, as macOS does: grey while the window has no
   focus, their symbols shown while the pointer is on one, darker while pressed.

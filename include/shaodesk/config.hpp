@@ -37,6 +37,10 @@ struct Binding {
     int amount = default_resize_amount; // for resize_*, in pixels; volume and brightness steps, in percent
     int layout = 0; // for switch_layout: 0 the next layout, -1 the previous, N the Nth from 1
     std::string output; // for move_workspace_to_output and swap_workspaces: the target
+    // Key bindings only: `locked` runs while the session is locked too (Hyprland's bindl), and
+    // `repeats` runs again while the key is held (Hyprland's binde), by default for resize_*.
+    bool locked = false;
+    bool repeats = false;
 };
 
 struct Launcher {

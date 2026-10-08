@@ -848,6 +848,10 @@ if(SHAODESK_BUILD_COMPOSITOR)
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:lock_probe>
             ${EXAMPLE_CONFIG})
         set_tests_properties(session_lock PROPERTIES TIMEOUT 60)
+        add_test(NAME locked_bindings_smoke COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/locked_bindings_smoke.py
+            $<TARGET_FILE:shaodesk> $<TARGET_FILE:lock_probe>)
+        set_tests_properties(locked_bindings_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME window_capture_smoke COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/tests/window_capture_smoke.py
             $<TARGET_FILE:shaodesk> $<TARGET_FILE:wayland_probe> $<TARGET_FILE:window_probe>

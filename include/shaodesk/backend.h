@@ -455,6 +455,12 @@ struct sh_window_rule {
     bool sticky; /* only with features.sticky */
 };
 
+/* What a key binding asks for besides its action (sh_callbacks.binding_flags). */
+enum sh_binding_flag {
+    SH_BINDING_LOCKED = 1,  /* it runs while the session is locked too */
+    SH_BINDING_REPEATS = 2, /* it runs again while its key is held */
+};
+
 struct sh_rect;
 struct sh_callbacks {
     void *userdata;
@@ -509,6 +515,8 @@ struct sh_callbacks {
      * first word of its command line; either may be ""), is one that a program startup,
      * autostart or --exec started at startup will open again. */
     bool (*started)(void *, const char *app_id, const char *program);
+    /* The sh_binding_flag bits of the binding that `key` returned last. */
+    unsigned (*binding_flags)(void *);
 };
 
 enum sh_backend_mode { SH_BACKEND_NESTED, SH_BACKEND_HEADLESS, SH_BACKEND_SESSION };

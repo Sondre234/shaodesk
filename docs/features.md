@@ -1327,6 +1327,29 @@ now, and what it is over (a surface as `get seat` names it, `pointer`, or `-`). 
 absolute, a tablet's mouse too, and its area keeps the tablet's whole surface: there are no
 settings yet for a part of it, its proportions, a left-handed turn or a pad's modes.
 
+### Bindings on the lock screen, and held keys
+
+A key binding with `locked = true` runs while the session is locked too, as Hyprland's `bindl`
+does: the shipped volume, microphone and brightness keys are such, so they change the sound and
+the screen from the lock screen. Every other key goes to the lock screen as before, and the
+control socket still refuses actions while it is locked. Any action may be marked; one with
+nothing to do while the session is locked (focusing or moving windows, the switcher, the
+overview) does nothing, and one that ends the session (`quit`, `logout`) ends it from the lock
+screen, so mark those with care.
+
+A key binding with `repeats = true` runs again while its key is held, after
+`keyboard.repeat_delay` and at `keyboard.repeat_rate`, as Hyprland's `binde` does; the shipped
+volume and brightness steps do, and keyboard resizing does unless `repeats = false`. (Lua keeps
+the word `repeat` for its own loops.) One that is not `locked` stops as the session locks. Mouse
+button bindings take neither.
+
+```lua
+{ mods = {}, key = "XF86AudioRaiseVolume", action = "volume_up", locked = true, repeats = true },
+{ mods = { "Super" }, key = "F12", action = "night_light_toggle", locked = true },
+```
+
+`locked_bindings_smoke` tests both, holding keys on and off the lock screen.
+
 ### Nested sessions
 
 The host compositor can consume shortcuts before the nested compositor receives
@@ -1448,7 +1471,8 @@ The keyboard's volume, microphone and brightness keys work without setup, as on 
 the shipped configuration binds XF86AudioRaiseVolume, XF86AudioLowerVolume, XF86AudioMute,
 XF86AudioMicMute, XF86MonBrightnessUp and XF86MonBrightnessDown, and a configuration with
 `extends = "default"` gets them unless it binds those keys itself (one without `extends` has only
-its own bindings). Their actions:
+its own bindings). They work on the lock screen too (`locked = true`), and the steps repeat while
+their key is held (`repeats = true`). Their actions:
 
 - `volume_up` and `volume_down` change the default sound output's volume by `amount` percent (5
   unless the binding, or `shaodesk msg volume_up 10`, gives another, up to 100), no further than
@@ -1686,7 +1710,10 @@ installed. The desktop is covered
 before the locker draws, only the locker receives input, and if it crashes the
 session stays locked until a new locker takes over. Idle notification and idle
 inhibition (`ext-idle-notify-v1`, `idle-inhibit-unstable-v1`) let swayidle lock
-or blank after inactivity while video players keep the session awake. While a standalone
+or blank after inactivity while video players keep the session awake. Key bindings marked
+`locked = true`, the volume, microphone and brightness keys among them, still run while the
+session is locked ([Bindings on the lock screen, and held
+keys](#bindings-on-the-lock-screen-and-held-keys)). While a standalone
 session is on screen it holds a logind sleep inhibitor, so an idle daemon left running by
 another desktop on a different VT cannot suspend the machine; switching VTs away releases it.
 This needs sd-bus from libsystemd, libelogind, or basu at build time.
