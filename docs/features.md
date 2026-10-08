@@ -1517,9 +1517,10 @@ it is to be on (1 or 0), whether it shows a picture (`on`, `off`, or `lid` while
 off), the monitor it mirrors or `-`, its place in the arrangement (x and y, before the layout is
 moved to start at 0, 0), its mode, scale and transform, adaptive sync (`on`, `off`, or `-` where
 the monitor has none), the bits per colour channel asked for and drawn in, HDR asked for (`on` or
-`off`) and driven (`hdr` or `sdr`), why it cannot have HDR (or `-`), whether it is the primary
-monitor (1 or 0), and the modes it offers, separated by commas, its preferred one marked with
-`*`. Where it shows a picture, its mode, scale, transform and adaptive sync are what it has now.
+`off`) and driven (`hdr` or `sdr`), why it cannot have HDR whatever it asks (its EDID, or the
+renderer) or `-`, whether it is the primary monitor (1 or 0), and the modes it offers, separated
+by commas, its preferred one marked with `*`. Where it shows a picture, its mode, scale,
+transform and adaptive sync are what it has now.
 
 ### Turning monitors off
 

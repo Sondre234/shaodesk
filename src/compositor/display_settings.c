@@ -213,9 +213,9 @@ static void describe_monitor(struct sh_server *server, int fd, struct sh_output 
     // Whether it shows a picture: "off" while disabled or turned off, "lid" while the lid holds
     // it off.
     const char *state = lid_holds_off(server, output) ? "lid" : live && o->enabled ? "on" : "off";
+    // Why it cannot have HDR whatever it asks; one that can, asking and still SDR, says so in
+    // the log (hdr.c).
     const char *why = hdr_unavailable(output);
-    if (!why && m->hdr && !output_is_hdr(output) && output->hdr_refused && *output->hdr_refused)
-        why = output->hdr_refused;
     char mode[48], line[1024];
     plain_text(shown.description);
     format_mode(mode, sizeof(mode), m->width, m->height, m->refresh);
