@@ -121,6 +121,7 @@ static void run_swipe(struct sh_server *server, const struct sh_swipe_binding *b
 /* The fingers lift (or libinput gives the swipe up): the step goes on or back from there. */
 static void finish_swipe(struct sh_server *server, uint32_t time, bool cancelled) {
     struct sh_gesture *gesture = &server->gesture;
+    cancelled = cancelled || server->locked; // the screen locked under the fingers
     double progress = sh_swipe_progress(&gesture->swipe);
     double speed = sh_swipe_speed(&gesture->swipe, time);
     switch (gesture->mode) {
