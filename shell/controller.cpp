@@ -770,7 +770,26 @@ void ShellController::subscribe() {
                 nextOverviewSelected_ = words[3].toInt();
                 nextOverviewViewed_ = words[4].toInt();
                 nextOverviewFilter_ = words[10] == "-" && words.size() == 11 ? QString() : QStringList(words.mid(10)).join(' ');
+                nextOverviewAssist_ = false;
                 overviewPending_ = words[2].toInt() + words[5].toInt();
+                nextOverviewWindows_.clear();
+                nextOverviewStrip_.clear();
+                if (overviewPending_ <= 0)
+                    showOverview();
+                continue;
+            } else if (line.startsWith("overview-assist ")) {
+                // overview-assist OUTPUT COUNT SELECTED X Y WIDTH HEIGHT (the free slot beside a
+                // window just snapped), then COUNT overview-window lines.
+                const auto words = line.split(' ');
+                if (words.size() < 8)
+                    continue;
+                nextOverviewArea_ = QRect(words[4].toInt(), words[5].toInt(), words[6].toInt(), words[7].toInt());
+                nextOverviewOutput_ = words[1];
+                nextOverviewSelected_ = words[3].toInt();
+                nextOverviewViewed_ = 0;
+                nextOverviewFilter_.clear();
+                nextOverviewAssist_ = true;
+                overviewPending_ = words[2].toInt();
                 nextOverviewWindows_.clear();
                 nextOverviewStrip_.clear();
                 if (overviewPending_ <= 0)
@@ -1008,6 +1027,7 @@ void ShellController::showOverview() {
     overviewViewed_ = nextOverviewViewed_;
     overviewFilter_ = nextOverviewFilter_;
     overviewArea_ = nextOverviewArea_;
+    overviewAssist_ = nextOverviewAssist_;
     Q_EMIT overviewChanged();
     Q_EMIT overviewSelectedChanged();
 }

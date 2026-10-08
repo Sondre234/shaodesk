@@ -327,6 +327,11 @@ if(BUILD_TESTING)
             ${PROJECT_SOURCE_DIR}/tests/overview_shell_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe>)
         set_tests_properties(overview_shell_smoke PROPERTIES TIMEOUT 60)
+        add_test(NAME snap_assist_shell_smoke COMMAND ${Python3_EXECUTABLE}
+            ${PROJECT_SOURCE_DIR}/tests/snap_assist_shell_smoke.py $<TARGET_FILE:shaodesk>
+            $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe>
+            $<TARGET_FILE:pointer_probe>)
+        set_tests_properties(snap_assist_shell_smoke PROPERTIES TIMEOUT 60)
         add_test(NAME overlay_exit_smoke COMMAND ${Python3_EXECUTABLE}
             ${PROJECT_SOURCE_DIR}/tests/overlay_exit_smoke.py $<TARGET_FILE:shaodesk>
             $<TARGET_FILE:shaodesk-shell> $<TARGET_FILE:wayland_probe>)
