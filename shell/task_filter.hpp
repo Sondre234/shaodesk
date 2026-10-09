@@ -4,8 +4,8 @@
 #include <QSortFilterProxyModel>
 
 class ShellController;
-// The windows that belong in one taskbar slot: those of the pinned application `app`, or, when
-// `app` is empty, every window no pinned application takes in. `controller` is the shell.
+// The windows of one button on the taskbar or the dock: those of the pinned application `app`, or,
+// when `app` is empty, every window no pinned application takes in. `controller` is the shell.
 // `windowApp`, when set, keeps only the windows with that app id. `grouped` keeps one window per
 // application, the first of them: in a pinned slot the whole slot is one application; elsewhere
 // windows with the same app id are, and those without one stand alone. `taskId`, when 0 or more,
@@ -50,9 +50,6 @@ class TaskFilter : public QSortFilterProxyModel {
     QVariantList windows() const;
     // The window after the focused one, wrapping around, or the first when none is focused.
     Q_INVOKABLE int nextTask() const;
-    // Moves within the source model, so dragging reorders the whole task list. Grouped, a
-    // row's windows all move, landing past (or ahead of) every window of the row at `to`.
-    Q_INVOKABLE void move(int from, int to, int count = 1);
   Q_SIGNALS:
     void controllerChanged();
     void appChanged();

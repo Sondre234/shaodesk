@@ -84,8 +84,6 @@ class TaskModel : public QAbstractListModel {
     // foreign-toplevel protocol has no such state, so a task is urgent when a pair matches its
     // app id and title (each pair marks one task, the first not marked already).
     void setUrgent(const QList<QPair<QString, QString>> &windows);
-    // Same signature as ListModel.move, so the panel can reorder either.
-    Q_INVOKABLE void move(int from, int to, int count = 1);
   Q_SIGNALS:
     void disconnected();
     void peekedTaskChanged();
