@@ -1073,15 +1073,30 @@ ListModel {
             .call({view.engine()->newQObject(fakeModel)});
     };
     QQuickItem *task = nullptr;
+    // The button of the index-th window along the bar, past the launchers of the pinned
+    // applications.
     auto listedTask = [&](int index) {
         QQuickItem *item = nullptr;
         return QTest::qWaitFor([&] {
-            QMetaObject::invokeMethod(tasks, "itemAtIndex", Q_RETURN_ARG(QQuickItem *, item),
-                                      Q_ARG(int, index));
+            item = nullptr;
+            for (int row = 0, windows = 0; row < tasks->property("count").toInt(); ++row) {
+                QQuickItem *button = nullptr;
+                QMetaObject::invokeMethod(tasks, "itemAtIndex", Q_RETURN_ARG(QQuickItem *, button),
+                                          Q_ARG(int, row));
+                if (button && !button->property("launcher").toBool() && windows++ == index) {
+                    item = button;
+                    break;
+                }
+            }
             return item != nullptr;
         })
                    ? item
                    : nullptr;
+    };
+    // How many windows' buttons the bar has.
+    auto windowButtons = [&] {
+        return tasks->property("count").toInt() -
+               tasks->property("model").value<QObject *>()->property("launchers").toInt();
     };
     if (!(task = listedTask(0)))
         return fail("the first task is not listed");
@@ -1413,47 +1428,46 @@ ListModel {
         if (!QTest::qWaitFor([&] { return !popover->isVisible() && !task->property("stacked").toBool(); }))
             return fail("the popover did not close after restoring the stack");
     }
-    // The task's window belongs to an installed application, which its menu pins. Pinned, the
-    // window takes over the application's slot instead of adding a button; with no window left
-    // the slot's launcher returns, and its own menu unpins it. Pins are remembered in the state
-    // directory.
+    // The task's window belongs to an installed application, which its menu pins. Pinned, grouped
+    // as windows are by default, the window's button becomes the application's, staying where it
+    // is; with no window left it is the application's launcher, and its own menu unpins it. Pins
+    // are remembered in the state directory.
     auto readPins = [&] {
         QFile file(pins);
         return file.open(QIODevice::ReadOnly) ? QString::fromUtf8(file.readAll()) : QString();
     };
     auto pinned = [&] { return find(view.rootObject(), "pinned:shaodesk-test-app.desktop"); };
     auto pinnedTask = [&] { return find(view.rootObject(), "pinnedTask:shaodesk-test-app.desktop"); };
+    const int buttons = tasks->property("count").toInt();
+    QPointer<QQuickItem> unpinnedButton = task;
     click(task, Qt::RightButton);
     if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Pin to taskbar"); })) {
         std::cerr << "a task's menu did not offer to pin its application\n";
         return 1;
     }
     click(menuItem("Pin to taskbar"));
-    if (!QTest::qWaitFor([&] { return pinned() != nullptr; }) ||
+    if (!QTest::qWaitFor([&] { return pinnedTask() != nullptr; }) ||
         !controller.isPinned("shaodesk-test-app.desktop") ||
         readPins() != "shaodesk-test-app.desktop\n") {
-        std::cerr << "pinning a task's application did not add and save a taskbar button\n";
+        std::cerr << "pinning a task's application did not pin and save it\n";
         return 1;
     }
-    if (!QTest::qWaitFor([&] {
-            return pinnedTask() && pinnedTask()->isVisible() && !pinned()->isVisible() &&
-                   tasks->property("count").toInt() == 0;
-        })) {
-        std::cerr << "a pinned application's window did not take over its slot\n";
+    if (pinnedTask() != unpinnedButton || pinned() || tasks->property("count").toInt() != buttons) {
+        std::cerr << "a pinned application's window did not keep its button\n";
         return 1;
     }
     if (!QTest::qWaitFor([&] { return !popover->isVisible(); })) {
         std::cerr << "the popover did not close after pinning\n";
         return 1;
     }
-    // Dragging a pinned slot's window onto another pinned slot moves the pin there.
+    // Dragging a pinned application's button past another's launcher moves the pin there.
     controller.pin("shaodesk-test-other.desktop");
     auto other = [&] { return find(view.rootObject(), "pinned:shaodesk-test-other.desktop"); };
     if (!QTest::qWaitFor([&] {
             return other() && other()->isVisible() &&
                    centre(other()).x() > centre(pinnedTask()).x();
         }))
-        return fail("the dragged pin did not move past the other task");
+        return fail("an application just pinned is not after the others");
     {
         const QPoint from = centre(pinnedTask()), to = centre(other());
         QTest::mousePress(&view, Qt::LeftButton, Qt::NoModifier, from);
@@ -1469,18 +1483,17 @@ ListModel {
             return pinnedTask() && other() &&
                    other()->mapToScene({0, 0}).x() < pinnedTask()->mapToScene({0, 0}).x();
         })) {
-        std::cerr << "dragging a pinned window onto another pinned slot did not move its pin\n";
+        std::cerr << "dragging a pinned application's button past another did not move its pin\n";
         return 1;
     }
     controller.unpin("shaodesk-test-other.desktop");
     editTasks("model.remove(0)");
-    if (!QTest::qWaitFor([&] { return !pinnedTask() && pinned()->isVisible(); })) {
-        std::cerr << "a pinned slot did not show its launcher again once its window closed\n";
+    if (!QTest::qWaitFor([&] { return !pinnedTask() && pinned() && pinned()->isVisible(); })) {
+        std::cerr << "a pinned application's button did not become its launcher once its window closed\n";
         return 1;
     }
-    // Slowed down: a window opening in a pinned slot draws its line out under the launcher's
-    // icon, which stays, and an application just pinned fades and grows into a slot opening
-    // for it.
+    // Slowed down: a window of a pinned application opening draws its line out under the
+    // launcher's icon, which stays, and an application just pinned fades and grows in.
     {
         if (!slowMotion(true))
             return fail("the animations were not slowed down");
@@ -1489,24 +1502,24 @@ ListModel {
         QPointer<QQuickItem> arrived;
         if (!QTest::qWaitFor([&] { return (arrived = pinnedTask()) != nullptr; }) ||
             arrived->property("reveal").toReal() == 1 || arrived->opacity() != 1 || arrived->scale() != 1)
-            return fail("a window opening in a pinned slot did not only draw its line out");
+            return fail("a pinned application's window opening did not only draw its line out");
         if (!QTest::qWaitFor([&] { return arrived && arrived->property("reveal").toReal() == 1; }))
-            return fail("the line of a window opening in a pinned slot was not drawn all the way");
+            return fail("the line of a pinned application's window opening was not drawn all the way");
         editTasks("model.remove(0)");
         controller.pin("shaodesk-test-other.desktop");
-        QPointer<QQuickItem> slot;
-        if (!QTest::qWaitFor([&] { return other() && (slot = other()->parentItem()); }) ||
-            slot->property("grow").toReal() == 1 || slot->opacity() == 1)
-            return fail("an application just pinned did not grow into its slot");
-        if (!QTest::qWaitFor([&] { return slot && slot->property("grow").toReal() == 1; }))
+        QPointer<QQuickItem> launcher;
+        if (!QTest::qWaitFor([&] { return (launcher = other()) != nullptr; }) ||
+            (launcher->opacity() == 1 && launcher->scale() == 1))
+            return fail("an application just pinned did not grow in");
+        if (!QTest::qWaitFor([&] { return launcher && launcher->opacity() == 1 && launcher->scale() == 1; }))
             return fail("an application just pinned did not come all the way in");
-        if (pinned()->parentItem()->property("grow").toReal() != 1)
-            return fail("a slot that was there already came in again with another");
+        if (!pinned() || pinned()->opacity() != 1 || pinned()->scale() != 1)
+            return fail("a launcher that was there already came in again with another");
         controller.unpin("shaodesk-test-other.desktop");
         if (!slowMotion(false))
             return fail("the animations did not get their speed back");
-        if (!QTest::qWaitFor([&] { return !other() && !pinnedTask() && pinned()->isVisible(); }))
-            return fail("the pinned slots did not go back as they were");
+        if (!QTest::qWaitFor([&] { return !other() && !pinnedTask() && pinned() && pinned()->isVisible(); }))
+            return fail("the launchers did not go back as they were");
     }
     click(pinned(), Qt::RightButton);
     if (!QTest::qWaitFor([&] { return menuShown() && menuItem("Unpin from taskbar"); }) ||
@@ -1557,6 +1570,85 @@ ListModel {
     if (!QTest::qWaitFor([&] { return !popover->isVisible(); })) {
         std::cerr << "the popover did not close after unpinning\n";
         return 1;
+    }
+    // Apart (shell.group_windows = false), a pinned application's windows have a button each, as
+    // any window has, and each moves along the bar on its own: the first opens in the launcher's
+    // place, the others at the end, and dragging one moves neither the others nor the pin. With no
+    // window left, the launcher comes back in its place.
+    {
+        if (!rewrite(QString(lua).replace("shell={", "shell={group_windows=false,")))
+            return fail("could not rewrite the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return !controller.groupWindows(); }))
+            return fail("shell.group_windows = false was not read");
+        controller.pin("shaodesk-test-app.desktop");
+        QPointer<QQuickItem> launcher;
+        if (!QTest::qWaitFor([&] { return (launcher = pinned()) && launcher->isVisible(); }))
+            return fail("the pinned application's launcher is not on the bar");
+        editTasks("model.append({ taskId: 20, title: 'Fake one', appId: 'fake', active: false, "
+                  "minimized: false, urgent: false });"
+                  "model.append({ taskId: 21, title: 'Fake two', appId: 'fake', active: false, "
+                  "minimized: false, urgent: false });"
+                  "model.append({ taskId: 22, title: 'Second', appId: 'second', active: false, "
+                  "minimized: false, urgent: false })");
+        auto order = [&] {
+            QList<int> ids;
+            for (int i = 0; i < 3; ++i) {
+                auto *button = listedTask(i);
+                ids.push_back(button ? button->property("taskId").toInt() : -1);
+            }
+            return ids;
+        };
+        if (!QTest::qWaitFor([&] { return order() == QList<int>{20, 21, 22}; }) || pinned() ||
+            listedTask(0) != launcher.data())
+            return fail("a pinned application's windows did not open in its launcher's place and at the end");
+        // Every button where the list lays it out, none sliding over still.
+        auto laidOut = [&] {
+            QQuickItem *previous = nullptr;
+            for (int row = 0; row < tasks->property("count").toInt(); ++row) {
+                QQuickItem *button = nullptr;
+                QMetaObject::invokeMethod(tasks, "itemAtIndex", Q_RETURN_ARG(QQuickItem *, button),
+                                          Q_ARG(int, row));
+                if (!button || (previous && button->x() != previous->x() + previous->width() +
+                                                               tasks->property("spacing").toReal()))
+                    return false;
+                previous = button;
+            }
+            return true;
+        };
+        auto drag = [&](QQuickItem *button, QQuickItem *past) {
+            if (!QTest::qWaitFor(laidOut))
+                return false;
+            const QPoint from = centre(button), to = centre(past) + QPoint(int(past->width()) / 4, 0);
+            QTest::mousePress(&view, Qt::LeftButton, Qt::NoModifier, from);
+            for (int step = 1; step <= 10; ++step) {
+                QTest::mouseMove(&view, from + (to - from) * step / 10);
+                QTest::qWait(10);
+            }
+            QTest::mouseRelease(&view, Qt::LeftButton, Qt::NoModifier, to);
+            return true;
+        };
+        if (!drag(listedTask(1), listedTask(2)) ||
+            !QTest::qWaitFor([&] { return order() == QList<int>{20, 22, 21}; }) ||
+            readPins() != "shaodesk-test-app.desktop\n")
+            return fail("a pinned application's window did not move on its own");
+        if (!drag(listedTask(0), listedTask(2)) ||
+            !QTest::qWaitFor([&] { return order() == QList<int>{22, 21, 20}; }) ||
+            readPins() != "shaodesk-test-app.desktop\n")
+            return fail("the window in a pinned application's place did not move on its own");
+        editTasks("model.remove(0); model.remove(0)");
+        if (!QTest::qWaitFor([&] {
+                return pinned() && pinned()->isVisible() && windowButtons() == 1 && laidOut() &&
+                       pinned()->x() < listedTask(0)->x();
+            }))
+            return fail("the launcher did not come back in its place once its windows closed");
+        editTasks("model.remove(0)");
+        controller.unpin("shaodesk-test-app.desktop");
+        if (!rewrite(lua))
+            return fail("could not restore the configuration");
+        controller.reload();
+        if (!QTest::qWaitFor([&] { return controller.groupWindows() && !pinned(); }))
+            return fail("the configuration was not restored");
     }
     editTasks("model.append({ taskId: 7, title: 'Fake', appId: 'fake', active: false, "
               "minimized: false, urgent: false })");
@@ -1944,7 +2036,11 @@ ListModel {
         QTest::qWait(10);
     }
     QTest::mouseRelease(&view, Qt::LeftButton, Qt::NoModifier, to);
-    if (!QTest::qWaitFor([&] { return taskIdAt(2) == 7; }) || taskIdAt(0) != 8 ||
+    auto shownTaskId = [&](int index) {
+        auto *button = listedTask(index);
+        return button ? button->property("taskId").toInt() : -1;
+    };
+    if (!QTest::qWaitFor([&] { return shownTaskId(2) == 7; }) || shownTaskId(0) != 8 ||
         tasks->property("contentX").toReal() != 0) {
         std::cerr << "dragging a task did not reorder the task list\n";
         return 1;
@@ -1958,7 +2054,7 @@ ListModel {
     if (!QTest::qWaitFor([&] {
             stack = listedTask(3);
             auto *stackCount = stack ? find(stack, "taskCount") : nullptr;
-            return tasks->property("count").toInt() == 4 && stackCount &&
+            return windowButtons() == 4 && stackCount &&
                    stack->property("stacked").toBool() && stack->property("shownActive").toBool() &&
                    stackCount->isVisible();
         })) {
@@ -2004,7 +2100,7 @@ ListModel {
             return nullptr;
         };
         auto buttonFor = [&](int id) -> QQuickItem * {
-            for (int i = 0; i < tasks->property("count").toInt(); ++i)
+            for (int i = 0; i < windowButtons(); ++i)
                 if (auto *button = listedTask(i); button && button->property("taskId").toInt() == id)
                     return button;
             return nullptr;
@@ -2404,7 +2500,7 @@ ListModel {
         QCoreApplication::sendEvent(popover, &leavePopover);
         if (!QTest::qWaitFor([&] {
                 stack = listedTask(3);
-                return stack && stack->property("stacked").toBool() && tasks->property("count").toInt() == 4;
+                return stack && stack->property("stacked").toBool() && windowButtons() == 4;
             }))
             return fail("the stacked button did not come back");
         // Pressing a button closes its card, which stays closed while the pointer stays.
@@ -2981,7 +3077,7 @@ ListModel {
         QQuickItem *single = nullptr;
         if (!card || !QTest::qWaitFor([&] {
                 stack = listedTask(3);
-                for (int i = 0; i < tasks->property("count").toInt(); ++i)
+                for (int i = 0; i < windowButtons(); ++i)
                     if (auto *button = listedTask(i); button && button->property("taskId").toInt() == 7)
                         single = button;
                 return single && stack && stack->property("stacked").toBool();
@@ -3070,7 +3166,7 @@ ListModel {
             return -1;
         };
         auto buttonFor = [&](int id) -> QQuickItem * {
-            for (int i = 0; i < tasks->property("count").toInt(); ++i)
+            for (int i = 0; i < windowButtons(); ++i)
                 if (auto *button = listedTask(i); button && button->property("taskId").toInt() == id)
                     return button;
             return nullptr;
@@ -3229,7 +3325,7 @@ ListModel {
         if (selected() != stack)
             return fail("End did not move to the last button");
         press(Qt::Key_Home);
-        if (!selected() || selected()->objectName() != "pinned:pinned:0" || !ringed(selected(), "pinnedFocusRing") ||
+        if (!selected() || selected()->objectName() != "pinned:pinned:0" || !ringed(selected(), "taskFocusRing") ||
             root->property("groupOpen").toBool() || spoken() != "Test app")
             return fail("Home did not move to the configured launcher's button");
         QFile::remove(marker);
@@ -3349,12 +3445,14 @@ ListModel {
         }
         QTest::mouseRelease(&view, Qt::LeftButton, Qt::NoModifier, to);
     }
-    if (!QTest::qWaitFor([&] { return taskIdAt(0) == 10; }) || taskIdAt(1) != 11) {
+    if (!QTest::qWaitFor([&] { return shownTaskId(0) == 10 && listedTask(0)->property("stacked").toBool(); })) {
         std::cerr << "dragging a stacked task did not move all its windows\n";
         return 1;
     }
     // One window left, the button is a plain one again.
-    editTasks("model.remove(0)");
+    for (int row = 0; row < fakeModel->property("count").toInt(); ++row)
+        if (taskIdAt(row) == 10)
+            editTasks(QString("model.remove(%1)").arg(row));
     if (!QTest::qWaitFor([&] {
             auto *single = listedTask(0);
             return single && single->property("taskId").toInt() == 11 &&
@@ -6585,8 +6683,8 @@ ListModel {
         controller.reload();
     }
     std::cout << "Hover/click, launcher keyboard focus, search, command launch, tiling toggle, and "
-                 "workspace indicator, task and bar context menus, pinning into a window's slot, "
-                 "reordering pins, "
+                 "workspace indicator, task and bar context menus, pinning a window's application, "
+                 "reordering pins, a pinned application's windows moving apart, "
                  "task reordering, grouped windows, the keyboard on the bar, the volume control, the "
                  "command palette, and the "
                  "notification bell, cards and history, the tray, the design tokens, and the macOS style's "

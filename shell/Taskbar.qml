@@ -5,7 +5,7 @@ import QtQuick.Layouts
 import Shaodesk
 
 // The taskbar (shell.style "taskbar"): the bar along the panel's edge, as Windows 11 has it, with
-// the start button, the pinned applications and the windows, then the workspaces, the widgets
+// the start button, the pinned applications and the windows in one row, then the workspaces, the widgets
 // shell.widgets puts on the bar, Quick Settings, the clock and the show-desktop sliver. It fills
 // the panel's surface and draws the bar inset by shell.panel_margin.
 Item {
@@ -15,7 +15,6 @@ Item {
     // them, as TopMenuBar.qml names its own.
     readonly property Item barItem: bar
     readonly property Item tasks: taskList
-    readonly property Item pins: pinnedSlots
     readonly property Item trayRow: tray
     readonly property Item clock: clockButton
     readonly property Item volume: audioWidget
@@ -91,8 +90,6 @@ Item {
                     }
                 }
             }
-            PinnedSlots { id: pinnedSlots; panel: taskbar.panel }
-            Rectangle { Layout.preferredWidth: 1; Layout.preferredHeight: Theme.barButtonHeight / 2 + Theme.spacingS; color: Theme.divider }
             TaskList { id: taskList; panel: taskbar.panel }
             WorkspaceIndicator { id: workspaceIndicator; panel: taskbar.panel }
             BindingMode { panel: taskbar.panel }

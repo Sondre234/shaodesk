@@ -482,11 +482,11 @@ what was there.
 | --- | --- |
 | `Theme.qml` | The design tokens (colours, type, radii, spacing, icon sizes, motion, whether effects can be drawn), derived from the appearance profile. A singleton: every file reads `Theme.surface`, `Theme.hover`, ... instead of colours and sizes of its own. |
 | `Panel.qml` | The panel on one output: which popup is open and where, the bars of the style (a loader for each), and the popover with a loader for each popup. Every part below takes the panel as `panel` (and a popup the bar as `barItem`) and reaches its state and functions through it; a popup is placed in `panel.popupLayer`, beside the part of the bar it belongs to (`panel.barAnchor(x, width)`). |
-| `Taskbar.qml` | The taskbar: the bar along the panel's edge with the start button, the pinned applications, the windows, the widgets and the clock, and its smaller buttons. |
+| `Taskbar.qml` | The taskbar: the bar along the panel's edge with the start button, the row of pinned applications and windows, the widgets and the clock, and its smaller buttons. |
 | `TopMenuBar.qml`, `Dock.qml`, `DockIcon.qml` | The bars of the macOS style (`shell.style`): the menu bar along the top in a `MenuBarWindow` of its own, with the system, application and Window menus, the widgets, search, Quick Settings and the clock; and the dock in the panel's surface, an icon for each application, pinned or running, with the applications button and the Trash. |
 | `BarKeyboard.qml` | The keyboard on the bar (`taskbar_focus`): held in the popover, it walks the taskbar's buttons or the dock's icons and the windows they show. |
 | `BindingMode.qml` | The name of the binding mode in use, on the bar while it is not the default one. |
-| `PinnedSlots.qml`, `TaskList.qml`, `TaskButton.qml`, `TrayButton.qml`, `WorkspaceIndicator.qml`, `VolumeButton.qml`, `ClockButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `QuickSettingsButton.qml`, `WallpapersButton.qml`, `ProfilesButton.qml`, `TilingButton.qml`, `BarAppIcon.qml`, `Badge.qml`, `BarTip.qml` | Parts of the bar: widgets, an application's icon on it, a count on a pill, and the tooltip for things on it. |
+| `TaskList.qml`, `TaskButton.qml`, `TrayButton.qml`, `WorkspaceIndicator.qml`, `VolumeButton.qml`, `ClockButton.qml`, `BatteryWidget.qml`, `NetworkWidget.qml`, `NotificationBell.qml`, `KeyboardLayout.qml`, `QuickSettingsButton.qml`, `WallpapersButton.qml`, `ProfilesButton.qml`, `TilingButton.qml`, `BarAppIcon.qml`, `Badge.qml`, `BarTip.qml` | Parts of the bar: widgets, an application's icon on it, a count on a pill, and the tooltip for things on it. |
 | `ClockFlyout.qml`, `QuickSettings.qml`, `AudioMixer.qml`, `AudioOutputs.qml`, `ProfileList.qml`, `WallpaperPicker.qml`, `Launcher.qml`, `PowerMenu.qml`, `TaskbarMenu.qml`, `TrayMenu.qml`, `GroupList.qml`, `WindowThumbnails.qml`, `MenuBarMenu.qml` | Popups of the bar, each made by a loader in `Panel.qml` when first needed. |
 | `CalendarPopup.qml`, `NotificationHistory.qml` | The clock flyout's cards: the month calendar, and the notifications grouped by application. |
 | `QuickTile.qml` | A tile of Quick Settings: a toggle, a list it opens, or a state. |
@@ -545,8 +545,10 @@ holding the keyboard, shown on the output the window was opened on, or on the pr
 that output is gone (`screenAdded` and `screenRemoved`), as a trial may turn it off.
 `tests/display_settings_shell_smoke.py` follows it with a real compositor.
 
-The models behind them: `task_model.cpp` (windows, from foreign-toplevel) and `task_filter.cpp`
-(the taskbar's slots and groups), `audio.cpp` with `pulse_audio.cpp`, `system_status.cpp`
+The models behind them: `task_model.cpp` (windows, from foreign-toplevel), `taskbar_model.cpp`
+(the taskbar's one row of pinned applications and windows, in an order every panel shares, a
+`TaskbarOrder` the source model owns) and `task_filter.cpp` (an application's windows, for its
+groups and menus), `audio.cpp` with `pulse_audio.cpp`, `system_status.cpp`
 (battery, network), `tray*.cpp`, `notification*.cpp`, `osd.cpp` and `backlight.cpp`,
 `volume_keys.cpp` (what the compositor passes on from the volume, microphone and brightness keys),
 `power.cpp`, `palette.cpp` (with `fuzzy.cpp`, and `calculator.cpp`, `file_index.cpp` and
@@ -705,10 +707,10 @@ The keyboard on the bar (`BarKeyboard.qml`, the panel's `barKeys`) is held in th
 panel's `toggleBarKeyboard()` and logs `shaodesk taskbar keyboard on|off on OUTPUT`. While
 `barKeys.active` the popover is open and holds the keyboard as for a menu, and `BarKeyboard`, which
 has the active focus there, takes the keys. Its stops are found anew as they are needed
-(`stops()`): the pinned slots' visible buttons that have a `keyMenu()`, then the task list's rows
-by number, since the list makes the buttons outside its view only as they scroll in
-(`positionViewAtIndex` brings the selected one into view), or the dock's icons. The selected
-`button` shows its windows with the panel's own `openGroup`, so the card glides as on hover, and
+(`stops()`): the task list's rows by number, since the list makes the buttons outside its view
+only as they scroll in (`positionViewAtIndex` brings the selected one into view), or the dock's
+icons. The selected `button` shows its windows with the panel's own `openGroup`, so the card
+glides as on hover, and
 `window` indexes the card's tiles or the list's rows (`windowAt(index)`). A button, tile or row
 reads `keySelected` from it to draw a `FocusRing` and, on a tile, to stand in for the pointer in
 the peek's `resting`. The window that had the keyboard is noted as `from` before the popover takes

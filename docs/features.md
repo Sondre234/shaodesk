@@ -73,8 +73,8 @@ profile re-lays the shell out at once.
 
 ### Taskbar
 
-Along the bar, from the left: the start button, the pinned applications and a button for each
-open window, the workspace indicator, the widgets placed on the bar, the tray, the Quick Settings
+Along the bar, from the left: the start button, one row of the pinned applications and the open
+windows, the workspace indicator, the widgets placed on the bar, the tray, the Quick Settings
 button, the clock, and a sliver at the end that shows the desktop. A button shows a tooltip when
 the pointer rests on it, but for a window's, which shows pictures of its windows instead
 ([below](#window-pictures)). Lua configures the panel's height, top or bottom placement
@@ -93,9 +93,13 @@ window: long in the accent colour for the focused one, short for the others, dim
 minimized; a window asking for attention tints its button in the urgent colour. Installed
 applications can be pinned to the taskbar from a window's menu or the start menu, and unpinned
 from their button's menu; those pins are kept in `$XDG_STATE_HOME/shaodesk/pinned`
-(`~/.local/state/shaodesk/pinned`), one desktop id per line, and stay off the desktop. A pinned
-application's windows take its button's place, keeping its icon, and dragging the button moves the
-pin.
+(`~/.local/state/shaodesk/pinned`), one desktop id per line, and stay off the desktop. Pinning
+changes nothing about an application's windows: a pinned application shows its launcher while it
+has no window, its first window opens in the launcher's place and any other at the end, as any
+window does, and each window's button moves along the bar on its own, wherever it is dragged among
+the others. With no window left, the launcher shows again in its place; dragging the launcher moves
+the pin. Grouped, a pinned application's button stands for all its windows in the launcher's
+place, and dragging it moves the pin.
 
 Something dragged from an application (a file, text, a link) brings windows forward as on Windows:
 resting the drag on a window's button for half a second brings that window to the front, restored
@@ -136,7 +140,7 @@ show desktop, and the appearance profiles beside their entry.
 The bar moves with what happens on it, briefly and without holding anything up: a button's fill
 fades in under the pointer and out after it, an application's icon shrinks a little while it is
 pressed, a window's button fades and grows in as the window opens and shrinks away as it closes
-while the others slide over, an application just pinned grows into a slot that opens for it, the
+while the others slide over, an application just pinned grows in, the
 line under a button eases to its new length and colour, the workspace pill slides to the workspace
 shown, a count grows in and pops as it goes up, and an icon that follows a state (the network, the
 volume, do-not-disturb, tiling) crossfades as the state changes.

@@ -312,22 +312,6 @@ void ShellController::unpin(const QString &id) {
     sortApps();
     Q_EMIT appsChanged();
 }
-void ShellController::movePin(const QString &id, const QString &target) {
-    const auto from = userPins_.indexOf(id);
-    auto to = userPins_.indexOf(target);
-    // Dropped on a configured launcher: first after them.
-    if (to < 0 &&
-        std::any_of(
-            apps_.begin(), apps_.end(),
-            [&target](const App &app) { return app.id == target && !app.command.empty(); }))
-        to = 0;
-    if (from < 0 || to < 0 || from == to)
-        return;
-    userPins_.move(from, to);
-    savePins();
-    sortApps();
-    Q_EMIT appsChanged();
-}
 void ShellController::orderPins(const QStringList &order) {
     QStringList pins;
     for (const auto &id : order)

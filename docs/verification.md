@@ -557,8 +557,8 @@ in the gallery in both themes, both renderers and at a scale of 1.25 (every popu
 `launcher-empty` added for the start menu's search finding nothing). Motion does not show in
 stills, so `shell_ui` slows the animations to a quarter and checks them on their way: a window's
 button fading and growing in and shrinking out without taking clicks, a newly pinned application
-growing into its slot and a window in a pinned slot drawing only its line out, the tiling
-button's icon crossfading, and the workspace pill settling under the workspace shown. It also
+growing in and a pinned application's window opening on its launcher drawing only its line out,
+the tiling button's icon crossfading, and the workspace pill settling under the workspace shown. It also
 checks the safe triangle (heading for an open submenu across another entry keeps it, resting on
 that entry hands over), the keyboard reaching the best match's buttons, the calendar giving its
 time and date to the notifications on a short output with the list's edge fading, and the
