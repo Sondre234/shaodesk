@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "task_filter.hpp"
+#include "taskbar_model.hpp"
 #include <QAbstractListModel>
 #include <QElapsedTimer>
 #include <QSignalSpy>
@@ -7,6 +8,7 @@
 #include <algorithm>
 #include <functional>
 #include <iostream>
+#include <memory>
 #include <vector>
 
 namespace {
@@ -192,5 +194,131 @@ class TaskFilterTest : public QObject {
         QVERIFY(!app3.urgent());
     }
 };
-QTEST_GUILESS_MAIN(TaskFilterTest)
+// The taskbar's one row: pinned applications and windows, as TaskbarOrder keeps them.
+class TaskbarOrderTest : public QObject {
+    Q_OBJECT
+    std::unique_ptr<FakeTasks> source;
+    TaskbarOrder *order = nullptr;
+    // A window's app id is the id of the application it belongs to, pinned when it is here.
+    QStringList pins;
+    QList<QStringList> reordered;
+    using Entry = TaskbarOrder::Entry;
+
+    // The shown entries, as "a" for a pinned application's and "3" for window 3's.
+    QStringList shown(bool grouped = false) {
+        QStringList list;
+        for (const auto &entry : order->shown(grouped))
+            list.push_back(entry.pin.isEmpty() ? QString::number(entry.taskId) : entry.pin);
+        return list;
+    }
+    // Lets the windows just added take their places.
+    void settle() { QCoreApplication::processEvents(); }
+
+  private Q_SLOTS:
+    void init() {
+        source = std::make_unique<FakeTasks>();
+        pins = {"a", "b"};
+        reordered.clear();
+        order = TaskbarOrder::of(source.get());
+        order->setPins({[this] { return pins; },
+                        [this](const QString &appId) { return pins.contains(appId) ? appId : QString(); },
+                        [this](const QStringList &order) { reordered.push_back(order); }});
+    }
+    // A pinned application's first window opens in its launcher's place, any other at the end,
+    // and grouped, a pinned application's button stands for its windows wherever they are.
+    void windowsOpenWhereTheyBelong() {
+        QCOMPARE(shown(), (QStringList{"a", "b"}));
+        source->add("a", "a one");
+        source->add("a", "a two");
+        source->add("c", "c one");
+        QCOMPARE(shown(), (QStringList{"a", "b"}));
+        settle();
+        QCOMPARE(shown(), (QStringList{"1", "b", "2", "3"}));
+        QCOMPARE(shown(true), (QStringList{"a", "b", "3"}));
+        QCOMPARE(order->windowOf({"a"}), 1);
+        QCOMPARE(order->windowOf({"b"}), -1);
+    }
+    // The windows open as the taskbar starts go where the pins say.
+    void windowsOpenAlreadyFollowThePins() {
+        auto tasks = std::make_unique<FakeTasks>();
+        tasks->add("c", "c one");
+        tasks->add("b", "b one");
+        tasks->add("a", "a one");
+        auto *started = TaskbarOrder::of(tasks.get());
+        started->setPins({[this] { return pins; },
+                          [this](const QString &appId) { return pins.contains(appId) ? appId : QString(); },
+                          [](const QStringList &) {}});
+        QStringList list;
+        for (const auto &entry : started->shown(false))
+            list.push_back(entry.pin.isEmpty() ? QString::number(entry.taskId) : entry.pin);
+        QCOMPARE(list, (QStringList{"3", "2", "1"}));
+    }
+    // A window gets its app id after it opens, before the event loop turns.
+    void aWindowIsPlacedOnceItsAppIdIsIn() {
+        source->add("c", "c one");
+        source->add("", "a one");
+        source->rows[1].appId = "a";
+        source->changed(1, {FakeTasks::AppId});
+        settle();
+        QCOMPARE(shown(), (QStringList{"2", "b", "1"}));
+    }
+    // Each window moves on its own, its pinned application's place staying with the button after
+    // it; closing the last one shows the launcher there again.
+    void windowsMoveApart() {
+        source->add("a", "a one");
+        source->add("a", "a two");
+        source->add("c", "c one");
+        settle();
+        order->move(2, 0, false); // the second window ahead of the first
+        QCOMPARE(shown(), (QStringList{"2", "1", "b", "3"}));
+        order->move(1, 3, false); // the first past the others
+        QCOMPARE(shown(), (QStringList{"2", "b", "3", "1"}));
+        QVERIFY(reordered.isEmpty());
+        source->remove(0);
+        QCOMPARE(shown(), (QStringList{"2", "b", "3"}));
+        source->remove(0);
+        QCOMPARE(shown(), (QStringList{"a", "b", "3"}));
+    }
+    // Only a launcher's drag moves its pin, and the pins keep the order it leaves them in.
+    void launchersMovePins() {
+        source->add("c", "c one");
+        settle();
+        order->move(0, 2, false);
+        QCOMPARE(shown(), (QStringList{"b", "1", "a"}));
+        QCOMPARE(reordered, (QList<QStringList>{{"b", "a"}}));
+    }
+    // Grouped, the windows of an application not pinned move together.
+    void groupsMoveTogether() {
+        source->add("c", "c one");
+        source->add("d", "d one");
+        source->add("c", "c two");
+        settle();
+        QCOMPARE(shown(true), (QStringList{"a", "b", "1", "2"}));
+        order->move(2, 3, true);
+        QCOMPARE(shown(true), (QStringList{"a", "b", "2", "1"}));
+        QCOMPARE(shown(), (QStringList{"a", "b", "2", "1", "3"}));
+    }
+    // An application pinned with a window open takes its place where the window is; unpinned, its
+    // windows stay.
+    void pinningAndUnpinning() {
+        source->add("c", "c one");
+        source->add("d", "d one");
+        settle();
+        pins.push_back("d");
+        order->pinsChanged();
+        QCOMPARE(shown(true), (QStringList{"a", "b", "1", "d"}));
+        order->move(3, 0, true);
+        QCOMPARE(shown(true), (QStringList{"d", "a", "b", "1"}));
+        pins = {"a", "b"};
+        order->pinsChanged();
+        QCOMPARE(shown(), (QStringList{"2", "a", "b", "1"}));
+    }
+};
+
+int main(int argc, char **argv) {
+    QCoreApplication app(argc, argv);
+    TaskFilterTest filters;
+    TaskbarOrderTest order;
+    return QTest::qExec(&filters, argc, argv) | QTest::qExec(&order, argc, argv);
+}
 #include "task_filter_test.moc"

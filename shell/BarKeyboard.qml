@@ -4,8 +4,8 @@ import Shaodesk
 
 // The keyboard on the bar, as Windows' Win+T has it: the taskbar_focus action asks the panel on
 // the focused monitor for it (`taskbar OUTPUT`), and the popover takes the keyboard for this item,
-// which walks the bar's buttons with it. The stops are the buttons of windows and of pinned
-// applications on the taskbar, and every icon on the dock; the one with the window that had the
+// which walks the bar's buttons with it. The stops are the buttons of the taskbar's row, and every
+// icon on the dock; the one with the window that had the
 // keyboard is selected first, else the first. Left and Right, Home and End move between them, and
 // the windows of the one selected show at once, as resting the pointer on it shows them, the card
 // gliding along. Up (Down from a bar along the top) goes into the card of pictures or the list,
@@ -37,23 +37,15 @@ Item {
     Accessible.role: window >= 0 ? Accessible.ListItem : Accessible.Button
     Accessible.name: described ? described.Accessible.name : ""
 
-    // The windows of no pinned application, to find the one that had the keyboard among the rows
-    // of the task list.
-    TaskFilter { id: unpinned; controller: shell; sourceModel: keys.panel.taskSource }
+    // Every window, to find the one that had the keyboard.
+    TaskFilter { id: allWindows; sourceModel: keys.panel.taskSource }
 
-    // The stops in the bar's order: items, and for the task list, which makes the buttons outside
-    // its view only as they come into it, the numbers of its rows.
+    // The stops in the bar's order: the dock's items, or the numbers of the task list's rows, as
+    // it makes the buttons outside its view only as they come into it.
     function stops() {
-        var list = [], i, j
+        var list = [], i
         var taskbar = panel.taskbar, dock = panel.dock
         if (taskbar) {
-            for (i = 0; i < taskbar.pins.count; ++i) {
-                var slot = taskbar.pins.itemAt(i)
-                var children = slot ? slot.children : []
-                for (j = 0; j < children.length; ++j)
-                    if (children[j].visible && typeof children[j].keyMenu === "function")
-                        list.push(children[j])
-            }
             for (i = 0; i < taskbar.tasks.count; ++i)
                 list.push(i)
         } else if (dock) {
@@ -103,29 +95,17 @@ Item {
         return null
     }
     // The focused window as the bar shows it, -1 for none.
-    function focused(list) {
-        if (unpinned.activeTask >= 0)
-            return unpinned.activeTask
-        for (var i = 0; i < list.length; ++i) {
-            var stop = list[i]
-            var windows = typeof stop !== "number" && typeof stop.dragWindows === "function" ? stop.dragWindows() : []
-            for (var j = 0; j < windows.length; ++j)
-                if (windows[j].active)
-                    return windows[j].taskId
-        }
-        return -1
+    function focused() {
+        return allWindows.activeTask
     }
     // The stop with window `id` among its windows, -1 for none.
     function stopOf(list, id) {
-        var tasks = panel.taskbar ? panel.taskbar.tasks : null
-        var rows = tasks ? tasks.model.windows : []
-        var own = unpinned.windows.filter(function(row) { return row.taskId === id })[0]
+        // A row stands for its application's windows when they are grouped.
+        var row = panel.taskbar ? panel.taskbar.tasks.model.rowOf(id) : -1
         for (var i = 0; i < list.length; ++i) {
             var stop = list[i]
             if (typeof stop === "number") {
-                // A row stands for its application's windows when they are grouped.
-                var row = rows[stop]
-                if (row && (row.taskId === id || own && shell.groupWindows && own.appId !== "" && row.appId === own.appId))
+                if (stop === row)
                     return i
             } else if (typeof stop.dragWindows === "function" &&
                        stop.dragWindows().some(function(window) { return window.taskId === id })) {
@@ -143,7 +123,7 @@ Item {
         var list = stops()
         if (list.length === 0)
             return
-        from = focused(list)
+        from = focused()
         panel.closeMenus()
         pointer = null
         active = true

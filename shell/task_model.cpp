@@ -264,20 +264,6 @@ void TaskModel::setPeeked(int taskId) {
     peeked_ = taskId;
     Q_EMIT peekedTaskChanged();
 }
-void TaskModel::move(int from, int to, int count) {
-    int rows = rowCount();
-    if (count < 1 || from < 0 || to < 0 || from + count > rows || to + count > rows || from == to)
-        return;
-    // beginMoveRows wants the row the block lands in front of, counted before the move.
-    if (!beginMoveRows({}, from, from + count - 1, {}, to > from ? to + count : to))
-        return;
-    auto first = tasks_.begin() + from, last = first + count;
-    if (to > from)
-        std::rotate(first, last, last + (to - from));
-    else
-        std::rotate(tasks_.begin() + to, first, last);
-    endMoveRows();
-}
 void TaskModel::setUrgent(const QList<QPair<QString, QString>> &windows) {
     if (windows == urgent_)
         return;

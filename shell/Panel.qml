@@ -526,7 +526,7 @@ Item {
             if (shown !== undefined)
                 return shown
         }
-        var taskList = taskbar ? taskbar.tasks : null, pinnedSlots = taskbar ? taskbar.pins : null
+        var taskList = taskbar ? taskbar.tasks : null
         var tray = statusArea.trayRow, clockButton = statusArea.clock, audioWidget = statusArea.volume
         var quickButton = statusArea.quickSettings
         var profilesButton = statusArea.profiles, wallpapersButton = statusArea.wallpapers
@@ -559,19 +559,26 @@ Item {
             previewSubmenu.start()
             return shell.profiles.length > 0
         case "task-menu":
-            var task = taskList.itemAtIndex(0)
-            if (task)
-                openContextMenu(task, 0, task.taskId, task.appId)
-            return task !== null
+            // The first window's button.
+            for (i = 0; i < taskList.count; ++i) {
+                var task = taskList.itemAtIndex(i)
+                if (task && !task.launcher) {
+                    openContextMenu(task, 0, task.taskId, task.appId)
+                    return true
+                }
+            }
+            return false
         case "pin-menu":
-            // An installed application's slot when there is one, whose menu has more to show.
-            var slot = pinnedSlots.itemAt(0)
-            for (i = pinnedSlots.count - 1; i >= 0; --i)
-                if (!pinnedSlots.itemAt(i).modelData.configured)
-                    slot = pinnedSlots.itemAt(i)
-            if (slot)
-                openContextMenu(slot, 0, -1, slot.modelData)
-            return slot !== null
+            // An installed application's launcher when there is one, whose menu has more to show.
+            var launcher = null
+            for (i = 0; i < taskList.count; ++i) {
+                var button = taskList.itemAtIndex(i)
+                if (button && button.launcher && (!launcher || launcher.app.configured && !button.app.configured))
+                    launcher = button
+            }
+            if (launcher)
+                openContextMenu(launcher, 0, -1, launcher.app)
+            return launcher !== null
         case "stack-menu":
             // A stacked button's menu, with the workspaces to move its windows to beside it.
             for (i = 0; i < taskList.count; ++i) {
@@ -586,18 +593,15 @@ Item {
             return false
         case "group":
         case "thumbnails":
-            // A stacked button, in the task list or in a pinned slot: its list, or with
-            // shell.thumbnails the pictures of its windows (the gallery's group turns them off).
-            var buttons = []
-            for (i = 0; i < taskList.count; ++i)
-                buttons.push(taskList.itemAtIndex(i))
-            for (i = 0; i < pinnedSlots.count; ++i)
-                buttons = buttons.concat(pinnedSlots.itemAt(i).children)
-            for (i = 0; i < buttons.length; ++i)
-                if (buttons[i] && buttons[i].stacked) {
-                    openGroup(buttons[i])
+            // A stacked button: its list, or with shell.thumbnails the pictures of its windows (the
+            // gallery's group turns them off).
+            for (i = 0; i < taskList.count; ++i) {
+                var stacked = taskList.itemAtIndex(i)
+                if (stacked && stacked.stacked) {
+                    openGroup(stacked)
                     return name === "group" || thumbnailsOpen
                 }
+            }
             return false
         case "keyboard":
             return previewKeyboard()
