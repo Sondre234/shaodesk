@@ -328,6 +328,21 @@ void ShellController::movePin(const QString &id, const QString &target) {
     sortApps();
     Q_EMIT appsChanged();
 }
+void ShellController::orderPins(const QStringList &order) {
+    QStringList pins;
+    for (const auto &id : order)
+        if (userPins_.contains(id) && !pins.contains(id))
+            pins.push_back(id);
+    for (const auto &id : userPins_)
+        if (!pins.contains(id))
+            pins.push_back(id);
+    if (pins == userPins_)
+        return;
+    userPins_ = pins;
+    savePins();
+    sortApps();
+    Q_EMIT appsChanged();
+}
 bool ShellController::isPinned(const QString &id) const {
     return std::any_of(apps_.begin(), apps_.end(),
                        [&id](const App &app) { return app.id == id && app.pinned; });

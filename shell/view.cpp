@@ -2,6 +2,7 @@
 #include "view.hpp"
 #include "audio.hpp"
 #include "task_filter.hpp"
+#include "taskbar_model.hpp"
 #include <QGuiApplication>
 #include <QQuickItem>
 #include <QSGRendererInterface>
@@ -20,6 +21,7 @@ ShellView::ShellView(ShellController &controller, QScreen *screen, bool desktop,
     setResizeMode(QQuickView::SizeRootObjectToView);
     setFlags(Qt::FramelessWindowHint);
     static const int registered = qmlRegisterType<TaskFilter>("Shaodesk", 1, 0, "TaskFilter") +
+                                  qmlRegisterType<TaskbarModel>("Shaodesk", 1, 0, "TaskbarModel") +
                                   qmlRegisterType<WindowSound>("Shaodesk", 1, 0, "WindowSound") +
                                   qmlRegisterType<PopoverWindow>("Shaodesk", 1, 0, "PopoverWindow") +
                                   qmlRegisterType<MenuBarWindow>("Shaodesk", 1, 0, "MenuBarWindow");

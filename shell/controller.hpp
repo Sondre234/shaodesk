@@ -358,6 +358,9 @@ class ShellController : public QObject {
     // Moves a pinned application to the taskbar slot of another; configured launchers keep
     // their places ahead of them.
     Q_INVOKABLE void movePin(const QString &id, const QString &target);
+    // Puts the applications pinned from the shell in the order they have in `order`, as the
+    // taskbar has them; configured launchers keep their places ahead of them.
+    void orderPins(const QStringList &order);
     // The installed application a window's app id belongs to, or empty when none matches.
     Q_INVOKABLE QString appFor(const QString &windowAppId) const;
     Q_INVOKABLE bool isPinned(const QString &id) const;
