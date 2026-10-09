@@ -38,15 +38,16 @@ TaskbarOrder::TaskbarOrder(QAbstractItemModel *source) : QObject(source), source
                 if (roles.isEmpty() || roles.contains(roleId("appId")))
                     Q_EMIT changed();
             });
-    // The windows open already have their app ids.
+    // The windows open already wait for the pins, which say where they go.
     indexRows();
-    placeNew();
+    placeLater();
 }
 void TaskbarOrder::setPins(Pins pins) {
     if (hasPins())
         return;
     pins_ = std::move(pins);
     syncPins();
+    placeNew();
     Q_EMIT changed();
 }
 void TaskbarOrder::pinsChanged() {

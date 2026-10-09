@@ -238,6 +238,21 @@ class TaskbarOrderTest : public QObject {
         QCOMPARE(order->windowOf({"a"}), 1);
         QCOMPARE(order->windowOf({"b"}), -1);
     }
+    // The windows open as the taskbar starts go where the pins say.
+    void windowsOpenAlreadyFollowThePins() {
+        auto tasks = std::make_unique<FakeTasks>();
+        tasks->add("c", "c one");
+        tasks->add("b", "b one");
+        tasks->add("a", "a one");
+        auto *started = TaskbarOrder::of(tasks.get());
+        started->setPins({[this] { return pins; },
+                          [this](const QString &appId) { return pins.contains(appId) ? appId : QString(); },
+                          [](const QStringList &) {}});
+        QStringList list;
+        for (const auto &entry : started->shown(false))
+            list.push_back(entry.pin.isEmpty() ? QString::number(entry.taskId) : entry.pin);
+        QCOMPARE(list, (QStringList{"3", "2", "1"}));
+    }
     // A window gets its app id after it opens, before the event loop turns.
     void aWindowIsPlacedOnceItsAppIdIsIn() {
         source->add("c", "c one");
